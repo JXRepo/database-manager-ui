@@ -80,3 +80,23 @@ class SignInForm(AuthenticationForm):
             }
         )
     )
+
+
+class JSONUploadForm(forms.Form):
+    """
+    Upload a JSON file
+
+    Attributes
+    ----------
+    file : UploadedFile
+        JSON file to upload
+    """
+
+    file = forms.FileField(
+        widget=forms.ClearableFileInput(
+            attrs={
+                "class": "form-control",
+                "accept": ".json",
+            }
+        )
+    )

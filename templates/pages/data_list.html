@@ -1,0 +1,61 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Data List{% endblock title %}
+
+{% block content %}
+<div class="pc-container">
+  <div class="pc-content">
+    <div class="page-header">
+      <div class="page-block">
+        <div class="row align-items-center">
+          <div class="col-md-12">
+            <div class="page-header-title">
+              <h5 class="m-b-10">Data List</h5>
+            </div>
+            <ul class="breadcrumb">
+              <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+              <li class="breadcrumb-item">Data List</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h5>Uploaded JSON Objects</h5>
+      </div>
+      <div class="card-body">
+        {% if data_objects %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Access Type</th>
+                  <th>Uploaded At</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for obj in data_objects %}
+                  <tr>
+                    <td>{{ obj.id }}</td>
+                    <td>{{ obj.access_type }}</td>
+                    <td>{{ obj.uploaded_at }}</td>
+                    <td>
+                      <pre style="white-space: pre-wrap; margin-bottom: 0;">{{ obj.data }}</pre>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p>No uploaded data found</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}
