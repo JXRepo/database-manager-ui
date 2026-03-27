@@ -4,6 +4,7 @@ Copyright (c) 2019 - present AppSeed.us
 """
 
 import datetime, sys, inspect, importlib
+import json
 
 from functools import wraps
 
@@ -61,3 +62,50 @@ def check_permission(function):
             return HttpResponse( 'Error: ' + str( e ) )
 
     return wrap
+
+
+def validate_json(data):
+    """
+    Validate JSON data based on shared_with.access_type
+
+    Parameters
+    ----------
+    data : list of dict
+        Parsed JSON data
+
+    Returns
+    -------
+    valid_data : list of dict
+        Valid objects
+
+    errors : list of str
+        Error messages
+    """
+    valid_data = []
+    errors = []
+
+    for i, obj in enumerate(data):
+        if not isinstance(obj, dict):
+            errors.append(f"Object {i}: not a valid JSON object")
+            continue
+
+        shared_with = obj.get("shared_with")
+
+        if not shared_with or not isinstance(shared_with, list):
+            errors.append(f"Object {i}: missing or invalid 'shared_with'")
+            continue
+
+        has_valid_access = False
+
+        for item in shared_with:
+            if isinstance(item, dict) and item.get("access_type") in {"c", "all"}:
+                has_valid_access = True
+                break
+
+        if not has_valid_access:
+            errors.append(f"Object {i}: no valid access_type in shared_with")
+            continue
+
+        valid_data.append(obj)
+
+    return valid_data, errors

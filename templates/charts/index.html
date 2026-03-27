@@ -4,85 +4,202 @@
 {% block title %}Charts{% endblock title %}
 
 {% block content %}
-    <!-- [ Main Content ] start -->
-    <div class="pc-container">
-      <div class="pc-content">
-        <!-- [ breadcrumb ] start -->
-        <div class="page-header">
-          <div class="page-block">
-            <div class="row align-items-center">
-              <div class="col-md-12">
-                <div class="page-header-title">
-                  <h5 class="mb-0">Charts</h5>
-                </div>
-              </div>
-              <div class="col-md-12">
-                <ul class="breadcrumb mb-0">
-                  <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
-                  <li class="breadcrumb-item" aria-current="page">Charts</li>
-                </ul>
-              </div>
+<div class="pc-container">
+  <div class="pc-content">
+    <div class="page-header">
+      <div class="page-block">
+        <div class="row align-items-center">
+          <div class="col-md-12">
+            <div class="page-header-title">
+              <h5 class="mb-0">Charts</h5>
             </div>
+          </div>
+          <div class="col-md-12">
+            <ul class="breadcrumb mb-0">
+              <li class="breadcrumb-item"><a href="{% url 'search' %}">Home</a></li>
+              <li class="breadcrumb-item" aria-current="page">Charts</li>
+            </ul>
           </div>
         </div>
-        <!-- [ breadcrumb ] end -->
-
-        <!-- [ Main Content ] start -->
-        <div class="row">
-          <!-- [ Bar Chart ] start -->
-          <div class="col-sm-12 col-md-6">
-            <div class="card">
-              <div class="card-header">
-                <h5>Bar Chart</h5>
-              </div>
-              <div class="card-body text-center">
-                <div id="bar-chart"></div>
-              </div>
-            </div>
-          </div>
-          <!-- [ Bar Chart ] end -->
-
-          <!-- [ Pie Chart ] start -->
-          <div class="col-sm-12 col-md-6">
-            <div class="card">
-              <div class="card-header">
-                <h5>Pie Chart</h5>
-              </div>
-              <div class="card-body text-center">
-                <div id="pie-chart"></div>
-              </div>
-            </div>
-          </div>
-          <!-- [ Pie Chart ] end -->
-        </div>
-        <!-- [ Main Content ] end -->
       </div>
     </div>
+
+    <div class="row mb-3">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <h6 class="mb-0">Total records: {{ total_objects }}</h6>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-sm-12 col-xl-6">
+        <div class="card">
+          <div class="card-header">
+            <h5>Access Distribution</h5>
+          </div>
+          <div class="card-body">
+            <div id="access-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-sm-12 col-xl-6">
+        <div class="card">
+          <div class="card-header">
+            <h5>Upload Trend (Last 30 Days)</h5>
+          </div>
+          <div class="card-body">
+            <div id="upload-trend-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-sm-12 col-xl-6">
+        <div class="card">
+          <div class="card-header">
+            <h5>Software Distribution</h5>
+          </div>
+          <div class="card-body">
+            <div id="software-chart"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-sm-12 col-xl-6">
+        <div class="card">
+          <div class="card-header">
+            <h5>Top Keywords</h5>
+          </div>
+          <div class="card-body">
+            <div id="keywords-chart"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock content %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
-  document.addEventListener("DOMContentLoaded", function() {
-    var products = JSON.parse('{{ products|escapejs }}');
-    var names = products.map(p => p.fields.name);
-    var prices = products.map(p => p.fields.price);
+  document.addEventListener("DOMContentLoaded", function () {
+    const accessLabels = JSON.parse('{{ access_labels_json|escapejs }}');
+    const accessSeries = JSON.parse('{{ access_series_json|escapejs }}');
 
-    var barOptions = {
-      chart: { type: 'bar', height: 350 },
-      series: [{ name: 'Price', data: prices }],
-      xaxis: { categories: names }
-    };
-    var barChart = new ApexCharts(document.querySelector("#bar-chart"), barOptions);
-    barChart.render();
+    const uploadLabels = JSON.parse('{{ upload_labels_json|escapejs }}');
+    const uploadSeries = JSON.parse('{{ upload_series_json|escapejs }}');
 
-    var pieOptions = {
-      chart: { type: 'pie', height: 350 },
-      series: prices,
-      labels: names
+    const softwareLabels = JSON.parse('{{ software_labels_json|escapejs }}');
+    const softwareSeries = JSON.parse('{{ software_series_json|escapejs }}');
+
+    const keywordLabels = JSON.parse('{{ keyword_labels_json|escapejs }}');
+    const keywordSeries = JSON.parse('{{ keyword_series_json|escapejs }}');
+
+    const accessOptions = {
+      chart: {
+        type: "donut",
+        height: 350
+      },
+      series: accessSeries,
+      labels: accessLabels,
+      legend: {
+        position: "bottom"
+      },
+      noData: {
+        text: "No data"
+      }
     };
-    var pieChart = new ApexCharts(document.querySelector("#pie-chart"), pieOptions);
-    pieChart.render();
+
+    const uploadTrendOptions = {
+      chart: {
+        type: "line",
+        height: 350,
+        toolbar: {
+          show: false
+        }
+      },
+      series: [
+        {
+          name: "Uploads",
+          data: uploadSeries
+        }
+      ],
+      xaxis: {
+        categories: uploadLabels,
+        labels: {
+          rotate: -45,
+          hideOverlappingLabels: true
+        }
+      },
+      stroke: {
+        curve: "smooth"
+      },
+      noData: {
+        text: "No data"
+      }
+    };
+
+    const softwareOptions = {
+      chart: {
+        type: "bar",
+        height: 350,
+        toolbar: {
+          show: false
+        }
+      },
+      series: [
+        {
+          name: "Count",
+          data: softwareSeries
+        }
+      ],
+      xaxis: {
+        categories: softwareLabels,
+        labels: {
+          rotate: -25,
+          hideOverlappingLabels: true
+        }
+      },
+      noData: {
+        text: "No data"
+      }
+    };
+
+    const keywordsOptions = {
+      chart: {
+        type: "bar",
+        height: 350,
+        toolbar: {
+          show: false
+        }
+      },
+      plotOptions: {
+        bar: {
+          horizontal: true
+        }
+      },
+      series: [
+        {
+          name: "Count",
+          data: keywordSeries
+        }
+      ],
+      xaxis: {
+        categories: keywordLabels
+      },
+      noData: {
+        text: "No data"
+      }
+    };
+
+    new ApexCharts(document.querySelector("#access-chart"), accessOptions).render();
+    new ApexCharts(document.querySelector("#upload-trend-chart"), uploadTrendOptions).render();
+    new ApexCharts(document.querySelector("#software-chart"), softwareOptions).render();
+    new ApexCharts(document.querySelector("#keywords-chart"), keywordsOptions).render();
   });
 </script>
 {% endblock extra_js %}

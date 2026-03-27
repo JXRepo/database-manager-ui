@@ -1,0 +1,587 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Data Detail{% endblock title %}
+
+{% block content %}
+{{ plot_variables|json_script:"plot-variables-data" }}
+<style>
+.detail-page-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
+}
+
+.detail-row-card {
+  background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 20px 22px;
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.05);
+  margin-bottom: 18px;
+  transition: all 0.2s ease;
+}
+
+.detail-row-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
+  border-color: #dbeafe;
+}
+
+.detail-label {
+  font-size: 1.08rem;
+  color: #2563eb;
+  margin-bottom: 10px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.detail-value {
+  color: #1f2937;
+  word-break: break-word;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+.detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.detail-list-item {
+  color: #1f2937;
+  word-break: break-word;
+  line-height: 1.7;
+  font-size: 1rem;
+}
+
+  .detail-empty {
+    color: #9ca3af;
+    font-style: italic;
+  }
+
+  .array-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #374151;
+    font-size: 0.95rem;
+  }
+
+  .array-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #4b5563;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .array-toggle {
+    margin-top: 10px;
+  }
+
+  .array-box {
+    background: #f6f8fa;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 0.9rem;
+    margin-top: 12px;
+    margin-bottom: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 320px;
+    overflow: auto;
+  }
+
+  .detail-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 18px;
+  }
+
+        .plot-panel {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: 0 4px 14px rgba(16, 24, 40, 0.05);
+      margin-bottom: 18px;
+    }
+
+    .plot-panel-title {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 14px;
+    }
+
+    .plot-controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .plot-field label {
+      display: block;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 6px;
+    }
+
+    .plot-empty {
+      color: #6b7280;
+      line-height: 1.6;
+    }
+
+    .plot-canvas-wrap {
+      background: #fbfdff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .plot-status {
+      margin-top: 10px;
+      color: #6b7280;
+      font-size: 0.92rem;
+    }
+
+
+
+
+    .raw-values-panel {
+  margin-top: 18px;
+}
+
+.raw-values-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.raw-values-box {
+  background: #fbfdff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.raw-values-box summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  list-style: none;
+}
+
+.raw-values-box summary::-webkit-details-marker {
+  display: none;
+}
+
+.raw-values-box summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  transition: transform 0.2s ease;
+}
+
+.raw-values-box[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.raw-values-meta {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.raw-values-pre {
+  margin-top: 12px;
+  margin-bottom: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f6f8fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  color: #1f2937;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+    .plot-button-field {
+      display: flex;
+      align-items: end;
+    }
+
+    .plot-button-field .btn {
+      width: auto;
+      min-width: 140px;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+
+    .detail-inline-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.detail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1f2937;
+  font-size: 1rem;
+  line-height: 1.4;
+  border: 1px solid #dbeafe;
+}
+
+
+
+</style>
+
+<div class="pc-container">
+  <div class="pc-content">
+    <div class="page-header">
+      <div class="page-block">
+        <div class="row align-items-center">
+          <div class="col-md-12">
+            <div class="page-header-title">
+              <h5 class="m-b-10">Data Detail</h5>
+            </div>
+            <ul class="breadcrumb">
+              <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+              <li class="breadcrumb-item"><a href="{% url 'json_data_list' %}">Data List</a></li>
+              <li class="breadcrumb-item">Detail</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card detail-page-card">
+      <div class="card-header">
+        <h5>{{ data_object.data.title|default:data_object.data.identifier|default:"Object Detail" }}</h5>
+      </div>
+
+      <div class="card-body">
+        {% for row in detail_rows %}
+          <div class="detail-row-card">
+            <div class="detail-label">{{ row.label }}</div>
+
+            {% if row.type == "string" %}
+              <div class="detail-value">{{ row.value }}</div>
+
+                {% elif row.type == "string_list" %}
+                  {% if row.value|length == 1 %}
+                    <div class="detail-value">{{ row.value.0 }}</div>
+                  {% else %}
+                    <div class="detail-inline-list">
+                      {% for item in row.value %}
+                        <span class="detail-chip">{{ item }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+
+            {% elif row.type == "numeric_array" %}
+              <div class="array-summary">
+                <span>Numeric array</span>
+                <span class="array-badge">{{ row.count }} values</span>
+              </div>
+
+              <div class="array-toggle">
+                <button
+                  class="btn btn-outline-secondary btn-sm"
+                  type="button"
+                  data-bs-toggle="collapse"
+                  data-bs-target="#array-{{ forloop.counter }}"
+                  aria-expanded="false"
+                  aria-controls="array-{{ forloop.counter }}"
+                >
+                  Show values
+                </button>
+
+                <div class="collapse" id="array-{{ forloop.counter }}">
+                  <pre class="array-box">{{ row.json_value }}</pre>
+                </div>
+              </div>
+            {% else %}
+              <div class="detail-empty">Unsupported field</div>
+            {% endif %}
+          </div>
+        {% empty %}
+          <div class="detail-empty">No displayable detail fields found</div>
+        {% endfor %}
+
+
+          <div class="plot-panel">
+      <div class="plot-panel-title">Mechanical Variable Plot Viewer</div>
+
+      {% if plot_variables %}
+        <div class="plot-controls">
+          <div class="plot-field">
+            <label for="plot-x-select">X variable</label>
+            <select id="plot-x-select" class="form-select"></select>
+          </div>
+
+          <div class="plot-field">
+            <label for="plot-y-select">Y variable</label>
+            <select id="plot-y-select" class="form-select"></select>
+          </div>
+
+
+            <div class="plot-field plot-button-field">
+              <button id="download-plot-btn" type="button" class="btn btn-primary">
+                Download
+              </button>
+            </div>
+
+
+        </div>
+
+        <div class="plot-canvas-wrap">
+          <canvas id="mechanical-plot" height="120"></canvas>
+          <div id="plot-status" class="plot-status"></div>
+        </div>
+
+
+              <div class="raw-values-panel">
+                  <div class="raw-values-grid">
+                    <details id="x-raw-box" class="raw-values-box">
+                      <summary id="x-raw-summary">Show X raw values</summary>
+                      <div id="x-raw-meta" class="raw-values-meta"></div>
+                      <pre id="x-raw-pre" class="raw-values-pre"></pre>
+                    </details>
+
+                    <details id="y-raw-box" class="raw-values-box">
+                      <summary id="y-raw-summary">Show Y raw values</summary>
+                      <div id="y-raw-meta" class="raw-values-meta"></div>
+                      <pre id="y-raw-pre" class="raw-values-pre"></pre>
+                    </details>
+                  </div>
+                </div>
+
+
+      {% else %}
+        <div class="plot-empty">
+          No plot-ready mechanical variables were found in this object
+        </div>
+      {% endif %}
+    </div>
+
+
+
+        <div class="detail-actions">
+          <a href="{% url 'json_data_list' %}" class="btn btn-outline-secondary btn-sm">
+            Back
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+  const plotVariables = JSON.parse(
+    document.getElementById("plot-variables-data").textContent
+  );
+
+  const xSelect = document.getElementById("plot-x-select");
+  const ySelect = document.getElementById("plot-y-select");
+  const downloadPlotButton = document.getElementById("download-plot-btn");
+  const plotStatus = document.getElementById("plot-status");
+  const canvas = document.getElementById("mechanical-plot");
+  const xRawSummary = document.getElementById("x-raw-summary");
+    const yRawSummary = document.getElementById("y-raw-summary");
+    const xRawMeta = document.getElementById("x-raw-meta");
+    const yRawMeta = document.getElementById("y-raw-meta");
+    const xRawPre = document.getElementById("x-raw-pre");
+    const yRawPre = document.getElementById("y-raw-pre");
+
+  let chartInstance = null;
+
+  function findDefaultKey(prefix) {
+    const item = plotVariables.find(variable => variable.short_label.startsWith(prefix));
+    return item ? item.key : (plotVariables[0] ? plotVariables[0].key : "");
+  }
+
+  function populatePlotSelect(selectElement, defaultKey) {
+    if (!selectElement) {
+      return;
+    }
+
+    plotVariables.forEach(variable => {
+      const option = document.createElement("option");
+      option.value = variable.key;
+      option.textContent = variable.label;
+      selectElement.appendChild(option);
+    });
+
+    if (defaultKey) {
+      selectElement.value = defaultKey;
+    }
+  }
+
+  function getVariableByKey(key) {
+    return plotVariables.find(variable => variable.key === key) || null;
+  }
+
+
+  function sanitizeFileName(text) {
+  return text.replace(/[^a-zA-Z0-9_-]+/g, "_");
+}
+
+function downloadCurrentPlot() {
+  if (!chartInstance) {
+    return;
+  }
+
+  const xVariable = getVariableByKey(xSelect.value);
+  const yVariable = getVariableByKey(ySelect.value);
+
+  if (!xVariable || !yVariable) {
+    return;
+  }
+
+  const link = document.createElement("a");
+  const fileName =
+    `${sanitizeFileName(yVariable.short_label)}_vs_${sanitizeFileName(xVariable.short_label)}.png`;
+
+  link.href = chartInstance.toBase64Image("image/png", 1);
+  link.download = fileName;
+  link.click();
+}
+
+
+
+  function renderPlot() {
+    const xVariable = getVariableByKey(xSelect.value);
+    const yVariable = getVariableByKey(ySelect.value);
+
+    if (!xVariable || !yVariable) {
+      plotStatus.textContent = "Please select both X and Y variables";
+      return;
+    }
+
+
+    function formatRawValues(values) {
+  return values.map((value, index) => `${index}: ${value}`).join("\n");
+}
+
+function updateRawValues(xVariable, yVariable) {
+  if (!xVariable || !yVariable) {
+    return;
+  }
+
+  xRawSummary.textContent = `Show X raw values (${xVariable.short_label})`;
+  yRawSummary.textContent = `Show Y raw values (${yVariable.short_label})`;
+
+  xRawMeta.textContent = `${xVariable.values.length} values`;
+  yRawMeta.textContent = `${yVariable.values.length} values`;
+
+  xRawPre.textContent = formatRawValues(xVariable.values);
+  yRawPre.textContent = formatRawValues(yVariable.values);
+}
+
+
+    const pointCount = Math.min(xVariable.values.length, yVariable.values.length);
+
+    if (pointCount === 0) {
+      plotStatus.textContent = "Selected variables do not contain plot data";
+      return;
+    }
+
+    const points = [];
+    for (let i = 0; i < pointCount; i += 1) {
+      points.push({
+        x: xVariable.values[i],
+        y: yVariable.values[i],
+      });
+    }
+
+    if (chartInstance) {
+      chartInstance.destroy();
+    }
+
+    chartInstance = new Chart(canvas, {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            label: `${yVariable.short_label} vs ${xVariable.short_label}`,
+            data: points,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        parsing: false,
+        scales: {
+          x: {
+            type: "linear",
+            title: {
+              display: true,
+              text: xVariable.short_label,
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: yVariable.short_label,
+            }
+          }
+        }
+      }
+    });
+
+updateRawValues(xVariable, yVariable);
+
+if (xVariable.values.length !== yVariable.values.length) {
+  plotStatus.textContent =
+    `Showing ${yVariable.short_label} vs ${xVariable.short_label} (${pointCount} shared points). Raw arrays have different lengths.`;
+} else {
+  plotStatus.textContent =
+    `Showing ${yVariable.short_label} vs ${xVariable.short_label} (${pointCount} points)`;
+}
+  }
+
+
+    if (plotVariables.length > 0 && xSelect && ySelect && canvas) {
+      populatePlotSelect(xSelect, findDefaultKey("strain_"));
+      populatePlotSelect(ySelect, findDefaultKey("stress_"));
+
+      xSelect.addEventListener("change", renderPlot);
+      ySelect.addEventListener("change", renderPlot);
+
+      if (downloadPlotButton) {
+        downloadPlotButton.addEventListener("click", downloadCurrentPlot);
+      }
+
+      if (xSelect.value && ySelect.value) {
+        renderPlot();
+      }
+    }
+
+
+
+
+</script>
+{% endblock content %}

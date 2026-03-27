@@ -3,6 +3,233 @@
 {% block title %}Data List{% endblock title %}
 
 {% block content %}
+<style>
+
+    .tag-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      background: #e0f2fe;
+      color: #0369a1;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .tag:hover {
+      background: #bae6fd;
+      color: #075985;
+    }
+
+    .badge-icon {
+      width: 13px;
+      height: 13px;
+      margin-right: 5px;
+      vertical-align: -1px;
+    }
+
+    .badge-public {
+      background: #dcfce7;
+      color: #166534;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .badge-public:hover {
+      background: #bbf7d0;
+    }
+
+    .badge-private {
+      background: #e2e8f0;
+      color: #334155;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+
+    .badge-private:hover {
+      background: #cbd5f5;
+    }
+
+  .soft-accordion .accordion-item {
+    border: 1px solid #e9ecef !important;
+    border-radius: 18px !important;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.04);
+    transition:
+      transform 0.28s ease,
+      box-shadow 0.28s ease,
+      border-color 0.28s ease;
+  }
+
+  .soft-accordion .accordion-item + .accordion-item {
+    margin-top: 16px;
+  }
+
+  .soft-accordion .accordion-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 26px rgba(16, 24, 40, 0.07);
+  }
+
+  .soft-accordion .accordion-item.open-soft {
+    border-color: #dbeafe !important;
+    box-shadow: 0 14px 32px rgba(59, 130, 246, 0.10);
+  }
+
+  .soft-accordion .accordion-button {
+    background: #ffffff !important;
+    color: #495057 !important;
+    font-weight: 500;
+    padding: 1.15rem 1.35rem;
+    border: none !important;
+    box-shadow: none !important;
+    transition:
+      background 0.28s ease,
+      color 0.28s ease,
+      padding 0.28s ease;
+  }
+
+  .soft-accordion .accordion-button.collapsed {
+    border-radius: 18px !important;
+  }
+
+  .soft-accordion .accordion-button:not(.collapsed) {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%) !important;
+    color: #25364d !important;
+  }
+
+  .soft-accordion .accordion-button:focus {
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .soft-accordion .accordion-button::after {
+    transition: transform 0.28s ease, opacity 0.28s ease;
+    opacity: 0.75;
+  }
+
+  .soft-accordion .accordion-collapse {
+    transition: all 0.32s ease;
+  }
+
+  .soft-accordion .accordion-body {
+    background: #fcfcfd;
+    padding: 1.2rem 1.35rem 1.3rem 1.35rem;
+    border-top: 1px solid #f1f3f5;
+    animation: jellyFadeIn 0.30s ease;
+  }
+
+.summary-grid {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.summary-value {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.summary-value .main {
+  color: #1f2937;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.summary-value .time {
+  color: #9ca3af;
+  font-weight: 400;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1200px) {
+  .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+    .detail-card {
+      background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+      border: 1px solid #dbeafe;
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: 0 2px 6px rgba(59, 130, 246, 0.08);
+    }
+
+    .detail-label {
+      font-size: 0.86rem;
+      color: #3b82f6;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+  .detail-value {
+    color: #374151;
+    word-break: break-word;
+  }
+
+    .detail-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+
+  .detail-actions .btn {
+    border-radius: 10px;
+    padding: 0.42rem 0.9rem;
+    font-weight: 500;
+  }
+
+
+
+  @keyframes jellyFadeIn {
+    0% {
+      opacity: 0;
+      transform: scaleY(0.96) translateY(-5px);
+      transform-origin: top;
+    }
+    60% {
+      opacity: 1;
+      transform: scaleY(1.01) translateY(0);
+      transform-origin: top;
+    }
+    100% {
+      opacity: 1;
+      transform: scaleY(1);
+      transform-origin: top;
+    }
+  }
+</style>
+
 <div class="pc-container">
   <div class="pc-content">
     <div class="page-header">
@@ -27,29 +254,89 @@
       </div>
       <div class="card-body">
         {% if data_objects %}
-          <div class="table-responsive">
-            <table class="table table-hover">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Access Type</th>
-                  <th>Uploaded At</th>
-                  <th>Data</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for obj in data_objects %}
-                  <tr>
-                    <td>{{ obj.id }}</td>
-                    <td>{{ obj.access_type }}</td>
-                    <td>{{ obj.uploaded_at }}</td>
-                    <td>
-                      <pre style="white-space: pre-wrap; margin-bottom: 0;">{{ obj.data }}</pre>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+          <div class="accordion soft-accordion" id="dataObjectAccordion">
+            {% for obj in data_objects %}
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ obj.id }}">
+                  <button
+                    class="accordion-button collapsed"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapse{{ obj.id }}"
+                    aria-expanded="false"
+                    aria-controls="collapse{{ obj.id }}"
+                  >
+
+                    <div class="summary-grid">
+                        <span class="summary-value">
+                          <span class="main">
+                            {{ obj.data.title|default:obj.data.identifier|default:"Object" }}
+                          </span>
+                          &nbsp;|&nbsp;
+                          <span class="time">
+                            {{ obj.owner.username }} | {{ obj.uploaded_at|date:"Y-m-d H:i" }}
+                          </span>
+                        </span>
+                    </div>
+
+                  </button>
+                </h2>
+
+                <div
+                  id="collapse{{ obj.id }}"
+                  class="accordion-collapse collapse"
+                  aria-labelledby="heading{{ obj.id }}"
+                  data-bs-parent="#dataObjectAccordion"
+                >
+                  <div class="accordion-body">
+                    <div class="detail-grid">
+                      {% for field in obj.summary_fields %}
+                        <div class="detail-card">
+                          <div class="detail-label">{{ field.label }}</div>
+
+                            <div class="detail-value">
+                              {% if field.type == "access" %}
+
+                                {% if field.value == "Public" %}
+                                  <span class="badge badge-public">
+                                    <i data-feather="unlock" class="badge-icon"></i>
+                                    {{ field.value }}
+                                  </span>
+                                {% else %}
+                                  <span class="badge badge-private">
+                                    <i data-feather="lock" class="badge-icon"></i>
+                                    {{ field.value }}
+                                  </span>
+                                {% endif %}
+
+                                   {% elif field.type == "keywords" %}
+
+                                  <div class="tag-container">
+                                    {% for tag in field.value %}
+                                      <span class="tag">{{ tag }}</span>
+                                    {% endfor %}
+                                  </div>
+
+                              {% else %}
+
+                                {{ field.value }}
+
+                              {% endif %}
+                            </div>
+
+                        </div>
+                      {% endfor %}
+                    </div>
+
+                    <div class="detail-actions">
+                      <a href="{% url 'json_data_detail' obj.id %}" class="btn btn-outline-primary btn-sm">
+                        More
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
           </div>
         {% else %}
           <p>No uploaded data found</p>
@@ -58,4 +345,44 @@
     </div>
   </div>
 </div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const collapses = document.querySelectorAll(".soft-accordion .accordion-collapse");
+
+    collapses.forEach(function (collapseEl) {
+      collapseEl.addEventListener("show.bs.collapse", function () {
+        const item = collapseEl.closest(".accordion-item");
+        if (item) {
+          item.classList.add("open-soft");
+        }
+      });
+
+      collapseEl.addEventListener("hide.bs.collapse", function () {
+        const item = collapseEl.closest(".accordion-item");
+        if (item) {
+          item.classList.remove("open-soft");
+        }
+      });
+
+      collapseEl.addEventListener("shown.bs.collapse", function () {
+        const item = collapseEl.closest(".accordion-item");
+        if (item) {
+          item.classList.add("open-soft");
+        }
+      });
+
+      collapseEl.addEventListener("hidden.bs.collapse", function () {
+        const item = collapseEl.closest(".accordion-item");
+        if (item) {
+          item.classList.remove("open-soft");
+        }
+      });
+    });
+
+    if (window.feather) {
+      feather.replace();
+    }
+  });
+</script>
 {% endblock content %}
