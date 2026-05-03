@@ -8,6 +8,7 @@ from .views import (
     json_data_list_view,
     json_data_detail_view,
     json_data_delete_view,
+    export_selected_search_results_view,
     search_view,
 )
 
@@ -25,6 +26,7 @@ urlpatterns = [
     path("register/", register_view, name="register"),
     path("upload/", upload_json_view, name="upload_json"),
     path("search/", search_view, name="search"),
+    path("search/export-selected/", export_selected_search_results_view, name="export_selected_search_results"),
     path("data-list/", json_data_list_view, name="json_data_list"),
     path("data-list/<int:pk>/", json_data_detail_view, name="json_data_detail"),
     path("data-list/<int:pk>/delete/", json_data_delete_view, name="json_data_delete"),

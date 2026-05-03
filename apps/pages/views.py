@@ -1,7 +1,7 @@
 import json
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.contrib.auth import login
 from apps.pages.models import Product
 from django.core import serializers
@@ -13,6 +13,8 @@ from .forms import SignUpForm, JSONUploadForm
 from django.views.decorators.http import require_POST
 from apps.dyn_api.helpers import validate_json
 from numbers import Number
+
+MAX_UPLOAD_FILES = 5
 
 
 @login_required
@@ -63,7 +65,7 @@ def register_view(request):
 @login_required
 def upload_json_view(request):
     """
-    Upload a JSON file, validate data objects, and save valid objects to the database
+    Upload JSON files, validate data objects, and save valid objects to the database
 
     Parameters
     ----------
@@ -79,73 +81,96 @@ def upload_json_view(request):
         form = JSONUploadForm(request.POST, request.FILES)
 
         if form.is_valid():
-            uploaded_file = form.cleaned_data["file"]
+            uploaded_files = form.cleaned_data["file"]
 
-            try:
-                payload = json.load(uploaded_file)
-            except json.JSONDecodeError:
-                messages.error(request, "Invalid JSON file")
-                return render(request, "pages/upload.html", {"form": form})
-
-
-
-            if isinstance(payload, list):
-                objects = payload
-            elif isinstance(payload, dict):
-                if isinstance(payload.get("data"), list):
-                    objects = payload["data"]
-                else:
-                    objects = [payload]
-            else:
+            if len(uploaded_files) > MAX_UPLOAD_FILES:
                 messages.error(
                     request,
-                    "JSON must be a single object, a list of objects, or a dict with a 'data' list",
+                    f"You can upload up to {MAX_UPLOAD_FILES} JSON files at once.",
                 )
                 return render(request, "pages/upload.html", {"form": form})
 
+            total_created_count = 0
+            processed_file_count = 0
+            upload_errors = []
 
+            for uploaded_file in uploaded_files:
+                file_name = uploaded_file.name or "Uploaded file"
 
+                try:
+                    payload = json.load(uploaded_file)
+                except json.JSONDecodeError:
+                    upload_errors.append(f"{file_name}: Invalid JSON file.")
+                    continue
 
-            valid_objects, errors = validate_json(objects)
+                if isinstance(payload, list):
+                    objects = payload
+                elif isinstance(payload, dict):
+                    if isinstance(payload.get("data"), list):
+                        objects = payload["data"]
+                    else:
+                        objects = [payload]
+                else:
+                    upload_errors.append(
+                        f"{file_name}: JSON must be a single object, a list of objects, or a dict with a 'data' list."
+                    )
+                    continue
 
-            created_count = 0
+                valid_objects, errors = validate_json(objects)
 
-            for obj in valid_objects:
-                shared_with = obj.get("shared_with", [])
-                access_type = "c"
+                created_count = 0
 
-                for item in shared_with:
-                    if isinstance(item, dict) and item.get("access_type") == "all":
-                        access_type = "all"
-                        break
-
-                if access_type not in {"c", "all"}:
+                for obj in valid_objects:
+                    shared_with = obj.get("shared_with", [])
                     access_type = "c"
 
-                JSONData.objects.create(
-                    owner=request.user,
-                    data=obj,
-                    access_type=access_type,
-                )
-                created_count += 1
+                    for item in shared_with:
+                        if isinstance(item, dict) and item.get("access_type") == "all":
+                            access_type = "all"
+                            break
 
-            if created_count == 0 and errors:
-                messages.error(request, "Upload failed.")
+                    if access_type not in {"c", "all"}:
+                        access_type = "c"
+
+                    JSONData.objects.create(
+                        owner=request.user,
+                        data=obj,
+                        access_type=access_type,
+                    )
+                    created_count += 1
+
+                processed_file_count += 1
+                total_created_count += created_count
+
                 for error in errors:
+                    upload_errors.append(f"{file_name}: {error}")
+
+                if created_count == 0 and errors:
+                    upload_errors.append(f"{file_name}: No valid data objects were saved.")
+
+            if total_created_count == 0 and upload_errors:
+                messages.error(request, "Upload failed.")
+                for error in upload_errors:
                     messages.error(request, error)
 
-            elif created_count > 0 and errors:
+            elif total_created_count > 0 and upload_errors:
                 messages.warning(
                     request,
-                    f"Upload partially successful: {created_count} object(s) saved.",
+                    (
+                        "Upload partially successful: "
+                        f"{total_created_count} object(s) saved from {processed_file_count} file(s)."
+                    ),
                 )
-                for error in errors:
+                for error in upload_errors:
                     messages.warning(request, error)
 
-            elif created_count > 0:
+            elif total_created_count > 0:
                 messages.success(
                     request,
-                    f"Upload successful: {created_count} object(s) saved.",
+                    (
+                        "Upload successful: "
+                        f"{total_created_count} object(s) saved from {processed_file_count} file(s)."
+                    ),
                 )
 
             return redirect("upload_json")
@@ -274,6 +299,96 @@ def _normalize_search_value(value):
         return " ".join(part for part in parts if part)
 
     return str(value)
+
+
+def _split_keyword_terms(keyword):
+    """
+    Split the basic search keyword into required terms
+    """
+    return [term for term in keyword.casefold().split() if term]
+
+
+def _is_meaningful_search_string(value):
+    """
+    Return True when a string is useful for basic search
+    """
+    text = str(value).strip()
+
+    if not text:
+        return False
+
+    if text.replace(".", "", 1).replace("-", "", 1).isdigit():
+        return False
+
+    return True
+
+
+def _is_technical_search_key(key):
+    """
+    Return True for JSON keys that should not feed basic search
+    """
+    return str(key).strip().casefold() in {
+        "$schema",
+        "input_path",
+        "results_path",
+    }
+
+
+def _is_identifier_search_key(key):
+    """
+    Return True for keys whose values are meaningful identifiers
+    """
+    normalized_key = str(key).strip().casefold()
+    return normalized_key == "identifier" or normalized_key.endswith("_id")
+
+
+def _collect_basic_search_values(value, key=""):
+    """
+    Collect meaningful text values from JSON while skipping numeric-only data
+    """
+    if _is_technical_search_key(key):
+        return []
+
+    if value is None or value == "":
+        return []
+
+    if isinstance(value, str):
+        if _is_identifier_search_key(key):
+            return [value.strip()] if value.strip() else []
+
+        return [value.strip()] if _is_meaningful_search_string(value) else []
+
+    if _is_number_value(value):
+        if _is_identifier_search_key(key):
+            return [str(value)]
+
+        return []
+
+    if isinstance(value, list):
+        if value and all(_is_number_value(item) for item in value):
+            return []
+
+        values = []
+        for item in value:
+            values.extend(_collect_basic_search_values(item, key=key))
+        return values
+
+    if isinstance(value, dict):
+        values = []
+        for child_key, item in value.items():
+            values.extend(_collect_basic_search_values(item, key=child_key))
+        return values
+
+    return [str(value)] if _is_meaningful_search_string(value) else []
+
+
+def _build_basic_search_text(obj, access_text):
+    """
+    Build basic-search text from meaningful JSON values and ownership metadata
+    """
+    values = _collect_basic_search_values(obj.data or {})
+    values.extend([obj.owner.username, access_text])
+    return " ".join(str(value) for value in values if str(value).strip()).casefold()
 
 
 def _build_search_text(obj, field):
@@ -431,8 +546,12 @@ def search_view(request):
             title_text = _normalize_search_value(data.get("title", ""))
             identifier_text = _normalize_search_value(data.get("identifier", ""))
             creator_text = _normalize_search_value(data.get("creator", ""))
+            creator_affiliation_text = _normalize_search_value(
+                data.get("creator_affiliation", "")
+            )
             software_text = _normalize_search_value(data.get("software", ""))
             keywords_text = _normalize_search_value(data.get("keywords", ""))
+            phase_text = _normalize_search_value(data.get("phase", ""))
             owner_text = _normalize_search_value(obj.owner.username)
 
             if obj.owner_id == request.user.id and obj.access_type == "c":
@@ -442,19 +561,11 @@ def search_view(request):
             else:
                 access_text = "shared"
 
-            full_text = " ".join(
-                [
-                    title_text,
-                    identifier_text,
-                    creator_text,
-                    software_text,
-                    keywords_text,
-                    owner_text,
-                    access_text,
-                ]
-            ).casefold()
+            full_text = _build_basic_search_text(obj, access_text)
 
-            if keyword and keyword.casefold() not in full_text:
+            keyword_terms = _split_keyword_terms(keyword)
+
+            if keyword_terms and not all(term in full_text for term in keyword_terms):
                 continue
 
             if title and title.casefold() not in title_text.casefold():
@@ -463,7 +574,11 @@ def search_view(request):
             if identifier and identifier.casefold() not in identifier_text.casefold():
                 continue
 
-            if creator and creator.casefold() not in creator_text.casefold():
+            creator_full_text = " ".join(
+                [creator_text, creator_affiliation_text]
+            ).casefold()
+
+            if creator and creator.casefold() not in creator_full_text:
                 continue
 
             if software and software.casefold() not in software_text.casefold():
@@ -498,6 +613,41 @@ def search_view(request):
         "access": access,
     }
     return render(request, "pages/search.html", context)
+
+
+@login_required
+@require_POST
+def export_selected_search_results_view(request):
+    """
+    Export selected accessible data objects as a JSON file
+    """
+    selected_ids = request.POST.getlist("selected_objects")
+    exported_objects = []
+
+    for raw_id in selected_ids:
+        try:
+            object_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+
+        try:
+            obj = JSONData.objects.select_related("owner").get(pk=object_id)
+        except JSONData.DoesNotExist:
+            continue
+
+        if not _user_can_access_object(obj, request.user):
+            continue
+
+        exported_objects.append(obj.data or {})
+
+    if not exported_objects:
+        messages.error(request, "Select at least one accessible data object to export.")
+        return redirect("search")
+
+    content = json.dumps(exported_objects, indent=2, ensure_ascii=False)
+    response = HttpResponse(content, content_type="application/json")
+    response["Content-Disposition"] = 'attachment; filename="selected_data_objects.json"'
+    return response
 
 
 

@@ -206,6 +206,65 @@
     box-shadow: none !important;
   }
 
+  .result-selection-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border: 1px solid #e9ecef;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 2px 10px rgba(16, 24, 40, 0.04);
+  }
+
+  .selection-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    color: #374151;
+    font-weight: 600;
+  }
+
+  .selection-count {
+    color: #6b7280;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .result-heading-row {
+    display: flex;
+    align-items: stretch;
+    background: #ffffff;
+  }
+
+  .result-select-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 1.1rem;
+    padding-right: 0.2rem;
+  }
+
+  .result-select-cell .form-check-input {
+    width: 1.05rem;
+    height: 1.05rem;
+    cursor: pointer;
+  }
+
+  .result-heading-row .accordion-button {
+    flex: 1;
+    min-width: 0;
+  }
+
+  @media (max-width: 768px) {
+    .result-selection-toolbar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+  }
+
   .soft-accordion .accordion-button.collapsed {
     border-radius: 18px !important;
   }
@@ -461,80 +520,110 @@
         </div>
       </div>
     {% elif data_objects %}
-      <div class="accordion soft-accordion" id="searchResultAccordion">
-        {% for obj in data_objects %}
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="heading{{ obj.id }}">
-              <button
-                class="accordion-button collapsed"
-                type="button"
-                data-bs-toggle="collapse"
-                data-bs-target="#collapse{{ obj.id }}"
-                aria-expanded="false"
-                aria-controls="collapse{{ obj.id }}"
-              >
-                <div class="summary-grid">
-                  <span class="summary-value">
-                    <span class="main">
-                      {{ obj.data.title|default:obj.data.identifier|default:"Object" }}
-                    </span>
-                    &nbsp;|&nbsp;
-                    <span class="time">
-                      {{ obj.owner.username }} | {{ obj.uploaded_at|date:"Y-m-d H:i" }}
-                    </span>
-                  </span>
-                </div>
-              </button>
-            </h2>
+      <form method="post" action="{% url 'export_selected_search_results' %}" id="searchSelectionForm">
+        {% csrf_token %}
 
-            <div
-              id="collapse{{ obj.id }}"
-              class="accordion-collapse collapse"
-              aria-labelledby="heading{{ obj.id }}"
-              data-bs-parent="#searchResultAccordion"
-            >
-              <div class="accordion-body">
-                <div class="detail-grid">
-                  {% for field in obj.summary_fields %}
-                    <div class="detail-card">
-                      <div class="detail-label">{{ field.label }}</div>
-                      <div class="detail-value">
-                        {% if field.type == "access" %}
-                          {% if field.value == "Public" %}
-                            <span class="badge badge-public">
-                              <i data-feather="unlock" class="badge-icon"></i>
-                              {{ field.value }}
-                            </span>
-                          {% else %}
-                            <span class="badge badge-private">
-                              <i data-feather="lock" class="badge-icon"></i>
-                              {{ field.value }}
-                            </span>
-                          {% endif %}
-                        {% elif field.type == "keywords" %}
-                          <div class="tag-container">
-                            {% for tag in field.value %}
-                              <span class="tag">{{ tag }}</span>
-                            {% endfor %}
-                          </div>
-                        {% else %}
-                          {{ field.value }}
-                        {% endif %}
-                      </div>
+        <div class="result-selection-toolbar">
+          <div class="selection-left">
+            <label class="mb-0">
+              <input type="checkbox" class="form-check-input me-2" id="selectAllResults">
+              Select all
+            </label>
+            <span class="selection-count" id="selectedResultCount">0 selected</span>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-sm" id="exportSelectedButton" disabled>
+            Export Selected Data Objects as JSON
+          </button>
+        </div>
+
+        <div class="accordion soft-accordion" id="searchResultAccordion">
+          {% for obj in data_objects %}
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="heading{{ obj.id }}">
+                <div class="result-heading-row">
+                  <div class="result-select-cell">
+                    <input
+                      type="checkbox"
+                      class="form-check-input result-checkbox"
+                      name="selected_objects"
+                      value="{{ obj.id }}"
+                      aria-label="Select {{ obj.data.title|default:obj.data.identifier|default:'data object' }}"
+                    >
+                  </div>
+
+                  <button
+                    class="accordion-button collapsed"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapse{{ obj.id }}"
+                    aria-expanded="false"
+                    aria-controls="collapse{{ obj.id }}"
+                  >
+                    <div class="summary-grid">
+                      <span class="summary-value">
+                        <span class="main">
+                          {{ obj.data.title|default:obj.data.identifier|default:"Object" }}
+                        </span>
+                        &nbsp;|&nbsp;
+                        <span class="time">
+                          {{ obj.owner.username }} | {{ obj.uploaded_at|date:"Y-m-d H:i" }}
+                        </span>
+                      </span>
                     </div>
-                  {% endfor %}
+                  </button>
                 </div>
+              </h2>
 
-                <div class="detail-actions">
-                  <a href="{% url 'json_data_detail' obj.id %}" class="btn btn-outline-primary btn-sm">
-                    More
-                  </a>
+              <div
+                id="collapse{{ obj.id }}"
+                class="accordion-collapse collapse"
+                aria-labelledby="heading{{ obj.id }}"
+                data-bs-parent="#searchResultAccordion"
+              >
+                <div class="accordion-body">
+                  <div class="detail-grid">
+                    {% for field in obj.summary_fields %}
+                      <div class="detail-card">
+                        <div class="detail-label">{{ field.label }}</div>
+                        <div class="detail-value">
+                          {% if field.type == "access" %}
+                            {% if field.value == "Public" %}
+                              <span class="badge badge-public">
+                                <i data-feather="unlock" class="badge-icon"></i>
+                                {{ field.value }}
+                              </span>
+                            {% else %}
+                              <span class="badge badge-private">
+                                <i data-feather="lock" class="badge-icon"></i>
+                                {{ field.value }}
+                              </span>
+                            {% endif %}
+                          {% elif field.type == "keywords" %}
+                            <div class="tag-container">
+                              {% for tag in field.value %}
+                                <span class="tag">{{ tag }}</span>
+                              {% endfor %}
+                            </div>
+                          {% else %}
+                            {{ field.value }}
+                          {% endif %}
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+
+                  <div class="detail-actions">
+                    <a href="{% url 'json_data_detail' obj.id %}" class="btn btn-outline-primary btn-sm">
+                      More
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        {% endfor %}
-      </div>
+          {% endfor %}
+        </div>
+      </form>
     {% else %}
       <div class="card">
         <div class="card-body">
@@ -548,6 +637,50 @@
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const collapses = document.querySelectorAll(".soft-accordion .accordion-collapse");
+    const resultCheckboxes = Array.from(document.querySelectorAll(".result-checkbox"));
+    const selectAllResults = document.getElementById("selectAllResults");
+    const selectedResultCount = document.getElementById("selectedResultCount");
+    const exportSelectedButton = document.getElementById("exportSelectedButton");
+
+    function updateSelectionState() {
+      const selectedCount = resultCheckboxes.filter(function (checkbox) {
+        return checkbox.checked;
+      }).length;
+
+      if (selectedResultCount) {
+        selectedResultCount.textContent =
+          selectedCount === 1 ? "1 selected" : `${selectedCount} selected`;
+      }
+
+      if (exportSelectedButton) {
+        exportSelectedButton.disabled = selectedCount === 0;
+      }
+
+      if (selectAllResults) {
+        selectAllResults.checked =
+          resultCheckboxes.length > 0 && selectedCount === resultCheckboxes.length;
+        selectAllResults.indeterminate =
+          selectedCount > 0 && selectedCount < resultCheckboxes.length;
+      }
+    }
+
+    if (selectAllResults) {
+      selectAllResults.addEventListener("change", function () {
+        resultCheckboxes.forEach(function (checkbox) {
+          checkbox.checked = selectAllResults.checked;
+        });
+        updateSelectionState();
+      });
+    }
+
+    resultCheckboxes.forEach(function (checkbox) {
+      checkbox.addEventListener("click", function (event) {
+        event.stopPropagation();
+      });
+      checkbox.addEventListener("change", updateSelectionState);
+    });
+
+    updateSelectionState();
 
     collapses.forEach(function (collapseEl) {
       collapseEl.addEventListener("show.bs.collapse", function () {

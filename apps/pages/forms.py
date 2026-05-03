@@ -82,21 +82,41 @@ class SignInForm(AuthenticationForm):
     )
 
 
+class MultipleFileInput(forms.ClearableFileInput):
+    """File input that allows selecting multiple files"""
+
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    """File field that returns a list of uploaded files"""
+
+    def clean(self, data, initial=None):
+        """Clean one or more uploaded files"""
+        single_file_clean = super().clean
+
+        if isinstance(data, (list, tuple)):
+            return [single_file_clean(file_item, initial) for file_item in data]
+
+        return [single_file_clean(data, initial)]
+
+
 class JSONUploadForm(forms.Form):
     """
-    Upload a JSON file
+    Upload one or more JSON files
 
     Attributes
     ----------
     file : UploadedFile
-        JSON file to upload
+        JSON file or files to upload
     """
 
-    file = forms.FileField(
-        widget=forms.ClearableFileInput(
+    file = MultipleFileField(
+        widget=MultipleFileInput(
             attrs={
                 "class": "form-control",
                 "accept": ".json",
+                "multiple": True,
             }
         )
     )
