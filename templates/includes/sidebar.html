@@ -3,9 +3,15 @@
 <nav class="pc-sidebar">
   <div class="navbar-wrapper">
     <div class="m-header">
-      <a href="{% url 'search' %}" class="b-brand text-primary">
-        <img src="{% static 'assets/images/logo-white.svg' %}" class="img-fluid" alt="logo">
-      </a>
+
+        <a href="{% url 'search' %}"
+           class="b-brand text-primary d-flex align-items-center"
+           style="text-decoration: none; padding: 6px 0;">
+          <img src="{% static 'assets/images/mimedat-logo.png' %}"
+               alt="MiMeDat logo"
+               style="width: 245px; max-width: 100%; height: auto; object-fit: contain; object-position: left center; flex: 0 0 auto;">
+        </a>
+
     </div>
 
     <div class="navbar-content">
@@ -51,7 +57,7 @@
             <span class="pc-micon">
               <i data-feather="list"></i>
             </span>
-            <span class="pc-mtext">Data List</span>
+            <span class="pc-mtext">My Data</span>
           </a>
         </li>
 

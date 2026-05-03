@@ -1,6 +1,7 @@
 import json
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import Http404
 from django.contrib.auth import login
 from apps.pages.models import Product
 from django.core import serializers
@@ -9,6 +10,7 @@ from django.contrib import messages
 
 from .models import *
 from .forms import SignUpForm, JSONUploadForm
+from django.views.decorators.http import require_POST
 from apps.dyn_api.helpers import validate_json
 from numbers import Number
 
@@ -85,21 +87,26 @@ def upload_json_view(request):
                 messages.error(request, "Invalid JSON file")
                 return render(request, "pages/upload.html", {"form": form})
 
+
+
             if isinstance(payload, list):
                 objects = payload
-            elif isinstance(payload, dict) and isinstance(payload.get("data"), list):
-                objects = payload["data"]
+            elif isinstance(payload, dict):
+                if isinstance(payload.get("data"), list):
+                    objects = payload["data"]
+                else:
+                    objects = [payload]
             else:
                 messages.error(
                     request,
-                    "JSON must be either a list or a dict with a 'data' list",
+                    "JSON must be a single object, a list of objects, or a dict with a 'data' list",
                 )
                 return render(request, "pages/upload.html", {"form": form})
 
-            valid_objects, errors = validate_json(objects)
 
-            for error in errors:
-                messages.error(request, error)
+
+
+            valid_objects, errors = validate_json(objects)
 
             created_count = 0
 
@@ -122,16 +129,28 @@ def upload_json_view(request):
                 )
                 created_count += 1
 
-            if created_count > 0:
+            if created_count == 0 and errors:
+                messages.error(request, "Upload failed.")
+                for error in errors:
+                    messages.error(request, error)
+
+            elif created_count > 0 and errors:
+                messages.warning(
+                    request,
+                    f"Upload partially successful: {created_count} object(s) saved.",
+                )
+                for error in errors:
+                    messages.warning(request, error)
+
+            elif created_count > 0:
                 messages.success(
                     request,
-                    f"Upload successful: {created_count} objects saved",
+                    f"Upload successful: {created_count} object(s) saved.",
                 )
 
-            if created_count == 0 and errors:
-                messages.error(request, "No valid objects were saved")
-
             return redirect("upload_json")
+
+
 
     else:
         form = JSONUploadForm()
@@ -510,7 +529,6 @@ def _format_detail_label(path):
 
     for raw_part in path.split("."):
         clean_part = raw_part.split("[")[0].strip()
-        clean_part = clean_part.lstrip("$")
 
         if clean_part:
             parts.append(clean_part)
@@ -529,9 +547,9 @@ def _build_detail_rows(data, prefix=""):
     Rules
     -----
     - Show str directly
+    - Show single numbers directly
     - Show list[str] directly
     - Show list[number] as collapsed numeric arrays
-    - Ignore single numbers
     - Recurse into dict and list[dict]
     """
     rows = []
@@ -582,7 +600,95 @@ def _build_detail_rows(data, prefix=""):
         )
         return rows
 
+    if _is_number_value(data):
+        rows.append(
+            {
+                "label": _format_detail_label(prefix),
+                "type": "number",
+                "value": data,
+            }
+        )
+        return rows
+
     return rows
+
+
+def _find_group_child(children, label):
+    """Return the existing group child with the given label if present"""
+    for child in children:
+        if child.get("type") == "group" and child.get("label") == label:
+            return child
+    return None
+
+
+def _insert_grouped_child(children, parts, row):
+    """Insert one detail row into a nested group structure"""
+    if not parts:
+        return
+
+    if len(parts) == 1:
+        leaf_row = row.copy()
+        leaf_row["label"] = parts[0]
+        children.append(leaf_row)
+        return
+
+    group_label = parts[0]
+    group_node = _find_group_child(children, group_label)
+
+    if group_node is None:
+        group_node = {
+            "type": "group",
+            "label": group_label,
+            "children": [],
+        }
+        children.append(group_node)
+
+    _insert_grouped_child(group_node["children"], parts[1:], row)
+
+
+def _group_detail_rows(detail_rows):
+    """Group selected hierarchical rows into nested collapsible sections"""
+    groupable_parents = {
+        "origin": "origin",
+        "mechanical_BC": "mechanical_BC",
+        "phase": "phase",
+        "stress": "stress",
+        "total_strain": "total_strain",
+        "plastic_strain": "plastic_strain",
+        "material": "material",
+        "units": "units",
+    }
+
+    grouped_rows = []
+    root_groups = {}
+
+    for row in detail_rows:
+        label = row.get("label", "")
+        matched_root = None
+
+        if isinstance(label, str) and " / " in label:
+            root_label, remainder = label.split(" / ", 1)
+
+            if root_label in groupable_parents:
+                if root_label not in root_groups:
+                    root_groups[root_label] = {
+                        "type": "group",
+                        "label": groupable_parents[root_label],
+                        "children": [],
+                    }
+                    grouped_rows.append(root_groups[root_label])
+
+                _insert_grouped_child(
+                    root_groups[root_label]["children"],
+                    remainder.split(" / "),
+                    row,
+                )
+                matched_root = root_label
+
+        if matched_root is None:
+            grouped_rows.append(row)
+
+    return grouped_rows
 
 
 
@@ -602,7 +708,7 @@ def _extract_plot_variables(data, prefix=""):
                 variables.append(
                     {
                         "key": full_key,
-                        "label": _format_detail_label(full_key),
+                        "label": _format_plot_variable_label(full_key),
                         "short_label": key,
                         "values": value,
                     }
@@ -618,22 +724,152 @@ def _extract_plot_variables(data, prefix=""):
     return variables
 
 
+def _format_plot_variable_label(path):
+    """
+    Format a plot variable label with the parent group and field name
+    """
+    parts = [part for part in _format_detail_label(path).split(" / ") if part]
+    return parts[-1] if parts else path
+
+
+
+
+MECHANICAL_BC_DIRECTIONS = ("X", "Y", "Z")
+
+
+def _format_mechanical_load_value(load):
+    """
+    Return a compact display value for one applied load
+    """
+    if not isinstance(load, dict):
+        return ""
+
+    magnitude = load.get("magnitude")
+    if magnitude is None:
+        return ""
+
+    if _is_number_value(magnitude):
+        return f"{magnitude:.4g}"
+
+    return str(magnitude)
+
+
+def _build_mechanical_bc_items(data):
+    """
+    Build normalized mechanical boundary condition items for the cube viewer
+    """
+    mechanical_bc = data.get("mechanical_BC", [])
+
+    if not isinstance(mechanical_bc, list):
+        return []
+
+    items = []
+
+    for condition in mechanical_bc:
+        if not isinstance(condition, dict):
+            continue
+
+        vertices = condition.get("vertex_list", [])
+        constraints = condition.get("constraints", [])
+        applied_loads = condition.get("applied_load", [])
+
+        if not isinstance(vertices, list):
+            vertices = [vertices]
+
+        if not isinstance(constraints, list):
+            constraints = []
+
+        if not isinstance(applied_loads, list):
+            applied_loads = []
+
+        load_index = 0
+        axes = []
+
+        for index, direction in enumerate(MECHANICAL_BC_DIRECTIONS):
+            status = ""
+            if index < len(constraints):
+                status = str(constraints[index]).strip().casefold()
+
+            load_label = ""
+            raw_magnitude = None
+
+            if status == "loaded":
+                load = applied_loads[load_index] if load_index < len(applied_loads) else {}
+                if isinstance(load, dict):
+                    raw_magnitude = load.get("magnitude")
+                load_label = _format_mechanical_load_value(load)
+                load_index += 1
+
+            axes.append(
+                {
+                    "direction": direction,
+                    "status": status,
+                    "load": load_label,
+                    "magnitude": raw_magnitude,
+                }
+            )
+
+        for vertex in vertices:
+            vertex_name = str(vertex).strip()
+            if not vertex_name:
+                continue
+
+            items.append(
+                {
+                    "vertex": vertex_name,
+                    "axes": axes,
+                    "loading_type": condition.get("loading_type", ""),
+                    "loading_mode": condition.get("loading_mode", ""),
+                }
+            )
+
+    return items
+
+
+
+
+
+
+@login_required
+@require_POST
+def json_data_delete_view(request, pk):
+    """
+    Delete one JSON data object owned by the current user
+    """
+    obj = get_object_or_404(JSONData, pk=pk, owner=request.user)
+    obj.delete()
+    messages.success(request, "Data object deleted successfully.")
+    return redirect("json_data_list")
+
+
+
+
 
 
 @login_required
 def json_data_detail_view(request, pk):
     """
-    Display a user-friendly detail page for one JSON data object
+    Display a user-friendly detail page for one accessible JSON data object
     """
-    obj = get_object_or_404(JSONData, pk=pk, owner=request.user)
+    obj = get_object_or_404(JSONData.objects.select_related("owner"), pk=pk)
+
+    if not _user_can_access_object(obj, request.user):
+        raise Http404("Data object not found")
 
     detail_rows = _build_detail_rows(obj.data or {})
-    string_rows = [row for row in detail_rows if row["type"] in {"string", "string_list"}]
+    display_rows = [
+        row
+        for row in detail_rows
+        if row["type"] in {"string", "string_list", "number", "numeric_array"}
+    ]
+    display_rows = _group_detail_rows(display_rows)
     plot_variables = _extract_plot_variables(obj.data or {})
+    mechanical_bc_items = _build_mechanical_bc_items(obj.data or {})
 
     context = {
         "data_object": obj,
-        "detail_rows": string_rows,
+        "detail_rows": display_rows,
         "plot_variables": plot_variables,
+        "mechanical_bc_items": mechanical_bc_items,
     }
     return render(request, "pages/data_detail.html", context)

@@ -1,6 +1,6 @@
 {% extends "layouts/base.html" %}
 
-{% block title %}Data List{% endblock title %}
+{% block title %}My Data{% endblock title %}
 
 {% block content %}
 <style>
@@ -187,7 +187,7 @@
 
     .detail-label {
       font-size: 0.86rem;
-      color: #3b82f6;
+      color: #3f6db3;
       margin-bottom: 4px;
       font-weight: 600;
     }
@@ -198,10 +198,11 @@
   }
 
     .detail-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 10px;
-  }
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 10px;
+    }
 
   .detail-actions .btn {
     border-radius: 10px;
@@ -237,20 +238,33 @@
         <div class="row align-items-center">
           <div class="col-md-12">
             <div class="page-header-title">
-              <h5 class="m-b-10">Data List</h5>
+              <h5 class="m-b-10">My Data</h5>
             </div>
             <ul class="breadcrumb">
               <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
-              <li class="breadcrumb-item">Data List</li>
+              <li class="breadcrumb-item">My Data</li>
             </ul>
           </div>
         </div>
       </div>
     </div>
 
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert auto-dismiss-alert
+          {% if message.tags == 'error' %}alert-danger
+          {% elif message.tags == 'success' %}alert-success
+          {% elif message.tags == 'warning' %}alert-warning
+          {% else %}alert-info
+          {% endif %} mb-3">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
     <div class="card">
       <div class="card-header">
-        <h5>Uploaded JSON Objects</h5>
+        <h5>My Uploaded Data Objects</h5>
       </div>
       <div class="card-body">
         {% if data_objects %}
@@ -270,7 +284,7 @@
                     <div class="summary-grid">
                         <span class="summary-value">
                           <span class="main">
-                            {{ obj.data.title|default:obj.data.identifier|default:"Object" }}
+                            {{ obj.data.identifier|default:obj.data.title|default:"Object" }}
                           </span>
                           &nbsp;|&nbsp;
                           <span class="time">
@@ -328,11 +342,23 @@
                       {% endfor %}
                     </div>
 
-                    <div class="detail-actions">
-                      <a href="{% url 'json_data_detail' obj.id %}" class="btn btn-outline-primary btn-sm">
-                        More
-                      </a>
-                    </div>
+                        <div class="detail-actions">
+                          <a href="{% url 'json_data_detail' obj.id %}" class="btn btn-outline-primary btn-sm">
+                            More
+                          </a>
+
+                          <form method="post" action="{% url 'json_data_delete' obj.id %}" class="m-0">
+                            {% csrf_token %}
+                            <button
+                              type="submit"
+                              class="btn btn-outline-danger btn-sm"
+                              onclick="return confirm('Are you sure you want to delete this data object?');"
+                            >
+                              Delete
+                            </button>
+                          </form>
+                        </div>
+
                   </div>
                 </div>
               </div>
@@ -348,6 +374,20 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
+    const alerts = document.querySelectorAll(".auto-dismiss-alert");
+
+    alerts.forEach(function (alert) {
+      setTimeout(function () {
+        alert.style.transition = "opacity 0.35s ease, transform 0.35s ease";
+        alert.style.opacity = "0";
+        alert.style.transform = "translateY(-4px)";
+
+        setTimeout(function () {
+          alert.remove();
+        }, 350);
+      }, 3000);
+    });
+
     const collapses = document.querySelectorAll(".soft-accordion .accordion-collapse");
 
     collapses.forEach(function (collapseEl) {

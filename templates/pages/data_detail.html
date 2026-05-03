@@ -4,7 +4,184 @@
 
 {% block content %}
 {{ plot_variables|json_script:"plot-variables-data" }}
+{{ mechanical_bc_items|json_script:"mechanical-bc-data" }}
 <style>
+
+
+    .detail-subgroup {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fafcff;
+}
+
+.detail-subgroup-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #4f7fd1;
+  line-height: 1.25;
+  user-select: none;
+}
+
+.detail-subgroup-summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-subgroup-summary::before {
+  content: "▸";
+  font-size: 0.9rem;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+details[open] > .detail-subgroup-summary::before {
+  transform: rotate(90deg);
+}
+
+.detail-subgroup-title {
+  color: #4f7fd1;
+  font-weight: 700;
+}
+
+.detail-subgroup-children {
+  padding: 0 8px 8px 8px;
+  display: grid;
+  gap: 8px;
+}
+
+
+
+
+.detail-group {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.detail-group-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: #3f6db3;
+  line-height: 1.25;
+  user-select: none;
+}
+
+.detail-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-group-summary-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.detail-group-summary-left::before {
+  content: "▸";
+  font-size: 0.95rem;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+
+.detail-group-summary-title {
+  color: #3f6db3;
+  font-weight: 700;
+}
+
+
+
+.detail-group-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #7b8798;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+
+
+
+.detail-group-hint {
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+
+details[open] > .detail-group-summary .detail-group-summary-left::before {
+  transform: rotate(90deg);
+}
+
+
+details[open] > .detail-group-summary {
+  border-bottom: none;
+  background: transparent;
+  margin-bottom: 8px;
+}
+
+.detail-group-children {
+  margin-top: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+
+
+.detail-child-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px 12px;
+  background: #ffffff;
+}
+
+.detail-child-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #5b84d6;
+  margin-bottom: 3px;
+  line-height: 1.25;
+}
+
+
+
+
+
+.detail-child-value {
+  font-size: 0.92rem;
+  color: #1f2937;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+
+
+
+
+
+
+
 .detail-page-card {
   border: 1px solid #e5e7eb;
   border-radius: 22px;
@@ -12,13 +189,17 @@
   box-shadow: 0 10px 30px rgba(16, 24, 40, 0.06);
 }
 
+.detail-page-card .card-body {
+  padding: 12px 14px;
+}
+
 .detail-row-card {
   background: linear-gradient(180deg, #ffffff 0%, #fafbff 100%);
   border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  padding: 20px 22px;
-  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.05);
-  margin-bottom: 18px;
+  border-radius: 16px;
+  padding: 10px 16px;
+  box-shadow: 0 3px 10px rgba(16, 24, 40, 0.04);
+  margin-bottom: 8px;
   transition: all 0.2s ease;
 }
 
@@ -29,20 +210,20 @@
 }
 
 .detail-label {
-  font-size: 1.08rem;
-  color: #2563eb;
-  margin-bottom: 10px;
+  font-size: 0.96rem;
+  color: #3f6db3;
+  margin-bottom: 4px;
   font-weight: 700;
   letter-spacing: 0.01em;
   word-break: break-word;
-  line-height: 1.4;
+  line-height: 1.25;
 }
 
 .detail-value {
   color: #1f2937;
   word-break: break-word;
-  line-height: 1.7;
-  font-size: 1rem;
+  line-height: 1.4;
+  font-size: 0.92rem;
 }
 
 .detail-list {
@@ -99,11 +280,236 @@
     overflow: auto;
   }
 
-  .detail-actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 18px;
-  }
+
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+
+    .bc-panel {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      padding: 20px 22px;
+      box-shadow: 0 4px 14px rgba(16, 24, 40, 0.05);
+      margin-bottom: 18px;
+    }
+
+    .bc-panel-title {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 14px;
+    }
+
+    .bc-layout {
+      display: grid;
+      grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    @media (max-width: 992px) {
+      .bc-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .bc-cube-wrap {
+      background: #fbfdff;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 12px;
+      min-height: 400px;
+    }
+
+    .bc-cube-svg {
+      width: 100%;
+      height: 400px;
+      display: block;
+    }
+
+    .bc-edge {
+      stroke: #9ca3af;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .bc-edge-back {
+      stroke: #cbd5e1;
+      stroke-width: 1.5;
+    }
+
+    .bc-node {
+      fill: #ffffff;
+      stroke: #1f2937;
+      stroke-width: 2;
+    }
+
+    .bc-node-active {
+      fill: #e0f2fe;
+      stroke: #0369a1;
+    }
+
+    .bc-label {
+      fill: #374151;
+      font-size: 12px;
+      font-weight: 700;
+      paint-order: stroke;
+      stroke: #fbfdff;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+
+    .bc-arrow {
+      stroke: #dc2626;
+      stroke-width: 2.6;
+      fill: none;
+      marker-end: url(#bc-arrow-head);
+    }
+
+    .bc-fixed {
+      fill: #f8fafc;
+      stroke: #2563eb;
+      stroke-width: 2;
+    }
+
+    .bc-fixed-label {
+      fill: #1e40af;
+      font-size: 11px;
+      font-weight: 700;
+      paint-order: stroke;
+      stroke: #fbfdff;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+
+    .bc-load-label {
+      fill: #991b1b;
+      font-size: 12px;
+      font-weight: 700;
+      paint-order: stroke;
+      stroke: #fbfdff;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+
+    .bc-axis {
+      stroke: #4b5563;
+      stroke-width: 2;
+      marker-end: url(#bc-axis-head);
+    }
+
+    .bc-axis-label {
+      fill: #4b5563;
+      font-size: 12px;
+      font-weight: 700;
+      paint-order: stroke;
+      stroke: #fbfdff;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+
+    .bc-legend {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      color: #4b5563;
+      font-size: 0.9rem;
+    }
+
+    .bc-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bc-legend-arrow {
+      width: 22px;
+      height: 0;
+      border-top: 3px solid #dc2626;
+      position: relative;
+    }
+
+    .bc-legend-arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -6px;
+      border-left: 8px solid #dc2626;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+    }
+
+    .bc-legend-fixed {
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-bottom: 14px solid #2563eb;
+    }
+
+    .bc-table-wrap {
+      overflow: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+    }
+
+    .bc-table {
+      width: 100%;
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .bc-table th,
+    .bc-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #eef2f7;
+      vertical-align: top;
+    }
+
+    .bc-table th {
+      color: #374151;
+      background: #f8fafc;
+      font-weight: 700;
+    }
+
+    .bc-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .bc-status {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-right: 4px;
+      margin-bottom: 4px;
+    }
+
+    .bc-status-loaded {
+      color: #991b1b;
+      background: #fee2e2;
+    }
+
+    .bc-status-fixed {
+      color: #1e40af;
+      background: #dbeafe;
+    }
+
+    .bc-status-empty {
+      color: #6b7280;
+      background: #f3f4f6;
+    }
+
 
         .plot-panel {
       background: #ffffff;
@@ -126,7 +532,7 @@
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 14px;
       align-items: end;
-      margin-bottom: 18px;
+      margin-bottom: 8px;
     }
 
     .plot-field label {
@@ -143,14 +549,41 @@
     }
 
     .plot-canvas-wrap {
-      background: #fbfdff;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
-      padding: 14px;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      max-width: 680px;
+      margin: 0 auto;
+      transform: translateX(-32px);
+    }
+
+    @media (max-width: 992px) {
+      .plot-canvas-wrap {
+        transform: none;
+      }
+    }
+
+    .plot-custom-legend {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 16px;
+      margin-bottom: 6px;
+      color: #111827;
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    #mechanical-plot {
+      width: 100% !important;
+      height: 520px !important;
+      display: block;
     }
 
     .plot-status {
-      margin-top: 10px;
+      margin-top: 12px;
       color: #6b7280;
       font-size: 0.92rem;
     }
@@ -272,59 +705,146 @@
       </div>
     </div>
 
+
     <div class="card detail-page-card">
       <div class="card-header">
-        <h5>{{ data_object.data.title|default:data_object.data.identifier|default:"Object Detail" }}</h5>
+        <h5>{{ data_object.data.identifier|default:"Data Detail" }}</h5>
       </div>
 
+
+
       <div class="card-body">
-        {% for row in detail_rows %}
-          <div class="detail-row-card">
-            <div class="detail-label">{{ row.label }}</div>
+{% for row in detail_rows %}
+  <div class="detail-row-card">
 
-            {% if row.type == "string" %}
-              <div class="detail-value">{{ row.value }}</div>
+{% if row.type == "group" %}
+  <details class="detail-group">
+    <summary class="detail-group-summary">
+      <span class="detail-group-summary-left">
+        <span class="detail-group-summary-title">{{ row.label }}</span>
+        <span class="detail-group-count">{{ row.children|length }} fields</span>
+      </span>
+    </summary>
 
-                {% elif row.type == "string_list" %}
-                  {% if row.value|length == 1 %}
-                    <div class="detail-value">{{ row.value.0 }}</div>
-                  {% else %}
-                    <div class="detail-inline-list">
-                      {% for item in row.value %}
-                        <span class="detail-chip">{{ item }}</span>
-                      {% endfor %}
-                    </div>
-                  {% endif %}
+    <div class="detail-group-children">
+      {% include "pages/detail_group_children.html" with rows=row.children %}
+    </div>
+  </details>
 
-            {% elif row.type == "numeric_array" %}
-              <div class="array-summary">
-                <span>Numeric array</span>
-                <span class="array-badge">{{ row.count }} values</span>
+    {% elif row.type == "string" %}
+      <div class="detail-label">{{ row.label }}</div>
+      <div class="detail-value">{{ row.value }}</div>
+
+    {% elif row.type == "number" %}
+      <div class="detail-label">{{ row.label }}</div>
+      <div class="detail-value">{{ row.value }}</div>
+
+    {% elif row.type == "string_list" %}
+      <div class="detail-label">{{ row.label }}</div>
+      {% if row.value|length == 1 %}
+        <div class="detail-value">{{ row.value.0 }}</div>
+      {% else %}
+        <div class="detail-inline-list">
+          {% for item in row.value %}
+            <span class="detail-chip">{{ item }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+    {% elif row.type == "numeric_array" %}
+      <div class="detail-label">{{ row.label }}</div>
+      <div class="array-summary">
+        <span>Numeric array</span>
+        <span class="array-badge">{{ row.count }} values</span>
+      </div>
+
+      <div class="array-toggle">
+        <button
+          class="btn btn-outline-secondary btn-sm"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#array-{{ forloop.counter }}"
+          aria-expanded="false"
+          aria-controls="array-{{ forloop.counter }}"
+        >
+          Show values
+        </button>
+
+        <div class="collapse" id="array-{{ forloop.counter }}">
+          <pre class="array-box">{{ row.json_value }}</pre>
+        </div>
+      </div>
+
+    {% else %}
+      <div class="detail-empty">Unsupported field</div>
+    {% endif %}
+  </div>
+{% empty %}
+  <div class="detail-empty">No displayable detail fields found</div>
+{% endfor %}
+
+
+{% if mechanical_bc_items %}
+        <div class="bc-panel">
+          <div class="bc-panel-title">Mechanical Boundary Condition Cube</div>
+
+          <div class="bc-layout">
+            <div>
+              <div class="bc-cube-wrap">
+                <svg
+                  id="mechanical-bc-cube"
+                  class="bc-cube-svg"
+                  viewBox="0 0 680 440"
+                  role="img"
+                  aria-label="Mechanical boundary condition cube"
+                ></svg>
               </div>
 
-              <div class="array-toggle">
-                <button
-                  class="btn btn-outline-secondary btn-sm"
-                  type="button"
-                  data-bs-toggle="collapse"
-                  data-bs-target="#array-{{ forloop.counter }}"
-                  aria-expanded="false"
-                  aria-controls="array-{{ forloop.counter }}"
-                >
-                  Show values
-                </button>
-
-                <div class="collapse" id="array-{{ forloop.counter }}">
-                  <pre class="array-box">{{ row.json_value }}</pre>
-                </div>
+              <div class="bc-legend">
+                <span class="bc-legend-item">
+                  <span class="bc-legend-arrow"></span>
+                  Loaded
+                </span>
+                <span class="bc-legend-item">
+                  <span class="bc-legend-fixed"></span>
+                  Fixed
+                </span>
+                <span class="bc-legend-item">X, Y, Z show constraint directions</span>
               </div>
-            {% else %}
-              <div class="detail-empty">Unsupported field</div>
-            {% endif %}
+            </div>
+
+            <div class="bc-table-wrap">
+              <table class="bc-table">
+                <thead>
+                  <tr>
+                    <th>Vertex</th>
+                    <th>Constraints</th>
+                    <th>Loading</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in mechanical_bc_items %}
+                    <tr>
+                      <td><strong>{{ item.vertex }}</strong></td>
+                      <td>
+                        {% for axis in item.axes %}
+                          <span class="bc-status bc-status-{{ axis.status|default:'empty' }}">
+                            {{ axis.direction }}: {{ axis.status|default:"free" }}{% if axis.load %} {{ axis.load }}{% endif %}
+                          </span>
+                        {% endfor %}
+                      </td>
+                      <td>
+                        {{ item.loading_type|default:"-" }}
+                        {% if item.loading_mode %} / {{ item.loading_mode }}{% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
-        {% empty %}
-          <div class="detail-empty">No displayable detail fields found</div>
-        {% endfor %}
+        </div>
+{% endif %}
 
 
           <div class="plot-panel">
@@ -353,7 +873,10 @@
         </div>
 
         <div class="plot-canvas-wrap">
-          <canvas id="mechanical-plot" height="120"></canvas>
+          <div class="plot-custom-legend">
+            <span id="plot-custom-legend-text"></span>
+          </div>
+          <canvas id="mechanical-plot"></canvas>
           <div id="plot-status" class="plot-status"></div>
         </div>
 
@@ -388,7 +911,23 @@
           <a href="{% url 'json_data_list' %}" class="btn btn-outline-secondary btn-sm">
             Back
           </a>
+
+          {% if data_object.owner_id == request.user.id %}
+            <form method="post" action="{% url 'json_data_delete' data_object.id %}" class="m-0">
+              {% csrf_token %}
+              <button
+                type="submit"
+                class="btn btn-outline-danger btn-sm"
+                onclick="return confirm('Are you sure you want to delete this data object?');"
+              >
+                Delete
+              </button>
+            </form>
+          {% endif %}
         </div>
+
+
+
       </div>
     </div>
   </div>
@@ -399,12 +938,16 @@
   const plotVariables = JSON.parse(
     document.getElementById("plot-variables-data").textContent
   );
+  const mechanicalBcItems = JSON.parse(
+    document.getElementById("mechanical-bc-data").textContent
+  );
 
   const xSelect = document.getElementById("plot-x-select");
   const ySelect = document.getElementById("plot-y-select");
   const downloadPlotButton = document.getElementById("download-plot-btn");
   const plotStatus = document.getElementById("plot-status");
   const canvas = document.getElementById("mechanical-plot");
+  const plotCustomLegendText = document.getElementById("plot-custom-legend-text");
   const xRawSummary = document.getElementById("x-raw-summary");
     const yRawSummary = document.getElementById("y-raw-summary");
     const xRawMeta = document.getElementById("x-raw-meta");
@@ -414,17 +957,316 @@
 
   let chartInstance = null;
 
+  function createSvgElement(name, attributes) {
+    const element = document.createElementNS("http://www.w3.org/2000/svg", name);
+
+    Object.entries(attributes || {}).forEach(([key, value]) => {
+      element.setAttribute(key, value);
+    });
+
+    return element;
+  }
+
+  function appendSvgText(parent, x, y, text, className) {
+    const element = createSvgElement("text", {
+      x,
+      y,
+      class: className,
+    });
+
+    element.textContent = text;
+    parent.appendChild(element);
+    return element;
+  }
+
+  function projectVertex(vertexName) {
+    const bits = String(vertexName || "").replace(/^V/i, "").padEnd(3, "0");
+    const x = bits[0] === "1" ? 1 : 0;
+    const y = bits[1] === "1" ? 1 : 0;
+    const z = bits[2] === "1" ? 1 : 0;
+
+    return {
+      x: 245 + (x * 190) + (z * -108),
+      y: 305 + (x * 44) + (y * -172) + (z * 60),
+    };
+  }
+
+  function getDirectionVector(direction) {
+    const vectors = {
+      X: { x: 1, y: 0.23 },
+      Y: { x: 0, y: -1 },
+      Z: { x: -0.86, y: 0.5 },
+    };
+
+    return vectors[direction] || { x: 1, y: 0 };
+  }
+
+  function normalizeVector(vector) {
+    const length = Math.sqrt((vector.x * vector.x) + (vector.y * vector.y)) || 1;
+    return {
+      x: vector.x / length,
+      y: vector.y / length,
+    };
+  }
+
+  function getVertexLabelOffset(vertexName) {
+    const offsets = {
+      V000: { x: 9, y: -6 },
+      V100: { x: 8, y: -8 },
+      V010: { x: 8, y: -8 },
+      V110: { x: 8, y: -8 },
+      V001: { x: 8, y: 18 },
+      V101: { x: 8, y: 18 },
+      V011: { x: 9, y: -16 },
+      V111: { x: 9, y: -8 },
+    };
+
+    return offsets[vertexName] || { x: 8, y: -8 };
+  }
+
+  function getLoadLabelOffset(vertexName, direction) {
+    const offsets = {
+      "V000:Y": { x: -12, y: 6 },
+      "V000:Z": { x: 12, y: -16 },
+      "V011:X": { x: -8, y: -10 },
+      "V011:Y": { x: 8, y: 4 },
+      "V101:X": { x: -6, y: 10 },
+      "V101:Z": { x: -4, y: 18 },
+    };
+
+    return offsets[`${vertexName}:${direction}`] || { x: 8, y: -8 };
+  }
+
+  function getFixedLabelOffset(vertexName, direction) {
+    const offsets = {
+      "V000:X": { x: 6, y: 15 },
+      "V001:X": { x: -10, y: 18 },
+      "V001:Y": { x: 6, y: -10 },
+      "V001:Z": { x: -14, y: 4 },
+      "V011:Z": { x: -14, y: 3 },
+      "V101:Y": { x: 6, y: -10 },
+    };
+
+    return offsets[`${vertexName}:${direction}`] || { x: 0, y: 0 };
+  }
+
+  function drawLoadedArrow(svg, point, item, axis) {
+    const direction = normalizeVector(getDirectionVector(axis.direction));
+    const magnitude = Number(axis.magnitude);
+    const sign = Number.isFinite(magnitude) && magnitude < 0 ? -1 : 1;
+    const offset = 20;
+    const length = 40;
+    const start = {
+      x: point.x + (direction.x * offset * sign),
+      y: point.y + (direction.y * offset * sign),
+    };
+    const end = {
+      x: point.x + (direction.x * (offset + length) * sign),
+      y: point.y + (direction.y * (offset + length) * sign),
+    };
+
+    svg.appendChild(createSvgElement("line", {
+      x1: start.x,
+      y1: start.y,
+      x2: end.x,
+      y2: end.y,
+      class: "bc-arrow",
+    }));
+
+    if (axis.load) {
+      const labelOffset = getLoadLabelOffset(item.vertex, axis.direction);
+      appendSvgText(
+        svg,
+        end.x + labelOffset.x,
+        end.y + labelOffset.y,
+        `${axis.direction} ${axis.load}`,
+        "bc-load-label"
+      );
+    }
+  }
+
+  function drawFixedSymbol(svg, point, item, axis) {
+    const direction = normalizeVector(getDirectionVector(axis.direction));
+    const center = {
+      x: point.x + (direction.x * 42),
+      y: point.y + (direction.y * 42),
+    };
+    const perpendicular = {
+      x: -direction.y,
+      y: direction.x,
+    };
+    const size = 10;
+    const depth = 17;
+    const points = [
+      `${center.x + (perpendicular.x * size)},${center.y + (perpendicular.y * size)}`,
+      `${center.x - (perpendicular.x * size)},${center.y - (perpendicular.y * size)}`,
+      `${center.x - (direction.x * depth)},${center.y - (direction.y * depth)}`,
+    ].join(" ");
+
+    svg.appendChild(createSvgElement("polygon", {
+      points,
+      class: "bc-fixed",
+    }));
+
+    const labelOffset = getFixedLabelOffset(item.vertex, axis.direction);
+    appendSvgText(
+      svg,
+      center.x + (perpendicular.x * 12) + labelOffset.x,
+      center.y + (perpendicular.y * 12) + labelOffset.y,
+      axis.direction,
+      "bc-fixed-label"
+    );
+  }
+
+  function renderMechanicalBcCube() {
+    const svg = document.getElementById("mechanical-bc-cube");
+
+    if (!svg || !mechanicalBcItems.length) {
+      return;
+    }
+
+    svg.innerHTML = "";
+
+    const defs = createSvgElement("defs");
+    const arrowMarker = createSvgElement("marker", {
+      id: "bc-arrow-head",
+      markerWidth: "10",
+      markerHeight: "10",
+      refX: "8",
+      refY: "3",
+      orient: "auto",
+      markerUnits: "strokeWidth",
+    });
+    arrowMarker.appendChild(createSvgElement("path", {
+      d: "M0,0 L0,6 L9,3 z",
+      fill: "#dc2626",
+    }));
+
+    const axisMarker = createSvgElement("marker", {
+      id: "bc-axis-head",
+      markerWidth: "8",
+      markerHeight: "8",
+      refX: "7",
+      refY: "3",
+      orient: "auto",
+      markerUnits: "strokeWidth",
+    });
+    axisMarker.appendChild(createSvgElement("path", {
+      d: "M0,0 L0,6 L7,3 z",
+      fill: "#4b5563",
+    }));
+
+    defs.appendChild(arrowMarker);
+    defs.appendChild(axisMarker);
+    svg.appendChild(defs);
+
+    const vertices = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
+    const activeVertices = new Set(mechanicalBcItems.map(item => item.vertex));
+    const edges = [
+      ["V000", "V100"], ["V000", "V010"], ["V000", "V001"],
+      ["V100", "V110"], ["V100", "V101"],
+      ["V010", "V110"], ["V010", "V011"],
+      ["V001", "V101"], ["V001", "V011"],
+      ["V110", "V111"], ["V101", "V111"], ["V011", "V111"],
+    ];
+
+    edges.forEach(([from, to]) => {
+      const start = projectVertex(from);
+      const end = projectVertex(to);
+      const isBackEdge = from.endsWith("1") && to.endsWith("1");
+      svg.appendChild(createSvgElement("line", {
+        x1: start.x,
+        y1: start.y,
+        x2: end.x,
+        y2: end.y,
+        class: isBackEdge ? "bc-edge bc-edge-back" : "bc-edge",
+      }));
+    });
+
+    mechanicalBcItems.forEach(item => {
+      const point = projectVertex(item.vertex);
+
+      item.axes.forEach(axis => {
+        if (axis.status === "loaded") {
+          drawLoadedArrow(svg, point, item, axis);
+        } else if (axis.status === "fixed") {
+          drawFixedSymbol(svg, point, item, axis);
+        }
+      });
+    });
+
+    vertices.forEach(vertex => {
+      const point = projectVertex(vertex);
+      const labelOffset = getVertexLabelOffset(vertex);
+      svg.appendChild(createSvgElement("circle", {
+        cx: point.x,
+        cy: point.y,
+        r: activeVertices.has(vertex) ? 6 : 4,
+        class: activeVertices.has(vertex) ? "bc-node bc-node-active" : "bc-node",
+      }));
+      appendSvgText(svg, point.x + labelOffset.x, point.y + labelOffset.y, vertex, "bc-label");
+    });
+
+    const axisOrigin = { x: 560, y: 345 };
+    [
+      { label: "X", dx: 58, dy: 13, labelX: 70, labelY: 18 },
+      { label: "Y", dx: 0, dy: -58, labelX: 7, labelY: -62 },
+      { label: "Z", dx: -50, dy: 29, labelX: -62, labelY: 42 },
+    ].forEach(({ label, dx, dy, labelX, labelY }) => {
+      svg.appendChild(createSvgElement("line", {
+        x1: axisOrigin.x,
+        y1: axisOrigin.y,
+        x2: axisOrigin.x + dx,
+        y2: axisOrigin.y + dy,
+        class: "bc-axis",
+      }));
+      appendSvgText(svg, axisOrigin.x + labelX, axisOrigin.y + labelY, label, "bc-axis-label");
+    });
+  }
+
   function findDefaultKey(prefix) {
     const item = plotVariables.find(variable => variable.short_label.startsWith(prefix));
     return item ? item.key : (plotVariables[0] ? plotVariables[0].key : "");
   }
 
-  function populatePlotSelect(selectElement, defaultKey) {
+  function getXPlotVariables() {
+    return plotVariables.filter(variable =>
+      variable.short_label.startsWith("strain_") ||
+      variable.short_label.startsWith("plastic_strain_")
+    );
+  }
+
+  function getYPlotVariables() {
+    return plotVariables.filter(variable => variable.short_label.startsWith("stress_"));
+  }
+
+  function getComponentSuffix(shortLabel) {
+    const match = String(shortLabel || "").match(/(?:plastic_)?(?:strain|stress)_(.+)$/);
+    return match ? match[1] : "";
+  }
+
+  function findMatchingVariable(sourceVariable, candidates, targetPrefix) {
+    if (!sourceVariable) {
+      return null;
+    }
+
+    const suffix = getComponentSuffix(sourceVariable.short_label);
+
+    if (!suffix) {
+      return null;
+    }
+
+    return candidates.find(variable => variable.short_label === `${targetPrefix}_${suffix}`) || null;
+  }
+
+  function populatePlotSelect(selectElement, variables, defaultKey) {
     if (!selectElement) {
       return;
     }
 
-    plotVariables.forEach(variable => {
+    selectElement.innerHTML = "";
+
+    variables.forEach(variable => {
       const option = document.createElement("option");
       option.value = variable.key;
       option.textContent = variable.label;
@@ -440,10 +1282,288 @@
     return plotVariables.find(variable => variable.key === key) || null;
   }
 
+  let isSyncingPlotSelects = false;
+
+  function syncYVariableToX() {
+    if (isSyncingPlotSelects) {
+      return;
+    }
+
+    const xVariable = getVariableByKey(xSelect.value);
+    const match = findMatchingVariable(xVariable, getYPlotVariables(), "stress");
+
+    if (!match || ySelect.value === match.key) {
+      return;
+    }
+
+    isSyncingPlotSelects = true;
+    ySelect.value = match.key;
+    isSyncingPlotSelects = false;
+  }
+
+  function syncXVariableToY() {
+    if (isSyncingPlotSelects) {
+      return;
+    }
+
+    const yVariable = getVariableByKey(ySelect.value);
+    const xCandidates = getXPlotVariables();
+    const match =
+      findMatchingVariable(yVariable, xCandidates, "strain") ||
+      findMatchingVariable(yVariable, xCandidates, "plastic_strain");
+
+    if (!match || xSelect.value === match.key) {
+      return;
+    }
+
+    isSyncingPlotSelects = true;
+    xSelect.value = match.key;
+    isSyncingPlotSelects = false;
+  }
+
 
   function sanitizeFileName(text) {
   return text.replace(/[^a-zA-Z0-9_-]+/g, "_");
 }
+
+function buildZeroInclusiveRange(values) {
+  const numericValues = values
+    .map(value => Number(value))
+    .filter(value => Number.isFinite(value));
+
+  if (!numericValues.length) {
+    return {
+      min: -1,
+      max: 1,
+    };
+  }
+
+  const maxAbsValue = Math.max(
+    ...numericValues.map(value => Math.abs(value)),
+    1e-12
+  );
+  const paddedMax = maxAbsValue * 1.08;
+
+  return {
+    min: -paddedMax,
+    max: paddedMax,
+  };
+}
+
+function buildNiceTickStep(maxAbsValue, targetIntervals) {
+  if (!Number.isFinite(maxAbsValue) || maxAbsValue <= 0) {
+    return 1;
+  }
+
+  const rawStep = maxAbsValue / targetIntervals;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const normalized = rawStep / magnitude;
+
+  if (normalized <= 1) {
+    return magnitude;
+  }
+
+  if (normalized <= 2) {
+    return 2 * magnitude;
+  }
+
+  if (normalized <= 5) {
+    return 5 * magnitude;
+  }
+
+  return 10 * magnitude;
+}
+
+function updatePlotTitlePosition(chart) {
+  const targetChart = chart || chartInstance;
+  const legend = plotCustomLegendText
+    ? plotCustomLegendText.closest(".plot-custom-legend")
+    : null;
+
+  if (!targetChart || !targetChart.chartArea || !legend) {
+    return;
+  }
+
+  const chartAreaCenter = (targetChart.chartArea.left + targetChart.chartArea.right) / 2;
+  const canvasCenter = targetChart.width / 2;
+  const titleOffset = Math.round(chartAreaCenter - canvasCenter);
+
+  legend.style.transform = `translateX(${titleOffset}px)`;
+}
+
+const zeroAxisPlugin = {
+  id: "zeroAxisPlugin",
+  afterDatasetsDraw(chart) {
+    const { ctx, chartArea, scales } = chart;
+    const xScale = scales.x;
+    const yScale = scales.y;
+
+    if (!xScale || !yScale || !chartArea) {
+      return;
+    }
+
+    const zeroX = xScale.getPixelForValue(0);
+    const zeroY = yScale.getPixelForValue(0);
+    const boundedZeroX = Math.min(Math.max(zeroX, chartArea.left), chartArea.right);
+    const boundedZeroY = Math.min(Math.max(zeroY, chartArea.top), chartArea.bottom);
+    const axisColor = "#0f172a";
+    const arrowSize = 10;
+    const tickLength = 6;
+
+    function drawArrowHead(x, y, angle) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(
+        x - (Math.cos(angle - Math.PI / 6) * arrowSize),
+        y - (Math.sin(angle - Math.PI / 6) * arrowSize)
+      );
+      ctx.lineTo(
+        x - (Math.cos(angle + Math.PI / 6) * arrowSize),
+        y - (Math.sin(angle + Math.PI / 6) * arrowSize)
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function formatTickLabel(value) {
+      if (Math.abs(value) < 1e-12) {
+        return "0";
+      }
+
+      return Number(value.toPrecision(3)).toString();
+    }
+
+    function drawTick(x1, y1, x2, y2) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    function buildAxisTickValues(scale) {
+      const step = Number(scale.options.ticks.stepSize);
+
+      if (!Number.isFinite(step) || step <= 0) {
+        return scale.ticks.map(tick => Number(tick.value));
+      }
+
+      const values = [];
+      const start = Math.ceil(scale.min / step) * step;
+      const end = Math.floor(scale.max / step) * step;
+
+      for (let value = start; value <= end + (step / 2); value += step) {
+        values.push(Number(value.toPrecision(12)));
+      }
+
+      return values;
+    }
+
+    ctx.save();
+    ctx.strokeStyle = axisColor;
+    ctx.fillStyle = axisColor;
+    ctx.lineWidth = 2.25;
+    ctx.textBaseline = "middle";
+
+    ctx.beginPath();
+    ctx.moveTo(boundedZeroX, boundedZeroY);
+    ctx.lineTo(chartArea.right - arrowSize, boundedZeroY);
+    ctx.stroke();
+    drawArrowHead(chartArea.right, boundedZeroY, 0);
+
+    ctx.beginPath();
+    ctx.moveTo(boundedZeroX, boundedZeroY);
+    ctx.lineTo(chartArea.left, boundedZeroY);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(boundedZeroX, boundedZeroY);
+    ctx.lineTo(boundedZeroX, chartArea.top + arrowSize);
+    ctx.stroke();
+    drawArrowHead(boundedZeroX, chartArea.top, -Math.PI / 2);
+
+    ctx.beginPath();
+    ctx.moveTo(boundedZeroX, boundedZeroY);
+    ctx.lineTo(boundedZeroX, chartArea.bottom);
+    ctx.stroke();
+
+    const xTickOutsideSign = 1;
+    const yTickOutsideSign = -1;
+
+    ctx.lineWidth = 1.25;
+    ctx.font = "600 12px sans-serif";
+    ctx.textAlign = "center";
+
+    buildAxisTickValues(xScale).forEach(value => {
+      value = Number(value);
+
+      if (!Number.isFinite(value) || Math.abs(value) < 1e-12) {
+        return;
+      }
+
+      const x = xScale.getPixelForValue(value);
+
+      if (x <= chartArea.left + arrowSize || x >= chartArea.right - arrowSize) {
+        return;
+      }
+
+      drawTick(x, boundedZeroY, x, boundedZeroY + (xTickOutsideSign * tickLength));
+      ctx.fillText(formatTickLabel(value), x, boundedZeroY + (xTickOutsideSign * 20));
+    });
+
+    ctx.textAlign = yTickOutsideSign < 0 ? "right" : "left";
+    buildAxisTickValues(yScale).forEach(value => {
+      value = Number(value);
+
+      if (!Number.isFinite(value) || Math.abs(value) < 1e-12) {
+        return;
+      }
+
+      const y = yScale.getPixelForValue(value);
+
+      if (y <= chartArea.top + arrowSize || y >= chartArea.bottom - arrowSize) {
+        return;
+      }
+
+      drawTick(boundedZeroX, y, boundedZeroX + (yTickOutsideSign * tickLength), y);
+      ctx.fillText(formatTickLabel(value), boundedZeroX + (yTickOutsideSign * 14), y);
+    });
+
+    ctx.font = "700 13px sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("0", boundedZeroX - 7, boundedZeroY + 13);
+
+    ctx.font = "800 16px sans-serif";
+
+    ctx.textAlign = "right";
+    ctx.fillText("X", chartArea.right - 3, boundedZeroY + 16);
+
+    ctx.textAlign = "left";
+    ctx.fillText("Y", boundedZeroX + 14, chartArea.top + 4);
+
+    ctx.font = "800 15px sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(xScale.options.title.text, chartArea.right + 4, boundedZeroY - 1);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(yScale.options.title.text, boundedZeroX, chartArea.top - 18);
+
+    ctx.restore();
+  },
+};
+
+const canvasBackgroundPlugin = {
+  id: "canvasBackgroundPlugin",
+  beforeDraw(chart) {
+    const { ctx, width, height } = chart;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-over";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+  },
+};
 
 function downloadCurrentPlot() {
   if (!chartInstance) {
@@ -460,8 +1580,45 @@ function downloadCurrentPlot() {
   const link = document.createElement("a");
   const fileName =
     `${sanitizeFileName(yVariable.short_label)}_vs_${sanitizeFileName(xVariable.short_label)}.png`;
+  const sourceCanvas = chartInstance.canvas;
+  const chartArea = chartInstance.chartArea;
+  const exportPadding = 48;
+  const titleHeight = 46;
+  const exportCanvas = document.createElement("canvas");
+  const exportContext = exportCanvas.getContext("2d", { alpha: false });
+  const exportTitle = `${yVariable.short_label} vs ${xVariable.short_label}`;
+  const exportPlotOffsetX = 42;
+  const pixelRatioX = sourceCanvas.width / chartInstance.width;
+  const chartAreaCenterX = chartArea
+    ? ((chartArea.left + chartArea.right) / 2) * pixelRatioX
+    : sourceCanvas.width / 2;
 
-  link.href = chartInstance.toBase64Image("image/png", 1);
+  exportCanvas.width = sourceCanvas.width + (exportPadding * 2);
+  exportCanvas.height = sourceCanvas.height + (exportPadding * 2) + titleHeight;
+
+  exportContext.save();
+  exportContext.globalCompositeOperation = "source-over";
+  exportContext.fillStyle = "#ffffff";
+  exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+
+  exportContext.fillStyle = "#111827";
+  exportContext.font = "700 24px sans-serif";
+  exportContext.textAlign = "center";
+  exportContext.textBaseline = "middle";
+  exportContext.fillText(
+    exportTitle,
+    exportPadding + chartAreaCenterX + exportPlotOffsetX,
+    exportPadding + 12
+  );
+
+  exportContext.drawImage(
+    sourceCanvas,
+    exportPadding + exportPlotOffsetX,
+    exportPadding + titleHeight
+  );
+  exportContext.restore();
+
+  link.href = exportCanvas.toDataURL("image/png", 1);
   link.download = fileName;
   link.click();
 }
@@ -475,6 +1632,10 @@ function downloadCurrentPlot() {
     if (!xVariable || !yVariable) {
       plotStatus.textContent = "Please select both X and Y variables";
       return;
+    }
+
+    if (plotCustomLegendText) {
+      plotCustomLegendText.textContent = `${yVariable.short_label} vs ${xVariable.short_label}`;
     }
 
 
@@ -508,10 +1669,15 @@ function updateRawValues(xVariable, yVariable) {
     const points = [];
     for (let i = 0; i < pointCount; i += 1) {
       points.push({
-        x: xVariable.values[i],
-        y: yVariable.values[i],
+        x: Number(xVariable.values[i]),
+        y: Number(yVariable.values[i]),
       });
     }
+
+    const xRange = buildZeroInclusiveRange(points.map(point => point.x));
+    const yRange = buildZeroInclusiveRange(points.map(point => point.y));
+    const xTickStep = buildNiceTickStep(xRange.max, 4);
+    const yTickStep = buildNiceTickStep(yRange.max, 4);
 
     if (chartInstance) {
       chartInstance.destroy();
@@ -525,6 +1691,8 @@ function updateRawValues(xVariable, yVariable) {
             label: `${yVariable.short_label} vs ${xVariable.short_label}`,
             data: points,
             borderWidth: 2,
+            backgroundColor: "rgba(66, 153, 225, 0.28)",
+            borderColor: "#3182ce",
             pointRadius: 0,
             tension: 0,
           }
@@ -532,44 +1700,101 @@ function updateRawValues(xVariable, yVariable) {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         parsing: false,
+        plugins: {
+          legend: {
+            display: false,
+          },
+        },
+        onResize(chart) {
+          window.requestAnimationFrame(() => updatePlotTitlePosition(chart));
+        },
+        layout: {
+          padding: {
+            top: 56,
+            right: 150,
+            bottom: 56,
+            left: 56,
+          },
+        },
         scales: {
           x: {
             type: "linear",
+            min: xRange.min,
+            max: xRange.max,
+            border: {
+              display: false,
+            },
+            grid: {
+              color: "rgba(0, 0, 0, 0.08)",
+              drawTicks: false,
+            },
+            ticks: {
+              display: false,
+              maxTicksLimit: 11,
+              stepSize: xTickStep,
+            },
             title: {
-              display: true,
+              display: false,
               text: xVariable.short_label,
             }
           },
           y: {
+            min: yRange.min,
+            max: yRange.max,
+            border: {
+              display: false,
+            },
+            grid: {
+              color: "rgba(0, 0, 0, 0.08)",
+              drawTicks: false,
+            },
+            ticks: {
+              display: false,
+              maxTicksLimit: 9,
+              stepSize: yTickStep,
+            },
             title: {
-              display: true,
+              display: false,
               text: yVariable.short_label,
             }
           }
         }
-      }
+      },
+      plugins: [canvasBackgroundPlugin, zeroAxisPlugin],
     });
 
+updatePlotTitlePosition(chartInstance);
 updateRawValues(xVariable, yVariable);
 
 if (xVariable.values.length !== yVariable.values.length) {
   plotStatus.textContent =
-    `Showing ${yVariable.short_label} vs ${xVariable.short_label} (${pointCount} shared points). Raw arrays have different lengths.`;
+    `Showing ${yVariable.short_label} vs ${xVariable.short_label} as signed values (${pointCount} shared points). Raw arrays have different lengths.`;
 } else {
   plotStatus.textContent =
-    `Showing ${yVariable.short_label} vs ${xVariable.short_label} (${pointCount} points)`;
+    `Showing ${yVariable.short_label} vs ${xVariable.short_label} as signed values (${pointCount} points)`;
 }
   }
 
 
     if (plotVariables.length > 0 && xSelect && ySelect && canvas) {
-      populatePlotSelect(xSelect, findDefaultKey("strain_"));
-      populatePlotSelect(ySelect, findDefaultKey("stress_"));
+      const xPlotVariables = getXPlotVariables();
+      const yPlotVariables = getYPlotVariables();
 
-      xSelect.addEventListener("change", renderPlot);
-      ySelect.addEventListener("change", renderPlot);
+      populatePlotSelect(xSelect, xPlotVariables, xPlotVariables[0] ? xPlotVariables[0].key : "");
+      populatePlotSelect(ySelect, yPlotVariables, yPlotVariables[0] ? yPlotVariables[0].key : "");
+
+      syncYVariableToX();
+
+      xSelect.addEventListener("change", function () {
+        syncYVariableToX();
+        renderPlot();
+      });
+      ySelect.addEventListener("change", function () {
+        syncXVariableToY();
+        renderPlot();
+      });
 
       if (downloadPlotButton) {
         downloadPlotButton.addEventListener("click", downloadCurrentPlot);
@@ -580,6 +1805,7 @@ if (xVariable.values.length !== yVariable.values.length) {
       }
     }
 
+    renderMechanicalBcCube();
 
 
 

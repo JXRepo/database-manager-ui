@@ -1,0 +1,70 @@
+{% for child in rows %}
+  {% if child.type == "group" %}
+    <details class="detail-subgroup">
+      <summary class="detail-subgroup-summary">
+        <span class="detail-subgroup-title">{{ child.label }}</span>
+        <span class="detail-group-count">{{ child.children|length }} fields</span>
+      </summary>
+
+      <div class="detail-subgroup-children">
+        {% include "pages/detail_group_children.html" with rows=child.children %}
+      </div>
+    </details>
+
+  {% elif child.type == "string" %}
+    <div class="detail-child-row">
+      <div class="detail-child-label">{{ child.label }}</div>
+      <div class="detail-child-value">{{ child.value }}</div>
+    </div>
+
+  {% elif child.type == "number" %}
+    <div class="detail-child-row">
+      <div class="detail-child-label">{{ child.label }}</div>
+      <div class="detail-child-value">{{ child.value }}</div>
+    </div>
+
+  {% elif child.type == "string_list" %}
+    <div class="detail-child-row">
+      <div class="detail-child-label">{{ child.label }}</div>
+
+      {% if child.value|length == 1 %}
+        <div class="detail-child-value">{{ child.value.0 }}</div>
+      {% else %}
+        <div class="detail-inline-list">
+          {% for item in child.value %}
+            <span class="detail-chip">{{ item }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+  {% elif child.type == "numeric_array" %}
+    <div class="detail-child-row">
+      <div class="detail-child-label">{{ child.label }}</div>
+      <div class="array-summary">
+        <span>Numeric array</span>
+        <span class="array-badge">{{ child.count }} values</span>
+      </div>
+
+      <div class="array-toggle">
+        <button
+          class="btn btn-outline-secondary btn-sm"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+          aria-expanded="false"
+          aria-controls="child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+        >
+          Show values
+        </button>
+
+        <div class="collapse" id="child-array-{{ child.label|slugify }}-{{ forloop.counter }}">
+          <pre class="array-box">{{ child.json_value }}</pre>
+        </div>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="detail-empty">Unsupported field</div>
+  {% endif %}
+{% endfor %}
