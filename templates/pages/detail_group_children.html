@@ -3,7 +3,7 @@
     <details class="detail-subgroup">
       <summary class="detail-subgroup-summary">
         <span class="detail-subgroup-title">{{ child.label }}</span>
-        <span class="detail-group-count">{{ child.children|length }} fields</span>
+        <span class="detail-group-count">{{ child.count }} fields</span>
       </summary>
 
       <div class="detail-subgroup-children">
@@ -41,25 +41,27 @@
   {% elif child.type == "numeric_array" %}
     <div class="detail-child-row">
       <div class="detail-child-label">{{ child.label }}</div>
-      <div class="array-summary">
-        <span>Numeric array</span>
-        <span class="array-badge">{{ child.count }} values</span>
-      </div>
+      <div class="detail-child-content">
+        <div class="array-summary">
+          <span>Numeric array</span>
+          <span class="array-badge">{{ child.count }} values</span>
+        </div>
 
-      <div class="array-toggle">
-        <button
-          class="btn btn-outline-secondary btn-sm"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
-          aria-expanded="false"
-          aria-controls="child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
-        >
-          Show values
-        </button>
+        <div class="array-toggle">
+          <button
+            class="btn btn-outline-secondary btn-sm"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+            aria-expanded="false"
+            aria-controls="child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+          >
+            Show values
+          </button>
 
-        <div class="collapse" id="child-array-{{ child.label|slugify }}-{{ forloop.counter }}">
-          <pre class="array-box">{{ child.json_value }}</pre>
+          <div class="collapse" id="child-array-{{ child.label|slugify }}-{{ forloop.counter }}">
+            <pre class="array-box">{{ child.json_value }}</pre>
+          </div>
         </div>
       </div>
     </div>

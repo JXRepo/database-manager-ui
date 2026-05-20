@@ -8,6 +8,9 @@ from .views import (
     json_data_list_view,
     json_data_detail_view,
     json_data_delete_view,
+    json_data_export_view,
+    json_data_sharing_view,
+    shared_with_me_view,
     export_selected_search_results_view,
     search_view,
 )
@@ -28,6 +31,9 @@ urlpatterns = [
     path("search/", search_view, name="search"),
     path("search/export-selected/", export_selected_search_results_view, name="export_selected_search_results"),
     path("data-list/", json_data_list_view, name="json_data_list"),
+    path("shared-with-me/", shared_with_me_view, name="shared_with_me"),
     path("data-list/<int:pk>/", json_data_detail_view, name="json_data_detail"),
+    path("data-list/<int:pk>/export/", json_data_export_view, name="json_data_export"),
+    path("data-list/<int:pk>/sharing/", json_data_sharing_view, name="json_data_sharing"),
     path("data-list/<int:pk>/delete/", json_data_delete_view, name="json_data_delete"),
 ]

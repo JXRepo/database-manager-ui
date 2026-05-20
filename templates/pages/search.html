@@ -227,6 +227,15 @@
     font-weight: 600;
   }
 
+  .badge-shared {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
   .selection-count {
     color: #6b7280;
     font-size: 0.9rem;
@@ -548,7 +557,7 @@
                       class="form-check-input result-checkbox"
                       name="selected_objects"
                       value="{{ obj.id }}"
-                      aria-label="Select {{ obj.data.title|default:obj.data.identifier|default:'data object' }}"
+                      aria-label="Select {{ obj.search_display_name }}"
                     >
                   </div>
 
@@ -563,7 +572,7 @@
                     <div class="summary-grid">
                       <span class="summary-value">
                         <span class="main">
-                          {{ obj.data.title|default:obj.data.identifier|default:"Object" }}
+                          {{ obj.search_display_name }}
                         </span>
                         &nbsp;|&nbsp;
                         <span class="time">
@@ -591,6 +600,11 @@
                             {% if field.value == "Public" %}
                               <span class="badge badge-public">
                                 <i data-feather="unlock" class="badge-icon"></i>
+                                {{ field.value }}
+                              </span>
+                            {% elif field.value == "Shared" %}
+                              <span class="badge badge-shared">
+                                <i data-feather="users" class="badge-icon"></i>
                                 {{ field.value }}
                               </span>
                             {% else %}

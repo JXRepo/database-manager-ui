@@ -47,6 +47,11 @@ class JSONData(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     data = models.JSONField()
     access_type = models.CharField(max_length=10, default="c")
+    shared_users = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name="shared_json_data",
+    )
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

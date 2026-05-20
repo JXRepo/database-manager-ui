@@ -3,6 +3,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import Http404, HttpResponse
 from django.contrib.auth import login
+from django.contrib.auth.models import User
 from apps.pages.models import Product
 from django.core import serializers
 from django.contrib.auth.decorators import login_required
@@ -426,8 +427,10 @@ def _prepare_list_object(obj):
     """
     data = obj.data or {}
     summary_fields = _build_summary_fields(data)
+    obj.list_display_name = data.get("identifier") or data.get("title") or "Object"
+    obj.search_display_name = data.get("title") or data.get("identifier") or "Object"
 
-    access_display = "Public" if obj.access_type == "all" else "Private"
+    access_display = _get_access_display(obj)
     summary_fields.append(
         {
             "label": "Access",
@@ -438,6 +441,51 @@ def _prepare_list_object(obj):
 
     obj.summary_fields = summary_fields
     return obj
+
+
+def _build_data_object_filename(obj):
+    """
+    Build a compact JSON filename for one data object
+    """
+    data = obj.data or {}
+    label = str(data.get("identifier") or data.get("title") or f"data_object_{obj.pk}")
+    filename = []
+
+    for character in label.strip():
+        if character.isalnum() or character in {"-", "_"}:
+            filename.append(character)
+        else:
+            filename.append("_")
+
+    safe_name = "".join(filename).strip("_")[:80]
+
+    if not safe_name:
+        safe_name = f"data_object_{obj.pk}"
+
+    return f"{safe_name}.json"
+
+
+def _get_access_display(obj):
+    """
+    Return the access label shown in object summaries.
+
+    Parameters
+    ----------
+    obj : JSONData
+        Data object to inspect.
+
+    Returns
+    -------
+    str
+        Public, Shared, or Private.
+    """
+    if obj.access_type == "all":
+        return "Public"
+
+    if obj.shared_users.exists():
+        return "Shared"
+
+    return "Private"
 
 
 def _is_shared_with_user(data, user):
@@ -482,12 +530,65 @@ def _user_can_access_object(obj, user):
     if obj.access_type == "all":
         return True
 
-    return _is_shared_with_user(obj.data or {}, user)
+    if obj.shared_users.filter(pk=user.pk).exists():
+        return True
+
+    return False
 
 
+def _user_has_specific_share(obj, user):
+    """
+    Return True when access comes from a specific share.
+
+    Parameters
+    ----------
+    obj : JSONData
+        Data object to inspect.
+    user : User
+        Current user.
+
+    Returns
+    -------
+    bool
+        True when the user is not the owner and is explicitly shared.
+    """
+    if obj.owner_id == user.id:
+        return False
+
+    if obj.access_type == "all":
+        return False
+
+    if obj.shared_users.filter(pk=user.pk).exists():
+        return True
+
+    return False
 
 
+def _find_share_user(identifier):
+    """
+    Find a user by username or email.
 
+    Parameters
+    ----------
+    identifier : str
+        Username or email address.
+
+    Returns
+    -------
+    User or None
+        Matching user, when one exists.
+    """
+    value = (identifier or "").strip()
+
+    if not value:
+        return None
+
+    username_match = User.objects.filter(username__iexact=value).first()
+
+    if username_match:
+        return username_match
+
+    return User.objects.filter(email__iexact=value).first()
 
 
 @login_required
@@ -495,12 +596,51 @@ def json_data_list_view(request):
     """
     Display uploaded JSON data objects for the current user
     """
-    data_objects = JSONData.objects.filter(owner=request.user).order_by("-uploaded_at")
+    data_objects = (
+        JSONData.objects
+        .filter(owner=request.user)
+        .prefetch_related("shared_users")
+        .order_by("-uploaded_at")
+    )
     prepared_objects = [_prepare_list_object(obj) for obj in data_objects]
 
     context = {
         "segment": "data_list",
+        "page_title": "My Data",
+        "page_heading": "My Data",
+        "breadcrumb_label": "My Data",
+        "card_title": "My Uploaded Data Objects",
         "data_objects": prepared_objects,
+        "empty_message": "No uploaded data found",
+        "show_delete": True,
+    }
+    return render(request, "pages/data_list.html", context)
+
+
+@login_required
+def shared_with_me_view(request):
+    """
+    Display data objects explicitly shared with the current user
+    """
+    data_objects = (
+        JSONData.objects
+        .filter(shared_users=request.user)
+        .exclude(owner=request.user)
+        .select_related("owner")
+        .prefetch_related("shared_users")
+        .order_by("-uploaded_at")
+    )
+    prepared_objects = [_prepare_list_object(obj) for obj in data_objects]
+
+    context = {
+        "segment": "shared_with_me",
+        "page_title": "Shared with Me",
+        "page_heading": "Shared with Me",
+        "breadcrumb_label": "Shared with Me",
+        "card_title": "Data Objects Shared with Me",
+        "data_objects": prepared_objects,
+        "empty_message": "No data objects have been shared with you yet",
+        "show_delete": False,
     }
     return render(request, "pages/data_list.html", context)
 
@@ -519,6 +659,9 @@ def search_view(request):
     owner_name = request.GET.get("owner", "").strip()
     access = request.GET.get("access", "").strip()
 
+    if access not in {"public", "my_private"}:
+        access = ""
+
     search_performed = any(
         [
             keyword,
@@ -535,7 +678,12 @@ def search_view(request):
     filtered_objects = []
 
     if search_performed:
-        data_objects = JSONData.objects.select_related("owner").order_by("-uploaded_at")
+        data_objects = (
+            JSONData.objects
+            .select_related("owner")
+            .prefetch_related("shared_users")
+            .order_by("-uploaded_at")
+        )
 
         for obj in data_objects:
             if not _user_can_access_object(obj, request.user):
@@ -554,7 +702,9 @@ def search_view(request):
             phase_text = _normalize_search_value(data.get("phase", ""))
             owner_text = _normalize_search_value(obj.owner.username)
 
-            if obj.owner_id == request.user.id and obj.access_type == "c":
+            if _user_has_specific_share(obj, request.user):
+                access_text = "shared with me"
+            elif obj.owner_id == request.user.id and obj.access_type == "c":
                 access_text = "my private"
             elif obj.access_type == "all":
                 access_text = "public"
@@ -631,7 +781,12 @@ def export_selected_search_results_view(request):
             continue
 
         try:
-            obj = JSONData.objects.select_related("owner").get(pk=object_id)
+            obj = (
+                JSONData.objects
+                .select_related("owner")
+                .prefetch_related("shared_users")
+                .get(pk=object_id)
+            )
         except JSONData.DoesNotExist:
             continue
 
@@ -647,6 +802,27 @@ def export_selected_search_results_view(request):
     content = json.dumps(exported_objects, indent=2, ensure_ascii=False)
     response = HttpResponse(content, content_type="application/json")
     response["Content-Disposition"] = 'attachment; filename="selected_data_objects.json"'
+    return response
+
+
+@login_required
+def json_data_export_view(request, pk):
+    """
+    Export one accessible JSON data object
+    """
+    obj = get_object_or_404(
+        JSONData.objects.select_related("owner").prefetch_related("shared_users"),
+        pk=pk,
+    )
+
+    if not _user_can_access_object(obj, request.user):
+        raise Http404("Data object not found")
+
+    content = json.dumps(obj.data or {}, indent=2, ensure_ascii=False)
+    response = HttpResponse(content, content_type="application/json")
+    response["Content-Disposition"] = (
+        f'attachment; filename="{_build_data_object_filename(obj)}"'
+    )
     return response
 
 
@@ -764,15 +940,38 @@ def _build_detail_rows(data, prefix=""):
 
 
 def _find_group_child(children, label):
-    """Return the existing group child with the given label if present"""
+    """Return an existing group child with the matching label
+
+    Parameters
+    ----------
+    children : list
+        Candidate child rows in the temporary group tree.
+    label : str
+        Group label to find.
+
+    Returns
+    -------
+    dict or None
+        The matching group row, or None when no match exists.
+    """
     for child in children:
-        if child.get("type") == "group" and child.get("label") == label:
+        if child.get("type") == "_group" and child.get("label") == label:
             return child
     return None
 
 
-def _insert_grouped_child(children, parts, row):
-    """Insert one detail row into a nested group structure"""
+def _insert_auto_grouped_child(children, parts, row):
+    """Insert one detail row into a nested group tree
+
+    Parameters
+    ----------
+    children : list
+        Mutable list of child rows at the current tree level.
+    parts : list
+        Ordered path parts for the row label.
+    row : dict
+        Detail row to insert.
+    """
     if not parts:
         return
 
@@ -787,56 +986,250 @@ def _insert_grouped_child(children, parts, row):
 
     if group_node is None:
         group_node = {
-            "type": "group",
+            "type": "_group",
             "label": group_label,
             "children": [],
         }
         children.append(group_node)
 
-    _insert_grouped_child(group_node["children"], parts[1:], row)
+    _insert_auto_grouped_child(group_node["children"], parts[1:], row)
 
 
-def _group_detail_rows(detail_rows):
-    """Group selected hierarchical rows into nested collapsible sections"""
-    groupable_parents = {
-        "origin": "origin",
-        "mechanical_BC": "mechanical_BC",
-        "phase": "phase",
-        "stress": "stress",
-        "total_strain": "total_strain",
-        "plastic_strain": "plastic_strain",
-        "material": "material",
-        "units": "units",
+def _count_group_leaves(node):
+    """Count displayable leaf rows under a temporary group node
+
+    Parameters
+    ----------
+    node : dict
+        Temporary group node or detail row.
+
+    Returns
+    -------
+    int
+        Number of leaf rows below the node.
+    """
+    if node.get("type") != "_group":
+        return 1
+
+    return sum(_count_group_leaves(child) for child in node.get("children", []))
+
+
+def _flatten_group_node(node, prefix=None):
+    """Flatten a temporary group that does not need a collapsible section
+
+    Parameters
+    ----------
+    node : dict
+        Temporary group node to flatten.
+    prefix : list, optional
+        Parent labels already collected for the flattened label.
+
+    Returns
+    -------
+    list
+        Detail rows with restored slash-separated labels.
+    """
+    prefix = list(prefix or []) + [node.get("label", "")]
+    rows = []
+
+    for child in node.get("children", []):
+        if child.get("type") == "_group":
+            rows.extend(_flatten_group_node(child, prefix))
+            continue
+
+        leaf_row = child.copy()
+        leaf_row["label"] = " / ".join(prefix + [str(child.get("label", ""))])
+        rows.append(leaf_row)
+
+    return rows
+
+
+def _finalize_group_node(node):
+    """Convert a temporary group tree into a template-ready group
+
+    Parameters
+    ----------
+    node : dict
+        Temporary group node.
+
+    Returns
+    -------
+    dict
+        Collapsible group row used by the templates.
+    """
+    children = []
+
+    for child in node.get("children", []):
+        if child.get("type") != "_group":
+            children.append(child)
+            continue
+
+        if _count_group_leaves(child) >= 2:
+            children.append(_finalize_group_node(child))
+        else:
+            children.extend(_flatten_group_node(child))
+
+    return {
+        "type": "group",
+        "label": node.get("label", ""),
+        "children": children,
+        "count": _count_group_leaves(node),
     }
+
+
+def _split_flat_group_label(label):
+    """Split a flat metadata label into a group prefix and child label
+
+    Parameters
+    ----------
+    label : str
+        Flat field label to inspect.
+
+    Returns
+    -------
+    tuple or None
+        The prefix and child label when a supported split is found.
+    """
+    if not isinstance(label, str) or " / " in label:
+        return None
+
+    for separator in ("_", "-"):
+        if separator in label:
+            prefix, child = label.split(separator, 1)
+
+            if prefix.strip() and child.strip():
+                return prefix.strip(), child.strip()
+
+    for index, character in enumerate(label[1:], start=1):
+        if character.isupper():
+            prefix = label[:index].strip()
+            child = label[index:].strip()
+
+            if prefix and child:
+                return prefix, child
+
+            break
+
+    return None
+
+
+def _group_repeated_flat_roots(rows):
+    """Group top-level fields that share a repeated flat-name prefix
+
+    Parameters
+    ----------
+    rows : list
+        Detail rows after nested JSON path grouping.
+
+    Returns
+    -------
+    list
+        Rows with repeated flat prefixes converted into groups.
+    """
+    prefix_counts = {}
+
+    for row in rows:
+        label = str(row.get("label", ""))
+        split_label = _split_flat_group_label(label)
+
+        if split_label is None:
+            continue
+
+        prefix, _child = split_label
+
+        if prefix:
+            prefix_counts[prefix] = prefix_counts.get(prefix, 0) + 1
+
+    for row in rows:
+        label = str(row.get("label", ""))
+
+        if " / " in label:
+            continue
+
+        if label in prefix_counts:
+            prefix_counts[label] += 1
+
+    repeated_prefixes = {
+        prefix
+        for prefix, count in prefix_counts.items()
+        if count >= 2
+    }
+
+    if not repeated_prefixes:
+        return rows
 
     grouped_rows = []
     root_groups = {}
 
+    for row in rows:
+        label = str(row.get("label", ""))
+        split_label = _split_flat_group_label(label)
+        matched_prefix = None
+
+        if label in repeated_prefixes:
+            matched_prefix = label
+            child_label = "value"
+        elif split_label is not None and split_label[0] in repeated_prefixes:
+            matched_prefix, child_label = split_label
+        else:
+            child_label = label
+
+        if matched_prefix is None:
+            grouped_rows.append(row)
+            continue
+
+        if matched_prefix not in root_groups:
+            root_groups[matched_prefix] = {
+                "type": "_group",
+                "label": matched_prefix,
+                "children": [],
+            }
+            grouped_rows.append(root_groups[matched_prefix])
+
+        child_row = row.copy()
+        child_row["label"] = child_label
+        root_groups[matched_prefix]["children"].append(child_row)
+
+    return grouped_rows
+
+
+def _group_detail_rows(detail_rows):
+    """Group hierarchical detail rows into nested collapsible sections
+
+    Parameters
+    ----------
+    detail_rows : list
+        Flat detail rows built from the JSON object.
+
+    Returns
+    -------
+    list
+        Detail rows and collapsible groups ready for rendering.
+    """
+    tree_rows = []
+
     for row in detail_rows:
         label = row.get("label", "")
-        matched_root = None
 
         if isinstance(label, str) and " / " in label:
-            root_label, remainder = label.split(" / ", 1)
+            _insert_auto_grouped_child(tree_rows, label.split(" / "), row)
+            continue
 
-            if root_label in groupable_parents:
-                if root_label not in root_groups:
-                    root_groups[root_label] = {
-                        "type": "group",
-                        "label": groupable_parents[root_label],
-                        "children": [],
-                    }
-                    grouped_rows.append(root_groups[root_label])
+        tree_rows.append(row)
 
-                _insert_grouped_child(
-                    root_groups[root_label]["children"],
-                    remainder.split(" / "),
-                    row,
-                )
-                matched_root = root_label
+    tree_rows = _group_repeated_flat_roots(tree_rows)
 
-        if matched_root is None:
+    grouped_rows = []
+
+    for row in tree_rows:
+        if row.get("type") != "_group":
             grouped_rows.append(row)
+            continue
+
+        if _count_group_leaves(row) >= 2:
+            grouped_rows.append(_finalize_group_node(row))
+        else:
+            grouped_rows.extend(_flatten_group_node(row))
 
     return grouped_rows
 
@@ -844,7 +1237,31 @@ def _group_detail_rows(detail_rows):
 
 PLOT_FIELD_PREFIXES = ("stress_", "strain_", "plastic_strain_")
 
-def _extract_plot_variables(data, prefix=""):
+
+def _get_plot_variable_unit(key, units):
+    """
+    Return the unit label for a plot variable
+    """
+    if not isinstance(units, dict):
+        return ""
+
+    if key.startswith("stress_"):
+        unit = units.get("Stress", "")
+    elif key.startswith(("strain_", "plastic_strain_")):
+        unit = units.get("Strain", "")
+    else:
+        unit = ""
+
+    if unit in ("", None):
+        return ""
+
+    if unit == 1 or str(unit).strip() == "1":
+        return "-"
+
+    return str(unit)
+
+
+def _extract_plot_variables(data, prefix="", units=None):
     """
     Recursively extract plot-ready numeric arrays for mechanical variables
     """
@@ -860,16 +1277,17 @@ def _extract_plot_variables(data, prefix=""):
                         "key": full_key,
                         "label": _format_plot_variable_label(full_key),
                         "short_label": key,
+                        "unit": _get_plot_variable_unit(key, units),
                         "values": value,
                     }
                 )
             else:
-                variables.extend(_extract_plot_variables(value, full_key))
+                variables.extend(_extract_plot_variables(value, full_key, units))
 
     elif isinstance(data, list):
         for index, item in enumerate(data):
             item_prefix = f"{prefix}[{index}]"
-            variables.extend(_extract_plot_variables(item, item_prefix))
+            variables.extend(_extract_plot_variables(item, item_prefix, units))
 
     return variables
 
@@ -879,6 +1297,11 @@ def _format_plot_variable_label(path):
     Format a plot variable label with the parent group and field name
     """
     parts = [part for part in _format_detail_label(path).split(" / ") if part]
+
+    if len(parts) >= 2 and parts[-2] in {"total_strain", "plastic_strain", "stress"}:
+        group_label = parts[-2].replace("_", " ").capitalize()
+        return f"{group_label}: {parts[-1]}"
+
     return parts[-1] if parts else path
 
 
@@ -982,6 +1405,54 @@ def _build_mechanical_bc_items(data):
 
 @login_required
 @require_POST
+def json_data_sharing_view(request, pk):
+    """
+    Update sharing settings for one data object.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Incoming POST request.
+    pk : int
+        Data object primary key.
+
+    Returns
+    -------
+    HttpResponse
+        Redirect to the detail page.
+    """
+    obj = get_object_or_404(JSONData, pk=pk, owner=request.user)
+    action = request.POST.get("action", "").strip()
+
+    if action == "add_user":
+        identifier = request.POST.get("share_user", "")
+        share_user = _find_share_user(identifier)
+
+        if share_user is None:
+            messages.error(request, "No user was found with that username or email.")
+            return redirect("json_data_detail", pk=obj.pk)
+
+        if share_user == request.user:
+            messages.error(request, "You already own this data object.")
+            return redirect("json_data_detail", pk=obj.pk)
+
+        obj.shared_users.add(share_user)
+        messages.success(request, f"Shared with {share_user.username}.")
+        return redirect("json_data_detail", pk=obj.pk)
+
+    if action == "remove_user":
+        user_id = request.POST.get("user_id")
+        share_user = get_object_or_404(User, pk=user_id)
+        obj.shared_users.remove(share_user)
+        messages.success(request, f"Removed sharing for {share_user.username}.")
+        return redirect("json_data_detail", pk=obj.pk)
+
+    messages.error(request, "Choose a valid sharing action.")
+    return redirect("json_data_detail", pk=obj.pk)
+
+
+@login_required
+@require_POST
 def json_data_delete_view(request, pk):
     """
     Delete one JSON data object owned by the current user
@@ -1001,7 +1472,10 @@ def json_data_detail_view(request, pk):
     """
     Display a user-friendly detail page for one accessible JSON data object
     """
-    obj = get_object_or_404(JSONData.objects.select_related("owner"), pk=pk)
+    obj = get_object_or_404(
+        JSONData.objects.select_related("owner").prefetch_related("shared_users"),
+        pk=pk,
+    )
 
     if not _user_can_access_object(obj, request.user):
         raise Http404("Data object not found")
@@ -1013,13 +1487,30 @@ def json_data_detail_view(request, pk):
         if row["type"] in {"string", "string_list", "number", "numeric_array"}
     ]
     display_rows = _group_detail_rows(display_rows)
-    plot_variables = _extract_plot_variables(obj.data or {})
+    plot_variables = _extract_plot_variables(
+        obj.data or {},
+        units=(obj.data or {}).get("units", {}),
+    )
     mechanical_bc_items = _build_mechanical_bc_items(obj.data or {})
+    is_owner = obj.owner_id == request.user.id
+
+    if is_owner:
+        detail_back_url_name = "json_data_list"
+        detail_back_label = "Back to My Data"
+    elif _user_has_specific_share(obj, request.user):
+        detail_back_url_name = "shared_with_me"
+        detail_back_label = "Back to Shared with Me"
+    else:
+        detail_back_url_name = "search"
+        detail_back_label = "Back to Search"
 
     context = {
         "data_object": obj,
         "detail_rows": display_rows,
         "plot_variables": plot_variables,
         "mechanical_bc_items": mechanical_bc_items,
+        "shared_users": obj.shared_users.order_by("username"),
+        "detail_back_url_name": detail_back_url_name,
+        "detail_back_label": detail_back_label,
     }
     return render(request, "pages/data_detail.html", context)

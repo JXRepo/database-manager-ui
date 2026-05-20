@@ -288,6 +288,72 @@ details[open] > .detail-group-summary {
   margin-top: 18px;
 }
 
+.sharing-panel {
+  margin-top: 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.sharing-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.sharing-panel-title {
+  margin: 0;
+  color: #111827;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.sharing-panel-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.sharing-add-form,
+.sharing-user-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sharing-add-form input {
+  max-width: 260px;
+}
+
+.sharing-user-list {
+  display: grid;
+  gap: 8px;
+}
+
+.sharing-user-row {
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid #edf0f5;
+  border-radius: 10px;
+  background: #fbfdff;
+}
+
+.sharing-user-name {
+  color: #374151;
+  font-weight: 600;
+}
+
+.sharing-empty {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
 
     .bc-panel {
       background: #ffffff;
@@ -319,39 +385,68 @@ details[open] > .detail-group-summary {
     }
 
     .bc-cube-wrap {
+      position: relative;
       background: #fbfdff;
       border: 1px solid #e5e7eb;
       border-radius: 16px;
       padding: 12px;
-      min-height: 400px;
+      min-height: 0;
+      max-width: 460px;
+      margin: 0 auto;
     }
 
-    .bc-cube-svg {
+    .bc-cube-plot {
       width: 100%;
-      height: 400px;
+      aspect-ratio: 1 / 1;
+      height: auto;
       display: block;
     }
 
+    .bc-cube-plot .modebar {
+      display: none !important;
+    }
+
+    .bc-axis-overlay {
+      position: absolute;
+      right: 22px;
+      bottom: 20px;
+      width: 82px;
+      height: 68px;
+      pointer-events: none;
+    }
+
+    .bc-axis-overlay line {
+      stroke: #4b5563;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+    }
+
+    .bc-axis-overlay text {
+      fill: #374151;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
     .bc-edge {
-      stroke: #9ca3af;
-      stroke-width: 2;
+      stroke: #9aa4b2;
+      stroke-width: 2.1;
       fill: none;
     }
 
     .bc-edge-back {
-      stroke: #cbd5e1;
-      stroke-width: 1.5;
+      stroke: #cfd7e3;
+      stroke-width: 1.7;
     }
 
     .bc-node {
       fill: #ffffff;
-      stroke: #1f2937;
-      stroke-width: 2;
+      stroke: #9ca3af;
+      stroke-width: 1.5;
     }
 
     .bc-node-active {
-      fill: #e0f2fe;
-      stroke: #0369a1;
+      fill: #111827;
+      stroke: #111827;
     }
 
     .bc-label {
@@ -366,15 +461,16 @@ details[open] > .detail-group-summary {
 
     .bc-arrow {
       stroke: #dc2626;
-      stroke-width: 2.6;
+      stroke-width: 2.2;
       fill: none;
       marker-end: url(#bc-arrow-head);
     }
 
     .bc-fixed {
-      fill: #f8fafc;
+      fill: #2563eb;
       stroke: #2563eb;
-      stroke-width: 2;
+      stroke-width: 1.2;
+      stroke-linejoin: round;
     }
 
     .bc-fixed-label {
@@ -430,28 +526,17 @@ details[open] > .detail-group-summary {
     }
 
     .bc-legend-arrow {
-      width: 22px;
-      height: 0;
-      border-top: 3px solid #dc2626;
-      position: relative;
-    }
-
-    .bc-legend-arrow::after {
-      content: "";
-      position: absolute;
-      right: -1px;
-      top: -6px;
-      border-left: 8px solid #dc2626;
-      border-top: 5px solid transparent;
-      border-bottom: 5px solid transparent;
+      width: 28px;
+      height: 16px;
+      display: inline-block;
+      flex: 0 0 auto;
     }
 
     .bc-legend-fixed {
-      width: 0;
-      height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-bottom: 14px solid #2563eb;
+      width: 20px;
+      height: 16px;
+      display: inline-block;
+      flex: 0 0 auto;
     }
 
     .bc-table-wrap {
@@ -553,9 +638,9 @@ details[open] > .detail-group-summary {
       border: none;
       border-radius: 0;
       padding: 0;
-      max-width: 680px;
+      max-width: 780px;
       margin: 0 auto;
-      transform: translateX(-32px);
+      transform: none;
     }
 
     @media (max-width: 992px) {
@@ -578,7 +663,7 @@ details[open] > .detail-group-summary {
 
     #mechanical-plot {
       width: 100% !important;
-      height: 520px !important;
+      height: 500px !important;
       display: block;
     }
 
@@ -682,6 +767,200 @@ details[open] > .detail-group-summary {
   border: 1px solid #dbeafe;
 }
 
+.detail-metadata-list {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.detail-metadata-list .detail-row-card {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin: 0;
+  padding: 11px 18px;
+  border: 0;
+  border-bottom: 1px solid #edf0f5;
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: none;
+  transition: background 0.15s ease;
+}
+
+.detail-metadata-list .detail-row-card:last-child {
+  border-bottom: 0;
+}
+
+.detail-metadata-list .detail-row-card:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: #edf0f5;
+  background: #f8fbff;
+}
+
+.detail-metadata-list .detail-label,
+.detail-metadata-list .detail-child-label {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  margin: 0;
+  color: #365f9f;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+.detail-metadata-list .detail-label::before,
+.detail-metadata-list .detail-child-label::before {
+  content: "";
+}
+
+.detail-metadata-list .detail-value,
+.detail-metadata-list .detail-child-value,
+.detail-metadata-list .detail-value-block,
+.detail-metadata-list .detail-child-content {
+  min-width: 0;
+  color: #1f2937;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.detail-metadata-list .detail-group {
+  grid-column: 1 / -1;
+}
+
+.detail-metadata-list .detail-group-summary {
+  display: grid;
+  grid-template-columns: 14px minmax(0, auto) auto;
+  column-gap: 8px;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 0;
+}
+
+.detail-metadata-list .detail-group-summary-left {
+  display: contents;
+}
+
+.detail-metadata-list .detail-group-summary-left::before {
+  content: "▸";
+  grid-column: 1;
+  font-size: 0.8rem;
+  color: #6b7280;
+  transition: transform 0.2s ease;
+}
+
+.detail-metadata-list .detail-group-count {
+  grid-column: 3;
+  padding: 3px 9px;
+  background: #eef4ff;
+  color: #4f6f9f;
+  font-size: 0.76rem;
+}
+
+.detail-metadata-list details[open] > .detail-group-summary {
+  margin-bottom: 0;
+}
+
+.detail-metadata-list details[open] > .detail-group-summary .detail-group-summary-left::before {
+  transform: rotate(90deg);
+}
+
+.detail-metadata-list .detail-group-children {
+  margin-left: 28px;
+  margin-top: 10px;
+  padding: 10px 0 2px 16px;
+  border-left: 2px solid #e5ecf7;
+  display: grid;
+  gap: 0;
+}
+
+.detail-metadata-list .detail-child-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 190px) minmax(0, 1fr);
+  gap: 14px;
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid #f0f2f6;
+  border-radius: 0;
+  background: transparent;
+}
+
+.detail-metadata-list .detail-child-row:last-child {
+  border-bottom: 0;
+}
+
+.detail-metadata-list .detail-subgroup {
+  border: 0;
+  border-bottom: 1px solid #f0f2f6;
+  border-radius: 0;
+  background: transparent;
+}
+
+.detail-metadata-list .detail-subgroup:last-child {
+  border-bottom: 0;
+}
+
+.detail-metadata-list .detail-subgroup-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  color: #365f9f;
+}
+
+.detail-metadata-list .detail-subgroup-summary::before {
+  font-size: 0.8rem;
+}
+
+.detail-metadata-list .detail-subgroup-title {
+  color: #365f9f;
+}
+
+.detail-metadata-list .detail-subgroup-children {
+  padding: 0 0 0 18px;
+  border-left: 2px solid #edf2fb;
+  gap: 0;
+}
+
+.detail-metadata-list .detail-inline-list {
+  gap: 6px;
+}
+
+.detail-metadata-list .detail-chip {
+  padding: 4px 9px;
+  font-size: 0.88rem;
+}
+
+.detail-metadata-list .detail-value-truncated {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-metadata-list .array-toggle {
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .detail-metadata-list .detail-row-card,
+  .detail-metadata-list .detail-child-row {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .detail-metadata-list .detail-group-children {
+    margin-left: 0;
+    padding-left: 12px;
+  }
+}
+
 
 
 </style>
@@ -714,6 +993,7 @@ details[open] > .detail-group-summary {
 
 
       <div class="card-body">
+<div class="detail-metadata-list">
 {% for row in detail_rows %}
   <div class="detail-row-card">
 
@@ -722,7 +1002,7 @@ details[open] > .detail-group-summary {
     <summary class="detail-group-summary">
       <span class="detail-group-summary-left">
         <span class="detail-group-summary-title">{{ row.label }}</span>
-        <span class="detail-group-count">{{ row.children|length }} fields</span>
+        <span class="detail-group-count">{{ row.count }} fields</span>
       </span>
     </summary>
 
@@ -733,7 +1013,11 @@ details[open] > .detail-group-summary {
 
     {% elif row.type == "string" %}
       <div class="detail-label">{{ row.label }}</div>
-      <div class="detail-value">{{ row.value }}</div>
+      {% if row.label == "$schema" %}
+        <div class="detail-value detail-value-truncated" title="{{ row.value }}">{{ row.value }}</div>
+      {% else %}
+        <div class="detail-value">{{ row.value }}</div>
+      {% endif %}
 
     {% elif row.type == "number" %}
       <div class="detail-label">{{ row.label }}</div>
@@ -753,25 +1037,27 @@ details[open] > .detail-group-summary {
 
     {% elif row.type == "numeric_array" %}
       <div class="detail-label">{{ row.label }}</div>
-      <div class="array-summary">
-        <span>Numeric array</span>
-        <span class="array-badge">{{ row.count }} values</span>
-      </div>
+      <div class="detail-value-block">
+        <div class="array-summary">
+          <span>Numeric array</span>
+          <span class="array-badge">{{ row.count }} values</span>
+        </div>
 
-      <div class="array-toggle">
-        <button
-          class="btn btn-outline-secondary btn-sm"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#array-{{ forloop.counter }}"
-          aria-expanded="false"
-          aria-controls="array-{{ forloop.counter }}"
-        >
-          Show values
-        </button>
+        <div class="array-toggle">
+          <button
+            class="btn btn-outline-secondary btn-sm"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#array-{{ forloop.counter }}"
+            aria-expanded="false"
+            aria-controls="array-{{ forloop.counter }}"
+          >
+            Show values
+          </button>
 
-        <div class="collapse" id="array-{{ forloop.counter }}">
-          <pre class="array-box">{{ row.json_value }}</pre>
+          <div class="collapse" id="array-{{ forloop.counter }}">
+            <pre class="array-box">{{ row.json_value }}</pre>
+          </div>
         </div>
       </div>
 
@@ -782,6 +1068,7 @@ details[open] > .detail-group-summary {
 {% empty %}
   <div class="detail-empty">No displayable detail fields found</div>
 {% endfor %}
+</div>
 
 
 {% if mechanical_bc_items %}
@@ -791,25 +1078,54 @@ details[open] > .detail-group-summary {
           <div class="bc-layout">
             <div>
               <div class="bc-cube-wrap">
-                <svg
+                <div
                   id="mechanical-bc-cube"
-                  class="bc-cube-svg"
-                  viewBox="0 0 680 440"
+                  class="bc-cube-plot"
                   role="img"
                   aria-label="Mechanical boundary condition cube"
-                ></svg>
+                ></div>
+                <svg class="bc-axis-overlay" viewBox="0 0 118 96" aria-hidden="true">
+                  <defs>
+                    <marker
+                      id="bc-axis-overlay-arrow"
+                      markerWidth="5"
+                      markerHeight="5"
+                      refX="4.5"
+                      refY="2.5"
+                      orient="auto"
+                      markerUnits="strokeWidth"
+                    >
+                      <path d="M0,0 L5,2.5 L0,5 z" fill="#4b5563"></path>
+                    </marker>
+                  </defs>
+                  <line x1="50" y1="65" x2="29" y2="80" marker-end="url(#bc-axis-overlay-arrow)"></line>
+                  <line x1="50" y1="65" x2="78" y2="78" marker-end="url(#bc-axis-overlay-arrow)"></line>
+                  <line x1="50" y1="65" x2="50" y2="31" marker-end="url(#bc-axis-overlay-arrow)"></line>
+                  <text x="22" y="90">X</text>
+                  <text x="82" y="86">Y</text>
+                  <text x="54" y="30">Z</text>
+                </svg>
               </div>
 
               <div class="bc-legend">
                 <span class="bc-legend-item">
-                  <span class="bc-legend-arrow"></span>
+                  <svg class="bc-legend-arrow" viewBox="0 0 28 16" aria-hidden="true">
+                    <line x1="2" y1="8" x2="17" y2="8" stroke="#dc2626" stroke-width="2.4" stroke-linecap="round"></line>
+                    <path d="M16 3 L26 8 L16 13 Z" fill="#dc2626"></path>
+                    <path d="M16 3 L26 8 L17 8 Z" fill="#ef4444"></path>
+                    <path d="M17 8 L26 8 L16 13 Z" fill="#991b1b" opacity="0.85"></path>
+                  </svg>
                   Loaded
                 </span>
                 <span class="bc-legend-item">
-                  <span class="bc-legend-fixed"></span>
-                  Fixed
+                  <svg class="bc-legend-fixed" viewBox="0 0 20 16" aria-hidden="true">
+                    <path d="M3 3 L17 8 L3 13 Z" fill="#2563eb"></path>
+                    <path d="M3 3 L17 8 L5 8 Z" fill="#3b82f6"></path>
+                    <path d="M5 8 L17 8 L3 13 Z" fill="#1d4ed8"></path>
+                  </svg>
+                  Fixed constraint
                 </span>
-                <span class="bc-legend-item">X, Y, Z show constraint directions</span>
+                <span class="bc-legend-item">X/Y/Z directions</span>
               </div>
             </div>
 
@@ -905,11 +1221,63 @@ details[open] > .detail-group-summary {
       {% endif %}
     </div>
 
+        {% if data_object.owner_id == request.user.id %}
+          <div class="sharing-panel">
+            <div class="sharing-panel-header">
+              <h6 class="sharing-panel-title">Sharing</h6>
+              <span class="badge {% if data_object.access_type == 'all' %}bg-success{% else %}bg-secondary{% endif %}">
+                {% if data_object.access_type == "all" %}Public{% else %}Private{% endif %}
+              </span>
+            </div>
+
+            <div class="sharing-panel-body">
+              <form method="post" action="{% url 'json_data_sharing' data_object.id %}" class="sharing-add-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_user">
+                <input
+                  type="text"
+                  name="share_user"
+                  class="form-control form-control-sm"
+                  placeholder="Username or email"
+                  aria-label="Username or email"
+                >
+                <button type="submit" class="btn btn-outline-primary btn-sm">
+                  Add user
+                </button>
+              </form>
+
+              <div class="sharing-user-list">
+                {% for user in shared_users %}
+                  <div class="sharing-user-row">
+                    <span class="sharing-user-name">
+                      {{ user.username }}{% if user.email %} · {{ user.email }}{% endif %}
+                    </span>
+                    <form method="post" action="{% url 'json_data_sharing' data_object.id %}" class="m-0">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="remove_user">
+                      <input type="hidden" name="user_id" value="{{ user.id }}">
+                      <button type="submit" class="btn btn-outline-danger btn-sm">
+                        Remove
+                      </button>
+                    </form>
+                  </div>
+                {% empty %}
+                  <div class="sharing-empty">No specific users are shared yet.</div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
 
 
         <div class="detail-actions">
-          <a href="{% url 'json_data_list' %}" class="btn btn-outline-secondary btn-sm">
-            Back
+          <a href="{% url detail_back_url_name %}" class="btn btn-outline-secondary btn-sm">
+            {{ detail_back_label }}
+          </a>
+
+          <a href="{% url 'json_data_export' data_object.id %}" class="btn btn-outline-primary btn-sm">
+            Download JSON
           </a>
 
           {% if data_object.owner_id == request.user.id %}
@@ -933,6 +1301,7 @@ details[open] > .detail-group-summary {
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 
 <script>
   const plotVariables = JSON.parse(
@@ -980,25 +1349,54 @@ details[open] > .detail-group-summary {
   }
 
   function projectVertex(vertexName) {
-    const bits = String(vertexName || "").replace(/^V/i, "").padEnd(3, "0");
-    const x = bits[0] === "1" ? 1 : 0;
-    const y = bits[1] === "1" ? 1 : 0;
-    const z = bits[2] === "1" ? 1 : 0;
+    const bits = getVertexBits(vertexName);
+    const origin = { x: 185, y: 295 };
+    const basis = {
+      x: { x: 135, y: 40 },
+      y: { x: 0, y: -135 },
+      z: { x: -105, y: 60 },
+    };
 
     return {
-      x: 245 + (x * 190) + (z * -108),
-      y: 305 + (x * 44) + (y * -172) + (z * 60),
+      x: origin.x + (bits.x * basis.x.x) + (bits.y * basis.y.x) + (bits.z * basis.z.x),
+      y: origin.y + (bits.x * basis.x.y) + (bits.y * basis.y.y) + (bits.z * basis.z.y),
+    };
+  }
+
+  function getVertexBits(vertexName) {
+    const bits = String(vertexName || "").replace(/^V/i, "").padEnd(3, "0");
+
+    return {
+      x: bits[0] === "1" ? 1 : 0,
+      y: bits[1] === "1" ? 1 : 0,
+      z: bits[2] === "1" ? 1 : 0,
     };
   }
 
   function getDirectionVector(direction) {
     const vectors = {
-      X: { x: 1, y: 0.23 },
-      Y: { x: 0, y: -1 },
-      Z: { x: -0.86, y: 0.5 },
+      X: { x: 135, y: 40 },
+      Y: { x: 0, y: -135 },
+      Z: { x: -105, y: 60 },
     };
 
     return vectors[direction] || { x: 1, y: 0 };
+  }
+
+  function getOutwardDirection(vertexName, direction) {
+    const bits = getVertexBits(vertexName);
+    const signs = {
+      X: bits.x === 0 ? -1 : 1,
+      Y: bits.y === 0 ? -1 : 1,
+      Z: bits.z === 0 ? -1 : 1,
+    };
+    const vector = getDirectionVector(direction);
+    const sign = signs[direction] || 1;
+
+    return normalizeVector({
+      x: vector.x * sign,
+      y: vector.y * sign,
+    });
   }
 
   function normalizeVector(vector) {
@@ -1054,8 +1452,8 @@ details[open] > .detail-group-summary {
     const direction = normalizeVector(getDirectionVector(axis.direction));
     const magnitude = Number(axis.magnitude);
     const sign = Number.isFinite(magnitude) && magnitude < 0 ? -1 : 1;
-    const offset = 20;
-    const length = 40;
+    const offset = 7;
+    const length = 30;
     const start = {
       x: point.x + (direction.x * offset * sign),
       y: point.y + (direction.y * offset * sign),
@@ -1073,92 +1471,148 @@ details[open] > .detail-group-summary {
       class: "bc-arrow",
     }));
 
-    if (axis.load) {
-      const labelOffset = getLoadLabelOffset(item.vertex, axis.direction);
-      appendSvgText(
-        svg,
-        end.x + labelOffset.x,
-        end.y + labelOffset.y,
-        `${axis.direction} ${axis.load}`,
-        "bc-load-label"
-      );
-    }
   }
 
   function drawFixedSymbol(svg, point, item, axis) {
-    const direction = normalizeVector(getDirectionVector(axis.direction));
-    const center = {
-      x: point.x + (direction.x * 42),
-      y: point.y + (direction.y * 42),
-    };
+    const direction = getOutwardDirection(item.vertex, axis.direction);
     const perpendicular = {
       x: -direction.y,
       y: direction.x,
     };
-    const size = 10;
-    const depth = 17;
+    const halfWidth = 7;
+    const depth = 20;
+    const baseCenter = {
+      x: point.x + (direction.x * depth),
+      y: point.y + (direction.y * depth),
+    };
     const points = [
-      `${center.x + (perpendicular.x * size)},${center.y + (perpendicular.y * size)}`,
-      `${center.x - (perpendicular.x * size)},${center.y - (perpendicular.y * size)}`,
-      `${center.x - (direction.x * depth)},${center.y - (direction.y * depth)}`,
+      `${point.x},${point.y}`,
+      `${baseCenter.x + (perpendicular.x * halfWidth)},${baseCenter.y + (perpendicular.y * halfWidth)}`,
+      `${baseCenter.x - (perpendicular.x * halfWidth)},${baseCenter.y - (perpendicular.y * halfWidth)}`,
     ].join(" ");
 
     svg.appendChild(createSvgElement("polygon", {
       points,
       class: "bc-fixed",
     }));
-
-    const labelOffset = getFixedLabelOffset(item.vertex, axis.direction);
-    appendSvgText(
-      svg,
-      center.x + (perpendicular.x * 12) + labelOffset.x,
-      center.y + (perpendicular.y * 12) + labelOffset.y,
-      axis.direction,
-      "bc-fixed-label"
-    );
   }
 
   function renderMechanicalBcCube() {
     const svg = document.getElementById("mechanical-bc-cube");
 
-    if (!svg || !mechanicalBcItems.length) {
+    if (svg instanceof SVGSVGElement && mechanicalBcItems.length) {
+      svg.innerHTML = "";
+
+      const defs = createSvgElement("defs");
+      const arrowMarker = createSvgElement("marker", {
+        id: "bc-arrow-head",
+        markerWidth: "7",
+        markerHeight: "7",
+        refX: "6",
+        refY: "3.5",
+        orient: "auto",
+        markerUnits: "strokeWidth",
+      });
+      arrowMarker.appendChild(createSvgElement("path", {
+        d: "M0,0 L0,7 L7,3.5 z",
+        fill: "#dc2626",
+      }));
+
+      const axisMarker = createSvgElement("marker", {
+        id: "bc-axis-head",
+        markerWidth: "6",
+        markerHeight: "6",
+        refX: "5.5",
+        refY: "3",
+        orient: "auto",
+        markerUnits: "strokeWidth",
+      });
+      axisMarker.appendChild(createSvgElement("path", {
+        d: "M0,0 L0,6 L6,3 z",
+        fill: "#4b5563",
+      }));
+
+      defs.appendChild(arrowMarker);
+      defs.appendChild(axisMarker);
+      svg.appendChild(defs);
+
+      const vertices = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
+      const activeVertices = new Set(mechanicalBcItems.map(item => item.vertex));
+      const edges = [
+        ["V000", "V100"], ["V000", "V010"], ["V000", "V001"],
+        ["V100", "V110"], ["V100", "V101"],
+        ["V010", "V110"], ["V010", "V011"],
+        ["V001", "V101"], ["V001", "V011"],
+        ["V110", "V111"], ["V101", "V111"], ["V011", "V111"],
+      ];
+
+      edges.forEach(([from, to]) => {
+        const start = projectVertex(from);
+        const end = projectVertex(to);
+        const isBackEdge = from.endsWith("1") && to.endsWith("1");
+
+        svg.appendChild(createSvgElement("line", {
+          x1: start.x,
+          y1: start.y,
+          x2: end.x,
+          y2: end.y,
+          class: isBackEdge ? "bc-edge bc-edge-back" : "bc-edge",
+        }));
+      });
+
+      mechanicalBcItems.forEach(item => {
+        const point = projectVertex(item.vertex);
+
+        item.axes.forEach(axis => {
+          if (axis.status === "loaded") {
+            drawLoadedArrow(svg, point, item, axis);
+          } else if (axis.status === "fixed") {
+            drawFixedSymbol(svg, point, item, axis);
+          }
+        });
+      });
+
+      vertices.forEach(vertex => {
+        const point = projectVertex(vertex);
+        const isActive = activeVertices.has(vertex);
+
+        svg.appendChild(createSvgElement("circle", {
+          cx: point.x,
+          cy: point.y,
+          r: isActive ? 4.2 : 3.8,
+          class: isActive ? "bc-node bc-node-active" : "bc-node",
+        }));
+
+        if (isActive) {
+          const labelOffset = getVertexLabelOffset(vertex);
+          appendSvgText(svg, point.x + labelOffset.x, point.y + labelOffset.y, vertex, "bc-label");
+        }
+      });
+
+      const axisOrigin = { x: 342, y: 372 };
+      [
+        { label: "X", dx: -28, dy: 22, labelX: -39, labelY: 32 },
+        { label: "Y", dx: 38, dy: 14, labelX: 43, labelY: 22 },
+        { label: "Z", dx: 0, dy: -45, labelX: 7, labelY: -48 },
+      ].forEach(({ label, dx, dy, labelX, labelY }) => {
+        svg.appendChild(createSvgElement("line", {
+          x1: axisOrigin.x,
+          y1: axisOrigin.y,
+          x2: axisOrigin.x + dx,
+          y2: axisOrigin.y + dy,
+          class: "bc-axis",
+        }));
+        appendSvgText(svg, axisOrigin.x + labelX, axisOrigin.y + labelY, label, "bc-axis-label");
+      });
+
       return;
     }
 
-    svg.innerHTML = "";
+    const container = document.getElementById("mechanical-bc-cube");
 
-    const defs = createSvgElement("defs");
-    const arrowMarker = createSvgElement("marker", {
-      id: "bc-arrow-head",
-      markerWidth: "10",
-      markerHeight: "10",
-      refX: "8",
-      refY: "3",
-      orient: "auto",
-      markerUnits: "strokeWidth",
-    });
-    arrowMarker.appendChild(createSvgElement("path", {
-      d: "M0,0 L0,6 L9,3 z",
-      fill: "#dc2626",
-    }));
-
-    const axisMarker = createSvgElement("marker", {
-      id: "bc-axis-head",
-      markerWidth: "8",
-      markerHeight: "8",
-      refX: "7",
-      refY: "3",
-      orient: "auto",
-      markerUnits: "strokeWidth",
-    });
-    axisMarker.appendChild(createSvgElement("path", {
-      d: "M0,0 L0,6 L7,3 z",
-      fill: "#4b5563",
-    }));
-
-    defs.appendChild(arrowMarker);
-    defs.appendChild(axisMarker);
-    svg.appendChild(defs);
+    if (!container || !mechanicalBcItems.length || typeof Plotly === "undefined") {
+      return;
+    }
 
     const vertices = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
     const activeVertices = new Set(mechanicalBcItems.map(item => item.vertex));
@@ -1170,58 +1624,303 @@ details[open] > .detail-group-summary {
       ["V110", "V111"], ["V101", "V111"], ["V011", "V111"],
     ];
 
+    function vertexCoordinates(vertexName) {
+      const bits = String(vertexName || "").replace(/^V/i, "").padEnd(3, "0");
+
+      return {
+        x: bits[0] === "1" ? 1 : 0,
+        y: bits[1] === "1" ? 1 : 0,
+        z: bits[2] === "1" ? 1 : 0,
+      };
+    }
+
+    function directionVector3d(direction) {
+      const vectors = {
+        X: { x: 1, y: 0, z: 0 },
+        Y: { x: 0, y: 1, z: 0 },
+        Z: { x: 0, y: 0, z: 1 },
+      };
+
+      return vectors[direction] || { x: 1, y: 0, z: 0 };
+    }
+
+    function fixedMarkerOutwardVector(point, direction) {
+      if (direction === "X") {
+        return { x: point.x === 0 ? -1 : 1, y: 0, z: 0 };
+      }
+
+      if (direction === "Y") {
+        return { x: 0, y: point.y === 0 ? -1 : 1, z: 0 };
+      }
+
+      return { x: 0, y: 0, z: point.z === 0 ? -1 : 1 };
+    }
+
+    function activeVertexLabelPosition(vertex) {
+      const positions = {
+        V000: "middle right",
+        V001: "bottom right",
+        V011: "top center",
+        V101: "bottom right",
+      };
+
+      return positions[vertex] || "top center";
+    }
+
+    const cubeFaceTrace = {
+      type: "mesh3d",
+      x: vertices.map(vertex => vertexCoordinates(vertex).x),
+      y: vertices.map(vertex => vertexCoordinates(vertex).y),
+      z: vertices.map(vertex => vertexCoordinates(vertex).z),
+      i: [0, 0, 4, 4, 0, 0, 2, 2, 0, 0, 1, 1],
+      j: [1, 3, 5, 7, 1, 5, 3, 7, 2, 6, 3, 7],
+      k: [3, 2, 7, 6, 5, 4, 7, 6, 6, 4, 7, 5],
+      color: "#60a5fa",
+      opacity: 0.055,
+      hoverinfo: "skip",
+      showlegend: false,
+    };
+
+    const edgeTrace = {
+      type: "scatter3d",
+      mode: "lines",
+      x: [],
+      y: [],
+      z: [],
+      line: {
+        color: "#8f99a8",
+        width: 4,
+      },
+      hoverinfo: "skip",
+      showlegend: false,
+    };
+
     edges.forEach(([from, to]) => {
-      const start = projectVertex(from);
-      const end = projectVertex(to);
-      const isBackEdge = from.endsWith("1") && to.endsWith("1");
-      svg.appendChild(createSvgElement("line", {
-        x1: start.x,
-        y1: start.y,
-        x2: end.x,
-        y2: end.y,
-        class: isBackEdge ? "bc-edge bc-edge-back" : "bc-edge",
-      }));
+      const start = vertexCoordinates(from);
+      const end = vertexCoordinates(to);
+      edgeTrace.x.push(start.x, end.x, null);
+      edgeTrace.y.push(start.y, end.y, null);
+      edgeTrace.z.push(start.z, end.z, null);
     });
 
+    const inactiveNodeTrace = {
+      type: "scatter3d",
+      mode: "markers",
+      x: [],
+      y: [],
+      z: [],
+      hovertext: [],
+      hoverinfo: "text",
+      marker: {
+        size: 3.1,
+        color: "#ffffff",
+        line: {
+          color: "#9ca3af",
+          width: 1.1,
+        },
+      },
+      showlegend: false,
+    };
+
+    const activeNodeTrace = {
+      type: "scatter3d",
+      mode: "markers+text",
+      x: [],
+      y: [],
+      z: [],
+      text: [],
+      textposition: [],
+      hovertext: [],
+      hoverinfo: "text",
+      textfont: {
+        color: "#374151",
+        size: 10,
+      },
+      marker: {
+        size: 3.1,
+        color: "#111827",
+        line: {
+          color: "#111827",
+          width: 1.1,
+        },
+      },
+      showlegend: false,
+    };
+
+    vertices.forEach(vertex => {
+      const point = vertexCoordinates(vertex);
+
+      if (activeVertices.has(vertex)) {
+        activeNodeTrace.x.push(point.x);
+        activeNodeTrace.y.push(point.y);
+        activeNodeTrace.z.push(point.z);
+        activeNodeTrace.text.push(vertex);
+        activeNodeTrace.textposition.push(activeVertexLabelPosition(vertex));
+        activeNodeTrace.hovertext.push(`${vertex}<br>Boundary condition defined`);
+      } else {
+        inactiveNodeTrace.x.push(point.x);
+        inactiveNodeTrace.y.push(point.y);
+        inactiveNodeTrace.z.push(point.z);
+        inactiveNodeTrace.hovertext.push(`${vertex}<br>No boundary condition`);
+      }
+    });
+
+    const loadedLineTrace = {
+      type: "scatter3d",
+      mode: "lines",
+      x: [],
+      y: [],
+      z: [],
+      line: {
+        color: "#dc2626",
+        width: 1.9,
+      },
+      hoverinfo: "skip",
+      showlegend: false,
+      name: "Loaded",
+    };
+
+    const loadedConeTrace = {
+      type: "cone",
+      x: [],
+      y: [],
+      z: [],
+      u: [],
+      v: [],
+      w: [],
+      text: [],
+      hoverinfo: "text",
+      anchor: "tail",
+      sizemode: "absolute",
+      sizeref: 0.034,
+      colorscale: [[0, "#dc2626"], [1, "#dc2626"]],
+      showscale: false,
+      showlegend: false,
+      name: "Loaded",
+    };
+
+    const fixedMarkerTrace = {
+      type: "cone",
+      x: [],
+      y: [],
+      z: [],
+      u: [],
+      v: [],
+      w: [],
+      text: [],
+      hoverinfo: "text",
+      anchor: "tail",
+      sizemode: "absolute",
+      sizeref: 0.075,
+      colorscale: [[0, "#2563eb"], [1, "#2563eb"]],
+      showscale: false,
+      showlegend: false,
+      name: "Fixed",
+    };
+
     mechanicalBcItems.forEach(item => {
-      const point = projectVertex(item.vertex);
+      const point = vertexCoordinates(item.vertex);
 
       item.axes.forEach(axis => {
+        const direction = directionVector3d(axis.direction);
+
         if (axis.status === "loaded") {
-          drawLoadedArrow(svg, point, item, axis);
+          const magnitude = Number(axis.magnitude);
+          const sign = Number.isFinite(magnitude) && magnitude < 0 ? -1 : 1;
+          const offset = 0.06;
+          const shaftLength = 0.08;
+          const coneLength = 0.045;
+          const start = {
+            x: point.x + (direction.x * offset * sign),
+            y: point.y + (direction.y * offset * sign),
+            z: point.z + (direction.z * offset * sign),
+          };
+          const coneStart = {
+            x: point.x + (direction.x * (offset + shaftLength) * sign),
+            y: point.y + (direction.y * (offset + shaftLength) * sign),
+            z: point.z + (direction.z * (offset + shaftLength) * sign),
+          };
+
+          loadedLineTrace.x.push(start.x, coneStart.x, null);
+          loadedLineTrace.y.push(start.y, coneStart.y, null);
+          loadedLineTrace.z.push(start.z, coneStart.z, null);
+
+          loadedConeTrace.x.push(coneStart.x);
+          loadedConeTrace.y.push(coneStart.y);
+          loadedConeTrace.z.push(coneStart.z);
+          loadedConeTrace.u.push(direction.x * coneLength * sign);
+          loadedConeTrace.v.push(direction.y * coneLength * sign);
+          loadedConeTrace.w.push(direction.z * coneLength * sign);
+          loadedConeTrace.text.push(`${item.vertex}<br>${axis.direction}: loaded ${axis.load || ""}`.trim());
+
         } else if (axis.status === "fixed") {
-          drawFixedSymbol(svg, point, item, axis);
+          const coneLength = 0.12;
+          const outward = fixedMarkerOutwardVector(point, axis.direction);
+
+          fixedMarkerTrace.x.push(point.x + (outward.x * coneLength));
+          fixedMarkerTrace.y.push(point.y + (outward.y * coneLength));
+          fixedMarkerTrace.z.push(point.z + (outward.z * coneLength));
+          fixedMarkerTrace.u.push(-outward.x * coneLength);
+          fixedMarkerTrace.v.push(-outward.y * coneLength);
+          fixedMarkerTrace.w.push(-outward.z * coneLength);
+          fixedMarkerTrace.text.push(`${item.vertex}<br>${axis.direction}: fixed`);
         }
       });
     });
 
-    vertices.forEach(vertex => {
-      const point = projectVertex(vertex);
-      const labelOffset = getVertexLabelOffset(vertex);
-      svg.appendChild(createSvgElement("circle", {
-        cx: point.x,
-        cy: point.y,
-        r: activeVertices.has(vertex) ? 6 : 4,
-        class: activeVertices.has(vertex) ? "bc-node bc-node-active" : "bc-node",
-      }));
-      appendSvgText(svg, point.x + labelOffset.x, point.y + labelOffset.y, vertex, "bc-label");
-    });
+    const traces = [
+      cubeFaceTrace,
+      edgeTrace,
+      inactiveNodeTrace,
+      fixedMarkerTrace,
+      loadedLineTrace,
+      loadedConeTrace,
+      activeNodeTrace,
+    ];
+    const layout = {
+      margin: { l: 0, r: 0, t: 0, b: 0 },
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)",
+      showlegend: false,
+      scene: {
+        aspectmode: "cube",
+        camera: {
+          eye: { x: 1.45, y: 1.35, z: 1.05 },
+        },
+        xaxis: {
+          title: "",
+          showgrid: false,
+          zeroline: false,
+          showticklabels: false,
+          range: [-0.55, 1.55],
+          visible: false,
+        },
+        yaxis: {
+          title: "",
+          showgrid: false,
+          zeroline: false,
+          showticklabels: false,
+          range: [-0.55, 1.55],
+          visible: false,
+        },
+        zaxis: {
+          title: "",
+          showgrid: false,
+          zeroline: false,
+          showticklabels: false,
+          range: [-0.55, 1.55],
+          visible: false,
+        },
+      },
+    };
+    const config = {
+      displaylogo: false,
+      responsive: true,
+      displayModeBar: false,
+      modeBarButtonsToRemove: ["lasso2d", "select2d"],
+    };
 
-    const axisOrigin = { x: 560, y: 345 };
-    [
-      { label: "X", dx: 58, dy: 13, labelX: 70, labelY: 18 },
-      { label: "Y", dx: 0, dy: -58, labelX: 7, labelY: -62 },
-      { label: "Z", dx: -50, dy: 29, labelX: -62, labelY: 42 },
-    ].forEach(({ label, dx, dy, labelX, labelY }) => {
-      svg.appendChild(createSvgElement("line", {
-        x1: axisOrigin.x,
-        y1: axisOrigin.y,
-        x2: axisOrigin.x + dx,
-        y2: axisOrigin.y + dy,
-        class: "bc-axis",
-      }));
-      appendSvgText(svg, axisOrigin.x + labelX, axisOrigin.y + labelY, label, "bc-axis-label");
-    });
+    Plotly.react(container, traces, layout, config);
   }
 
   function findDefaultKey(prefix) {
@@ -1282,6 +1981,16 @@ details[open] > .detail-group-summary {
     return plotVariables.find(variable => variable.key === key) || null;
   }
 
+  function getVariableAxisLabel(variable) {
+    if (!variable) {
+      return "";
+    }
+
+    return variable.unit
+      ? `${variable.short_label} (${variable.unit})`
+      : variable.short_label;
+  }
+
   let isSyncingPlotSelects = false;
 
   function syncYVariableToX() {
@@ -1322,56 +2031,75 @@ details[open] > .detail-group-summary {
   }
 
 
-  function sanitizeFileName(text) {
+function sanitizeFileName(text) {
   return text.replace(/[^a-zA-Z0-9_-]+/g, "_");
 }
 
-function buildZeroInclusiveRange(values) {
+function cleanScaleNumber(value) {
+  if (Math.abs(value) < 1e-12) {
+    return 0;
+  }
+
+  return Number(value.toPrecision(12));
+}
+
+function buildDataRangeTicks(minValue, maxValue) {
+  const values = [];
+  const step = (maxValue - minValue) / 4;
+
+  for (let index = 0; index <= 4; index += 1) {
+    values.push(cleanScaleNumber(minValue + (step * index)));
+  }
+
+  return values;
+}
+
+function buildPlotScale(values) {
   const numericValues = values
     .map(value => Number(value))
     .filter(value => Number.isFinite(value));
 
   if (!numericValues.length) {
     return {
-      min: -1,
-      max: 1,
+      chartMin: -1.08,
+      chartMax: 1.08,
+      step: 0.5,
+      labelPrecision: 4,
+      ticks: [-1, -0.5, 0, 0.5, 1],
     };
   }
 
-  const maxAbsValue = Math.max(
-    ...numericValues.map(value => Math.abs(value)),
-    1e-12
-  );
-  const paddedMax = maxAbsValue * 1.08;
+  const minValue = Math.min(...numericValues);
+  const maxValue = Math.max(...numericValues);
+  const span = maxValue - minValue;
+
+  if (minValue === maxValue) {
+    const padding = Math.max(Math.abs(minValue) * 0.08, 1);
+    const tickStep = padding;
+
+    return {
+      chartMin: cleanScaleNumber(minValue - padding),
+      chartMax: cleanScaleNumber(maxValue + padding),
+      step: tickStep,
+      labelPrecision: 4,
+      ticks: [
+        cleanScaleNumber(minValue - padding),
+        cleanScaleNumber(minValue),
+        cleanScaleNumber(maxValue + padding),
+      ],
+    };
+  }
+
+  const padding = Math.max(span * 0.08, Number.EPSILON);
+  const step = span / 4;
 
   return {
-    min: -paddedMax,
-    max: paddedMax,
+    chartMin: cleanScaleNumber(minValue - padding),
+    chartMax: cleanScaleNumber(maxValue + padding),
+    step,
+    labelPrecision: 4,
+    ticks: buildDataRangeTicks(minValue, maxValue),
   };
-}
-
-function buildNiceTickStep(maxAbsValue, targetIntervals) {
-  if (!Number.isFinite(maxAbsValue) || maxAbsValue <= 0) {
-    return 1;
-  }
-
-  const rawStep = maxAbsValue / targetIntervals;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
-  const normalized = rawStep / magnitude;
-
-  if (normalized <= 1) {
-    return magnitude;
-  }
-
-  if (normalized <= 2) {
-    return 2 * magnitude;
-  }
-
-  if (normalized <= 5) {
-    return 5 * magnitude;
-  }
-
-  return 10 * magnitude;
 }
 
 function updatePlotTitlePosition(chart) {
@@ -1391,8 +2119,8 @@ function updatePlotTitlePosition(chart) {
   legend.style.transform = `translateX(${titleOffset}px)`;
 }
 
-const zeroAxisPlugin = {
-  id: "zeroAxisPlugin",
+const cornerAxisPlugin = {
+  id: "cornerAxisPlugin",
   afterDatasetsDraw(chart) {
     const { ctx, chartArea, scales } = chart;
     const xScale = scales.x;
@@ -1402,10 +2130,8 @@ const zeroAxisPlugin = {
       return;
     }
 
-    const zeroX = xScale.getPixelForValue(0);
-    const zeroY = yScale.getPixelForValue(0);
-    const boundedZeroX = Math.min(Math.max(zeroX, chartArea.left), chartArea.right);
-    const boundedZeroY = Math.min(Math.max(zeroY, chartArea.top), chartArea.bottom);
+    const axisX = chartArea.left;
+    const axisY = chartArea.bottom;
     const axisColor = "#0f172a";
     const arrowSize = 10;
     const tickLength = 6;
@@ -1425,12 +2151,60 @@ const zeroAxisPlugin = {
       ctx.fill();
     }
 
-    function formatTickLabel(value) {
+    function formatTickLabel(value, precision) {
       if (Math.abs(value) < 1e-12) {
-        return "0";
+        return {
+          type: "plain",
+          text: "0",
+        };
       }
 
-      return Number(value.toPrecision(3)).toString();
+      if (Math.abs(value) < 0.001) {
+        const exponent = Math.floor(Math.log10(Math.abs(value)));
+        const mantissa = value / Math.pow(10, exponent);
+        return {
+          type: "scientific",
+          mantissa: Number(mantissa.toPrecision(3)).toString(),
+          exponent: exponent.toString(),
+        };
+      }
+
+      return {
+        type: "plain",
+        text: Number(value.toPrecision(precision)).toString(),
+      };
+    }
+
+    function drawTickLabel(x, y, value, align, precision) {
+      const label = formatTickLabel(value, precision);
+
+      if (label.type === "plain") {
+        ctx.font = "600 12px sans-serif";
+        ctx.textAlign = align;
+        ctx.fillText(label.text, x, y);
+        return;
+      }
+
+      const baseText = `${label.mantissa} x 10`;
+      ctx.font = "600 12px sans-serif";
+
+      const baseWidth = ctx.measureText(baseText).width;
+      const exponentWidth = ctx.measureText(label.exponent).width;
+      const totalWidth = baseWidth + exponentWidth + 1;
+      let baseX = x;
+
+      if (align === "center") {
+        baseX = x - (totalWidth / 2);
+      } else if (align === "right") {
+        baseX = x - totalWidth;
+      }
+
+      ctx.textAlign = "left";
+      ctx.fillText(baseText, baseX, y);
+
+      ctx.font = "600 9px sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(label.exponent, baseX + baseWidth + 1, y - 7);
     }
 
     function drawTick(x1, y1, x2, y2) {
@@ -1441,6 +2215,10 @@ const zeroAxisPlugin = {
     }
 
     function buildAxisTickValues(scale) {
+      if (Array.isArray(scale.options.customTickValues)) {
+        return scale.options.customTickValues.map(value => Number(value));
+      }
+
       const step = Number(scale.options.ticks.stepSize);
 
       if (!Number.isFinite(step) || step <= 0) {
@@ -1465,26 +2243,16 @@ const zeroAxisPlugin = {
     ctx.textBaseline = "middle";
 
     ctx.beginPath();
-    ctx.moveTo(boundedZeroX, boundedZeroY);
-    ctx.lineTo(chartArea.right - arrowSize, boundedZeroY);
+    ctx.moveTo(axisX, axisY);
+    ctx.lineTo(chartArea.right - arrowSize, axisY);
     ctx.stroke();
-    drawArrowHead(chartArea.right, boundedZeroY, 0);
+    drawArrowHead(chartArea.right, axisY, 0);
 
     ctx.beginPath();
-    ctx.moveTo(boundedZeroX, boundedZeroY);
-    ctx.lineTo(chartArea.left, boundedZeroY);
+    ctx.moveTo(axisX, axisY);
+    ctx.lineTo(axisX, chartArea.top + arrowSize);
     ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(boundedZeroX, boundedZeroY);
-    ctx.lineTo(boundedZeroX, chartArea.top + arrowSize);
-    ctx.stroke();
-    drawArrowHead(boundedZeroX, chartArea.top, -Math.PI / 2);
-
-    ctx.beginPath();
-    ctx.moveTo(boundedZeroX, boundedZeroY);
-    ctx.lineTo(boundedZeroX, chartArea.bottom);
-    ctx.stroke();
+    drawArrowHead(axisX, chartArea.top, -Math.PI / 2);
 
     const xTickOutsideSign = 1;
     const yTickOutsideSign = -1;
@@ -1496,57 +2264,61 @@ const zeroAxisPlugin = {
     buildAxisTickValues(xScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value) || Math.abs(value) < 1e-12) {
+      if (!Number.isFinite(value)) {
         return;
       }
 
       const x = xScale.getPixelForValue(value);
 
-      if (x <= chartArea.left + arrowSize || x >= chartArea.right - arrowSize) {
+      const isZeroTick = Math.abs(value) < 1e-12;
+
+      if (!isZeroTick && (x < chartArea.left - 1 || x > chartArea.right + 1)) {
         return;
       }
 
-      drawTick(x, boundedZeroY, x, boundedZeroY + (xTickOutsideSign * tickLength));
-      ctx.fillText(formatTickLabel(value), x, boundedZeroY + (xTickOutsideSign * 20));
+      drawTick(x, axisY, x, axisY + (xTickOutsideSign * tickLength));
+      drawTickLabel(
+        x,
+        axisY + (xTickOutsideSign * 20),
+        value,
+        "center",
+        Number(xScale.options.customLabelPrecision || 4)
+      );
     });
 
     ctx.textAlign = yTickOutsideSign < 0 ? "right" : "left";
     buildAxisTickValues(yScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value) || Math.abs(value) < 1e-12) {
+      if (!Number.isFinite(value)) {
         return;
       }
 
       const y = yScale.getPixelForValue(value);
 
-      if (y <= chartArea.top + arrowSize || y >= chartArea.bottom - arrowSize) {
+      const isZeroTick = Math.abs(value) < 1e-12;
+
+      if (!isZeroTick && (y <= chartArea.top + 16 || y > chartArea.bottom + 1)) {
         return;
       }
 
-      drawTick(boundedZeroX, y, boundedZeroX + (yTickOutsideSign * tickLength), y);
-      ctx.fillText(formatTickLabel(value), boundedZeroX + (yTickOutsideSign * 14), y);
+      drawTick(axisX, y, axisX + (yTickOutsideSign * tickLength), y);
+      drawTickLabel(
+        axisX + (yTickOutsideSign * 14),
+        y,
+        value,
+        yTickOutsideSign < 0 ? "right" : "left",
+        Number(yScale.options.customLabelPrecision || 4)
+      );
     });
-
-    ctx.font = "700 13px sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText("0", boundedZeroX - 7, boundedZeroY + 13);
-
-    ctx.font = "800 16px sans-serif";
-
-    ctx.textAlign = "right";
-    ctx.fillText("X", chartArea.right - 3, boundedZeroY + 16);
-
-    ctx.textAlign = "left";
-    ctx.fillText("Y", boundedZeroX + 14, chartArea.top + 4);
 
     ctx.font = "800 15px sans-serif";
     ctx.textAlign = "left";
-    ctx.fillText(xScale.options.title.text, chartArea.right + 4, boundedZeroY - 1);
+    ctx.fillText(`X, ${xScale.options.title.text}`, chartArea.right + 14, axisY - 1);
 
-    ctx.textAlign = "center";
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(yScale.options.title.text, boundedZeroX, chartArea.top - 18);
+    ctx.fillText(`Y, ${yScale.options.title.text}`, axisX - 46, chartArea.top - 26);
 
     ctx.restore();
   },
@@ -1651,8 +2423,8 @@ function updateRawValues(xVariable, yVariable) {
   xRawSummary.textContent = `Show X raw values (${xVariable.short_label})`;
   yRawSummary.textContent = `Show Y raw values (${yVariable.short_label})`;
 
-  xRawMeta.textContent = `${xVariable.values.length} values`;
-  yRawMeta.textContent = `${yVariable.values.length} values`;
+  xRawMeta.textContent = "";
+  yRawMeta.textContent = "";
 
   xRawPre.textContent = formatRawValues(xVariable.values);
   yRawPre.textContent = formatRawValues(yVariable.values);
@@ -1674,10 +2446,8 @@ function updateRawValues(xVariable, yVariable) {
       });
     }
 
-    const xRange = buildZeroInclusiveRange(points.map(point => point.x));
-    const yRange = buildZeroInclusiveRange(points.map(point => point.y));
-    const xTickStep = buildNiceTickStep(xRange.max, 4);
-    const yTickStep = buildNiceTickStep(yRange.max, 4);
+    const xScaleConfig = buildPlotScale(points.map(point => point.x));
+    const yScaleConfig = buildPlotScale(points.map(point => point.y));
 
     if (chartInstance) {
       chartInstance.destroy();
@@ -1712,57 +2482,61 @@ function updateRawValues(xVariable, yVariable) {
         },
         layout: {
           padding: {
-            top: 56,
-            right: 150,
-            bottom: 56,
-            left: 56,
+            top: 82,
+            right: 220,
+            bottom: 82,
+            left: 96,
           },
         },
         scales: {
           x: {
             type: "linear",
-            min: xRange.min,
-            max: xRange.max,
+            min: xScaleConfig.chartMin,
+            max: xScaleConfig.chartMax,
+            customTickValues: xScaleConfig.ticks,
+            customTickStep: xScaleConfig.step,
+            customLabelPrecision: xScaleConfig.labelPrecision,
             border: {
               display: false,
             },
             grid: {
-              color: "rgba(0, 0, 0, 0.08)",
+              display: false,
               drawTicks: false,
             },
             ticks: {
               display: false,
               maxTicksLimit: 11,
-              stepSize: xTickStep,
             },
             title: {
               display: false,
-              text: xVariable.short_label,
+              text: getVariableAxisLabel(xVariable),
             }
           },
           y: {
-            min: yRange.min,
-            max: yRange.max,
+            min: yScaleConfig.chartMin,
+            max: yScaleConfig.chartMax,
+            customTickValues: yScaleConfig.ticks,
+            customTickStep: yScaleConfig.step,
+            customLabelPrecision: yScaleConfig.labelPrecision,
             border: {
               display: false,
             },
             grid: {
-              color: "rgba(0, 0, 0, 0.08)",
+              display: false,
               drawTicks: false,
             },
             ticks: {
               display: false,
               maxTicksLimit: 9,
-              stepSize: yTickStep,
             },
             title: {
               display: false,
-              text: yVariable.short_label,
+              text: getVariableAxisLabel(yVariable),
             }
           }
         }
       },
-      plugins: [canvasBackgroundPlugin, zeroAxisPlugin],
+      plugins: [canvasBackgroundPlugin, cornerAxisPlugin],
     });
 
 updatePlotTitlePosition(chartInstance);
@@ -1770,10 +2544,10 @@ updateRawValues(xVariable, yVariable);
 
 if (xVariable.values.length !== yVariable.values.length) {
   plotStatus.textContent =
-    `Showing ${yVariable.short_label} vs ${xVariable.short_label} as signed values (${pointCount} shared points). Raw arrays have different lengths.`;
+    `${pointCount} shared points plotted. Raw arrays have different lengths.`;
 } else {
   plotStatus.textContent =
-    `Showing ${yVariable.short_label} vs ${xVariable.short_label} as signed values (${pointCount} points)`;
+    `${pointCount} points plotted.`;
 }
   }
 

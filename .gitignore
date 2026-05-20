@@ -36,5 +36,4 @@ dist/
 # Node
 node_modules/
 yarn.lock
-/example_json_files/
-/AGENTS.md
+
