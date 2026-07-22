@@ -10,22 +10,22 @@ The primary audience is materials simulation researchers encountering the platfo
 
 Use the **Materials Atlas** direction.
 
-The visual concept comes from material morphology maps, contour plots, specimen labels, and archive records. Its signature element is a large irregular "material fingerprint": nested contour lines with a small specimen label attached. This replaces the current layered grids, crystal badge, and code-like metadata console that make the page resemble a development tool.
+The visual concept comes from polycrystalline microstructure maps, specimen labels, and archive records. Its signature element is a cropped representative-volume-element field: irregular polygonal grains, restrained boundary lines, and a load-direction annotation with a small specimen label attached. This replaces both the former IDE-like graphics and the concentric "material fingerprint," which reads as an abstract circle rather than a materials simulation artifact.
 
-The page should feel scientific and precise without looking clinical. The fingerprint is the one expressive element; surrounding layout, cards, and typography remain restrained.
+The page should feel scientific and precise without looking clinical. The microstructure field is the one expressive element; surrounding layout, cards, and typography remain restrained.
 
 ## Visual System
 
 ### Color
 
-- Mineral mist `#EDF3F4`: primary page background
-- Paper white `#FBFDFD`: elevated surfaces
-- Deep mineral `#163F40`: headings, primary buttons, footer
-- Oxidized copper `#C9573D`: focal points and small status accents
-- Patina teal `#55A8A3`: contour lines and supporting highlights
-- Slate ink `#334A4E`: body text
+- Workspace canvas `#F4F7FA`: primary page background, matching the authenticated application
+- Paper white `#FFFFFF`: elevated surfaces
+- Workspace navy `#3F4D67`: headings, primary buttons, grain boundaries, and footer
+- Active blue `#04A9F5`: focal points and actions, matching the authenticated navigation state
+- Sidebar mist `#A9B7D0`: quiet labels and supporting visual details
+- Slate ink `#334155`: body text
 
-Avoid dark editor surfaces, neon gradients, terminal green, and full-page graph paper. Fine rules may appear only where they organize real data.
+Avoid dark editor surfaces, neon gradients, terminal green, and full-page graph paper. Blue is used as a controlled product accent rather than as a decorative glow. Fine rules may appear only where they organize real data.
 
 ### Typography
 
@@ -39,7 +39,7 @@ The type contrast should signal "research atlas" rather than "developer console.
 
 - Use soft rectangular surfaces with 12–18px corners, not a repeated grid of identical SaaS cards
 - Keep shadows subtle and cool-toned
-- Animate only the hero fingerprint and initial hero reveal
+- Animate only the initial hero reveal and a very small vertical shift of the microstructure field
 - Respect `prefers-reduced-motion`
 - Hover states should shift position or color by a small, controlled amount
 
@@ -54,7 +54,7 @@ Use a compact public navigation bar with the platform name, in-page links for ca
 Use a two-column composition:
 
 - Left: FAIR materials data label, a concise thesis headline, supporting copy, `Search data` primary action, and `Upload JSON` secondary action
-- Right: the material fingerprint SVG and a small specimen label showing a realistic material phase, identifier, solver, and validation state
+- Right: the polycrystalline RVE SVG and a small specimen label showing a realistic material phase, identifier, solver, and validation state
 
 The proposed headline is: **The material record behind every simulation.**
 
@@ -100,7 +100,7 @@ All secure routes continue to rely on Django view permissions. The homepage rede
 - Preserve a useful layout from 320px mobile width upward
 - Collapse navigation cleanly without hiding account actions
 - Convert hero and editorial grids to a single column on small screens
-- Keep all text selectable; the fingerprint SVG is decorative and hidden from assistive technology
+- Keep all text selectable; the microstructure SVG is decorative and hidden from assistive technology
 - Provide visible keyboard focus styles
 - Maintain adequate text and control contrast
 - Disable nonessential motion when reduced motion is requested
