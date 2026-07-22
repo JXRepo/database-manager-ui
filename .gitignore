@@ -29,6 +29,7 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+.superpowers/
 
 # Logs
 *.log
