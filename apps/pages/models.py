@@ -64,3 +64,94 @@ class JSONData(models.Model):
             Summary string
         """
         return f"{self.owner.username} - {self.access_type} - {self.id}"
+
+
+class AccountProfile(models.Model):
+    """
+    Store optional research profile fields for one user
+
+    Attributes
+    ----------
+    user : User
+        Account that owns this profile.
+    institution : str
+        Optional institution name.
+    orcid : str
+        Optional ORCID identifier.
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="profile",
+    )
+    institution = models.CharField(max_length=255, blank=True)
+    orcid = models.CharField(max_length=32, blank=True)
+
+    def __str__(self):
+        """
+        Return a simple profile summary
+        """
+        return f"{self.user.username} profile"
+
+
+class DataNotification(models.Model):
+    """
+    Store one user notification
+
+    Attributes
+    ----------
+    recipient : User
+        User who receives the notification
+    actor : User
+        User who triggered the notification
+    data_object : JSONData
+        Data object related to the notification
+    notification_type : str
+        Notification category
+    message : str
+        User-facing notification text
+    is_read : bool
+        Whether the recipient has opened the notification
+    created_at : datetime
+        Notification creation timestamp
+    """
+
+    TYPE_SHARED_DATA = "shared_data"
+
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="data_notifications",
+    )
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="sent_data_notifications",
+    )
+    data_object = models.ForeignKey(
+        JSONData,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    notification_type = models.CharField(max_length=50, default=TYPE_SHARED_DATA)
+    message = models.CharField(max_length=255)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("is_read", "-created_at")
+
+    @property
+    def display_title(self):
+        """
+        Return the related data object's best display title
+        """
+        data = self.data_object.data or {}
+        return data.get("identifier") or data.get("title") or "Data object"
+
+    def __str__(self):
+        """
+        Return a simple notification summary
+        """
+        return f"{self.recipient.username} - {self.notification_type} - {self.id}"

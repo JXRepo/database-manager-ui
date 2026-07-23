@@ -1,65 +1,121 @@
-# 🚀 FAIR Data Platform (Django)
+# FAIR Materials Data Platform
 
-A Django-based data management platform for **materials simulation data**, designed following **FAIR principles** (Findable, Accessible, Interoperable, Reusable).
+A Django-based platform for uploading, validating, browsing, sharing, and exporting
+FAIR materials simulation JSON data.
 
-Built on top of the **Datta Able UI framework**, this project provides a clean interface for uploading, validating, managing, and exporting structured JSON data for downstream analysis and machine learning.
+The current target is an internal user-ready MVP. The platform focuses on the
+core database workflow, not on ontology, knowledge graph, full Studio
+integration, or production AI features.
 
----
+## Current Scope
 
-## ✨ Core Features
+- Upload one or more JSON files.
+- Unwrap a single object, a list of objects, or a dict with a top-level `data` list.
+- Validate required top-level fields before saving.
+- Save each valid data object as one `JSONData` record.
+- Search accessible data by practical metadata fields.
+- View compact detail pages with plots and mechanical boundary condition summaries.
+- Manage owned data in My Data.
+- Share private data with specific usernames.
+- Export accessible or owned selected data objects.
 
-- 📤 **Upload JSON Data**
-  - Support batch upload of multiple data objects in a single file
-  - Automatically unwrap and store each object as an individual record
+## Access Rules
 
-- 🧩 **Data Unwrapping**
-  - Accept:
-    - JSON list of objects
-    - JSON with `data` field containing a list
-  - Each object is stored independently with metadata
+- Owners can always view and delete their own data.
+- Public data (`access_type: "all"`) can be found through Search.
+- Private data (`access_type: "c"`) is only visible to the owner unless shared.
+- Shared private data is visible to explicitly listed users.
+- Permissions are enforced in Django views, not only hidden in templates.
 
-- 🔐 **User-based Ownership**
-  - Each data object is linked to a user
-  - Enables future access control and sharing
+## Required JSON Fields
 
-- 📊 **Data Listing**
-  - View uploaded data objects in a structured table
-  - Basic metadata display (ID, access type, timestamp)
+Uploads currently validate required top-level fields only. Extra fields are
+allowed.
 
----
+Required fields include:
 
-## 🧠 Planned Features (Work in Progress)
+```text
+identifier, title, creator, creator_affiliation, date, shared_with, rights,
+rights_holder, software, software_version, system, system_version,
+processor_specifications, input_path, results_path, RVE_size, RVE_continuity,
+discretization_type, discretization_unit_size, discretization_count,
+mechanical_BC, phase, stress, total_strain, units
+```
 
-- ✅ **JSON Schema Validation**
-  - Validate required fields and structure
-  - Reject invalid or incomplete data
+Use `phase`, not `material`, unless the schema is explicitly changed later.
 
-- ⚠️ **User-friendly Error Feedback**
-  - Highlight missing/incorrect fields
-  - Allow users to fix and re-upload
+Sharing metadata uses usernames:
 
-- 📄 **Data Detail Page**
-  - Structured visualization of each data object
-  - Replace raw arrays with meaningful plots (e.g., stress–strain curves)
+```json
+{
+  "shared_with": [
+    {
+      "access_type": "c",
+      "username": "viewer"
+    }
+  ]
+}
+```
 
-- 🔎 **Search & Filtering**
-  - Query data based on metadata fields
+For public data:
 
-- 📦 **Dataset Export**
-  - Combine selected data objects into JSON datasets for ML
+```json
+{
+  "shared_with": [
+    {
+      "access_type": "all"
+    }
+  ]
+}
+```
 
-- 🌐 **REST API**
-  - Provide programmatic access to stored data
+## Local Setup
 
----
+Create or update `.env` from `env.sample`:
 
-## 🏗️ Tech Stack
+```text
+DEBUG=True
+SECRET_KEY=<STRONG_KEY_HERE>
+```
 
-- **Backend:** Django
-- **Frontend:** Datta Able (Bootstrap-based UI)
-- **Database:** SQLite (default, extensible to PostgreSQL/MySQL)
-- **Data Format:** JSON (schema-based)
+Install dependencies and prepare the database:
 
----
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe manage.py migrate
+.\.venv\Scripts\python.exe manage.py createsuperuser
+```
 
-## 📁 Project Structure (Simplified)
+Run the development server:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+```
+
+Open:
+
+```text
+http://127.0.0.1:8000/
+```
+
+## Verification
+
+Run the core test suite:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py test
+```
+
+Check migrations and Django configuration:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
+.\.venv\Scripts\python.exe manage.py check
+```
+
+## Near-Term Product Priorities
+
+1. Keep upload, validation, search, detail, access control, sharing, and export stable.
+2. Add only light microstructure visualization first, using a shared example object.
+3. Keep MimDat Studio as a workflow/local tool unless a small maintainable viewer is extracted.
+4. Treat ontology, knowledge graph, LLM assistant, and agent features as later enhancements.

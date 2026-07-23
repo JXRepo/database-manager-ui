@@ -1,0 +1,241 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Share{% endblock title %}
+
+{% block content %}
+<style>
+  .share-tabs {
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .share-tabs .nav-link {
+    border: 0;
+    border-bottom: 3px solid transparent;
+    color: #64748b;
+    font-weight: 700;
+    padding: 12px 14px;
+  }
+
+  .share-tabs .nav-link.active {
+    background: transparent;
+    border-bottom-color: #2563eb;
+    color: #1d4ed8;
+  }
+
+  .share-panel {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .share-table {
+    margin: 0;
+  }
+
+  .share-table th {
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .share-table td {
+    color: #334155;
+    vertical-align: middle;
+  }
+
+  .share-title {
+    color: #0f172a;
+    font-weight: 700;
+  }
+
+  .share-meta {
+    color: #64748b;
+    font-size: 0.86rem;
+    margin-top: 2px;
+  }
+
+  .share-user-badge {
+    background: #dbeafe;
+    border-radius: 999px;
+    color: #1d4ed8;
+    display: inline-flex;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 5px 10px;
+  }
+
+  .share-empty {
+    color: #64748b;
+    padding: 24px;
+  }
+
+  @media (max-width: 640px) {
+    .share-tabs {
+      flex-direction: column;
+    }
+  }
+</style>
+
+<div class="pc-container">
+  <div class="pc-content">
+    <div class="page-header">
+      <div class="page-block">
+        <div class="row align-items-center">
+          <div class="col-md-12">
+            <div class="page-header-title">
+              <h5 class="m-b-10">Share</h5>
+            </div>
+            <ul class="breadcrumb">
+              <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+              <li class="breadcrumb-item">Share</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h5>Share</h5>
+      </div>
+      <div class="card-body">
+        <ul class="nav share-tabs" id="shareTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link active"
+              id="shared-with-me-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#shared-with-me-panel"
+              type="button"
+              role="tab"
+              aria-controls="shared-with-me-panel"
+              aria-selected="true"
+            >
+              Shared with Me
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link"
+              id="sharing-history-tab"
+              data-bs-toggle="tab"
+              data-bs-target="#sharing-history-panel"
+              type="button"
+              role="tab"
+              aria-controls="sharing-history-panel"
+              aria-selected="false"
+            >
+              Sharing History
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content">
+          <div
+            class="tab-pane fade show active"
+            id="shared-with-me-panel"
+            role="tabpanel"
+            aria-labelledby="shared-with-me-tab"
+          >
+            <div class="share-panel">
+              {% if shared_with_me_objects %}
+                <div class="table-responsive">
+                  <table class="table table-hover share-table">
+                    <thead>
+                      <tr>
+                        <th>Data object</th>
+                        <th>Owner</th>
+                        <th>Uploaded at</th>
+                        <th class="text-end">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for obj in shared_with_me_objects %}
+                        <tr>
+                          <td>
+                            <div class="share-title">{{ obj.list_display_name }}</div>
+                            <div class="share-meta">
+                              {% for field in obj.summary_fields %}
+                                {% if field.label == "Identifier" %}{{ field.value }}{% endif %}
+                              {% endfor %}
+                            </div>
+                          </td>
+                          <td>
+                            <span class="share-user-badge">{{ obj.owner.username }}</span>
+                          </td>
+                          <td>{{ obj.uploaded_at|date:"Y-m-d H:i" }}</td>
+                          <td class="text-end">
+                            <a href="{% url 'json_data_detail' obj.id %}" class="btn btn-outline-primary btn-sm">
+                              Open
+                            </a>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="share-empty">No data objects have been shared with you yet.</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div
+            class="tab-pane fade"
+            id="sharing-history-panel"
+            role="tabpanel"
+            aria-labelledby="sharing-history-tab"
+          >
+            <div class="share-panel">
+              {% if share_events %}
+                <div class="table-responsive">
+                  <table class="table table-hover share-table">
+                    <thead>
+                      <tr>
+                        <th>Data object</th>
+                        <th>Shared with</th>
+                        <th>Shared at</th>
+                        <th class="text-end">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for event in share_events %}
+                        <tr>
+                          <td>
+                            <div class="share-title">
+                              {{ event.data_object.data.title|default:event.data_object.data.identifier|default:event.display_title }}
+                            </div>
+                            <div class="share-meta">
+                              {{ event.data_object.data.identifier|default:"No identifier" }}
+                            </div>
+                          </td>
+                          <td>
+                            <span class="share-user-badge">{{ event.recipient.username }}</span>
+                          </td>
+                          <td>{{ event.created_at|date:"Y-m-d H:i" }}</td>
+                          <td class="text-end">
+                            <a href="{% url 'json_data_detail' event.data_object_id %}" class="btn btn-outline-primary btn-sm">
+                              Open
+                            </a>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <div class="share-empty">You have not shared any data objects yet.</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

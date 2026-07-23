@@ -4,6 +4,329 @@
 {% block title %}Charts{% endblock title %}
 
 {% block content %}
+<style>
+  .analytics-card,
+  .metric-card {
+    background: #ffffff;
+    border: 1px solid #e8edf3;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  }
+
+  .metric-card .card-body {
+    align-items: center;
+    display: flex;
+    gap: 14px;
+    min-height: 92px;
+    padding: 16px;
+  }
+
+  .metric-icon {
+    align-items: center;
+    border-radius: 8px;
+    color: #ffffff;
+    display: inline-flex;
+    flex: 0 0 42px;
+    height: 42px;
+    justify-content: center;
+    width: 42px;
+  }
+
+  .metric-icon svg {
+    height: 20px;
+    width: 20px;
+  }
+
+  .metric-icon.blue {
+    background: #2563eb;
+  }
+
+  .metric-icon.green {
+    background: #16a34a;
+  }
+
+  .metric-icon.orange {
+    background: #ea580c;
+  }
+
+  .metric-icon.red {
+    background: #dc2626;
+  }
+
+  .metric-label {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  .metric-value {
+    color: #0f172a;
+    font-size: 1.5rem;
+    font-weight: 750;
+    line-height: 1.15;
+  }
+
+  .analytics-card .card-header {
+    align-items: center;
+    background: #ffffff;
+    border-bottom: 1px solid #eef2f7;
+    display: flex;
+    justify-content: space-between;
+    min-height: 52px;
+    padding: 12px 16px;
+  }
+
+  .analytics-card .card-header h5 {
+    color: #0f172a;
+    font-size: 0.98rem;
+    font-weight: 750;
+    margin: 0;
+  }
+
+  .analytics-card .card-body {
+    padding: 14px 16px 16px;
+  }
+
+  .summary-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .summary-item {
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    min-width: 0;
+    padding: 11px 12px;
+  }
+
+  .summary-label {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .summary-value {
+    color: #111827;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+  }
+
+  .analytics-table {
+    margin-bottom: 0;
+  }
+
+  .analytics-table th {
+    border-top: 0;
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .analytics-table td {
+    color: #1f2937;
+    font-size: 0.88rem;
+    vertical-align: middle;
+  }
+
+  .primary-cell {
+    color: #0f172a;
+    font-weight: 750;
+  }
+
+  .muted-cell {
+    color: #64748b;
+    font-size: 0.82rem;
+  }
+
+  .compact-badge {
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 750;
+    padding: 5px 8px;
+  }
+
+  .coverage-row {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(120px, 1fr) 74px 70px;
+    padding: 8px 0;
+  }
+
+  .coverage-row + .coverage-row {
+    border-top: 1px solid #eef2f7;
+  }
+
+  .coverage-label {
+    color: #1f2937;
+    font-weight: 700;
+    min-width: 0;
+  }
+
+  .coverage-count {
+    color: #64748b;
+    font-size: 0.82rem;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .coverage-bar {
+    background: #e5e7eb;
+    border-radius: 999px;
+    height: 8px;
+    overflow: hidden;
+  }
+
+  .coverage-fill {
+    border-radius: inherit;
+    height: 100%;
+  }
+
+  .coverage-fill.success {
+    background: #16a34a;
+  }
+
+  .coverage-fill.warning {
+    background: #ea580c;
+  }
+
+  .coverage-fill.danger {
+    background: #dc2626;
+  }
+
+  .issue-list {
+    border-top: 1px solid #eef2f7;
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+
+  .issue-heading {
+    color: #0f172a;
+    font-size: 0.84rem;
+    font-weight: 750;
+    margin-bottom: 8px;
+  }
+
+  .issue-row {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(120px, 1fr) auto auto;
+    padding: 6px 0;
+  }
+
+  .issue-label {
+    color: #1f2937;
+    font-weight: 700;
+    min-width: 0;
+  }
+
+  .issue-example {
+    color: #64748b;
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .bc-matrix {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .bc-axis {
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .bc-axis-title {
+    color: #0f172a;
+    font-size: 1rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+
+  .bc-axis-line {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+  }
+
+  .bc-axis-label {
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .bc-axis-value {
+    color: #111827;
+    font-weight: 750;
+  }
+
+  .chart-panel {
+    min-height: 275px;
+  }
+
+  .chart-error {
+    align-items: center;
+    border: 1px dashed #d8e0ea;
+    border-radius: 8px;
+    color: #64748b;
+    display: flex;
+    justify-content: center;
+    min-height: 230px;
+    padding: 16px;
+    text-align: center;
+  }
+
+  .empty-state {
+    color: #64748b;
+    padding: 18px;
+    text-align: center;
+  }
+
+  @media (max-width: 1200px) {
+    .summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 768px) {
+    .bc-matrix,
+    .summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .coverage-row {
+      grid-template-columns: 1fr 62px;
+    }
+
+    .issue-row {
+      grid-template-columns: 1fr auto;
+    }
+
+    .issue-example {
+      grid-column: 1 / -1;
+    }
+
+    .coverage-bar {
+      grid-column: 1 / -1;
+    }
+  }
+</style>
+
 <div class="pc-container">
   <div class="pc-content">
     <div class="page-header">
@@ -11,7 +334,7 @@
         <div class="row align-items-center">
           <div class="col-md-12">
             <div class="page-header-title">
-              <h5 class="mb-0">Charts</h5>
+              <h5 class="mb-0">Simulation Charts</h5>
             </div>
           </div>
           <div class="col-md-12">
@@ -24,57 +347,312 @@
       </div>
     </div>
 
-    <div class="row mb-3">
-      <div class="col-12">
-        <div class="card">
+    <div class="row g-3 mb-3">
+      <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card">
           <div class="card-body">
-            <h6 class="mb-0">Total records: {{ total_objects }}</h6>
+            <span class="metric-icon blue"><i data-feather="database"></i></span>
+            <div>
+              <div class="metric-label">Accessible Objects</div>
+              <div class="metric-value">{{ total_objects }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card">
+          <div class="card-body">
+            <span class="metric-icon green"><i data-feather="layers"></i></span>
+            <div>
+              <div class="metric-label">Comparable Sets</div>
+              <div class="metric-value">{{ comparable_group_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card">
+          <div class="card-body">
+            <span class="metric-icon orange"><i data-feather="activity"></i></span>
+            <div>
+              <div class="metric-label">Curve Ready</div>
+              <div class="metric-value">{{ plot_ready_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card">
+          <div class="card-body">
+            <span class="metric-icon red"><i data-feather="alert-triangle"></i></span>
+            <div>
+              <div class="metric-label">Objects With Gaps</div>
+              <div class="metric-value">{{ data_gap_count }}</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="row">
-      <div class="col-sm-12 col-xl-6">
-        <div class="card">
+    <div class="row g-3 mb-3">
+      <div class="col-xl-7">
+        <div class="card analytics-card h-100">
           <div class="card-header">
-            <h5>Access Distribution</h5>
+            <h5>Simulation Setup Groups</h5>
           </div>
           <div class="card-body">
-            <div id="access-chart"></div>
+            {% if comparable_group_rows %}
+              <div class="table-responsive">
+                <table class="table analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Phase</th>
+                      <th>Setup</th>
+                      <th>Loading</th>
+                      <th>Conditions</th>
+                      <th>Status</th>
+                      <th>Objects</th>
+                      <th>Curve Ready</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in comparable_group_rows %}
+                      <tr>
+                        <td class="primary-cell">{{ row.phase }}</td>
+                        <td>
+                          <div>{{ row.setup }}</div>
+                        </td>
+                        <td>{{ row.loading }}</td>
+                        <td class="muted-cell">{{ row.conditions }}</td>
+                        <td>
+                          <span class="badge bg-{{ row.group_status_class }} compact-badge">{{ row.group_status }}</span>
+                        </td>
+                        <td class="primary-cell">{{ row.objects }}</td>
+                        <td>
+                          <span class="badge bg-{{ row.readiness_class }} compact-badge">{{ row.ready_label }}</span>
+                        </td>
+                        <td>
+                          <a href="{% url 'json_data_detail' row.representative_id %}" class="btn btn-outline-primary btn-sm">Open</a>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="empty-state">No accessible data objects.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-5">
+        <div class="card analytics-card h-100">
+          <div class="card-header">
+            <h5>Metadata Coverage</h5>
+          </div>
+          <div class="card-body">
+            {% for row in quality_rows %}
+              <div class="coverage-row">
+                <div class="coverage-label">{{ row.label }}</div>
+                <div class="coverage-count">{{ row.present }} / {{ total_objects }}</div>
+                <div class="coverage-bar">
+                  <div class="coverage-fill {{ row.status_class }}" style="width: {{ row.coverage }}%"></div>
+                </div>
+              </div>
+            {% empty %}
+              <div class="empty-state">No coverage data.</div>
+            {% endfor %}
+
+            {% if quality_issue_rows %}
+              <div class="issue-list">
+                <div class="issue-heading">Needs Attention</div>
+                {% for row in quality_issue_rows %}
+                  <div class="issue-row">
+                    <div class="issue-label">{{ row.label }}</div>
+                    <span class="badge bg-{{ row.status_class }} compact-badge">{{ row.missing }} missing</span>
+                    {% if row.example_id %}
+                      <a href="{% url 'json_data_detail' row.example_id %}" class="issue-example">{{ row.example_label }}</a>
+                    {% else %}
+                      <span class="issue-example">-</span>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-xl-6">
+        <div class="card analytics-card h-100">
+          <div class="card-header">
+            <h5>Simulation Conditions</h5>
+          </div>
+          <div class="card-body">
+            <div class="summary-grid">
+              {% for item in condition_rows %}
+                <div class="summary-item">
+                  <div class="summary-label">{{ item.label }}</div>
+                  <div class="summary-value">{{ item.value }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-6">
+        <div class="card analytics-card h-100">
+          <div class="card-header">
+            <h5>Mechanical Response</h5>
+          </div>
+          <div class="card-body">
+            <div class="summary-grid">
+              {% for item in response_overview_rows %}
+                <div class="summary-item">
+                  <div class="summary-label">{{ item.label }}</div>
+                  <div class="summary-value">{{ item.value }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="card analytics-card">
+          <div class="card-header">
+            <h5>Curve-Ready Objects</h5>
+          </div>
+          <div class="card-body">
+            {% if response_rows %}
+              <div class="table-responsive">
+                <table class="table analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Object</th>
+                      <th>Phase</th>
+                      <th>Model</th>
+                      <th>Loading</th>
+                      <th>Points</th>
+                      <th>Peak |stress_11|</th>
+                      <th>Peak |strain_11|</th>
+                      <th>Peak |plastic_strain_11|</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in response_rows %}
+                      <tr>
+                        <td class="primary-cell">
+                          <a href="{% url 'json_data_detail' row.id %}">{{ row.identifier }}</a>
+                        </td>
+                        <td>{{ row.phase }}</td>
+                        <td>{{ row.model }}</td>
+                        <td>{{ row.loading }}</td>
+                        <td class="primary-cell">{{ row.points }}</td>
+                        <td>{{ row.stress_peak }}</td>
+                        <td>{{ row.strain_peak }}</td>
+                        <td>{{ row.plastic_peak }}</td>
+                        <td>
+                          <span class="badge bg-{{ row.status_class }} compact-badge">{{ row.status }}</span>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="empty-state">No accessible data objects.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="card analytics-card h-100">
+          <div class="card-header">
+            <h5>Material Model Parameters</h5>
+          </div>
+          <div class="card-body">
+            {% if material_model_rows %}
+              <div class="table-responsive">
+                <table class="table analytics-table">
+                  <thead>
+                    <tr>
+                      <th>Phase</th>
+                      <th>Model</th>
+                      <th>Objects</th>
+                      <th>Elastic Model</th>
+                      <th>Stiffness</th>
+                      <th>Strength</th>
+                      <th>Hardening</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for row in material_model_rows %}
+                      <tr>
+                        <td class="primary-cell">{{ row.phase }}</td>
+                        <td>{{ row.model }}</td>
+                        <td class="primary-cell">{{ row.objects }}</td>
+                        <td>{{ row.elastic_model }}</td>
+                        <td>{{ row.stiffness }}</td>
+                        <td>{{ row.strength }}</td>
+                        <td>{{ row.hardening }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <div class="empty-state">No material model metadata.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-sm-12 col-xl-6">
+        <div class="card analytics-card">
+          <div class="card-header">
+            <h5>Phase / Material</h5>
+          </div>
+          <div class="card-body">
+            <div id="phase-chart" class="chart-panel"></div>
           </div>
         </div>
       </div>
 
       <div class="col-sm-12 col-xl-6">
-        <div class="card">
+        <div class="card analytics-card">
           <div class="card-header">
-            <h5>Upload Trend (Last 30 Days)</h5>
+            <h5>Software / Solver</h5>
           </div>
           <div class="card-body">
-            <div id="upload-trend-chart"></div>
+            <div id="software-chart" class="chart-panel"></div>
           </div>
         </div>
       </div>
 
       <div class="col-sm-12 col-xl-6">
-        <div class="card">
+        <div class="card analytics-card">
           <div class="card-header">
-            <h5>Software Distribution</h5>
+            <h5>Constitutive Model</h5>
           </div>
           <div class="card-body">
-            <div id="software-chart"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-sm-12 col-xl-6">
-        <div class="card">
-          <div class="card-header">
-            <h5>Top Keywords</h5>
-          </div>
-          <div class="card-body">
-            <div id="keywords-chart"></div>
+            <div id="model-chart" class="chart-panel"></div>
           </div>
         </div>
       </div>
@@ -84,122 +662,241 @@
 {% endblock content %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="{% static 'assets/js/plugins/apexcharts.min.js' %}"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const accessLabels = JSON.parse('{{ access_labels_json|escapejs }}');
-    const accessSeries = JSON.parse('{{ access_series_json|escapejs }}');
-
-    const uploadLabels = JSON.parse('{{ upload_labels_json|escapejs }}');
-    const uploadSeries = JSON.parse('{{ upload_series_json|escapejs }}');
-
+    const phaseLabels = JSON.parse('{{ phase_labels_json|escapejs }}');
+    const phaseSeries = JSON.parse('{{ phase_series_json|escapejs }}');
     const softwareLabels = JSON.parse('{{ software_labels_json|escapejs }}');
     const softwareSeries = JSON.parse('{{ software_series_json|escapejs }}');
+    const modelLabels = JSON.parse('{{ model_labels_json|escapejs }}');
+    const modelSeries = JSON.parse('{{ model_series_json|escapejs }}');
 
-    const keywordLabels = JSON.parse('{{ keyword_labels_json|escapejs }}');
-    const keywordSeries = JSON.parse('{{ keyword_series_json|escapejs }}');
-
-    const accessOptions = {
-      chart: {
-        type: "donut",
-        height: 350
-      },
-      series: accessSeries,
-      labels: accessLabels,
-      legend: {
-        position: "bottom"
-      },
-      noData: {
-        text: "No data"
-      }
+    const palette = {
+      phase: ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#dc2626"],
+      software: ["#0f766e", "#0284c7", "#16a34a", "#4f46e5", "#7c3aed", "#db2777"],
+      model: ["#4f46e5", "#0f766e", "#dc2626", "#ea580c", "#2563eb", "#16a34a"]
     };
 
-    const uploadTrendOptions = {
-      chart: {
-        type: "line",
-        height: 350,
-        toolbar: {
+    function getChartElement(selector) {
+      return document.querySelector(selector);
+    }
+
+    function hasChartData(labels, series) {
+      return labels.length > 0 && series.some(function (value) {
+        return Number(value) > 0;
+      });
+    }
+
+    function renderEmpty(selector, message) {
+      const element = getChartElement(selector);
+
+      if (element) {
+        element.innerHTML = `<div class="chart-error">${message}</div>`;
+      }
+    }
+
+    function renderApexChart(selector, options, labels, series) {
+      const element = getChartElement(selector);
+
+      if (!element) {
+        return;
+      }
+
+      if (!hasChartData(labels, series)) {
+        renderEmpty(selector, "No chart data");
+        return;
+      }
+
+      if (!window.ApexCharts) {
+        renderEmpty(selector, "Chart library could not be loaded.");
+        return;
+      }
+
+      try {
+        new ApexCharts(element, options).render();
+      } catch (error) {
+        renderEmpty(selector, "This chart could not be rendered.");
+        console.error(error);
+      }
+    }
+
+    function buildTreemapSeries(labels, series) {
+      return labels.map(function (label, index) {
+        return {
+          x: label,
+          y: series[index] || 0
+        };
+      });
+    }
+
+    function integerFormatter(value) {
+      return Number.isInteger(value) ? value.toString() : "";
+    }
+
+    function renderDonutChart(selector, labels, series, colors, valueName) {
+      const options = {
+        chart: {
+          type: "donut",
+          height: 275,
+          toolbar: {
+            show: false
+          }
+        },
+        series: series,
+        labels: labels,
+        colors: colors,
+        stroke: {
+          width: 2,
+          colors: ["#ffffff"]
+        },
+        plotOptions: {
+          pie: {
+            donut: {
+              size: "68%",
+              labels: {
+                show: true,
+                name: {
+                  color: "#64748b",
+                  fontSize: "13px",
+                  show: true
+                },
+                value: {
+                  color: "#0f172a",
+                  fontSize: "24px",
+                  fontWeight: 750,
+                  show: true
+                },
+                total: {
+                  color: "#64748b",
+                  label: valueName,
+                  show: true
+                }
+              }
+            }
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        legend: {
+          fontSize: "13px",
+          markers: {
+            radius: 8
+          },
+          position: "bottom"
+        },
+        tooltip: {
+          theme: "light"
+        }
+      };
+
+      renderApexChart(selector, options, labels, series);
+    }
+
+    function renderTreemapChart(selector, labels, series, colors) {
+      const options = {
+        chart: {
+          type: "treemap",
+          height: 275,
+          toolbar: {
+            show: false
+          }
+        },
+        colors: colors,
+        dataLabels: {
+          enabled: true,
+          formatter: function (text, options) {
+            const value = options.value || 0;
+            return `${text}: ${value}`;
+          },
+          style: {
+            fontSize: "12px",
+            fontWeight: 750
+          }
+        },
+        legend: {
           show: false
+        },
+        plotOptions: {
+          treemap: {
+            distributed: true,
+            enableShades: false
+          }
+        },
+        series: [
+          {
+            data: buildTreemapSeries(labels, series)
+          }
+        ],
+        tooltip: {
+          theme: "light"
         }
-      },
-      series: [
-        {
-          name: "Uploads",
-          data: uploadSeries
-        }
-      ],
-      xaxis: {
-        categories: uploadLabels,
-        labels: {
-          rotate: -45,
-          hideOverlappingLabels: true
-        }
-      },
-      stroke: {
-        curve: "smooth"
-      },
-      noData: {
-        text: "No data"
-      }
-    };
+      };
 
-    const softwareOptions = {
-      chart: {
-        type: "bar",
-        height: 350,
-        toolbar: {
-          show: false
-        }
-      },
-      series: [
-        {
-          name: "Count",
-          data: softwareSeries
-        }
-      ],
-      xaxis: {
-        categories: softwareLabels,
-        labels: {
-          rotate: -25,
-          hideOverlappingLabels: true
-        }
-      },
-      noData: {
-        text: "No data"
-      }
-    };
+      renderApexChart(selector, options, labels, series);
+    }
 
-    const keywordsOptions = {
-      chart: {
-        type: "bar",
-        height: 350,
-        toolbar: {
-          show: false
+    function renderColumnChart(selector, labels, series, colors, valueName) {
+      const options = {
+        chart: {
+          height: 275,
+          toolbar: {
+            show: false
+          },
+          type: "bar"
+        },
+        colors: colors,
+        dataLabels: {
+          enabled: true,
+          style: {
+            fontSize: "12px",
+            fontWeight: 750
+          }
+        },
+        grid: {
+          borderColor: "#eef2f7"
+        },
+        plotOptions: {
+          bar: {
+            borderRadius: 6,
+            columnWidth: "44%",
+            distributed: true
+          }
+        },
+        series: [
+          {
+            data: series,
+            name: valueName
+          }
+        ],
+        tooltip: {
+          theme: "light"
+        },
+        xaxis: {
+          categories: labels,
+          labels: {
+            hideOverlappingLabels: true,
+            rotate: -20,
+            style: {
+              fontSize: "12px"
+            },
+            trim: true
+          }
+        },
+        yaxis: {
+          labels: {
+            formatter: integerFormatter
+          }
         }
-      },
-      plotOptions: {
-        bar: {
-          horizontal: true
-        }
-      },
-      series: [
-        {
-          name: "Count",
-          data: keywordSeries
-        }
-      ],
-      xaxis: {
-        categories: keywordLabels
-      },
-      noData: {
-        text: "No data"
-      }
-    };
+      };
 
-    new ApexCharts(document.querySelector("#access-chart"), accessOptions).render();
-    new ApexCharts(document.querySelector("#upload-trend-chart"), uploadTrendOptions).render();
-    new ApexCharts(document.querySelector("#software-chart"), softwareOptions).render();
-    new ApexCharts(document.querySelector("#keywords-chart"), keywordsOptions).render();
+      renderApexChart(selector, options, labels, series);
+    }
+
+    renderDonutChart("#phase-chart", phaseLabels, phaseSeries, palette.phase, "Objects");
+    renderTreemapChart("#software-chart", softwareLabels, softwareSeries, palette.software);
+    renderColumnChart("#model-chart", modelLabels, modelSeries, palette.model, "Objects");
   });
 </script>
 {% endblock extra_js %}

@@ -92,7 +92,7 @@ def check_permission(function):
 
 def _is_empty_required_value(value):
     """
-    Return True when a required top-level field exists but is empty
+    Return True when a required top-level field value is empty
 
     Parameters
     ----------
@@ -150,8 +150,6 @@ def validate_json(data):
                 missing_fields.append(field)
             elif _is_empty_required_value(obj.get(field)):
                 empty_fields.append(field)
-
-
 
         if missing_fields or empty_fields:
             missing_label = "field" if len(missing_fields) == 1 else "fields"

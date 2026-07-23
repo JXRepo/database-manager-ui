@@ -1,0 +1,30 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A FAIR platform for materials simulation data, from structured upload to discovery and review.">
+    <meta name="theme-color" content="#f4f7fa">
+    <title>{% block title %}Materials Data Platform{% endblock title %}</title>
+    <link rel="icon" href="{% static 'assets/images/favicon.svg' %}" type="image/svg+xml">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        background: #f4f7fa;
+      }
+    </style>
+    {% block extrastyle %}{% endblock extrastyle %}
+  </head>
+  <body>
+    {% block content %}{% endblock content %}
+  </body>
+</html>

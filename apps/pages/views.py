@@ -1,27 +1,64 @@
 import json
+import math
+import secrets
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
+from django.conf import settings
 from django.contrib.auth import login
 from django.contrib.auth.models import User
 from apps.pages.models import Product
 from django.core import serializers
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db.models import Q
+from django.urls import reverse
+from django.utils import timezone
 
 from .models import *
-from .forms import SignUpForm, JSONUploadForm
+from .forms import AccountSettingsForm, SignUpForm, JSONUploadForm
 from django.views.decorators.http import require_POST
-from apps.dyn_api.helpers import validate_json
+from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS, validate_json
 from numbers import Number
 
 MAX_UPLOAD_FILES = 5
+SHORT_NUMERIC_ARRAY_INLINE_LIMIT = 6
+ASSISTANT_MAX_QUESTION_LENGTH = 600
+SHARE_USERNAME_KEY = "username"
+UPLOAD_ISSUE_CATEGORIES = (
+    ("invalid_file", "Invalid files"),
+    ("invalid_structure", "Invalid JSON structure"),
+    ("missing_required", "Missing required fields"),
+    ("empty_values", "Empty values"),
+    ("duplicate_identifier", "Duplicate identifiers"),
+    ("invalid_access", "Invalid access metadata"),
+    ("unknown_share_user", "Unknown shared users"),
+    ("self_share", "Invalid share targets"),
+    ("other_validation", "Other validation issues"),
+)
+MECHANICAL_BC_VERTICES = (
+    "V000",
+    "V100",
+    "V010",
+    "V110",
+    "V001",
+    "V101",
+    "V011",
+    "V111",
+)
+ORCID_AUTH_SCOPE = "/authenticate"
+ORCID_STATE_SESSION_KEY = "orcid_oauth_state"
 
 
-@login_required
 def index(request):
-    """Redirect authenticated users to the search page"""
-    return redirect("search")
+    """Show the public landing page or redirect signed-in users to search"""
+    if request.user.is_authenticated:
+        return redirect("search")
+
+    return render(request, "pages/index.html")
 
 # Components
 def color(request):
@@ -64,6 +101,472 @@ def register_view(request):
 
 
 @login_required
+def account_settings_view(request):
+    """
+    Update the signed-in user's basic account settings
+    """
+    profile, _created = AccountProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        form = AccountSettingsForm(request.POST, instance=request.user)
+
+        if form.is_valid():
+            form.save()
+            profile.institution = form.cleaned_data["institution"]
+            profile.orcid = form.cleaned_data["orcid"]
+            profile.save(update_fields=["institution", "orcid"])
+            messages.success(request, "Account settings updated.")
+            return redirect("account_settings")
+    else:
+        form = AccountSettingsForm(instance=request.user)
+
+    return render(
+        request,
+        "accounts/settings.html",
+        {
+            "form": form,
+            "profile": profile,
+        },
+    )
+
+
+def _get_orcid_base_url():
+    """
+    Return the configured ORCID base URL without a trailing slash
+    """
+    return getattr(settings, "ORCID_BASE_URL", "https://sandbox.orcid.org").rstrip("/")
+
+
+def _get_orcid_redirect_uri(request):
+    """
+    Return the redirect URI registered with ORCID
+    """
+    configured_uri = getattr(settings, "ORCID_REDIRECT_URI", "").strip()
+
+    if configured_uri:
+        return configured_uri
+
+    return request.build_absolute_uri(reverse("orcid_callback"))
+
+
+def _build_orcid_authorization_url(request, state):
+    """
+    Build the ORCID authorization URL for account linking
+    """
+    query = urlencode(
+        {
+            "client_id": settings.ORCID_CLIENT_ID,
+            "response_type": "code",
+            "scope": ORCID_AUTH_SCOPE,
+            "redirect_uri": _get_orcid_redirect_uri(request),
+            "state": state,
+        }
+    )
+    return f"{_get_orcid_base_url()}/oauth/authorize?{query}"
+
+
+def _exchange_orcid_authorization_code(code, redirect_uri):
+    """
+    Exchange an ORCID authorization code for token response data
+    """
+    body = urlencode(
+        {
+            "client_id": settings.ORCID_CLIENT_ID,
+            "client_secret": settings.ORCID_CLIENT_SECRET,
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": redirect_uri,
+        }
+    ).encode("utf-8")
+    request = Request(
+        f"{_get_orcid_base_url()}/oauth/token",
+        data=body,
+        headers={
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+
+    with urlopen(request, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+@login_required
+def orcid_connect_view(request):
+    """
+    Redirect the signed-in user to ORCID account linking
+    """
+    if not settings.ORCID_CLIENT_ID or not settings.ORCID_CLIENT_SECRET:
+        messages.error(
+            request,
+            "ORCID connection is not configured yet. Add ORCID client credentials first.",
+        )
+        return redirect("account_settings")
+
+    state = secrets.token_urlsafe(24)
+    request.session[ORCID_STATE_SESSION_KEY] = state
+    return redirect(_build_orcid_authorization_url(request, state))
+
+
+@login_required
+def orcid_callback_view(request):
+    """
+    Store the authenticated ORCID iD returned by ORCID
+    """
+    expected_state = request.session.pop(ORCID_STATE_SESSION_KEY, "")
+    received_state = request.GET.get("state", "")
+
+    if not expected_state or received_state != expected_state:
+        messages.error(request, "ORCID connection could not be verified.")
+        return redirect("account_settings")
+
+    if request.GET.get("error"):
+        messages.error(request, "ORCID connection was cancelled.")
+        return redirect("account_settings")
+
+    code = request.GET.get("code", "").strip()
+
+    if not code:
+        messages.error(request, "ORCID did not return an authorization code.")
+        return redirect("account_settings")
+
+    try:
+        token_data = _exchange_orcid_authorization_code(
+            code,
+            _get_orcid_redirect_uri(request),
+        )
+    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+        messages.error(request, "ORCID connection failed. Please try again.")
+        return redirect("account_settings")
+
+    orcid = str(token_data.get("orcid", "")).strip()
+
+    if not orcid:
+        messages.error(request, "ORCID did not return an authenticated iD.")
+        return redirect("account_settings")
+
+    profile, _created = AccountProfile.objects.get_or_create(user=request.user)
+    profile.orcid = orcid
+    profile.save(update_fields=["orcid"])
+    messages.success(request, "ORCID connected.")
+    return redirect("account_settings")
+
+
+def _get_shared_with_entries(data):
+    """
+    Return normalized sharing entries from one JSON object
+
+    Parameters
+    ----------
+    data : dict
+        Parsed JSON data object.
+
+    Returns
+    -------
+    list
+        Sharing entries from the top-level shared_with field.
+    """
+    shared_with = data.get("shared_with", [])
+
+    if isinstance(shared_with, list):
+        return shared_with
+
+    if isinstance(shared_with, dict):
+        return [shared_with]
+
+    return []
+
+
+def _get_upload_access_type(data):
+    """
+    Return the stored access type for an uploaded JSON object
+
+    Parameters
+    ----------
+    data : dict
+        Parsed JSON data object.
+
+    Returns
+    -------
+    str
+        The stored access type, either all or c.
+    """
+    for item in _get_shared_with_entries(data):
+        if not isinstance(item, dict):
+            continue
+
+        access_type = str(item.get("access_type", "c")).strip().casefold()
+
+        if access_type == "all":
+            return "all"
+
+    return "c"
+
+
+def _get_share_username(item):
+    """
+    Return the username value from one sharing entry
+
+    Parameters
+    ----------
+    item : dict
+        One shared_with entry from the uploaded JSON metadata.
+
+    Returns
+    -------
+    str
+        The stripped username value.
+    """
+    if not isinstance(item, dict):
+        return ""
+
+    return str(item.get(SHARE_USERNAME_KEY, "")).strip()
+
+
+def _add_upload_issue(upload_issues, category, message):
+    """
+    Add one upload issue to its display category
+
+    Parameters
+    ----------
+    upload_issues : dict
+        Mapping of issue category keys to message lists.
+    category : str
+        Issue category key.
+    message : str
+        User-facing issue detail.
+    """
+    upload_issues.setdefault(category, []).append(message)
+
+
+def _get_upload_issue_messages(upload_issues):
+    """
+    Build numbered upload issue messages grouped by category
+
+    Parameters
+    ----------
+    upload_issues : dict
+        Mapping of issue category keys to message lists.
+
+    Returns
+    -------
+    list
+        Numbered messages for display through Django messages.
+    """
+    numbered_messages = []
+    issue_number = 1
+
+    for category, label in UPLOAD_ISSUE_CATEGORIES:
+        details = upload_issues.get(category, [])
+
+        if not details:
+            continue
+
+        numbered_messages.append(
+            f"{issue_number}. {label}: {'; '.join(details)}"
+        )
+        issue_number += 1
+
+    return numbered_messages
+
+
+def _categorize_validation_error(error):
+    """
+    Return the upload issue category for one schema validation message
+
+    Parameters
+    ----------
+    error : str
+        Validation error returned by validate_json.
+
+    Returns
+    -------
+    str
+        Upload issue category key.
+    """
+    error_text = error.casefold()
+
+    if "missing required" in error_text:
+        return "missing_required"
+
+    if "empty " in error_text:
+        return "empty_values"
+
+    return "other_validation"
+
+
+def _resolve_upload_access_metadata(data, owner):
+    """
+    Resolve upload access type and username sharing metadata
+
+    Parameters
+    ----------
+    data : dict
+        Parsed JSON data object.
+    owner : User
+        User uploading the data object.
+
+    Returns
+    -------
+    tuple
+        Stored access type, resolved shared users, and issue dictionaries.
+    """
+    users = []
+    issues = []
+    seen_user_ids = set()
+    access_type = _get_upload_access_type(data)
+
+    for index, item in enumerate(_get_shared_with_entries(data), start=1):
+        if not isinstance(item, dict):
+            issues.append(
+                (
+                    "invalid_access",
+                    f"shared_with entry {index} must be an object.",
+                )
+            )
+            continue
+
+        has_access_type_key = "access_type" in item
+        raw_access_type = item.get("access_type", "c")
+        item_access_type = str(raw_access_type).strip().casefold()
+
+        if has_access_type_key and not item_access_type:
+            issues.append(
+                (
+                    "empty_values",
+                    f"shared_with entry {index} has an empty access_type.",
+                )
+            )
+            continue
+
+        if item_access_type not in {"all", "c"}:
+            issues.append(
+                (
+                    "invalid_access",
+                    (
+                        f'shared_with entry {index} has invalid access_type '
+                        f'"{raw_access_type}". Use "all" for public data or '
+                        f'"c" for private or shared data.'
+                    ),
+                )
+            )
+            continue
+
+        has_username_key = SHARE_USERNAME_KEY in item
+        username = _get_share_username(item)
+
+        if access_type == "all":
+            if has_username_key:
+                issues.append(
+                    (
+                        "invalid_access",
+                        (
+                            f'shared_with entry {index} cannot include username '
+                            'when access_type is "all". Public data is already '
+                            "available through Search."
+                        ),
+                    )
+                )
+            continue
+
+        if item_access_type == "all":
+            continue
+
+        if not has_username_key:
+            continue
+
+        if not username:
+            issues.append(
+                (
+                    "empty_values",
+                    f"shared_with entry {index} has an empty username.",
+                )
+            )
+            continue
+
+        share_user = _find_share_user(username)
+
+        if share_user is None:
+            issues.append(
+                (
+                    "unknown_share_user",
+                    (
+                        f'username "{username}" in shared_with entry {index} '
+                        "does not exist."
+                    ),
+                )
+            )
+            continue
+
+        if share_user.pk == owner.pk:
+            issues.append(
+                (
+                    "self_share",
+                    (
+                        f'username "{username}" is the owner. Remove username '
+                        "to keep this object private."
+                    ),
+                )
+            )
+            continue
+
+        if share_user.pk in seen_user_ids:
+            continue
+
+        users.append(share_user)
+        seen_user_ids.add(share_user.pk)
+
+    return access_type, users, issues
+
+
+def _identifier_exists(identifier):
+    """
+    Return True when an identifier already exists in stored JSON data
+
+    Parameters
+    ----------
+    identifier : str
+        Top-level JSON identifier to check.
+
+    Returns
+    -------
+    bool
+        True when any JSONData row already stores this identifier.
+    """
+    return JSONData.objects.filter(data__identifier=identifier).exists()
+
+
+def _get_data_object_display_title(data_object):
+    """
+    Return the best display title for one data object
+    """
+    data = data_object.data or {}
+    return data.get("identifier") or data.get("title") or "Data object"
+
+
+def _create_shared_data_notification(data_object, actor, recipient):
+    """
+    Create a notification for one private data share
+    """
+    if actor.pk == recipient.pk:
+        return None
+
+    if data_object.access_type != "c":
+        return None
+
+    title = _get_data_object_display_title(data_object)
+
+    return DataNotification.objects.create(
+        recipient=recipient,
+        actor=actor,
+        data_object=data_object,
+        notification_type=DataNotification.TYPE_SHARED_DATA,
+        message=f"{actor.username} shared {title} with you.",
+    )
+
+
+@login_required
 def upload_json_view(request):
     """
     Upload JSON files, validate data objects, and save valid objects to the database
@@ -93,7 +596,8 @@ def upload_json_view(request):
 
             total_created_count = 0
             processed_file_count = 0
-            upload_errors = []
+            upload_issues = {}
+            seen_identifiers = set()
 
             for uploaded_file in uploaded_files:
                 file_name = uploaded_file.name or "Uploaded file"
@@ -101,7 +605,11 @@ def upload_json_view(request):
                 try:
                     payload = json.load(uploaded_file)
                 except json.JSONDecodeError:
-                    upload_errors.append(f"{file_name}: Invalid JSON file.")
+                    _add_upload_issue(
+                        upload_issues,
+                        "invalid_file",
+                        f"{file_name} is not valid JSON.",
+                    )
                     continue
 
                 if isinstance(payload, list):
@@ -112,49 +620,111 @@ def upload_json_view(request):
                     else:
                         objects = [payload]
                 else:
-                    upload_errors.append(
-                        f"{file_name}: JSON must be a single object, a list of objects, or a dict with a 'data' list."
+                    _add_upload_issue(
+                        upload_issues,
+                        "invalid_structure",
+                        (
+                            f"{file_name} must be a single object, a list of objects, "
+                            "or a dict with a 'data' list."
+                        ),
                     )
                     continue
 
                 valid_objects, errors = validate_json(objects)
+                object_indexes = {}
+
+                for object_index, obj in enumerate(objects, start=1):
+                    if isinstance(obj, dict):
+                        object_indexes[id(obj)] = object_index
 
                 created_count = 0
 
                 for obj in valid_objects:
-                    shared_with = obj.get("shared_with", [])
-                    access_type = "c"
+                    object_index = object_indexes.get(id(obj), 1)
+                    identifier = str(obj.get("identifier", "")).strip()
+                    object_label = f"{file_name} data object {object_index}"
 
-                    for item in shared_with:
-                        if isinstance(item, dict) and item.get("access_type") == "all":
-                            access_type = "all"
-                            break
+                    if identifier in seen_identifiers:
+                        _add_upload_issue(
+                            upload_issues,
+                            "duplicate_identifier",
+                            (
+                                f'{object_label}: identifier "{identifier}" is duplicated '
+                                "in this upload. Please use a unique identifier."
+                            ),
+                        )
+                        continue
 
-                    if access_type not in {"c", "all"}:
-                        access_type = "c"
+                    if _identifier_exists(identifier):
+                        _add_upload_issue(
+                            upload_issues,
+                            "duplicate_identifier",
+                            (
+                                f'{object_label}: identifier "{identifier}" already exists. '
+                                "Please use a unique identifier."
+                            ),
+                        )
+                        continue
 
-                    JSONData.objects.create(
+                    access_type, shared_users, access_issues = _resolve_upload_access_metadata(
+                        obj,
+                        request.user,
+                    )
+
+                    if access_issues:
+                        for category, issue in access_issues:
+                            _add_upload_issue(
+                                upload_issues,
+                                category,
+                                f"{object_label}: {issue}",
+                            )
+                        continue
+
+                    data_object = JSONData.objects.create(
                         owner=request.user,
                         data=obj,
                         access_type=access_type,
                     )
+
+                    if access_type == "c" and shared_users:
+                        data_object.shared_users.add(*shared_users)
+
+                        for shared_user in shared_users:
+                            _create_shared_data_notification(
+                                data_object,
+                                request.user,
+                                shared_user,
+                            )
+
+                    seen_identifiers.add(identifier)
                     created_count += 1
 
                 processed_file_count += 1
                 total_created_count += created_count
 
                 for error in errors:
-                    upload_errors.append(f"{file_name}: {error}")
+                    category = _categorize_validation_error(error)
+                    _add_upload_issue(
+                        upload_issues,
+                        category,
+                        f"{file_name}: {error}",
+                    )
 
                 if created_count == 0 and errors:
-                    upload_errors.append(f"{file_name}: No valid data objects were saved.")
+                    _add_upload_issue(
+                        upload_issues,
+                        "other_validation",
+                        f"{file_name}: No valid data objects were saved.",
+                    )
 
-            if total_created_count == 0 and upload_errors:
+            upload_issue_messages = _get_upload_issue_messages(upload_issues)
+
+            if total_created_count == 0 and upload_issue_messages:
                 messages.error(request, "Upload failed.")
-                for error in upload_errors:
-                    messages.error(request, error)
+                for issue in upload_issue_messages:
+                    messages.error(request, issue)
 
-            elif total_created_count > 0 and upload_errors:
+            elif total_created_count > 0 and upload_issue_messages:
                 messages.warning(
                     request,
                     (
@@ -162,8 +732,8 @@ def upload_json_view(request):
                         f"{total_created_count} object(s) saved from {processed_file_count} file(s)."
                     ),
                 )
-                for error in upload_errors:
-                    messages.warning(request, error)
+                for issue in upload_issue_messages:
+                    messages.warning(request, issue)
 
             elif total_created_count > 0:
                 messages.success(
@@ -383,6 +953,453 @@ def _collect_basic_search_values(value, key=""):
     return [str(value)] if _is_meaningful_search_string(value) else []
 
 
+def _assistant_text(value):
+    """
+    Return compact text for assistant answers
+
+    Parameters
+    ----------
+    value : object
+        Value from JSON metadata.
+
+    Returns
+    -------
+    str
+        Human-readable text.
+    """
+    text = _format_summary_value(value)
+    return "" if text == "-" else text
+
+
+def _assistant_phase_names(data):
+    """
+    Return phase names from one JSON data object
+
+    Parameters
+    ----------
+    data : dict
+        Parsed JSON data object.
+
+    Returns
+    -------
+    list
+        Phase labels found in the data.
+    """
+    phases = data.get("phase", [])
+    names = []
+
+    if isinstance(phases, list):
+        for phase in phases:
+            if isinstance(phase, dict):
+                name = (
+                    phase.get("phase_identifier")
+                    or phase.get("name")
+                    or phase.get("identifier")
+                )
+                if name:
+                    names.append(str(name))
+            elif phase:
+                names.append(str(phase))
+    elif phases:
+        names.append(str(phases))
+
+    return names
+
+
+def _assistant_access_summary(obj):
+    """
+    Return the assistant access summary for one object
+
+    Parameters
+    ----------
+    obj : JSONData
+        Data object to inspect.
+
+    Returns
+    -------
+    str
+        Access summary.
+    """
+    if obj.access_type == "all":
+        return "Access: Public. Other users can find this object through Search."
+
+    shared_count = obj.shared_users.count()
+
+    if shared_count:
+        return (
+            "Access: Private and shared. The owner can always view it, and "
+            f"{shared_count} explicitly shared user(s) can also view it."
+        )
+
+    return "Access: Private. Only the owner can view it."
+
+
+def _assistant_mechanical_bc_summary(data):
+    """
+    Return a compact mechanical boundary condition summary
+
+    Parameters
+    ----------
+    data : dict
+        Parsed JSON data object.
+
+    Returns
+    -------
+    str
+        Boundary condition summary.
+    """
+    items = _build_mechanical_bc_items(data)
+
+    if not items:
+        return "I did not find usable mechanical_BC data in this object."
+
+    defined_items = [item for item in items if item.get("is_defined") is not False]
+    loaded = []
+    fixed = []
+
+    for item in defined_items:
+        vertex = item.get("vertex", "")
+
+        for axis in item.get("axes", []):
+            direction = axis.get("direction", "")
+            status = axis.get("status", "")
+
+            if status == "loaded":
+                label = f"{vertex} {direction}"
+                if axis.get("load"):
+                    label = f"{label} ({axis['load']})"
+                loaded.append(label)
+            elif status == "fixed":
+                fixed.append(f"{vertex} {direction}")
+
+    lines = [
+        f"Mechanical boundary conditions are defined on {len(defined_items)} vertex/vertices."
+    ]
+
+    if fixed:
+        lines.append(f"Fixed constraints: {', '.join(fixed)}.")
+
+    if loaded:
+        lines.append(f"Loaded directions: {', '.join(loaded)}.")
+
+    return "\n".join(lines)
+
+
+def _assistant_plot_summary(data):
+    """
+    Return a summary of plot-ready variables
+
+    Parameters
+    ----------
+    data : dict
+        Parsed JSON data object.
+
+    Returns
+    -------
+    str
+        Plot guidance.
+    """
+    variables = _extract_plot_variables(data, units=data.get("units", {}))
+
+    if not variables:
+        return "I did not find plot-ready numeric arrays in this object."
+
+    stress_variables = [
+        variable for variable in variables
+        if "stress" in variable.get("key", "").casefold()
+    ]
+    strain_variables = [
+        variable for variable in variables
+        if "strain" in variable.get("key", "").casefold()
+    ]
+
+    lines = [f"I found {len(variables)} plot-ready numeric variable(s)."]
+
+    if stress_variables and strain_variables:
+        lines.append(
+            "A natural first plot is a stress component against the matching "
+            "strain component, for example stress_11 vs strain_11 if both are present."
+        )
+    else:
+        examples = [variable.get("short_label", "") for variable in variables[:4]]
+        examples = [example for example in examples if example]
+
+        if examples:
+            lines.append(f"Examples: {', '.join(examples)}.")
+
+    return "\n".join(lines)
+
+
+def _assistant_object_overview(obj):
+    """
+    Return a compact overview for one accessible data object
+
+    Parameters
+    ----------
+    obj : JSONData
+        Data object to summarize.
+
+    Returns
+    -------
+    str
+        Object summary.
+    """
+    data = obj.data or {}
+    title = _assistant_text(data.get("title")) or "Untitled data object"
+    identifier = _assistant_text(data.get("identifier")) or "No identifier"
+    software = _assistant_text(data.get("software")) or "Software not specified"
+    phases = _assistant_phase_names(data)
+
+    lines = [
+        f"{title}",
+        f"Identifier: {identifier}",
+        f"Software: {software}",
+    ]
+
+    if phases:
+        lines.append(f"Phase: {', '.join(phases)}")
+
+    lines.append(_assistant_access_summary(obj))
+    return "\n".join(lines)
+
+
+def _assistant_upload_answer(question):
+    """
+    Return assistant guidance for the upload workflow
+
+    Parameters
+    ----------
+    question : str
+        User question.
+
+    Returns
+    -------
+    str
+        Upload guidance.
+    """
+    normalized_question = question.casefold()
+
+    if "share" in normalized_question or "username" in normalized_question:
+        return (
+            'For sharing, use shared_with with access_type "c" and a username.\n'
+            'If access_type is "c" and username is absent, the object stays private.\n'
+            'If username is present, it must match an existing system username.\n'
+            'Use access_type "all" for public data; public data should not include username.'
+        )
+
+    if "identifier" in normalized_question or "duplicate" in normalized_question:
+        return (
+            "Each uploaded data object must have a unique identifier. If the same "
+            "identifier already exists in the database or appears twice in one upload, "
+            "that object is rejected and the upload message lists the duplicate."
+        )
+
+    if (
+        "empty" in normalized_question
+        or "missing" in normalized_question
+        or "required" in normalized_question
+    ):
+        return (
+            "Upload validation checks required top-level fields and empty top-level values. "
+            "Errors are grouped by category, such as missing required fields, empty values, "
+            "duplicate identifiers, invalid access metadata, and unknown shared users."
+        )
+
+    return (
+        "Upload accepts JSON files with one object, a list of objects, or a dict containing "
+        "a data list. Valid objects are saved; objects with missing fields, empty values, "
+        "invalid sharing metadata, unknown usernames, or duplicate identifiers are rejected."
+    )
+
+
+def _assistant_search_answer(question):
+    """
+    Return assistant guidance for the search workflow
+
+    Parameters
+    ----------
+    question : str
+        User question.
+
+    Returns
+    -------
+    str
+        Search guidance.
+    """
+    normalized_question = question.casefold()
+    suggestions = []
+
+    if "public" in normalized_question:
+        suggestions.append("set Access to Public")
+
+    if "private" in normalized_question:
+        suggestions.append("set Access to My Private")
+
+    for term in ("copper", "goss", "abaqus", "stress", "strain"):
+        if term in normalized_question:
+            suggestions.append(f'use "{term}" as a keyword or field filter')
+
+    if "phase" in normalized_question:
+        suggestions.append("use the Phase field")
+
+    if "software" in normalized_question:
+        suggestions.append("use the Software field")
+
+    if suggestions:
+        return "Suggested search setup: " + "; ".join(suggestions) + "."
+
+    return (
+        "Use the main search box for broad keywords. Use Advanced Search when you know "
+        "a specific identifier, creator, software, phase, owner, or access type."
+    )
+
+
+def _assistant_detail_answer(question, obj):
+    """
+    Return assistant guidance for one detail page object
+
+    Parameters
+    ----------
+    question : str
+        User question.
+    obj : JSONData
+        Accessible data object.
+
+    Returns
+    -------
+    str
+        Detail page answer.
+    """
+    normalized_question = question.casefold()
+    data = obj.data or {}
+
+    if any(
+        term in normalized_question
+        for term in ("boundary", "mechanical", "bc", "vertex", "fixed", "loaded")
+    ):
+        return _assistant_mechanical_bc_summary(data)
+
+    if any(term in normalized_question for term in ("plot", "curve", "stress", "strain", "variable")):
+        return _assistant_plot_summary(data)
+
+    if any(term in normalized_question for term in ("access", "share", "private", "public")):
+        return _assistant_access_summary(obj)
+
+    if any(term in normalized_question for term in ("phase", "material")):
+        phases = _assistant_phase_names(data)
+
+        if phases:
+            return "Phase information: " + ", ".join(phases) + "."
+
+        return "I did not find phase information in this object."
+
+    if "software" in normalized_question:
+        software = _assistant_text(data.get("software"))
+        version = _assistant_text(data.get("software_version"))
+
+        if software and version:
+            return f"Software: {software} {version}."
+
+        if software:
+            return f"Software: {software}."
+
+        return "I did not find software information in this object."
+
+    return _assistant_object_overview(obj)
+
+
+def _build_assistant_answer(question, page, obj=None):
+    """
+    Build a read-only assistant answer for the current page
+
+    Parameters
+    ----------
+    question : str
+        User question.
+    page : str
+        Current assistant page context.
+    obj : JSONData, optional
+        Accessible data object for detail answers.
+
+    Returns
+    -------
+    tuple
+        Answer text and suggested follow-up prompts.
+    """
+    if obj is not None:
+        suggestions = [
+            "Summarize this data",
+            "Explain mechanical_BC",
+            "What can I plot?",
+            "How is access set?",
+        ]
+        return _assistant_detail_answer(question, obj), suggestions
+
+    if page == "upload":
+        suggestions = [
+            "How should I write shared_with?",
+            "What if identifier already exists?",
+            "Why did upload reject empty values?",
+        ]
+        return _assistant_upload_answer(question), suggestions
+
+    suggestions = [
+        "How do I find copper data?",
+        "How do I search by phase?",
+        "How do I find public data?",
+    ]
+    return _assistant_search_answer(question), suggestions
+
+
+@login_required
+@require_POST
+def fair_assistant_ask_view(request):
+    """
+    Answer a read-only FAIR data assistant question
+
+    Parameters
+    ----------
+    request : HttpRequest
+        AJAX request containing question, page, and optional object_id.
+
+    Returns
+    -------
+    JsonResponse
+        Assistant answer and suggested follow-up prompts.
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Invalid assistant request."}, status=400)
+
+    question = str(payload.get("question", "")).strip()
+    page = str(payload.get("page", "search")).strip().casefold()
+    object_id = payload.get("object_id")
+
+    if not question:
+        return JsonResponse({"error": "Enter a question for the assistant."}, status=400)
+
+    question = question[:ASSISTANT_MAX_QUESTION_LENGTH]
+    obj = None
+
+    if object_id:
+        try:
+            obj = (
+                JSONData.objects
+                .select_related("owner")
+                .prefetch_related("shared_users")
+                .get(pk=int(object_id))
+            )
+        except (TypeError, ValueError, JSONData.DoesNotExist):
+            return JsonResponse({"error": "Data object not found."}, status=404)
+
+        if not _user_can_access_object(obj, request.user):
+            return JsonResponse({"error": "Data object not found."}, status=404)
+
+    answer, suggestions = _build_assistant_answer(question, page, obj=obj)
+    return JsonResponse({"answer": answer, "suggestions": suggestions})
+
+
 def _build_basic_search_text(obj, access_text):
     """
     Build basic-search text from meaningful JSON values and ownership metadata
@@ -435,6 +1452,7 @@ def _prepare_list_object(obj):
         {
             "label": "Access",
             "value": access_display,
+            "badges": _get_access_badges(obj),
             "type": "access",
         }
     )
@@ -488,6 +1506,31 @@ def _get_access_display(obj):
     return "Private"
 
 
+def _get_access_badges(obj):
+    """
+    Return access badges shown in object summaries
+
+    Parameters
+    ----------
+    obj : JSONData
+        Data object to inspect.
+
+    Returns
+    -------
+    list
+        Ordered access labels for display.
+    """
+    if obj.access_type == "all":
+        return ["Public"]
+
+    badges = ["Private"]
+
+    if obj.shared_users.exists():
+        badges.append("Shared")
+
+    return badges
+
+
 def _is_shared_with_user(data, user):
     """
     Return True when the JSON object is explicitly shared with the user
@@ -498,23 +1541,13 @@ def _is_shared_with_user(data, user):
         return False
 
     username = (user.username or "").strip().casefold()
-    email = (user.email or "").strip().casefold()
 
     for item in shared_with:
         if not isinstance(item, dict):
             continue
 
-        candidates = [
-            str(item.get("username", "")).strip().casefold(),
-            str(item.get("user", "")).strip().casefold(),
-            str(item.get("name", "")).strip().casefold(),
-            str(item.get("email", "")).strip().casefold(),
-        ]
-
-        if username and username in candidates:
-            return True
-
-        if email and email in candidates:
+        share_username = str(item.get(SHARE_USERNAME_KEY, "")).strip().casefold()
+        if username and username == share_username:
             return True
 
     return False
@@ -566,12 +1599,12 @@ def _user_has_specific_share(obj, user):
 
 def _find_share_user(identifier):
     """
-    Find a user by username or email.
+    Find a user by username
 
     Parameters
     ----------
     identifier : str
-        Username or email address.
+        Username to look up.
 
     Returns
     -------
@@ -583,12 +1616,7 @@ def _find_share_user(identifier):
     if not value:
         return None
 
-    username_match = User.objects.filter(username__iexact=value).first()
-
-    if username_match:
-        return username_match
-
-    return User.objects.filter(email__iexact=value).first()
+    return User.objects.filter(username__iexact=value).first()
 
 
 @login_required
@@ -613,36 +1641,188 @@ def json_data_list_view(request):
         "data_objects": prepared_objects,
         "empty_message": "No uploaded data found",
         "show_delete": True,
+        "show_bulk_export": True,
     }
     return render(request, "pages/data_list.html", context)
 
 
 @login_required
-def shared_with_me_view(request):
+@require_POST
+def export_selected_my_data_objects_view(request):
     """
-    Display data objects explicitly shared with the current user
+    Export selected data objects owned by the current user
+    """
+    selected_ids = request.POST.getlist("selected_objects")
+    exported_objects = []
+
+    for raw_id in selected_ids:
+        try:
+            object_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+
+        try:
+            obj = JSONData.objects.get(pk=object_id, owner=request.user)
+        except JSONData.DoesNotExist:
+            continue
+
+        exported_objects.append(obj.data or {})
+
+    if not exported_objects:
+        messages.error(request, "Select at least one of your data objects to export.")
+        return redirect("json_data_list")
+
+    content = json.dumps(exported_objects, indent=2, ensure_ascii=False)
+    response = HttpResponse(content, content_type="application/json")
+    response["Content-Disposition"] = 'attachment; filename="my_data_objects.json"'
+    return response
+
+
+@login_required
+@require_POST
+def delete_selected_my_data_objects_view(request):
+    """
+    Delete selected data objects owned by the current user
+    """
+    selected_ids = request.POST.getlist("selected_objects")
+    object_ids = []
+
+    for raw_id in selected_ids:
+        try:
+            object_ids.append(int(raw_id))
+        except (TypeError, ValueError):
+            continue
+
+    if not object_ids:
+        messages.error(request, "Select at least one of your data objects to delete.")
+        return redirect("json_data_list")
+
+    data_objects = JSONData.objects.filter(pk__in=object_ids, owner=request.user)
+    deleted_count = data_objects.count()
+
+    if deleted_count == 0:
+        messages.error(request, "Select at least one of your data objects to delete.")
+        return redirect("json_data_list")
+
+    data_objects.delete()
+    messages.success(request, f"Deleted {deleted_count} data object(s).")
+    return redirect("json_data_list")
+
+
+def _get_shared_with_me_objects(user):
+    """
+    Return prepared data objects explicitly shared with one user
     """
     data_objects = (
         JSONData.objects
-        .filter(shared_users=request.user)
-        .exclude(owner=request.user)
+        .filter(shared_users=user, access_type="c")
+        .exclude(owner=user)
         .select_related("owner")
         .prefetch_related("shared_users")
         .order_by("-uploaded_at")
     )
-    prepared_objects = [_prepare_list_object(obj) for obj in data_objects]
+
+    return [_prepare_list_object(obj) for obj in data_objects]
+
+
+def _get_share_events(user):
+    """
+    Return share events created by one user
+    """
+    return (
+        DataNotification.objects
+        .filter(
+            actor=user,
+            notification_type=DataNotification.TYPE_SHARED_DATA,
+        )
+        .select_related("recipient", "data_object", "data_object__owner")
+        .order_by("-created_at")
+    )
+
+
+@login_required
+def share_view(request):
+    """
+    Display incoming and outgoing sharing information
+    """
+    context = {
+        "segment": "share",
+        "shared_with_me_objects": _get_shared_with_me_objects(request.user),
+        "share_events": _get_share_events(request.user),
+    }
+    return render(request, "pages/share.html", context)
+
+
+@login_required
+def shared_with_me_view(request):
+    """
+    Redirect old Shared with Me links to the unified Share page
+    """
+    return redirect("share")
+
+
+@login_required
+def sharing_history_view(request):
+    """
+    Redirect old sharing history links to the unified Share page
+    """
+    return redirect("share")
+
+
+@login_required
+def notification_list_view(request):
+    """
+    Display notifications for the signed-in user
+    """
+    notifications = (
+        DataNotification.objects
+        .filter(recipient=request.user)
+        .select_related("actor", "data_object", "data_object__owner")
+        .order_by("is_read", "-created_at")
+    )
 
     context = {
-        "segment": "shared_with_me",
-        "page_title": "Shared with Me",
-        "page_heading": "Shared with Me",
-        "breadcrumb_label": "Shared with Me",
-        "card_title": "Data Objects Shared with Me",
-        "data_objects": prepared_objects,
-        "empty_message": "No data objects have been shared with you yet",
-        "show_delete": False,
+        "segment": "notifications",
+        "notifications": notifications,
+        "unread_count": notifications.filter(is_read=False).count(),
     }
-    return render(request, "pages/data_list.html", context)
+    return render(request, "pages/notifications.html", context)
+
+
+@login_required
+def notification_open_view(request, pk):
+    """
+    Mark one notification read and open its data object
+    """
+    notification = get_object_or_404(
+        DataNotification.objects.select_related("data_object"),
+        pk=pk,
+        recipient=request.user,
+    )
+
+    if not _user_can_access_object(notification.data_object, request.user):
+        raise Http404("Data object not found")
+
+    if not notification.is_read:
+        notification.is_read = True
+        notification.save(update_fields=["is_read"])
+
+    return redirect("json_data_detail", pk=notification.data_object_id)
+
+
+@login_required
+@require_POST
+def notification_mark_all_read_view(request):
+    """
+    Mark all notifications read for the signed-in user
+    """
+    DataNotification.objects.filter(
+        recipient=request.user,
+        is_read=False,
+    ).update(is_read=True)
+
+    messages.success(request, "All notifications marked as read.")
+    return redirect("notification_list")
 
 
 @login_required
@@ -655,6 +1835,7 @@ def search_view(request):
     identifier = request.GET.get("identifier", "").strip()
     creator = request.GET.get("creator", "").strip()
     software = request.GET.get("software", "").strip()
+    phase = request.GET.get("phase", "").strip()
     keywords_value = request.GET.get("keywords", "").strip()
     owner_name = request.GET.get("owner", "").strip()
     access = request.GET.get("access", "").strip()
@@ -669,6 +1850,7 @@ def search_view(request):
             identifier,
             creator,
             software,
+            phase,
             keywords_value,
             owner_name,
             access,
@@ -734,6 +1916,9 @@ def search_view(request):
             if software and software.casefold() not in software_text.casefold():
                 continue
 
+            if phase and phase.casefold() not in phase_text.casefold():
+                continue
+
             if keywords_value and keywords_value.casefold() not in keywords_text.casefold():
                 continue
 
@@ -758,11 +1943,67 @@ def search_view(request):
         "identifier": identifier,
         "creator": creator,
         "software": software,
+        "phase": phase,
         "keywords_value": keywords_value,
         "owner_name": owner_name,
         "access": access,
     }
     return render(request, "pages/search.html", context)
+
+
+@login_required
+def search_live_data_objects_view(request):
+    """
+    Return recent data objects the current user can access
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Incoming AJAX request.
+
+    Returns
+    -------
+    JsonResponse
+        Compact data object summaries.
+    """
+    data_objects = (
+        JSONData.objects
+        .filter(
+            Q(owner=request.user)
+            | Q(access_type="all")
+            | Q(shared_users=request.user, access_type="c")
+        )
+        .select_related("owner")
+        .prefetch_related("shared_users")
+        .distinct()
+        .order_by("-uploaded_at")[:20]
+    )
+
+    objects = []
+
+    for obj in data_objects:
+        if not _user_can_access_object(obj, request.user):
+            continue
+
+        data = obj.data or {}
+        uploaded_at = timezone.localtime(obj.uploaded_at)
+        display_name = str(data.get("title") or data.get("identifier") or "Object")
+        identifier = str(data.get("identifier") or "")
+
+        objects.append(
+            {
+                "id": obj.id,
+                "display_name": display_name,
+                "identifier": identifier,
+                "owner": obj.owner.username,
+                "access": _get_access_display(obj),
+                "access_badges": _get_access_badges(obj),
+                "uploaded_at": uploaded_at.strftime("%Y-%m-%d %H:%M"),
+                "detail_url": reverse("json_data_detail", args=[obj.pk]),
+            }
+        )
+
+    return JsonResponse({"objects": objects})
 
 
 @login_required
@@ -875,12 +2116,24 @@ def _build_detail_rows(data, prefix=""):
     - Show str directly
     - Show single numbers directly
     - Show list[str] directly
-    - Show list[number] as collapsed numeric arrays
+    - Show short list[number] directly and longer list[number] collapsed
+    - Show bool, empty values, and complex arrays without dropping them
     - Recurse into dict and list[dict]
     """
     rows = []
 
     if isinstance(data, dict):
+        if not data:
+            rows.append(
+                {
+                    "label": _format_detail_label(prefix),
+                    "type": "json",
+                    "summary": "Empty object",
+                    "json_value": json.dumps(data, indent=2, ensure_ascii=False),
+                }
+            )
+            return rows
+
         for key, value in data.items():
             full_key = f"{prefix}.{key}" if prefix else key
             rows.extend(_build_detail_rows(value, full_key))
@@ -888,6 +2141,14 @@ def _build_detail_rows(data, prefix=""):
 
     if isinstance(data, list):
         if len(data) == 0:
+            rows.append(
+                {
+                    "label": _format_detail_label(prefix),
+                    "type": "json",
+                    "summary": "Empty list",
+                    "json_value": json.dumps(data, indent=2, ensure_ascii=False),
+                }
+            )
             return rows
 
         if all(isinstance(item, str) and item.strip() for item in data):
@@ -905,7 +2166,20 @@ def _build_detail_rows(data, prefix=""):
                 {
                     "label": _format_detail_label(prefix),
                     "type": "numeric_array",
+                    "value": data,
                     "count": len(data),
+                    "is_inline": len(data) <= SHORT_NUMERIC_ARRAY_INLINE_LIMIT,
+                    "json_value": json.dumps(data, indent=2, ensure_ascii=False),
+                }
+            )
+            return rows
+
+        if not all(isinstance(item, dict) for item in data):
+            rows.append(
+                {
+                    "label": _format_detail_label(prefix),
+                    "type": "json",
+                    "summary": f"Array with {len(data)} item(s)",
                     "json_value": json.dumps(data, indent=2, ensure_ascii=False),
                 }
             )
@@ -916,12 +2190,32 @@ def _build_detail_rows(data, prefix=""):
             rows.extend(_build_detail_rows(item, item_prefix))
         return rows
 
-    if isinstance(data, str) and data.strip():
+    if isinstance(data, str):
+        if not data.strip():
+            rows.append(
+                {
+                    "label": _format_detail_label(prefix),
+                    "type": "empty",
+                    "value": "",
+                }
+            )
+            return rows
+
         rows.append(
             {
                 "label": _format_detail_label(prefix),
                 "type": "string",
                 "value": data,
+            }
+        )
+        return rows
+
+    if isinstance(data, bool):
+        rows.append(
+            {
+                "label": _format_detail_label(prefix),
+                "type": "boolean",
+                "value": str(data).lower(),
             }
         )
         return rows
@@ -936,7 +2230,76 @@ def _build_detail_rows(data, prefix=""):
         )
         return rows
 
+    if data is None:
+        rows.append(
+            {
+                "label": _format_detail_label(prefix),
+                "type": "empty",
+                "value": "",
+            }
+        )
+        return rows
+
+    rows.append(
+        {
+            "label": _format_detail_label(prefix),
+            "type": "json",
+            "summary": type(data).__name__,
+            "json_value": json.dumps(data, indent=2, ensure_ascii=False, default=str),
+        }
+    )
     return rows
+
+
+def _ensure_required_detail_rows(data, rows):
+    """
+    Add empty placeholders for missing required top-level fields
+    """
+    if not isinstance(data, dict):
+        data = {}
+
+    existing_labels = {row.get("label") for row in rows}
+    complete_rows = list(rows)
+
+    for field in REQUIRED_TOP_LEVEL_FIELDS:
+        if field in data or field in existing_labels:
+            continue
+
+        complete_rows.append(
+            {
+                "label": field,
+                "type": "empty",
+                "value": "",
+            }
+        )
+
+    return complete_rows
+
+
+VISUALIZED_DETAIL_FIELD_ROOTS = {
+    "mechanical_BC",
+    "stress",
+    "total_strain",
+    "plastic_strain",
+}
+
+
+def _filter_visualized_detail_rows(rows):
+    """
+    Remove rows that are already represented by detail-page visualizations
+    """
+    filtered_rows = []
+
+    for row in rows:
+        label = str(row.get("label", ""))
+        root_label = label.split(" / ", 1)[0]
+
+        if root_label in VISUALIZED_DETAIL_FIELD_ROOTS:
+            continue
+
+        filtered_rows.append(row)
+
+    return filtered_rows
 
 
 def _find_group_child(children, label):
@@ -1217,8 +2580,6 @@ def _group_detail_rows(detail_rows):
 
         tree_rows.append(row)
 
-    tree_rows = _group_repeated_flat_roots(tree_rows)
-
     grouped_rows = []
 
     for row in tree_rows:
@@ -1236,6 +2597,7 @@ def _group_detail_rows(detail_rows):
 
 
 PLOT_FIELD_PREFIXES = ("stress_", "strain_", "plastic_strain_")
+MECHANICAL_TENSOR_COMPONENTS = ("11", "22", "33", "12", "13", "23")
 
 
 def _get_plot_variable_unit(key, units):
@@ -1245,9 +2607,12 @@ def _get_plot_variable_unit(key, units):
     if not isinstance(units, dict):
         return ""
 
-    if key.startswith("stress_"):
+    if key.startswith("stress_") or key == "equivalent_stress":
         unit = units.get("Stress", "")
-    elif key.startswith(("strain_", "plastic_strain_")):
+    elif key.startswith(("strain_", "plastic_strain_")) or key in {
+        "equivalent_total_strain",
+        "equivalent_plastic_strain",
+    }:
         unit = units.get("Strain", "")
     else:
         unit = ""
@@ -1256,9 +2621,239 @@ def _get_plot_variable_unit(key, units):
         return ""
 
     if unit == 1 or str(unit).strip() == "1":
-        return "-"
+        return ""
 
     return str(unit)
+
+
+def _get_plot_variable_kind(key):
+    """
+    Return the mechanical variable kind for one plot key
+    """
+    if key.startswith("stress_") or key == "equivalent_stress":
+        return "stress"
+
+    if key.startswith("plastic_strain_") or key == "equivalent_plastic_strain":
+        return "plastic_strain"
+
+    if key.startswith("strain_") or key == "equivalent_total_strain":
+        return "strain"
+
+    return ""
+
+
+def _get_plot_component(key):
+    """
+    Return the tensor component suffix or equivalent marker
+    """
+    if key.startswith("stress_"):
+        return key.replace("stress_", "", 1)
+
+    if key.startswith("plastic_strain_"):
+        return key.replace("plastic_strain_", "", 1)
+
+    if key.startswith("strain_"):
+        return key.replace("strain_", "", 1)
+
+    if key.startswith("equivalent_"):
+        return "equivalent"
+
+    return ""
+
+
+def _get_plot_symbol_label(key):
+    """
+    Return an ASCII notation key for one plot variable
+    """
+    component = _get_plot_component(key)
+
+    if key == "equivalent_stress":
+        return "sigma_eq"
+
+    if key == "equivalent_total_strain":
+        return "epsilon_eq"
+
+    if key == "equivalent_plastic_strain":
+        return "epsilon_p_eq"
+
+    if key.startswith("stress_"):
+        return f"sigma_{component}"
+
+    if key.startswith("plastic_strain_"):
+        return f"epsilon_p_{component}"
+
+    if key.startswith("strain_"):
+        return f"epsilon_{component}"
+
+    return key
+
+
+def _get_plot_display_label(key):
+    """
+    Return display notation for one plot variable
+    """
+    if key == "equivalent_stress":
+        return "\u03c3_eq"
+
+    if key == "equivalent_total_strain":
+        return "\u03b5_eq"
+
+    if key == "equivalent_plastic_strain":
+        return "\u03b5_p,eq"
+
+    component = _get_plot_component(key)
+
+    if key.startswith("stress_"):
+        return f"σ_{component}"
+
+    if key.startswith("plastic_strain_"):
+        return f"ε_p,{component}"
+
+    if key.startswith("strain_"):
+        return f"ε_{component}"
+
+    return key
+
+
+def _build_plot_variable(full_key, key, values, units):
+    """
+    Build one template-ready plot variable dictionary
+    """
+    return {
+        "key": full_key,
+        "label": _format_plot_variable_label(full_key),
+        "short_label": key,
+        "symbol_label": _get_plot_symbol_label(key),
+        "display_label": _get_plot_display_label(key),
+        "kind": _get_plot_variable_kind(key),
+        "component": _get_plot_component(key),
+        "unit": _get_plot_variable_unit(key, units),
+        "values": values,
+    }
+
+
+def _get_component_arrays(group, prefix):
+    """
+    Return component arrays for a stress or strain tensor group
+    """
+    if not isinstance(group, dict):
+        return None
+
+    arrays = {}
+
+    for component in MECHANICAL_TENSOR_COMPONENTS:
+        key = f"{prefix}_{component}"
+        value = group.get(key)
+
+        if not _is_numeric_list(value):
+            return None
+
+        arrays[component] = value
+
+    return arrays
+
+
+def _calculate_equivalent_stress(arrays):
+    """
+    Calculate von Mises equivalent stress values
+    """
+    count = min(len(values) for values in arrays.values())
+    values = []
+
+    for index in range(count):
+        s11 = arrays["11"][index]
+        s22 = arrays["22"][index]
+        s33 = arrays["33"][index]
+        s12 = arrays["12"][index]
+        s13 = arrays["13"][index]
+        s23 = arrays["23"][index]
+        equivalent = math.sqrt(
+            0.5 * (
+                ((s11 - s22) ** 2)
+                + ((s22 - s33) ** 2)
+                + ((s33 - s11) ** 2)
+            )
+            + (3 * ((s12 ** 2) + (s13 ** 2) + (s23 ** 2)))
+        )
+        values.append(equivalent)
+
+    return values
+
+
+def _calculate_equivalent_strain(arrays):
+    """
+    Calculate von Mises equivalent strain values
+    """
+    count = min(len(values) for values in arrays.values())
+    values = []
+
+    for index in range(count):
+        e11 = arrays["11"][index]
+        e22 = arrays["22"][index]
+        e33 = arrays["33"][index]
+        e12 = arrays["12"][index]
+        e13 = arrays["13"][index]
+        e23 = arrays["23"][index]
+        mean_strain = (e11 + e22 + e33) / 3
+        equivalent = math.sqrt(
+            (2 / 3) * (
+                ((e11 - mean_strain) ** 2)
+                + ((e22 - mean_strain) ** 2)
+                + ((e33 - mean_strain) ** 2)
+                + (2 * ((e12 ** 2) + (e13 ** 2) + (e23 ** 2)))
+            )
+        )
+        values.append(equivalent)
+
+    return values
+
+
+def _extract_equivalent_plot_variables(data, units):
+    """
+    Build calculated equivalent stress and strain plot variables
+    """
+    if not isinstance(data, dict):
+        return []
+
+    variables = []
+    stress_arrays = _get_component_arrays(data.get("stress"), "stress")
+    total_strain_arrays = _get_component_arrays(data.get("total_strain"), "strain")
+    plastic_strain_arrays = _get_component_arrays(
+        data.get("plastic_strain"),
+        "plastic_strain",
+    )
+
+    if stress_arrays is not None:
+        variables.append(
+            _build_plot_variable(
+                "stress.equivalent_stress",
+                "equivalent_stress",
+                _calculate_equivalent_stress(stress_arrays),
+                units,
+            )
+        )
+
+    if total_strain_arrays is not None:
+        variables.append(
+            _build_plot_variable(
+                "total_strain.equivalent_total_strain",
+                "equivalent_total_strain",
+                _calculate_equivalent_strain(total_strain_arrays),
+                units,
+            )
+        )
+
+    if plastic_strain_arrays is not None:
+        variables.append(
+            _build_plot_variable(
+                "plastic_strain.equivalent_plastic_strain",
+                "equivalent_plastic_strain",
+                _calculate_equivalent_strain(plastic_strain_arrays),
+                units,
+            )
+        )
+
+    return variables
 
 
 def _extract_plot_variables(data, prefix="", units=None):
@@ -1272,15 +2867,7 @@ def _extract_plot_variables(data, prefix="", units=None):
             full_key = f"{prefix}.{key}" if prefix else key
 
             if isinstance(value, list) and _is_numeric_list(value) and key.startswith(PLOT_FIELD_PREFIXES):
-                variables.append(
-                    {
-                        "key": full_key,
-                        "label": _format_plot_variable_label(full_key),
-                        "short_label": key,
-                        "unit": _get_plot_variable_unit(key, units),
-                        "values": value,
-                    }
-                )
+                variables.append(_build_plot_variable(full_key, key, value, units))
             else:
                 variables.extend(_extract_plot_variables(value, full_key, units))
 
@@ -1288,6 +2875,9 @@ def _extract_plot_variables(data, prefix="", units=None):
         for index, item in enumerate(data):
             item_prefix = f"{prefix}[{index}]"
             variables.extend(_extract_plot_variables(item, item_prefix, units))
+
+    if not prefix:
+        variables.extend(_extract_equivalent_plot_variables(data, units))
 
     return variables
 
@@ -1310,21 +2900,111 @@ def _format_plot_variable_label(path):
 MECHANICAL_BC_DIRECTIONS = ("X", "Y", "Z")
 
 
-def _format_mechanical_load_value(load):
+def _format_compact_value(value):
     """
-    Return a compact display value for one applied load
+    Return a compact display value for one scalar or list
+    """
+    if isinstance(value, list):
+        if len(value) <= 6:
+            return "[" + ", ".join(_format_compact_value(item) for item in value) + "]"
+
+        return f"[{len(value)} values]"
+
+    if _is_number_value(value):
+        return f"{value:.4g}"
+
+    if value in (None, ""):
+        return ""
+
+    return str(value)
+
+
+def _normalize_applied_load(load):
+    """
+    Return display-ready details for one applied load entry
     """
     if not isinstance(load, dict):
-        return ""
+        return None
 
-    magnitude = load.get("magnitude")
-    if magnitude is None:
-        return ""
+    details = []
 
-    if _is_number_value(magnitude):
-        return f"{magnitude:.4g}"
+    for key in ("magnitude", "frequency", "duration", "R"):
+        if key not in load:
+            continue
 
-    return str(magnitude)
+        details.append(
+            {
+                "key": key,
+                "value": load.get(key),
+                "display": _format_compact_value(load.get(key)),
+            }
+        )
+
+    if not details:
+        return None
+
+    return {
+        "magnitude": load.get("magnitude"),
+        "frequency": load.get("frequency"),
+        "duration": load.get("duration"),
+        "R": load.get("R"),
+        "details": details,
+        "summary": ", ".join(
+            f"{detail['key']}: {detail['display']}"
+            for detail in details
+            if detail["display"] != ""
+        ),
+    }
+
+
+def _get_mechanical_target_type(vertices):
+    """
+    Return the display target type from normalized vertices
+    """
+    normalized_vertices = {
+        str(vertex).strip().upper()
+        for vertex in vertices
+        if str(vertex).strip()
+    }
+
+    if normalized_vertices == set(MECHANICAL_BC_VERTICES):
+        return "Whole cube"
+
+    if len(normalized_vertices) == 4:
+        return "Face"
+
+    if len(normalized_vertices) == 2:
+        return "Edge"
+
+    return "Point"
+
+
+def _get_mechanical_target_label(vertices):
+    """
+    Return a compact target label for a mechanical boundary condition
+    """
+    target_type = _get_mechanical_target_type(vertices)
+
+    if target_type == "Whole cube":
+        return "Whole cube"
+
+    if len(vertices) == 1:
+        return vertices[0]
+
+    return " - ".join(vertices)
+
+
+def _get_load_for_axis(applied_loads, load_index, is_group_target):
+    """
+    Return the load entry for one loaded axis
+    """
+    if load_index < len(applied_loads):
+        return applied_loads[load_index]
+
+    if is_group_target and len(applied_loads) == 1:
+        return applied_loads[0]
+
+    return {}
 
 
 def _build_mechanical_bc_items(data):
@@ -1349,52 +3029,94 @@ def _build_mechanical_bc_items(data):
         if not isinstance(vertices, list):
             vertices = [vertices]
 
+        vertices = [
+            str(vertex).strip()
+            for vertex in vertices
+            if str(vertex).strip()
+        ]
+
+        if not vertices:
+            continue
+
         if not isinstance(constraints, list):
             constraints = []
 
         if not isinstance(applied_loads, list):
-            applied_loads = []
+            applied_loads = [applied_loads] if isinstance(applied_loads, dict) else []
 
         load_index = 0
         axes = []
+        is_group_target = len(vertices) > 1
 
         for index, direction in enumerate(MECHANICAL_BC_DIRECTIONS):
             status = ""
             if index < len(constraints):
                 status = str(constraints[index]).strip().casefold()
 
-            load_label = ""
-            raw_magnitude = None
+            normalized_load = None
 
             if status == "loaded":
-                load = applied_loads[load_index] if load_index < len(applied_loads) else {}
-                if isinstance(load, dict):
-                    raw_magnitude = load.get("magnitude")
-                load_label = _format_mechanical_load_value(load)
+                load = _get_load_for_axis(applied_loads, load_index, is_group_target)
+                normalized_load = _normalize_applied_load(load)
                 load_index += 1
 
             axes.append(
                 {
                     "direction": direction,
                     "status": status,
-                    "load": load_label,
-                    "magnitude": raw_magnitude,
+                    "load": normalized_load,
+                    "load_details": normalized_load["details"] if normalized_load else [],
+                    "load_summary": normalized_load["summary"] if normalized_load else "",
+                    "magnitude": normalized_load["magnitude"] if normalized_load else None,
                 }
             )
 
-        for vertex in vertices:
-            vertex_name = str(vertex).strip()
-            if not vertex_name:
-                continue
+        items.append(
+            {
+                "vertex": _get_mechanical_target_label(vertices),
+                "vertices": vertices,
+                "target_type": _get_mechanical_target_type(vertices),
+                "axes": axes,
+                "loading_type": condition.get("loading_type", ""),
+                "loading_mode": condition.get("loading_mode", ""),
+            }
+        )
 
-            items.append(
-                {
-                    "vertex": vertex_name,
-                    "axes": axes,
-                    "loading_type": condition.get("loading_type", ""),
-                    "loading_mode": condition.get("loading_mode", ""),
-                }
-            )
+    defined_vertices = {
+        vertex
+        for item in items
+        for vertex in item.get("vertices", [])
+    }
+    free_axes = [
+        {
+            "direction": direction,
+            "status": "free",
+            "load": "",
+            "load_details": [],
+            "load_summary": "",
+            "magnitude": None,
+        }
+        for direction in MECHANICAL_BC_DIRECTIONS
+    ]
+
+    for vertex in MECHANICAL_BC_VERTICES:
+        if vertex in defined_vertices:
+            continue
+
+        items.append(
+            {
+                "vertex": vertex,
+                "vertices": [vertex],
+                "target_type": "Point",
+                "axes": free_axes,
+                "loading_type": "",
+                "loading_mode": "",
+                "is_defined": False,
+            }
+        )
+
+    for item in items:
+        item.setdefault("is_defined", True)
 
     return items
 
@@ -1425,18 +3147,30 @@ def json_data_sharing_view(request, pk):
     action = request.POST.get("action", "").strip()
 
     if action == "add_user":
-        identifier = request.POST.get("share_user", "")
-        share_user = _find_share_user(identifier)
+        if obj.access_type == "all":
+            messages.error(
+                request,
+                "Public data objects cannot be shared with specific users. Use Search to find public data.",
+            )
+            return redirect("json_data_detail", pk=obj.pk)
+
+        username = request.POST.get("share_user", "")
+        share_user = _find_share_user(username)
 
         if share_user is None:
-            messages.error(request, "No user was found with that username or email.")
+            messages.error(request, "No user was found with that username.")
             return redirect("json_data_detail", pk=obj.pk)
 
         if share_user == request.user:
             messages.error(request, "You already own this data object.")
             return redirect("json_data_detail", pk=obj.pk)
 
+        was_already_shared = obj.shared_users.filter(pk=share_user.pk).exists()
         obj.shared_users.add(share_user)
+
+        if not was_already_shared:
+            _create_shared_data_notification(obj, request.user, share_user)
+
         messages.success(request, f"Shared with {share_user.username}.")
         return redirect("json_data_detail", pk=obj.pk)
 
@@ -1480,11 +3214,25 @@ def json_data_detail_view(request, pk):
     if not _user_can_access_object(obj, request.user):
         raise Http404("Data object not found")
 
-    detail_rows = _build_detail_rows(obj.data or {})
+    detail_rows = _ensure_required_detail_rows(
+        obj.data or {},
+        _build_detail_rows(obj.data or {}),
+    )
+    detail_rows = _filter_visualized_detail_rows(detail_rows)
     display_rows = [
         row
         for row in detail_rows
-        if row["type"] in {"string", "string_list", "number", "numeric_array"}
+        if (
+            row["type"] in {
+                "string",
+                "string_list",
+                "number",
+                "numeric_array",
+                "boolean",
+                "empty",
+                "json",
+            }
+        )
     ]
     display_rows = _group_detail_rows(display_rows)
     plot_variables = _extract_plot_variables(
@@ -1497,12 +3245,15 @@ def json_data_detail_view(request, pk):
     if is_owner:
         detail_back_url_name = "json_data_list"
         detail_back_label = "Back to My Data"
+        detail_breadcrumb_label = "My Data"
     elif _user_has_specific_share(obj, request.user):
-        detail_back_url_name = "shared_with_me"
-        detail_back_label = "Back to Shared with Me"
+        detail_back_url_name = "share"
+        detail_back_label = "Back to Share"
+        detail_breadcrumb_label = "Share"
     else:
         detail_back_url_name = "search"
         detail_back_label = "Back to Search"
+        detail_breadcrumb_label = "Search"
 
     context = {
         "data_object": obj,
@@ -1512,5 +3263,6 @@ def json_data_detail_view(request, pk):
         "shared_users": obj.shared_users.order_by("username"),
         "detail_back_url_name": detail_back_url_name,
         "detail_back_label": detail_back_label,
+        "detail_breadcrumb_label": detail_breadcrumb_label,
     }
     return render(request, "pages/data_detail.html", context)

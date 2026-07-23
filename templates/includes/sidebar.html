@@ -58,11 +58,11 @@
         </li>
 
         <li class="pc-item">
-          <a href="{% url 'shared_with_me' %}" class="pc-link">
+          <a href="{% url 'share' %}" class="pc-link">
             <span class="pc-micon">
-              <i data-feather="users"></i>
+              <i data-feather="share-2"></i>
             </span>
-            <span class="pc-mtext">Shared with Me</span>
+            <span class="pc-mtext">Share</span>
           </a>
         </li>
 
@@ -97,6 +97,30 @@
           </a>
         </li>
         {% else %}
+        <li class="pc-item">
+          <a href="{% url 'notification_list' %}" class="pc-link">
+            <span class="pc-micon">
+              <i data-feather="bell"></i>
+            </span>
+            <span class="pc-mtext">Notifications</span>
+          </a>
+        </li>
+        <li class="pc-item">
+          <a href="{% url 'account_settings' %}" class="pc-link">
+            <span class="pc-micon">
+              <i data-feather="settings"></i>
+            </span>
+            <span class="pc-mtext">Settings</span>
+          </a>
+        </li>
+        <li class="pc-item">
+          <a href="{% url 'password_change' %}" class="pc-link">
+            <span class="pc-micon">
+              <i data-feather="lock"></i>
+            </span>
+            <span class="pc-mtext">Change Password</span>
+          </a>
+        </li>
         <li class="pc-item">
           <a href="{% url 'logout' %}" class="pc-link">
             <span class="pc-micon">

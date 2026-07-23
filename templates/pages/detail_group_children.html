@@ -23,6 +23,18 @@
       <div class="detail-child-value">{{ child.value }}</div>
     </div>
 
+  {% elif child.type == "boolean" %}
+    <div class="detail-child-row">
+      <div class="detail-child-label">{{ child.label }}</div>
+      <div class="detail-child-value">{{ child.value }}</div>
+    </div>
+
+  {% elif child.type == "empty" %}
+    <div class="detail-child-row">
+      <div class="detail-child-label">{{ child.label }}</div>
+      <div class="detail-empty">Empty</div>
+    </div>
+
   {% elif child.type == "string_list" %}
     <div class="detail-child-row">
       <div class="detail-child-label">{{ child.label }}</div>
@@ -41,10 +53,45 @@
   {% elif child.type == "numeric_array" %}
     <div class="detail-child-row">
       <div class="detail-child-label">{{ child.label }}</div>
+      {% if child.is_inline %}
+        <div class="detail-inline-list">
+          {% for item in child.value %}
+            <span class="detail-chip">{{ item }}</span>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="detail-child-content">
+          <div class="array-summary">
+            <span>Numeric array</span>
+            <span class="array-badge">{{ child.count }} values</span>
+          </div>
+
+          <div class="array-toggle">
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+              aria-expanded="false"
+              aria-controls="child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+            >
+              Show values
+            </button>
+
+            <div class="collapse" id="child-array-{{ child.label|slugify }}-{{ forloop.counter }}">
+              <pre class="array-box">{{ child.json_value }}</pre>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+  {% elif child.type == "json" %}
+    <div class="detail-child-row">
+      <div class="detail-child-label">{{ child.label }}</div>
       <div class="detail-child-content">
         <div class="array-summary">
-          <span>Numeric array</span>
-          <span class="array-badge">{{ child.count }} values</span>
+          <span>{{ child.summary }}</span>
         </div>
 
         <div class="array-toggle">
@@ -52,14 +99,14 @@
             class="btn btn-outline-secondary btn-sm"
             type="button"
             data-bs-toggle="collapse"
-            data-bs-target="#child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+            data-bs-target="#child-json-{{ child.label|slugify }}-{{ forloop.counter }}"
             aria-expanded="false"
-            aria-controls="child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+            aria-controls="child-json-{{ child.label|slugify }}-{{ forloop.counter }}"
           >
             Show values
           </button>
 
-          <div class="collapse" id="child-array-{{ child.label|slugify }}-{{ forloop.counter }}">
+          <div class="collapse" id="child-json-{{ child.label|slugify }}-{{ forloop.counter }}">
             <pre class="array-box">{{ child.json_value }}</pre>
           </div>
         </div>

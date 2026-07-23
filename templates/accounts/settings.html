@@ -1,0 +1,235 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Account Settings{% endblock title %}
+
+{% block content %}
+<style>
+  .account-page-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.6fr);
+    gap: 18px;
+  }
+
+  .account-summary {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 16px;
+    background: #f8fbff;
+  }
+
+  .account-summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .account-summary-row:last-child {
+    border-bottom: 0;
+  }
+
+  .account-summary-label {
+    color: #6b7280;
+    font-size: 0.86rem;
+  }
+
+  .account-summary-value {
+    color: #1f2937;
+    font-weight: 600;
+    text-align: right;
+    word-break: break-word;
+  }
+
+  .account-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .orcid-connect-panel {
+    align-items: center;
+    background: #f7fff2;
+    border: 1px solid #d7f0cd;
+    border-radius: 10px;
+    display: flex;
+    gap: 14px;
+    justify-content: space-between;
+    padding: 14px;
+  }
+
+  .orcid-connect-copy {
+    color: #375433;
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .orcid-connect-copy strong {
+    color: #243f20;
+    display: block;
+    font-size: 0.95rem;
+    margin-bottom: 2px;
+  }
+
+  .orcid-id-mark {
+    align-items: center;
+    background: #a6ce39;
+    border-radius: 999px;
+    color: #ffffff;
+    display: inline-flex;
+    font-size: 0.78rem;
+    font-weight: 700;
+    height: 28px;
+    justify-content: center;
+    margin-right: 8px;
+    width: 28px;
+  }
+
+  @media (max-width: 992px) {
+    .account-page-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .orcid-connect-panel {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+</style>
+
+<div class="pc-container">
+  <div class="pc-content">
+    <div class="page-header">
+      <div class="page-block">
+        <div class="row align-items-center">
+          <div class="col-md-12">
+            <div class="page-header-title">
+              <h5 class="m-b-10">Account Settings</h5>
+            </div>
+            <ul class="breadcrumb">
+              <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+              <li class="breadcrumb-item">Account Settings</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert
+          {% if message.tags == 'error' %}alert-danger
+          {% elif message.tags == 'success' %}alert-success
+          {% elif message.tags == 'warning' %}alert-warning
+          {% else %}alert-info
+          {% endif %} mb-3">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="account-page-grid">
+      <div class="card">
+        <div class="card-header">
+          <h5>Profile</h5>
+        </div>
+        <div class="card-body">
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              {% for error in form.non_field_errors %}
+                <div class="alert alert-danger">{{ error }}</div>
+              {% endfor %}
+            {% endif %}
+
+            {% for field in form %}
+              <div class="form-group mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}
+                  <span class="d-block mt-1 text-danger">{{ error }}</span>
+                {% endfor %}
+              </div>
+            {% endfor %}
+
+            <div class="orcid-connect-panel mt-2">
+              <div class="orcid-connect-copy">
+                <strong><span class="orcid-id-mark">iD</span>Connect ORCID</strong>
+                Link your authenticated ORCID iD instead of typing it manually.
+              </div>
+              <a href="{% url 'orcid_connect' %}" class="btn btn-outline-success">
+                Connect ORCID
+              </a>
+            </div>
+
+            <div class="account-actions mt-4">
+              <button type="submit" class="btn btn-primary">
+                <i data-feather="save" class="me-2"></i>
+                Save changes
+              </button>
+              <a href="{% url 'password_change' %}" class="btn btn-outline-secondary">
+                <i data-feather="lock" class="me-2"></i>
+                Change password
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h5>Account</h5>
+        </div>
+        <div class="card-body">
+          <div class="account-summary">
+            <div class="account-summary-row">
+              <span class="account-summary-label">Username</span>
+              <span class="account-summary-value">{{ request.user.username }}</span>
+            </div>
+            <div class="account-summary-row">
+              <span class="account-summary-label">Email</span>
+              <span class="account-summary-value">{{ request.user.email|default:"-" }}</span>
+            </div>
+            <div class="account-summary-row">
+              <span class="account-summary-label">Institution</span>
+              <span class="account-summary-value">{{ profile.institution|default:"-" }}</span>
+            </div>
+            <div class="account-summary-row">
+              <span class="account-summary-label">ORCID</span>
+              <span class="account-summary-value">{{ profile.orcid|default:"-" }}</span>
+            </div>
+            <div class="account-summary-row">
+              <span class="account-summary-label">Shared data</span>
+              <span class="account-summary-value">{{ shared_data_count|default:0 }}</span>
+            </div>
+          </div>
+
+          <div class="d-grid gap-2 mt-3">
+            <a href="{% url 'share' %}" class="btn btn-outline-primary">
+              <i data-feather="share-2" class="me-2"></i>
+              Share
+            </a>
+            <a href="{% url 'json_data_list' %}" class="btn btn-outline-secondary">
+              <i data-feather="database" class="me-2"></i>
+              My Data
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (window.feather) {
+      feather.replace();
+    }
+  });
+</script>
+{% endblock content %}

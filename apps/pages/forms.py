@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import password_validators_help_text_html
 
@@ -80,6 +81,110 @@ class SignInForm(AuthenticationForm):
             }
         )
     )
+
+
+class AccountSettingsForm(forms.ModelForm):
+    """Update basic account profile fields"""
+
+    username = forms.CharField(
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Username",
+            }
+        )
+    )
+
+    email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Email (optional)",
+            }
+        ),
+    )
+
+    institution = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Institution (optional)",
+            }
+        ),
+    )
+
+    orcid = forms.CharField(
+        required=False,
+        label="ORCID",
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "ORCID (optional)",
+            }
+        ),
+    )
+
+    class Meta:
+        model = User
+        fields = ("username", "email")
+
+    def __init__(self, *args, **kwargs):
+        """Populate optional profile fields from the current user profile"""
+        super().__init__(*args, **kwargs)
+
+        profile = getattr(self.instance, "profile", None)
+
+        if profile is None:
+            return
+
+        self.fields["institution"].initial = profile.institution
+        self.fields["orcid"].initial = profile.orcid
+
+    def clean_username(self):
+        """Return a unique username for the current account"""
+        username = self.cleaned_data["username"].strip()
+        duplicate_user = (
+            User.objects.filter(username__iexact=username)
+            .exclude(pk=self.instance.pk)
+            .exists()
+        )
+
+        if duplicate_user:
+            raise forms.ValidationError("A user with that username already exists.")
+
+        return username
+
+    def clean_institution(self):
+        """Return the normalized institution value"""
+        return self.cleaned_data.get("institution", "").strip()
+
+    def clean_orcid(self):
+        """Return the normalized ORCID value"""
+        return self.cleaned_data.get("orcid", "").strip()
+
+
+class StyledPasswordChangeForm(PasswordChangeForm):
+    """Password change form styled for the dashboard UI"""
+
+    def __init__(self, *args, **kwargs):
+        """Add Bootstrap classes to password fields"""
+        super().__init__(*args, **kwargs)
+
+        placeholders = {
+            "old_password": "Current password",
+            "new_password1": "New password",
+            "new_password2": "Confirm new password",
+        }
+
+        for field_name, field in self.fields.items():
+            field.widget.attrs.update(
+                {
+                    "class": "form-control",
+                    "placeholder": placeholders.get(field_name, field.label),
+                }
+            )
 
 
 class MultipleFileInput(forms.ClearableFileInput):

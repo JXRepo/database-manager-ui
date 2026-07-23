@@ -1,0 +1,154 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Notifications{% endblock title %}
+
+{% block content %}
+<style>
+  .notification-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .notification-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 0;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .notification-item:last-child {
+    border-bottom: 0;
+  }
+
+  .notification-item.unread .notification-title {
+    font-weight: 700;
+  }
+
+  .notification-title {
+    color: #1f2937;
+    margin-bottom: 4px;
+  }
+
+  .notification-message {
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .notification-meta {
+    color: #9ca3af;
+    font-size: 0.84rem;
+  }
+
+  .notification-status {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 576px) {
+    .notification-item {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .notification-status {
+      margin-left: 0;
+    }
+  }
+</style>
+
+<div class="pc-container">
+  <div class="pc-content">
+    <div class="page-header">
+      <div class="page-block">
+        <div class="row align-items-center">
+          <div class="col-md-12">
+            <div class="page-header-title">
+              <h5 class="m-b-10">Notifications</h5>
+            </div>
+            <ul class="breadcrumb">
+              <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+              <li class="breadcrumb-item">Notifications</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert
+          {% if message.tags == 'error' %}alert-danger
+          {% elif message.tags == 'success' %}alert-success
+          {% elif message.tags == 'warning' %}alert-warning
+          {% else %}alert-info
+          {% endif %} mb-3">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="card">
+      <div class="card-header notification-toolbar">
+        <div>
+          <h5 class="mb-1">Notifications</h5>
+          <span class="text-muted">{{ unread_count }} unread</span>
+        </div>
+
+        {% if unread_count %}
+          <form method="post" action="{% url 'notification_mark_all_read' %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary btn-sm">
+              <i data-feather="check-circle" class="me-2"></i>
+              Mark all read
+            </button>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="card-body">
+        {% if notifications %}
+          {% for notification in notifications %}
+            <div class="notification-item {% if not notification.is_read %}unread{% endif %}">
+              <div class="avtar avtar-s {% if notification.is_read %}bg-light-secondary{% else %}bg-light-primary{% endif %}">
+                <i data-feather="share-2"></i>
+              </div>
+
+              <div class="flex-grow-1">
+                <a href="{% url 'notification_open' notification.id %}" class="notification-title d-block">
+                  {{ notification.display_title }}
+                </a>
+                <p class="notification-message">{{ notification.message }}</p>
+                <div class="notification-meta">
+                  {{ notification.created_at|date:"Y-m-d H:i" }}
+                </div>
+              </div>
+
+              <div class="notification-status">
+                {% if notification.is_read %}
+                  <span class="badge bg-light-secondary text-secondary">Read</span>
+                {% else %}
+                  <span class="badge bg-primary">New</span>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="mb-0 text-muted">No notifications yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (window.feather) {
+      feather.replace();
+    }
+  });
+</script>
+{% endblock content %}

@@ -135,6 +135,158 @@
     margin-bottom: 20px;
   }
 
+  .search-live-expanded {
+    display: flex;
+    min-height: calc(100vh - 180px);
+  }
+
+  .search-live-expanded .card-body {
+    display: flex;
+    width: 100%;
+  }
+
+  .search-live-expanded .search-hero-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .live-data-panel {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #eef2f7;
+  }
+
+  .live-data-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .live-data-title {
+    color: #1f2937;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .live-data-subtitle,
+  .live-data-status {
+    color: #6b7280;
+    font-size: 0.82rem;
+  }
+
+  .live-data-status {
+    white-space: nowrap;
+  }
+
+  .live-data-list {
+    display: grid;
+    gap: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 2px;
+  }
+
+  .search-live-expanded .live-data-panel {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .search-live-expanded .live-data-list {
+    flex: 1;
+    max-height: none;
+    min-height: 420px;
+  }
+
+  .live-data-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    background: #ffffff;
+    color: inherit;
+    text-decoration: none;
+    transition:
+      border-color 0.18s ease,
+      background 0.18s ease;
+  }
+
+  .live-data-item:hover {
+    border-color: #cfe2ff;
+    background: #f8fbff;
+    color: inherit;
+  }
+
+  .live-data-main {
+    min-width: 0;
+  }
+
+  .live-data-name {
+    color: #1f2937;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-data-meta {
+    color: #6b7280;
+    font-size: 0.82rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-data-badge {
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 4px 9px;
+  }
+
+  .live-data-badge-group,
+  .access-badge-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .live-data-badge-group {
+    justify-content: flex-end;
+  }
+
+  .live-data-badge.public {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .live-data-badge.private {
+    background: #e2e8f0;
+    color: #334155;
+  }
+
+  .live-data-badge.shared {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .live-data-empty {
+    border: 1px dashed #dbe2ea;
+    border-radius: 12px;
+    color: #6b7280;
+    padding: 12px;
+  }
+
   .tag-container {
     display: flex;
     flex-wrap: wrap;
@@ -296,12 +448,11 @@
 
   .summary-grid {
     width: 100%;
-    display: flex;
-    align-items: center;
+    display: block;
     min-width: 0;
   }
 
-  .summary-value {
+  .summary-title-row {
     display: flex;
     gap: 6px;
     align-items: center;
@@ -309,7 +460,7 @@
     width: 100%;
   }
 
-  .summary-value .main {
+  .summary-title-row .main {
     color: #1f2937;
     font-weight: 600;
     white-space: nowrap;
@@ -317,11 +468,21 @@
     text-overflow: ellipsis;
   }
 
-  .summary-value .time {
+  .summary-title-row .time {
     color: #9ca3af;
     font-weight: 400;
     white-space: nowrap;
     flex-shrink: 0;
+  }
+
+  .summary-identifier {
+    color: #6b7280;
+    font-size: 0.82rem;
+    font-weight: 500;
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .detail-grid {
@@ -374,6 +535,26 @@
     padding: 0.42rem 0.9rem;
     font-weight: 500;
   }
+
+  @media (max-width: 768px) {
+    .search-live-expanded {
+      min-height: auto;
+    }
+
+    .search-live-expanded .live-data-list {
+      max-height: 520px;
+      min-height: 340px;
+    }
+
+    .live-data-header {
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .live-data-status {
+      white-space: normal;
+    }
+  }
 </style>
 
 <div class="pc-container">
@@ -397,7 +578,7 @@
 
 
 
-    <div class="card search-bar-card">
+    <div class="card search-bar-card {% if not search_performed %}search-live-expanded{% endif %}">
       <div class="card-body py-4">
         <div class="search-hero-wrap">
           <form method="get">
@@ -409,7 +590,7 @@
                 name="keyword"
                 id="id_keyword"
                 class="form-control search-main-input"
-                placeholder="Search by keyword, creator, software, or identifier"
+                placeholder="Search by keyword, phase, creator, software, or identifier"
                 value="{{ keyword }}"
               >
               <button type="submit" class="btn btn-primary search-main-submit">Search</button>
@@ -422,7 +603,7 @@
                     type="button"
                     data-bs-toggle="collapse"
                     data-bs-target="#advancedSearchPanel"
-                    aria-expanded="{% if title or identifier or creator or software or keywords_value or owner_name or access %}true{% else %}false{% endif %}"
+                    aria-expanded="{% if title or identifier or creator or software or phase or keywords_value or owner_name or access %}true{% else %}false{% endif %}"
                     aria-controls="advancedSearchPanel"
                   >
                     <i data-feather="sliders"></i>
@@ -440,7 +621,7 @@
 <!--                type="button"-->
 <!--                data-bs-toggle="collapse"-->
 <!--                data-bs-target="#advancedSearchPanel"-->
-<!--                aria-expanded="{% if title or identifier or creator or software or keywords_value or owner_name or access %}true{% else %}false{% endif %}"-->
+<!--                aria-expanded="{% if title or identifier or creator or software or phase or keywords_value or owner_name or access %}true{% else %}false{% endif %}"-->
 <!--                aria-controls="advancedSearchPanel"-->
 <!--              >-->
 <!--                Advanced Search-->
@@ -450,7 +631,7 @@
 
             <div
               id="advancedSearchPanel"
-              class="collapse advanced-panel {% if title or identifier or creator or software or keywords_value or owner_name or access %}show{% endif %}"
+              class="collapse advanced-panel {% if title or identifier or creator or software or phase or keywords_value or owner_name or access %}show{% endif %}"
             >
               <div class="row g-3">
                 <div class="col-md-3">
@@ -466,6 +647,11 @@
                 <div class="col-md-3">
                   <label for="id_software" class="form-label">Software</label>
                   <input type="text" name="software" id="id_software" class="form-control" value="{{ software }}">
+                </div>
+
+                <div class="col-md-3">
+                  <label for="id_phase" class="form-label">Phase</label>
+                  <input type="text" name="phase" id="id_phase" class="form-control" value="{{ phase }}">
                 </div>
 
                 <div class="col-md-3">
@@ -505,6 +691,19 @@
           </form>
 
 
+          <div class="live-data-panel" aria-live="polite">
+            <div class="live-data-header">
+              <div>
+                <div class="live-data-title">Live Data Objects</div>
+                <div class="live-data-subtitle">Latest accessible uploads</div>
+              </div>
+              <div class="live-data-status" id="liveDataStatus">Loading</div>
+            </div>
+            <div class="live-data-list" id="liveDataList">
+              <div class="live-data-empty">Loading data objects</div>
+            </div>
+          </div>
+
 
 
 
@@ -518,17 +717,8 @@
     </div>
 
 
-
-
-
-
-    {% if not search_performed %}
-      <div class="card">
-        <div class="card-body">
-          <p class="mb-0">Enter at least one search condition to view results</p>
-        </div>
-      </div>
-    {% elif data_objects %}
+    {% if search_performed %}
+      {% if data_objects %}
       <form method="post" action="{% url 'export_selected_search_results' %}" id="searchSelectionForm">
         {% csrf_token %}
 
@@ -570,7 +760,7 @@
                     aria-controls="collapse{{ obj.id }}"
                   >
                     <div class="summary-grid">
-                      <span class="summary-value">
+                      <div class="summary-title-row">
                         <span class="main">
                           {{ obj.search_display_name }}
                         </span>
@@ -578,7 +768,10 @@
                         <span class="time">
                           {{ obj.owner.username }} | {{ obj.uploaded_at|date:"Y-m-d H:i" }}
                         </span>
-                      </span>
+                      </div>
+                      {% if obj.data.identifier %}
+                        <div class="summary-identifier">Identifier: {{ obj.data.identifier }}</div>
+                      {% endif %}
                     </div>
                   </button>
                 </div>
@@ -597,22 +790,31 @@
                         <div class="detail-label">{{ field.label }}</div>
                         <div class="detail-value">
                           {% if field.type == "access" %}
-                            {% if field.value == "Public" %}
-                              <span class="badge badge-public">
-                                <i data-feather="unlock" class="badge-icon"></i>
-                                {{ field.value }}
-                              </span>
-                            {% elif field.value == "Shared" %}
-                              <span class="badge badge-shared">
-                                <i data-feather="users" class="badge-icon"></i>
-                                {{ field.value }}
-                              </span>
-                            {% else %}
-                              <span class="badge badge-private">
-                                <i data-feather="lock" class="badge-icon"></i>
-                                {{ field.value }}
-                              </span>
-                            {% endif %}
+                            <div class="access-badge-list">
+                              {% for badge in field.badges %}
+                                {% if badge == "Public" %}
+                                  <span class="badge badge-public">
+                                    <i data-feather="unlock" class="badge-icon"></i>
+                                    {{ badge }}
+                                  </span>
+                                {% elif badge == "Shared" %}
+                                  <span class="badge badge-shared">
+                                    <i data-feather="users" class="badge-icon"></i>
+                                    {{ badge }}
+                                  </span>
+                                {% else %}
+                                  <span class="badge badge-private">
+                                    <i data-feather="lock" class="badge-icon"></i>
+                                    {{ badge }}
+                                  </span>
+                                {% endif %}
+                              {% empty %}
+                                <span class="badge badge-private">
+                                  <i data-feather="lock" class="badge-icon"></i>
+                                  {{ field.value }}
+                                </span>
+                              {% endfor %}
+                            </div>
                           {% elif field.type == "keywords" %}
                             <div class="tag-container">
                               {% for tag in field.value %}
@@ -638,15 +840,18 @@
           {% endfor %}
         </div>
       </form>
-    {% else %}
+      {% else %}
       <div class="card">
         <div class="card-body">
           <p class="mb-0">No matching data found</p>
         </div>
       </div>
+      {% endif %}
     {% endif %}
   </div>
 </div>
+
+{% include "includes/fair_assistant.html" with assistant_page="search" %}
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
@@ -655,6 +860,10 @@
     const selectAllResults = document.getElementById("selectAllResults");
     const selectedResultCount = document.getElementById("selectedResultCount");
     const exportSelectedButton = document.getElementById("exportSelectedButton");
+    const liveDataList = document.getElementById("liveDataList");
+    const liveDataStatus = document.getElementById("liveDataStatus");
+    const liveDataEndpoint = "{% url 'search_live_data_objects' %}";
+    let liveDataLoading = false;
 
     function updateSelectionState() {
       const selectedCount = resultCheckboxes.filter(function (checkbox) {
@@ -695,6 +904,168 @@
     });
 
     updateSelectionState();
+
+    function getLiveDataBadgeClass(access) {
+      if (access === "Public") {
+        return "public";
+      }
+
+      if (access === "Shared") {
+        return "shared";
+      }
+
+      return "private";
+    }
+
+    function getLiveDataBadgeIcon(access) {
+      if (access === "Public") {
+        return "unlock";
+      }
+
+      if (access === "Shared") {
+        return "users";
+      }
+
+      return "lock";
+    }
+
+    function createLiveDataBadge(access) {
+      const badge = document.createElement("span");
+      badge.className = `live-data-badge ${getLiveDataBadgeClass(access)}`;
+
+      const icon = document.createElement("i");
+      icon.className = "badge-icon";
+      icon.setAttribute("data-feather", getLiveDataBadgeIcon(access));
+
+      badge.appendChild(icon);
+      badge.appendChild(document.createTextNode(access || "Private"));
+
+      return badge;
+    }
+
+    function createLiveDataItem(item) {
+      const link = document.createElement("a");
+      link.href = item.detail_url;
+      link.className = "live-data-item";
+
+      const main = document.createElement("div");
+      main.className = "live-data-main";
+
+      const name = document.createElement("div");
+      name.className = "live-data-name";
+      name.textContent = item.display_name || "Object";
+
+      const meta = document.createElement("div");
+      meta.className = "live-data-meta";
+      const metaParts = [];
+
+      if (item.identifier) {
+        metaParts.push(`Identifier: ${item.identifier}`);
+      }
+
+      metaParts.push(item.owner);
+      metaParts.push(item.uploaded_at);
+      meta.textContent = metaParts.join(" | ");
+
+      const badgeGroup = document.createElement("div");
+      badgeGroup.className = "live-data-badge-group";
+
+      const accessBadges = Array.isArray(item.access_badges) && item.access_badges.length
+        ? item.access_badges
+        : [item.access || "Private"];
+
+      accessBadges.forEach(function (access) {
+        badgeGroup.appendChild(createLiveDataBadge(access));
+      });
+
+      main.appendChild(name);
+      main.appendChild(meta);
+      link.appendChild(main);
+      link.appendChild(badgeGroup);
+
+      return link;
+    }
+
+    function renderLiveDataObjects(objects) {
+      if (!liveDataList) {
+        return;
+      }
+
+      liveDataList.replaceChildren();
+
+      if (!objects.length) {
+        const emptyMessage = document.createElement("div");
+        emptyMessage.className = "live-data-empty";
+        emptyMessage.textContent = "No accessible data objects yet";
+        liveDataList.appendChild(emptyMessage);
+        return;
+      }
+
+      objects.forEach(function (item) {
+        liveDataList.appendChild(createLiveDataItem(item));
+      });
+
+      if (window.feather) {
+        feather.replace();
+      }
+    }
+
+    function setLiveDataStatus(text) {
+      if (liveDataStatus) {
+        liveDataStatus.textContent = text;
+      }
+    }
+
+    function refreshLiveDataObjects() {
+      if (!liveDataList || liveDataLoading || document.hidden) {
+        return;
+      }
+
+      liveDataLoading = true;
+      setLiveDataStatus("Updating");
+
+      fetch(liveDataEndpoint, {
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("Live data request failed");
+          }
+
+          return response.json();
+        })
+        .then(function (data) {
+          const objects = Array.isArray(data.objects) ? data.objects : [];
+          renderLiveDataObjects(objects);
+
+          const updatedAt = new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+          setLiveDataStatus(`Updated ${updatedAt}`);
+        })
+        .catch(function () {
+          setLiveDataStatus("Unable to update");
+        })
+        .finally(function () {
+          liveDataLoading = false;
+        });
+    }
+
+    if (liveDataList) {
+      refreshLiveDataObjects();
+      window.setInterval(refreshLiveDataObjects, 5000);
+
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) {
+          refreshLiveDataObjects();
+        }
+      });
+    }
 
     collapses.forEach(function (collapseEl) {
       collapseEl.addEventListener("show.bs.collapse", function () {

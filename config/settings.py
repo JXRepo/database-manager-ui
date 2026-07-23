@@ -186,6 +186,11 @@ LOGIN_REDIRECT_URL = "/search/"
 LOGIN_URL = "/login/"
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+ORCID_BASE_URL = os.environ.get("ORCID_BASE_URL", "https://sandbox.orcid.org").rstrip("/")
+ORCID_CLIENT_ID = os.environ.get("ORCID_CLIENT_ID", "")
+ORCID_CLIENT_SECRET = os.environ.get("ORCID_CLIENT_SECRET", "")
+ORCID_REDIRECT_URI = os.environ.get("ORCID_REDIRECT_URI", "")
+
 # ### DYNAMIC_DATATB Settings ###
 DYNAMIC_DATATB = {
     # SLUG -> Import_PATH 
