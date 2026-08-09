@@ -115,17 +115,6 @@ class AccountSettingsForm(forms.ModelForm):
         ),
     )
 
-    orcid = forms.CharField(
-        required=False,
-        label="ORCID",
-        widget=forms.TextInput(
-            attrs={
-                "class": "form-control",
-                "placeholder": "ORCID (optional)",
-            }
-        ),
-    )
-
     class Meta:
         model = User
         fields = ("username", "email")
@@ -140,7 +129,6 @@ class AccountSettingsForm(forms.ModelForm):
             return
 
         self.fields["institution"].initial = profile.institution
-        self.fields["orcid"].initial = profile.orcid
 
     def clean_username(self):
         """Return a unique username for the current account"""
@@ -159,10 +147,6 @@ class AccountSettingsForm(forms.ModelForm):
     def clean_institution(self):
         """Return the normalized institution value"""
         return self.cleaned_data.get("institution", "").strip()
-
-    def clean_orcid(self):
-        """Return the normalized ORCID value"""
-        return self.cleaned_data.get("orcid", "").strip()
 
 
 class StyledPasswordChangeForm(PasswordChangeForm):

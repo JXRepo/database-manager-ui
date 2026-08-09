@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -12,6 +13,7 @@ from apps.dyn_api.helpers import validate_json
 
 from .context_processors import shared_data_notifications
 from .models import AccountProfile, DataNotification, JSONData
+from .orcid_auth import ORCID_TRANSACTION_SESSION_KEY
 from .views import (
     _build_detail_rows,
     _ensure_required_detail_rows,
@@ -400,6 +402,45 @@ class JSONDataSharingTests(TestCase):
         self.assertFalse(notification.is_read)
         self.assertIn("notify-object", notification.message)
 
+    def test_long_unicode_manual_share_notification_fits_message_field(self):
+        """
+        Manual sharing truncates only the Unicode display title
+        """
+        long_identifier = "显微组织" * 100
+        obj = JSONData.objects.create(
+            owner=self.owner,
+            data={"identifier": long_identifier, "phase": "alpha"},
+            access_type="c",
+        )
+        self.client.login(username="owner", password="password")
+
+        response = self.client.post(
+            reverse("json_data_sharing", args=[obj.pk]),
+            {
+                "action": "add_user",
+                "share_user": "viewer",
+            },
+        )
+
+        self.assertRedirects(response, reverse("json_data_detail", args=[obj.pk]))
+        notification = DataNotification.objects.get(
+            recipient=self.viewer,
+            actor=self.owner,
+            data_object=obj,
+        )
+        maximum_length = DataNotification._meta.get_field("message").max_length
+        prefix = f"{self.owner.username} shared "
+        suffix = " with you."
+        title_budget = maximum_length - len(prefix) - len(suffix)
+
+        self.assertLessEqual(len(notification.message), maximum_length)
+        self.assertTrue(notification.message.startswith(prefix))
+        self.assertTrue(notification.message.endswith(suffix))
+        self.assertEqual(
+            notification.message[len(prefix):-len(suffix)],
+            long_identifier[:title_budget],
+        )
+
     def test_notification_open_marks_notification_read(self):
         """
         Opening a notification marks it read and redirects to detail
@@ -565,9 +606,9 @@ class JSONDataSharingTests(TestCase):
         self.assertEqual(self.owner.username, "updated-owner")
         self.assertEqual(self.owner.email, "updated-owner@example.com")
 
-    def test_account_settings_updates_optional_research_profile(self):
+    def test_account_settings_updates_institution_and_ignores_orcid(self):
         """
-        Account settings save optional institution and ORCID fields
+        Account settings save institution but ignore a forged ORCID field
         """
         self.client.login(username="owner", password="password")
 
@@ -584,7 +625,7 @@ class JSONDataSharingTests(TestCase):
         self.assertRedirects(response, reverse("account_settings"))
         profile = AccountProfile.objects.get(user=self.owner)
         self.assertEqual(profile.institution, "ICAMS")
-        self.assertEqual(profile.orcid, "0000-0002-1451-2715")
+        self.assertEqual(profile.orcid, "")
 
     @override_settings(
         ORCID_CLIENT_ID="APP-TEST",
@@ -608,7 +649,9 @@ class JSONDataSharingTests(TestCase):
         self.assertIn("client_id=APP-TEST", response["Location"])
         self.assertIn("response_type=code", response["Location"])
         self.assertIn("scope=%2Fauthenticate", response["Location"])
-        self.assertIn("orcid_oauth_state", self.client.session)
+        transaction = self.client.session[ORCID_TRANSACTION_SESSION_KEY]
+        self.assertEqual(transaction["intent"], "link")
+        self.assertEqual(transaction["user_id"], self.owner.pk)
 
     @override_settings(
         ORCID_CLIENT_ID="APP-TEST",
@@ -616,28 +659,48 @@ class JSONDataSharingTests(TestCase):
         ORCID_BASE_URL="https://sandbox.orcid.org",
     )
     @patch("apps.pages.views._exchange_orcid_authorization_code")
-    def test_orcid_callback_saves_authenticated_orcid(self, mock_exchange):
+    def test_orcid_connect_callback_sets_only_verified_identity(self, mock_exchange):
         """
-        ORCID callback stores the authenticated ORCID iD on the profile
+        A successful Connect callback verifies ORCID without changing legacy data
         """
-        mock_exchange.return_value = {"orcid": "0000-0002-1451-2715"}
+        mock_exchange.return_value = {
+            "access_token": "provider-token",
+            "orcid": "0000-0002-1451-2715",
+            "name": "Researcher",
+            "token_type": "bearer",
+        }
+        profile = AccountProfile.objects.create(
+            user=self.owner,
+            orcid="legacy-orcid-value",
+        )
         self.client.login(username="owner", password="password")
-        session = self.client.session
-        session["orcid_oauth_state"] = "state-123"
-        session.save()
+        start_response = self.client.get(reverse("orcid_connect"))
+        self.assertEqual(start_response.status_code, 302)
+        transaction = self.client.session[ORCID_TRANSACTION_SESSION_KEY]
 
         response = self.client.get(
             reverse("orcid_callback"),
             {
                 "code": "auth-code",
-                "state": "state-123",
+                "state": transaction["state"],
             },
         )
 
-        self.assertRedirects(response, reverse("account_settings"))
-        profile = AccountProfile.objects.get(user=self.owner)
-        self.assertEqual(profile.orcid, "0000-0002-1451-2715")
-        mock_exchange.assert_called_once()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], reverse("account_settings"))
+        profile.refresh_from_db()
+        self.assertEqual(profile.orcid, "legacy-orcid-value")
+        self.assertEqual(
+            profile.authenticated_orcid,
+            "0000-0002-1451-2715",
+        )
+        self.assertIsNotNone(profile.orcid_authenticated_at)
+        self.assertEqual(int(self.client.session["_auth_user_id"]), self.owner.pk)
+        self.assertNotIn("provider-token", repr(dict(self.client.session)))
+        mock_exchange.assert_called_once_with(
+            "auth-code",
+            "http://testserver/settings/orcid/callback/",
+        )
 
     def test_account_settings_rejects_duplicate_username(self):
         """
@@ -973,6 +1036,26 @@ class JSONDataSharingTests(TestCase):
 
         messages = [str(message) for message in get_messages(response.wsgi_request)]
         self.assertTrue(any("already exists" in message for message in messages))
+
+    def test_upload_saves_valid_object_and_reports_schema_invalid_object(self):
+        """
+        Schema errors still allow other valid objects in the file to save
+        """
+        self.client.login(username="owner", password="password")
+        valid_object = self._build_valid_upload_object("valid-object")
+        invalid_object = {"identifier": "invalid-object"}
+
+        response = self._post_upload_object([valid_object, invalid_object])
+
+        self.assertRedirects(response, reverse("upload_json"))
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertTrue(
+            JSONData.objects.filter(data__identifier="valid-object").exists()
+        )
+        messages = [str(message) for message in get_messages(response.wsgi_request)]
+        self.assertTrue(any("partially successful" in message for message in messages))
+        self.assertTrue(any("Data object 2" in message for message in messages))
+        self.assertTrue(any("missing required fields" in message for message in messages))
 
     def test_search_filters_by_phase(self):
         """

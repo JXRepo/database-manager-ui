@@ -1,15 +1,50 @@
 services:
   - type: web
-    name: django-datta-latest
-    plan: starter
-    env: python
-    region: frankfurt  # region should be same as your database region.
-    buildCommand: "./build.sh"
-    startCommand: "gunicorn config.wsgi:application"
+    name: fair-materials-data-hub
+    plan: free
+    runtime: python
+    region: frankfurt
+    buildCommand: bash build.sh
+    startCommand: >-
+      python -m gunicorn config.wsgi:application
+      --bind 0.0.0.0:$PORT
+      --workers 1
+      --access-logfile -
+      --access-logformat '%(m)s %(s)s %(L)s %(b)s'
+      --error-logfile -
+    healthCheckPath: /healthz/
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
       - key: DEBUG
-        value: False
+        value: "False"
       - key: SECRET_KEY
         generateValue: true
-      - key: WEB_CONCURRENCY
-        value: 4
+      - key: DB_ENGINE
+        value: postgresql
+      - key: DB_PORT
+        value: "5432"
+      - key: DB_SSLMODE
+        value: require
+      - key: ALLOWED_HOSTS
+        value: ""
+      - key: CSRF_TRUSTED_ORIGINS
+        value: ""
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: ORCID_BASE_URL
+        value: https://orcid.org
+      - key: DB_NAME
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASS
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: ORCID_CLIENT_ID
+        sync: false
+      - key: ORCID_CLIENT_SECRET
+        sync: false
+      - key: ORCID_REDIRECT_URI
+        sync: false

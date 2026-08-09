@@ -38,6 +38,8 @@ class JSONData(models.Model):
         Owner of the data object
     data : dict
         Raw JSON object
+    size_bytes : int
+        Persisted UTF-8 byte size for the JSON object
     access_type : str
         Access level ("c" or "all")
     uploaded_at : datetime
@@ -46,6 +48,7 @@ class JSONData(models.Model):
 
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     data = models.JSONField()
+    size_bytes = models.PositiveBigIntegerField(default=0)
     access_type = models.CharField(max_length=10, default="c")
     shared_users = models.ManyToManyField(
         User,
@@ -66,6 +69,51 @@ class JSONData(models.Model):
         return f"{self.owner.username} - {self.access_type} - {self.id}"
 
 
+class RateLimitBucket(models.Model):
+    """
+    Store one fixed-window rate-limit bucket
+
+    Attributes
+    ----------
+    scope : str
+        Rate-limit scope name
+    identifier_hash : str
+        HMAC hash of the persisted identifier
+    window_seconds : int
+        Window size in seconds
+    window_id : int
+        Fixed-window identifier
+    count : int
+        Number of consumed actions in the window
+    expires_at : datetime
+        Time when the bucket expires
+    """
+
+    scope = models.CharField(max_length=32)
+    identifier_hash = models.CharField(max_length=64)
+    window_seconds = models.PositiveIntegerField()
+    window_id = models.BigIntegerField()
+    count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("scope", "identifier_hash", "window_seconds", "window_id"),
+                name="unique_rate_limit_bucket",
+            ),
+        ]
+
+    def __str__(self):
+        """
+        Return a simple bucket summary
+        """
+        return (
+            f"{self.scope} - {self.identifier_hash[:12]} - "
+            f"{self.window_seconds} - {self.window_id}"
+        )
+
+
 class AccountProfile(models.Model):
     """
     Store optional research profile fields for one user
@@ -77,7 +125,11 @@ class AccountProfile(models.Model):
     institution : str
         Optional institution name.
     orcid : str
-        Optional ORCID identifier.
+        Unverified legacy ORCID text.
+    authenticated_orcid : str or None
+        Verified ORCID identity returned by authentication.
+    orcid_authenticated_at : datetime or None
+        Time when the ORCID identity was authenticated.
     """
 
     user = models.OneToOneField(
@@ -87,6 +139,18 @@ class AccountProfile(models.Model):
     )
     institution = models.CharField(max_length=255, blank=True)
     orcid = models.CharField(max_length=32, blank=True)
+    authenticated_orcid = models.CharField(
+        max_length=19,
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+    )
+    orcid_authenticated_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     def __str__(self):
         """
