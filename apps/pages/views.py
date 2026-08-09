@@ -1,6 +1,5 @@
 import json
 import math
-import secrets
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -15,16 +14,37 @@ from django.core import serializers
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
+from django.db import DatabaseError, connection
 from django.urls import reverse
 from django.utils import timezone
 
 from .models import *
 from .forms import AccountSettingsForm, SignUpForm, JSONUploadForm
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS, validate_json
 from numbers import Number
 
-MAX_UPLOAD_FILES = 5
+from .rate_limits import consume_rate_limit, get_client_identifier
+from .orcid_auth import (
+    ORCID_TRANSACTION_SESSION_KEY,
+    ORCIDFlowError,
+    complete_orcid_link,
+    complete_orcid_login,
+    consume_orcid_transaction,
+    normalize_orcid,
+    start_orcid_transaction,
+)
+from .notifications import build_shared_data_notification_message
+from .upload_services import (
+    UploadIdentifierConflict,
+    PreparedJSONData,
+    UploadResourceLimitError,
+    canonical_json_size,
+    save_prepared_json_data,
+    validate_json_depth,
+    validate_upload_files,
+)
+
 SHORT_NUMERIC_ARRAY_INLINE_LIMIT = 6
 ASSISTANT_MAX_QUESTION_LENGTH = 600
 SHARE_USERNAME_KEY = "username"
@@ -50,7 +70,6 @@ MECHANICAL_BC_VERTICES = (
     "V111",
 )
 ORCID_AUTH_SCOPE = "/authenticate"
-ORCID_STATE_SESSION_KEY = "orcid_oauth_state"
 
 
 def index(request):
@@ -59,6 +78,18 @@ def index(request):
         return redirect("search")
 
     return render(request, "pages/index.html")
+
+
+def healthz_view(request):
+    """Return application readiness based on a live database query"""
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+    except DatabaseError:
+        return JsonResponse({"status": "unavailable"}, status=503)
+
+    return JsonResponse({"status": "ok"})
 
 # Components
 def color(request):
@@ -89,6 +120,19 @@ def sample_page(request):
 def register_view(request):
   """Register a new user and log them in"""
   if request.method == "POST":
+    try:
+      decision = consume_rate_limit(
+        "registration",
+        get_client_identifier(request),
+      )
+    except DatabaseError:
+      return HttpResponse("Service unavailable.", status=503)
+
+    if not decision.allowed:
+      response = HttpResponse("Too many requests.", status=429)
+      response["Retry-After"] = str(decision.retry_after_seconds)
+      return response
+
     form = SignUpForm(request.POST)
     if form.is_valid():
       user = form.save()
@@ -113,8 +157,7 @@ def account_settings_view(request):
         if form.is_valid():
             form.save()
             profile.institution = form.cleaned_data["institution"]
-            profile.orcid = form.cleaned_data["orcid"]
-            profile.save(update_fields=["institution", "orcid"])
+            profile.save(update_fields=["institution"])
             messages.success(request, "Account settings updated.")
             return redirect("account_settings")
     else:
@@ -149,13 +192,13 @@ def _get_orcid_redirect_uri(request):
     return request.build_absolute_uri(reverse("orcid_callback"))
 
 
-def _build_orcid_authorization_url(request, state):
+def _build_orcid_authorization_url(request, state, client_id):
     """
-    Build the ORCID authorization URL for account linking
+    Build the ORCID authorization URL for login or account linking
     """
     query = urlencode(
         {
-            "client_id": settings.ORCID_CLIENT_ID,
+            "client_id": client_id,
             "response_type": "code",
             "scope": ORCID_AUTH_SCOPE,
             "redirect_uri": _get_orcid_redirect_uri(request),
@@ -192,65 +235,163 @@ def _exchange_orcid_authorization_code(code, redirect_uri):
         return json.loads(response.read().decode("utf-8"))
 
 
+def _start_orcid_authorization(request, intent, user_id, failure_url, message):
+    """
+    Start one rate limited ORCID authorization transaction
+    """
+    had_transaction = ORCID_TRANSACTION_SESSION_KEY in request.session
+    request.session.pop(ORCID_TRANSACTION_SESSION_KEY, None)
+    if had_transaction:
+        request.session.save()
+
+    client_id = getattr(settings, "ORCID_CLIENT_ID", "")
+    client_secret = getattr(settings, "ORCID_CLIENT_SECRET", "")
+
+    if not isinstance(client_id, str) or not client_id.strip():
+        messages.error(request, message)
+        return redirect(failure_url)
+    if not isinstance(client_secret, str) or not client_secret.strip():
+        messages.error(request, message)
+        return redirect(failure_url)
+
+    try:
+        decision = consume_rate_limit(
+            "orcid_start",
+            get_client_identifier(request),
+        )
+    except DatabaseError:
+        return HttpResponse("Service unavailable.", status=503)
+
+    if not decision.allowed:
+        response = HttpResponse("Too many requests.", status=429)
+        response["Retry-After"] = str(max(1, decision.retry_after_seconds))
+        return response
+
+    state = start_orcid_transaction(
+        request,
+        intent,
+        user_id=user_id,
+        next_url=request.GET.get("next", ""),
+    )
+    return redirect(
+        _build_orcid_authorization_url(
+            request,
+            state,
+            client_id.strip(),
+        )
+    )
+
+
+@require_GET
+def orcid_login_view(request):
+    """
+    Redirect an anonymous user to ORCID sign in
+    """
+    return _start_orcid_authorization(
+        request,
+        intent="login",
+        user_id=None,
+        failure_url=settings.LOGIN_URL,
+        message="ORCID sign in is not configured yet.",
+    )
+
+
 @login_required
+@require_GET
 def orcid_connect_view(request):
     """
-    Redirect the signed-in user to ORCID account linking
+    Redirect the signed in user to ORCID account linking
     """
-    if not settings.ORCID_CLIENT_ID or not settings.ORCID_CLIENT_SECRET:
-        messages.error(
-            request,
-            "ORCID connection is not configured yet. Add ORCID client credentials first.",
-        )
-        return redirect("account_settings")
-
-    state = secrets.token_urlsafe(24)
-    request.session[ORCID_STATE_SESSION_KEY] = state
-    return redirect(_build_orcid_authorization_url(request, state))
+    return _start_orcid_authorization(
+        request,
+        intent="link",
+        user_id=request.user.pk,
+        failure_url="account_settings",
+        message="ORCID connection is not configured yet.",
+    )
 
 
-@login_required
+@require_GET
 def orcid_callback_view(request):
     """
-    Store the authenticated ORCID iD returned by ORCID
+    Complete one consumed ORCID login or route a valid link safely
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Provider callback request carrying state and authorization results.
+
+    Returns
+    -------
+    HttpResponse
+        Login result or a fixed local error redirect.
     """
-    expected_state = request.session.pop(ORCID_STATE_SESSION_KEY, "")
-    received_state = request.GET.get("state", "")
+    try:
+        orcid_transaction = consume_orcid_transaction(
+            request,
+            request.GET.get("state"),
+        )
+    except ORCIDFlowError:
+        messages.error(request, "ORCID sign in could not be verified.")
+        return redirect(settings.LOGIN_URL)
 
-    if not expected_state or received_state != expected_state:
-        messages.error(request, "ORCID connection could not be verified.")
-        return redirect("account_settings")
+    failure_url = (
+        "account_settings"
+        if orcid_transaction.intent == "link"
+        else settings.LOGIN_URL
+    )
 
-    if request.GET.get("error"):
-        messages.error(request, "ORCID connection was cancelled.")
-        return redirect("account_settings")
+    if "error" in request.GET:
+        messages.error(request, "ORCID authorization was cancelled.")
+        return redirect(failure_url)
 
-    code = request.GET.get("code", "").strip()
-
-    if not code:
+    code = request.GET.get("code")
+    if not isinstance(code, str) or not code.strip():
         messages.error(request, "ORCID did not return an authorization code.")
-        return redirect("account_settings")
+        return redirect(failure_url)
 
     try:
         token_data = _exchange_orcid_authorization_code(
             code,
             _get_orcid_redirect_uri(request),
         )
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
-        messages.error(request, "ORCID connection failed. Please try again.")
-        return redirect("account_settings")
+    except (
+        HTTPError,
+        URLError,
+        TimeoutError,
+        json.JSONDecodeError,
+        UnicodeDecodeError,
+    ):
+        messages.error(request, "ORCID sign in failed. Please try again.")
+        return redirect(failure_url)
 
-    orcid = str(token_data.get("orcid", "")).strip()
+    if type(token_data) is not dict:
+        messages.error(request, "ORCID sign in failed. Please try again.")
+        return redirect(failure_url)
 
-    if not orcid:
-        messages.error(request, "ORCID did not return an authenticated iD.")
-        return redirect("account_settings")
+    access_token = token_data.get("access_token")
+    if not isinstance(access_token, str) or not access_token.strip():
+        messages.error(request, "ORCID sign in failed. Please try again.")
+        return redirect(failure_url)
 
-    profile, _created = AccountProfile.objects.get_or_create(user=request.user)
-    profile.orcid = orcid
-    profile.save(update_fields=["orcid"])
-    messages.success(request, "ORCID connected.")
-    return redirect("account_settings")
+    try:
+        orcid = normalize_orcid(token_data.get("orcid"))
+    except ORCIDFlowError:
+        messages.error(request, "ORCID sign in failed. Please try again.")
+        return redirect(failure_url)
+
+    if orcid_transaction.intent == "link":
+        return complete_orcid_link(
+            request,
+            orcid_transaction,
+            orcid,
+        )
+
+    return complete_orcid_login(
+        request,
+        orcid,
+        orcid_transaction.next_url,
+    )
 
 
 def _get_shared_with_entries(data):
@@ -562,7 +703,7 @@ def _create_shared_data_notification(data_object, actor, recipient):
         actor=actor,
         data_object=data_object,
         notification_type=DataNotification.TYPE_SHARED_DATA,
-        message=f"{actor.username} shared {title} with you.",
+        message=build_shared_data_notification_message(actor, title),
     )
 
 
@@ -582,140 +723,184 @@ def upload_json_view(request):
         Rendered upload page or redirect after success
     """
     if request.method == "POST":
+        try:
+            decision = consume_rate_limit("upload", str(request.user.pk))
+        except DatabaseError:
+            return HttpResponse("Service unavailable.", status=503)
+
+        if not decision.allowed:
+            response = HttpResponse("Too many requests.", status=429)
+            response["Retry-After"] = str(decision.retry_after_seconds)
+            return response
+
         form = JSONUploadForm(request.POST, request.FILES)
 
         if form.is_valid():
             uploaded_files = form.cleaned_data["file"]
-
-            if len(uploaded_files) > MAX_UPLOAD_FILES:
-                messages.error(
-                    request,
-                    f"You can upload up to {MAX_UPLOAD_FILES} JSON files at once.",
-                )
-                return render(request, "pages/upload.html", {"form": form})
-
-            total_created_count = 0
             processed_file_count = 0
             upload_issues = {}
             seen_identifiers = set()
+            prepared_object_labels = {}
+            prepared_objects = []
+            raw_object_count = 0
 
-            for uploaded_file in uploaded_files:
-                file_name = uploaded_file.name or "Uploaded file"
+            try:
+                validate_upload_files(uploaded_files)
 
-                try:
-                    payload = json.load(uploaded_file)
-                except json.JSONDecodeError:
-                    _add_upload_issue(
-                        upload_issues,
-                        "invalid_file",
-                        f"{file_name} is not valid JSON.",
-                    )
-                    continue
+                for uploaded_file in uploaded_files:
+                    file_name = uploaded_file.name or "Uploaded file"
 
-                if isinstance(payload, list):
-                    objects = payload
-                elif isinstance(payload, dict):
-                    if isinstance(payload.get("data"), list):
-                        objects = payload["data"]
+                    try:
+                        payload = json.load(uploaded_file)
+                    except RecursionError as error:
+                        raise UploadResourceLimitError(
+                            "Uploaded JSON exceeds the maximum container depth."
+                        ) from error
+                    except ValueError:
+                        _add_upload_issue(
+                            upload_issues,
+                            "invalid_file",
+                            f"{file_name} is not valid JSON.",
+                        )
+                        continue
+
+                    validate_json_depth(payload)
+
+                    if isinstance(payload, list):
+                        objects = payload
+                    elif isinstance(payload, dict):
+                        if isinstance(payload.get("data"), list):
+                            objects = payload["data"]
+                        else:
+                            objects = [payload]
                     else:
-                        objects = [payload]
-                else:
-                    _add_upload_issue(
-                        upload_issues,
-                        "invalid_structure",
-                        (
-                            f"{file_name} must be a single object, a list of objects, "
-                            "or a dict with a 'data' list."
-                        ),
-                    )
-                    continue
-
-                valid_objects, errors = validate_json(objects)
-                object_indexes = {}
-
-                for object_index, obj in enumerate(objects, start=1):
-                    if isinstance(obj, dict):
-                        object_indexes[id(obj)] = object_index
-
-                created_count = 0
-
-                for obj in valid_objects:
-                    object_index = object_indexes.get(id(obj), 1)
-                    identifier = str(obj.get("identifier", "")).strip()
-                    object_label = f"{file_name} data object {object_index}"
-
-                    if identifier in seen_identifiers:
                         _add_upload_issue(
                             upload_issues,
-                            "duplicate_identifier",
+                            "invalid_structure",
                             (
-                                f'{object_label}: identifier "{identifier}" is duplicated '
-                                "in this upload. Please use a unique identifier."
+                                f"{file_name} must be a single object, a list of objects, "
+                                "or a dict with a 'data' list."
                             ),
                         )
                         continue
 
-                    if _identifier_exists(identifier):
-                        _add_upload_issue(
-                            upload_issues,
-                            "duplicate_identifier",
-                            (
-                                f'{object_label}: identifier "{identifier}" already exists. '
-                                "Please use a unique identifier."
-                            ),
+                    raw_object_count += len(objects)
+
+                    if raw_object_count > settings.PILOT_MAX_UPLOAD_OBJECTS:
+                        raise UploadResourceLimitError(
+                            "The upload exceeds the maximum number of JSON data objects."
                         )
-                        continue
 
-                    access_type, shared_users, access_issues = _resolve_upload_access_metadata(
-                        obj,
-                        request.user,
-                    )
+                    valid_objects, errors = validate_json(objects)
+                    object_indexes = {}
 
-                    if access_issues:
-                        for category, issue in access_issues:
+                    for object_index, obj in enumerate(objects, start=1):
+                        if isinstance(obj, dict):
+                            object_indexes[id(obj)] = object_index
+
+                    prepared_count = 0
+
+                    for obj in valid_objects:
+                        object_index = object_indexes.get(id(obj), 1)
+                        identifier = str(obj.get("identifier", "")).strip()
+                        object_label = f"{file_name} data object {object_index}"
+
+                        if identifier in seen_identifiers:
                             _add_upload_issue(
                                 upload_issues,
-                                category,
-                                f"{object_label}: {issue}",
+                                "duplicate_identifier",
+                                (
+                                    f'{object_label}: identifier "{identifier}" is duplicated '
+                                    "in this upload. Please use a unique identifier."
+                                ),
                             )
-                        continue
+                            continue
 
-                    data_object = JSONData.objects.create(
-                        owner=request.user,
-                        data=obj,
-                        access_type=access_type,
-                    )
+                        if _identifier_exists(identifier):
+                            _add_upload_issue(
+                                upload_issues,
+                                "duplicate_identifier",
+                                (
+                                    f'{object_label}: identifier "{identifier}" already exists. '
+                                    "Please use a unique identifier."
+                                ),
+                            )
+                            continue
 
-                    if access_type == "c" and shared_users:
-                        data_object.shared_users.add(*shared_users)
-
-                        for shared_user in shared_users:
-                            _create_shared_data_notification(
-                                data_object,
+                        access_type, shared_users, access_issues = (
+                            _resolve_upload_access_metadata(
+                                obj,
                                 request.user,
-                                shared_user,
                             )
+                        )
 
-                    seen_identifiers.add(identifier)
-                    created_count += 1
+                        if access_issues:
+                            for category, issue in access_issues:
+                                _add_upload_issue(
+                                    upload_issues,
+                                    category,
+                                    f"{object_label}: {issue}",
+                                )
+                            continue
 
-                processed_file_count += 1
-                total_created_count += created_count
+                        prepared_objects.append(
+                            PreparedJSONData(
+                                data=obj,
+                                access_type=access_type,
+                                shared_users=tuple(shared_users),
+                                size_bytes=canonical_json_size(obj),
+                            )
+                        )
+                        prepared_object_labels[identifier] = object_label
+                        seen_identifiers.add(identifier)
+                        prepared_count += 1
 
-                for error in errors:
-                    category = _categorize_validation_error(error)
+                    processed_file_count += 1
+
+                    for error in errors:
+                        category = _categorize_validation_error(error)
+                        _add_upload_issue(
+                            upload_issues,
+                            category,
+                            f"{file_name}: {error}",
+                        )
+
+                    if prepared_count == 0 and errors:
+                        _add_upload_issue(
+                            upload_issues,
+                            "other_validation",
+                            f"{file_name}: No valid data objects were saved.",
+                        )
+
+                saved_objects = save_prepared_json_data(
+                    request.user,
+                    prepared_objects,
+                )
+            except UploadIdentifierConflict as error:
+                for identifier in error.identifiers:
+                    object_label = prepared_object_labels.get(
+                        identifier,
+                        "Uploaded data object",
+                    )
                     _add_upload_issue(
                         upload_issues,
-                        category,
-                        f"{file_name}: {error}",
+                        "duplicate_identifier",
+                        (
+                            f'{object_label}: identifier "{identifier}" already exists. '
+                            "Please use a unique identifier."
+                        ),
                     )
 
-                if created_count == 0 and errors:
-                    _add_upload_issue(
-                        upload_issues,
-                        "other_validation",
-                        f"{file_name}: No valid data objects were saved.",
-                    )
+                messages.error(request, "Upload failed.")
+                for issue in _get_upload_issue_messages(upload_issues):
+                    messages.error(request, issue)
+                return render(request, "pages/upload.html", {"form": form})
+            except UploadResourceLimitError as error:
+                messages.error(request, "Upload failed.")
+                messages.error(request, str(error))
+                return render(request, "pages/upload.html", {"form": form})
+
+            total_created_count = len(saved_objects)
 
             upload_issue_messages = _get_upload_issue_messages(upload_issues)
 

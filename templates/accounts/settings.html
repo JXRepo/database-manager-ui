@@ -160,7 +160,7 @@
             <div class="orcid-connect-panel mt-2">
               <div class="orcid-connect-copy">
                 <strong><span class="orcid-id-mark">iD</span>Connect ORCID</strong>
-                Link your authenticated ORCID iD instead of typing it manually.
+                Link a verified ORCID iD to this account.
               </div>
               <a href="{% url 'orcid_connect' %}" class="btn btn-outline-success">
                 Connect ORCID
@@ -200,8 +200,8 @@
               <span class="account-summary-value">{{ profile.institution|default:"-" }}</span>
             </div>
             <div class="account-summary-row">
-              <span class="account-summary-label">ORCID</span>
-              <span class="account-summary-value">{{ profile.orcid|default:"-" }}</span>
+              <span class="account-summary-label">Verified ORCID iD</span>
+              <span class="account-summary-value">{{ profile.authenticated_orcid|default:"Not connected" }}</span>
             </div>
             <div class="account-summary-row">
               <span class="account-summary-label">Shared data</span>

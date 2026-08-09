@@ -2,8 +2,9 @@ from django.urls import path
 from django.urls import reverse_lazy
 from django.contrib.auth import views as auth_views
 from . import views
+from .auth_views import RateLimitedLoginView
 from .views import account_settings_view, register_view
-from .forms import SignInForm, StyledPasswordChangeForm
+from .forms import StyledPasswordChangeForm
 from .views import upload_json_view
 from .views import (
     json_data_list_view,
@@ -27,14 +28,15 @@ from .views import (
 
 urlpatterns = [
     path("", views.index, name="index"),
+    path("healthz/", views.healthz_view, name="healthz"),
+    path("accounts/login/", RateLimitedLoginView.as_view()),
+    path("accounts/register/", register_view),
     path(
         "login/",
-        auth_views.LoginView.as_view(
-            template_name="accounts/login.html",
-            authentication_form=SignInForm,
-        ),
+        RateLimitedLoginView.as_view(),
         name="login",
     ),
+    path("login/orcid/", views.orcid_login_view, name="orcid_login"),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("register/", register_view, name="register"),
     path("settings/", account_settings_view, name="account_settings"),

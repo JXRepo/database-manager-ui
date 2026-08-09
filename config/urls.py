@@ -15,21 +15,40 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
-from rest_framework.authtoken.views import obtain_auth_token # <-- NEW
+
+from apps.pages.auth_views import (
+    pilot_disabled_auth_view,
+    rate_limited_admin_login,
+)
 
 urlpatterns = [
     path('', include('apps.pages.urls')),
-    path("", include("apps.dyn_dt.urls")),
-    path("", include("apps.dyn_api.urls")),
     path('charts/', include('apps.charts.urls')),
+    path(
+        "accounts/password-reset/",
+        pilot_disabled_auth_view,
+        name="pilot_password_reset_disabled",
+    ),
+    path(
+        "accounts/password-reset-done/",
+        pilot_disabled_auth_view,
+        name="pilot_password_reset_done_disabled",
+    ),
+    path(
+        "accounts/password-reset-confirm/<uidb64>/<token>/",
+        pilot_disabled_auth_view,
+        name="pilot_password_reset_confirm_disabled",
+    ),
+    path(
+        "accounts/password-reset-complete/",
+        pilot_disabled_auth_view,
+        name="pilot_password_reset_complete_disabled",
+    ),
+    path(
+        "admin/login/",
+        rate_limited_admin_login,
+        name="pilot_admin_login",
+    ),
     path("", include('admin_datta.urls')),
     path("admin/", admin.site.urls),
 ]
-
-# Lazy-load on routing is needed
-# During the first build, API is not yet generated
-try:
-    urlpatterns.append( path("api/"      , include("api.urls"))    )
-    urlpatterns.append( path("login/jwt/", view=obtain_auth_token) )
-except:
-    pass
