@@ -1542,8 +1542,24 @@ class ORCIDLinkCallbackTests(ORCIDCallbackTestMixin, TestCase):
         self.assertNotIn(ORCID_TRANSACTION_SESSION_KEY, self.client.session)
         return response
 
-    def _assert_link_refused(self, response):
-        """Assert one link attempt returned the fixed local refusal"""
+    def _assert_link_refused(
+        self, response, expected_message="ORCID account linking could not be completed."
+    ):
+        """
+        Assert a refused link returns the expected guidance without private data
+
+        Parameters
+        ----------
+        response : HttpResponse
+            Response from the completed linking callback.
+        expected_message : str, optional
+            Guidance appropriate to the reason for refusing the link.
+
+        Returns
+        -------
+        str
+            Response and stored account artifacts checked for sensitive values.
+        """
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], reverse("account_settings"))
         artifacts = self._assert_sensitive_values_absent(
@@ -1555,7 +1571,7 @@ class ORCIDLinkCallbackTests(ORCIDCallbackTestMixin, TestCase):
             self.provider_email,
             self.provider_token_type,
         )
-        self.assertIn("ORCID account linking could not be completed.", artifacts)
+        self.assertIn(expected_message, artifacts)
         return artifacts
 
     def _assert_link_succeeded(self, response):
@@ -1615,7 +1631,9 @@ class ORCIDLinkCallbackTests(ORCIDCallbackTestMixin, TestCase):
         self.assertEqual(self._user_state(), before_users)
 
     def test_link_cannot_take_identity_from_another_user(self):
-        """An identity owned by another account cannot be transferred"""
+        """
+        Keep the original binding and explain how to disconnect it first
+        """
         other_linked_at = timezone.now() - timedelta(days=2)
         self.other_profile.authenticated_orcid = self.primary_orcid
         self.other_profile.orcid_authenticated_at = other_linked_at
@@ -1626,7 +1644,16 @@ class ORCIDLinkCallbackTests(ORCIDCallbackTestMixin, TestCase):
 
         response = self._complete_link()
 
-        self._assert_link_refused(response)
+        self._assert_link_refused(
+            response,
+            "This ORCID iD is already connected to another account. "
+            "Please sign in to that account and disconnect it in Settings "
+            "before connecting it here.",
+        )
+        settings_page = self.client.get(reverse("account_settings"))
+        self.assertContains(settings_page, "already connected to another account")
+        self.assertNotContains(settings_page, self.other.username)
+        self.assertNotContains(settings_page, self.other.email)
         self._assert_current_session_user(self.user)
         self.assertEqual(self._profile_state(), before_profiles)
 

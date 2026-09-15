@@ -335,7 +335,9 @@ def complete_orcid_link(request, orcid_transaction, orcid) -> HttpResponse:
             if identity_owner is not None:
                 messages.error(
                     request,
-                    "ORCID account linking could not be completed.",
+                    "This ORCID iD is already connected to another account. "
+                    "Please sign in to that account and disconnect it in Settings "
+                    "before connecting it here.",
                 )
                 return redirect("account_settings")
 
