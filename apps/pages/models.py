@@ -130,6 +130,8 @@ class AccountProfile(models.Model):
         Verified ORCID identity returned by authentication.
     orcid_authenticated_at : datetime or None
         Time when the ORCID identity was authenticated.
+    orcid_disconnected_at : datetime or None
+        Most recent disconnect time used to reject older linking callbacks.
     """
 
     user = models.OneToOneField(
@@ -149,6 +151,12 @@ class AccountProfile(models.Model):
     orcid_authenticated_at = models.DateTimeField(
         null=True,
         blank=True,
+        editable=False,
+    )
+    orcid_disconnected_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        default=None,
         editable=False,
     )
 

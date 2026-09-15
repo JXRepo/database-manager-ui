@@ -39,9 +39,14 @@ on the hosted website; deploying the code does not copy them to the cloud.
   and select Connect ORCID in Account Settings. Signing in directly with an
   unlinked ORCID identity creates a separate account; matching names or email
   addresses do not merge accounts.
-- One verified ORCID iD can belong to only one platform account. ORCID unlinking
-  is not currently available. Accounts created through ORCID do not initially
-  have a local password.
+- One verified ORCID iD can belong to only one platform account. Account Settings
+  shows Connected and a Disconnect button. If you already have a local password,
+  Disconnect removes the link directly.
+- Accounts created through ORCID do not initially have a local password.
+  Disconnect opens a dialog to choose a username, password, and confirmation.
+  Saving keeps you signed in and leaves ORCID connected, then asks whether to
+  continue disconnecting. Choose Yes to disconnect; No or closing the dialog
+  keeps ORCID connected. Your credentials, account, and uploaded data are retained.
 - Registration and login submissions are rate limited. Repeated attempts can
   temporarily block further submissions.
 

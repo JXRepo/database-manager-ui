@@ -41,6 +41,8 @@ urlpatterns = [
     path("register/", register_view, name="register"),
     path("settings/", account_settings_view, name="account_settings"),
     path("settings/orcid/connect/", views.orcid_connect_view, name="orcid_connect"),
+    path("settings/orcid/disconnect/", views.orcid_disconnect_view, name="orcid_disconnect"),
+    path("settings/orcid/setup/", views.orcid_setup_credentials_view, name="orcid_setup_credentials"),
     path("settings/orcid/callback/", views.orcid_callback_view, name="orcid_callback"),
     path(
         "password/change/",

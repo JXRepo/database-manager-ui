@@ -7,19 +7,19 @@ from urllib.request import Request, urlopen
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import Http404, HttpResponse, JsonResponse
 from django.conf import settings
-from django.contrib.auth import login
+from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.models import User
 from apps.pages.models import Product
 from django.core import serializers
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
-from django.db import DatabaseError, connection
+from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.urls import reverse
 from django.utils import timezone
 
 from .models import *
-from .forms import AccountSettingsForm, SignUpForm, JSONUploadForm
+from .forms import AccountSettingsForm, ORCIDAccountSetupForm, SignUpForm, JSONUploadForm
 from django.views.decorators.http import require_GET, require_POST
 from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS, validate_json
 from numbers import Number
@@ -70,6 +70,8 @@ MECHANICAL_BC_VERTICES = (
     "V111",
 )
 ORCID_AUTH_SCOPE = "/authenticate"
+ORCID_DISCONNECT_CONFIRMATION_SESSION_KEY = "orcid_disconnect_confirmation"
+ORCID_SETUP_REQUESTED_SESSION_KEY = "orcid_setup_requested"
 
 
 def index(request):
@@ -163,12 +165,155 @@ def account_settings_view(request):
     else:
         form = AccountSettingsForm(instance=request.user)
 
+    pending_disconnect = request.session.pop(
+        ORCID_DISCONNECT_CONFIRMATION_SESSION_KEY, None
+    )
+    setup_requested = request.session.pop(ORCID_SETUP_REQUESTED_SESSION_KEY, False)
+
     return render(
         request,
         "accounts/settings.html",
         {
             "form": form,
             "profile": profile,
+            "orcid_setup_form": ORCIDAccountSetupForm(
+                instance=request.user, prefix="orcid_setup"
+            ),
+            "show_orcid_setup": bool(
+                setup_requested
+                and profile.authenticated_orcid
+                and not request.user.has_usable_password()
+            ),
+            "show_orcid_disconnect_confirmation": bool(
+                pending_disconnect
+                and pending_disconnect == profile.authenticated_orcid
+                and request.user.has_usable_password()
+            ),
+        },
+    )
+
+
+@login_required
+@require_POST
+def orcid_disconnect_view(request):
+    """
+    Disconnect the current account only when a local password remains available
+
+    Serialize identity changes with OAuth callbacks and reject stale forms.
+    Existing account data and legacy profile text are not removed.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated POST containing the displayed verified ORCID iD.
+
+    Returns
+    -------
+    HttpResponse
+        Settings redirect with the result or an inactive account refusal.
+    """
+    with transaction.atomic():
+        current_user = User.objects.select_for_update().filter(pk=request.user.pk).first()
+        if current_user is None or not current_user.is_active:
+            return HttpResponse("Account unavailable.", status=403)
+        profile = (
+            AccountProfile.objects.select_for_update().filter(user=current_user).first()
+        )
+        if profile is None or not profile.authenticated_orcid:
+            messages.info(request, "ORCID is already disconnected.")
+            return redirect("account_settings")
+        if request.POST.get("orcid") != profile.authenticated_orcid:
+            messages.error(request, "Your ORCID connection changed. Please try again.")
+            return redirect("account_settings")
+        if not current_user.has_usable_password():
+            request.session[ORCID_SETUP_REQUESTED_SESSION_KEY] = True
+            messages.info(request, "Set a username and password before disconnecting ORCID.")
+            return redirect("account_settings")
+
+        profile.authenticated_orcid = None
+        profile.orcid_authenticated_at = None
+        profile.orcid_disconnected_at = timezone.now()
+        profile.save(
+            update_fields=[
+                "authenticated_orcid",
+                "orcid_authenticated_at",
+                "orcid_disconnected_at",
+            ]
+        )
+
+    request.session.pop(ORCID_TRANSACTION_SESSION_KEY, None)
+    request.session.pop(ORCID_DISCONNECT_CONFIRMATION_SESSION_KEY, None)
+    request.session.pop(ORCID_SETUP_REQUESTED_SESSION_KEY, None)
+    messages.success(
+        request,
+        "ORCID disconnected. You can still sign in with your username and password.",
+    )
+    return redirect("account_settings")
+
+
+@login_required
+@require_POST
+def orcid_setup_credentials_view(request):
+    """
+    Set local credentials before offering a separate ORCID disconnect decision
+
+    Update the same account under a lock and retain its current login session.
+    Saving credentials never disconnects the identity by itself.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated POST from the username and password setup modal.
+
+    Returns
+    -------
+    HttpResponse
+        Settings with field errors or a redirect to the confirmation dialog.
+    """
+    with transaction.atomic():
+        current_user = User.objects.select_for_update().filter(pk=request.user.pk).first()
+        if current_user is None or not current_user.is_active:
+            return HttpResponse("Account unavailable.", status=403)
+        profile = (
+            AccountProfile.objects.select_for_update().filter(user=current_user).first()
+        )
+        if (
+            profile is None
+            or not profile.authenticated_orcid
+            or request.POST.get("orcid") != profile.authenticated_orcid
+        ):
+            messages.error(request, "Your ORCID connection changed. Please try again.")
+            return redirect("account_settings")
+        if current_user.has_usable_password():
+            messages.info(request, "Your username and password are already set.")
+            return redirect("account_settings")
+
+        setup_form = ORCIDAccountSetupForm(
+            request.POST, instance=current_user, prefix="orcid_setup"
+        )
+        if setup_form.is_valid():
+            try:
+                with transaction.atomic():
+                    updated_user = setup_form.save()
+            except IntegrityError:
+                setup_form.add_error("username", "A user with that username already exists.")
+            else:
+                update_session_auth_hash(request, updated_user)
+                request.session[ORCID_DISCONNECT_CONFIRMATION_SESSION_KEY] = (
+                    profile.authenticated_orcid
+                )
+                messages.success(request, "Username and password set successfully.")
+                return redirect("account_settings")
+
+    return render(
+        request,
+        "accounts/settings.html",
+        {
+            "form": AccountSettingsForm(instance=request.user),
+            "profile": profile,
+            "orcid_setup_form": setup_form,
+            "show_orcid_setup": True,
+            "show_orcid_disconnect_confirmation": False,
         },
     )
 

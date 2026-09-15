@@ -158,6 +158,8 @@ def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
     """
     Resolve a verified ORCID identity into one safe local login
 
+    Recheck the resolved binding while holding the same locks as disconnect.
+
     Parameters
     ----------
     request : HttpRequest
@@ -236,13 +238,47 @@ def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
                 return redirect(settings.LOGIN_URL)
             user = identity_profile.user
 
-    login(request, user)
+    with transaction.atomic():
+        current_user = User.objects.select_for_update().filter(pk=user.pk).first()
+        if (
+            current_user is None
+            or not current_user.is_active
+            or not AccountProfile.objects.select_for_update().filter(
+                user_id=current_user.pk,
+                authenticated_orcid=orcid,
+            ).exists()
+        ):
+            messages.error(
+                request,
+                "ORCID sign in could not be completed. Please try again.",
+            )
+            return redirect(settings.LOGIN_URL)
+
+        login(request, current_user)
     messages.success(request, "Signed in with ORCID.")
     return redirect(next_url)
 
 
 def complete_orcid_link(request, orcid_transaction, orcid) -> HttpResponse:
-    """Link one verified ORCID identity to its initiating local account"""
+    """
+    Link one verified ORCID identity to its initiating local account
+
+    Disconnect markers prevent older callbacks from restoring a removed link.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Callback request carrying the initiating account's session.
+    orcid_transaction : ORCIDTransaction
+        Consumed transaction bound to the initiating account and start time.
+    orcid : str
+        Canonical verified ORCID identity returned by the provider.
+
+    Returns
+    -------
+    HttpResponse
+        Redirect to account settings with the connection result.
+    """
     if (
         not request.user.is_authenticated
         or not request.user.is_active
@@ -271,6 +307,16 @@ def complete_orcid_link(request, orcid_transaction, orcid) -> HttpResponse:
                     user=current_user
                 )
             )
+            if (
+                current_profile.orcid_disconnected_at is not None
+                and orcid_transaction.created_at
+                <= current_profile.orcid_disconnected_at.timestamp()
+            ):
+                messages.error(
+                    request,
+                    "ORCID account linking could not be completed. Start a new connection.",
+                )
+                return redirect("account_settings")
             if current_profile.authenticated_orcid == orcid:
                 messages.success(request, "ORCID iD connected.")
                 return redirect("account_settings")

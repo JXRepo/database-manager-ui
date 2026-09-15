@@ -149,6 +149,25 @@ class AccountSettingsForm(forms.ModelForm):
         """Return the normalized institution value"""
         return self.cleaned_data.get("institution", "").strip()
 
+    def save(self, commit=True):
+        """
+        Save profile fields without overwriting concurrently changed credentials
+
+        Parameters
+        ----------
+        commit : bool, optional
+            Whether to persist the updated profile fields immediately.
+
+        Returns
+        -------
+        User
+            The existing account with its edited username and email.
+        """
+        user = super().save(commit=False)
+        if commit:
+            user.save(update_fields=["username", "email"])
+        return user
+
 
 class StyledPasswordChangeForm(PasswordChangeForm):
     """Password change form styled for the dashboard UI"""
@@ -170,6 +189,67 @@ class StyledPasswordChangeForm(PasswordChangeForm):
                     "placeholder": placeholders.get(field_name, field.label),
                 }
             )
+
+
+class ORCIDAccountSetupForm(UserCreationForm):
+    """
+    Set local credentials on the existing ORCID account
+    """
+
+    class Meta(UserCreationForm.Meta):
+        fields = ("username",)
+
+    def __init__(self, *args, **kwargs):
+        """
+        Style credential fields and preserve Django's model validators
+
+        Parameters
+        ----------
+        *args : tuple
+            Positional form arguments.
+        **kwargs : dict
+            Form data and the existing user instance.
+        """
+        super().__init__(*args, **kwargs)
+        self.fields["username"].strip = False
+        self.fields["username"].help_text = "No spaces."
+        self.fields["password1"].help_text = "At least 8 characters."
+        placeholders = {
+            "username": "Username",
+            "password1": "Password",
+            "password2": "Confirm password",
+        }
+
+        for field_name, field in self.fields.items():
+            field.widget.attrs.update(
+                {"class": "form-control", "placeholder": placeholders[field_name]}
+            )
+
+    def clean_username(self):
+        """
+        Allow the current username while rejecting names held by another account
+
+        Returns
+        -------
+        str
+            Username normalized by Django's username field.
+
+        Raises
+        ------
+        forms.ValidationError
+            Another account already uses the chosen username.
+        """
+        username = self.cleaned_data["username"]
+        duplicate_user = (
+            User.objects.filter(username__iexact=username)
+            .exclude(pk=self.instance.pk)
+            .exists()
+        )
+        if duplicate_user:
+            raise forms.ValidationError(
+                self.instance.unique_error_message(User, ["username"])
+            )
+        return username
 
 
 class MultipleFileInput(forms.ClearableFileInput):
