@@ -1,5 +1,9 @@
 # FAIR Materials Data Platform
 
+This platform builds on the
+[DatabaseManager](https://github.com/Ronakshoghi/DatabaseManager) web application
+developed by [Ronak Shoghi](https://github.com/Ronakshoghi).
+
 A Django platform for uploading, validating, searching, sharing, and exporting
 materials simulation data as JSON.
 
