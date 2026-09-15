@@ -72,7 +72,7 @@ class PublicSurfaceTests(TestCase):
         """
         Show registration guidance and associate it with its input
 
-        Username and password guidance must be visible and available to
+        Both hints use the same plain text style and remain available to
         assistive technology when the registration page is rendered.
         """
         response = self.client.get(reverse("register"))
@@ -87,6 +87,14 @@ class PublicSurfaceTests(TestCase):
                 self.assertContains(response, f'id="{help_id}"')
                 self.assertContains(response, f'aria-describedby="{help_id}"')
                 self.assertContains(response, field.help_text)
+                self.assertContains(
+                    response,
+                    f'<small id="{help_id}" class="d-block mt-1 text-muted">'
+                    f"{field.help_text}</small>",
+                    html=True,
+                )
+
+        self.assertNotContains(response, 'class="mt-2 p-2 border rounded bg-light"')
 
     def test_healthz_returns_ok_when_database_is_ready(self):
         """
