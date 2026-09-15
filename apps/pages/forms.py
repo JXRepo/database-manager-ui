@@ -10,7 +10,7 @@ class SignUpForm(UserCreationForm):
     """Custom user registration form"""
 
     username = forms.CharField(
-        help_text="No spaces. Use letters, numbers, or @ . + - _.",
+        help_text="No spaces.",
         widget=forms.TextInput(
             attrs={
                 "class": "form-control",
@@ -30,11 +30,7 @@ class SignUpForm(UserCreationForm):
     )
 
     password1 = forms.CharField(
-        help_text=(
-            "Use at least 8 characters. Special characters are allowed. "
-            "Do not use only numbers, a common password, or a password "
-            "similar to your username or email."
-        ),
+        help_text="At least 8 characters.",
         widget=forms.PasswordInput(
             attrs={
                 "class": "form-control",
