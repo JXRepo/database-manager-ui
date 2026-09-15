@@ -38,9 +38,6 @@
                     </small>
                   {% elif field.name == "password1" and field.help_text %}
                     <div class="mt-2 p-2 border rounded bg-light">
-                      <small class="text-muted d-block">
-                        <strong>Password requirements</strong>
-                      </small>
                       <small id="{{ field.auto_id }}_helptext" class="text-muted d-block">
                         {{ field.help_text|safe }}
                       </small>
