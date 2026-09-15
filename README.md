@@ -1,11 +1,80 @@
 # FAIR Materials Data Platform
 
-A Django-based platform for uploading, validating, browsing, sharing, and exporting
-FAIR materials simulation JSON data.
+A Django platform for uploading, validating, searching, sharing, and exporting
+materials simulation data as JSON.
 
-The current target is an internal user-ready MVP. The platform focuses on the
-core database workflow, not on ontology, knowledge graph, full Studio
-integration, or production AI features.
+The platform is currently a public pilot for a small group of research users.
+Development focuses on the core data workflow and access control. Ontology,
+knowledge graphs, full Studio integration, and production AI features remain
+future enhancements.
+
+## Try the Platform
+
+[Open the pilot website](https://fair-materials-data-hub.onrender.com/).
+
+1. Create an account, or use the ORCID sign in option.
+2. Upload a small JSON file that follows the metadata requirements below.
+3. Search accessible records, manage your uploads in My Data, and try sharing
+   and JSON export.
+
+Use test data and keep your original files. The pilot is not a permanent archive.
+Accounts and data created on a local development server are separate from those
+on the hosted website; deploying the code does not copy them to the cloud.
+
+### Accounts
+
+- Usernames contain 1 to 150 characters: letters, numbers, or `@ . + - _`.
+  Spaces are not allowed. Registration rejects duplicate usernames, including
+  names that differ only in letter case.
+- Passwords must contain at least 8 characters. Special characters are allowed,
+  but no particular combination of character types is required. Passwords cannot
+  consist only of numbers, be commonly used, or be too similar to account details.
+- Email is optional. Email verification and email password recovery are not
+  available during the pilot.
+- To connect ORCID to an existing platform account, sign in to that account first
+  and select Connect ORCID in Account Settings. Signing in directly with an
+  unlinked ORCID identity creates a separate account; matching names or email
+  addresses do not merge accounts.
+- One verified ORCID iD can belong to only one platform account. ORCID unlinking
+  is not currently available. Accounts created through ORCID do not initially
+  have a local password.
+- Registration and login submissions are rate limited. Repeated attempts can
+  temporarily block further submissions.
+
+### Pilot Capacity
+
+The application currently enforces these limits:
+
+| Item | Limit |
+| --- | --- |
+| JSON files per upload submission | 5 |
+| Size of each file | 10 MiB |
+| Combined file size per submission | 25 MiB |
+| Data objects per submission | 100 |
+| JSON container depth | 100 |
+| Stored JSON per user | 50 MiB |
+| Upload attempts per user | 20 per hourly window |
+
+One MiB is 1,048,576 bytes. The per-user storage quota counts compact UTF-8 JSON,
+not the size of the original files. It is a limit on currently stored data, not
+a monthly allowance. Deleting your records frees your personal quota. Failed
+upload submissions also count toward the upload rate limit.
+
+The settings above are application limits, defined in
+[`config/settings.py`](config/settings.py). They are separate from the hosting
+providers' free plan limits. As of September 2026:
+
+- [Supabase Free](https://supabase.com/pricing) provides a 500 MB database shared
+  by the whole website. Accounts, indexes, and other database content use part of
+  this space. It is not 500 MB per user. The free project can pause after a week
+  of inactivity.
+- [Render Free](https://render.com/docs/free#spinning-down-on-idle) puts the web
+  service to sleep after 15 minutes without inbound traffic. The next visit can
+  show a loading page while the service starts, usually for about a minute.
+
+Keep uploads small even if your personal quota has not been reached. A full
+database can prevent uploads, registration, and other operations that need to
+write data.
 
 ## Current Scope
 
@@ -17,20 +86,30 @@ integration, or production AI features.
 - View compact detail pages with plots and mechanical boundary condition summaries.
 - Manage owned data in My Data.
 - Share private data with specific usernames.
-- Export accessible or owned selected data objects.
+- Export an individual data object or a selected list of accessible objects as JSON.
+
+Each valid data object becomes a separate `JSONData` record. The original
+uploaded file is not retained. An upload with both valid and invalid objects can
+save the valid objects and report errors for the others; a resource limit failure
+rejects the submission.
 
 ## Access Rules
 
 - Owners can always view and delete their own data.
-- Public data (`access_type: "all"`) can be found through Search.
+- Public data (`access_type: "all"`) can be found through Search by other signed-in users.
 - Private data (`access_type: "c"`) is only visible to the owner unless shared.
 - Shared private data is visible to explicitly listed users.
 - Permissions are enforced in Django views, not only hidden in templates.
 
+Here, public access refers to platform users, not anonymous browsing. Access
+settings do not grant a copyright license to reuse a dataset; check its rights
+metadata separately.
+
 ## Required JSON Fields
 
-Uploads currently validate required top-level fields only. Extra fields are
-allowed.
+Schema validation checks required top-level fields; extra fields are allowed.
+Required values cannot be null, blank strings, or empty lists or objects.
+Uploads also undergo resource, identifier, and sharing checks.
 
 Required fields include:
 
@@ -42,9 +121,26 @@ discretization_type, discretization_unit_size, discretization_count,
 mechanical_BC, phase, stress, total_strain, units
 ```
 
-Use `phase`, not `material`, unless the schema is explicitly changed later.
+Use `phase`, not `material`. Each `identifier` must be unique across stored
+records. See the [validation implementation](apps/dyn_api/helpers.py) for the
+current required fields.
 
-Sharing metadata uses usernames:
+The following examples show only the `shared_with` metadata. They are not complete
+upload files; the other required fields must also be present.
+
+For access by the owner only:
+
+```json
+{
+  "shared_with": [
+    {
+      "access_type": "c"
+    }
+  ]
+}
+```
+
+To share privately, use an existing platform username other than your own:
 
 ```json
 {
@@ -57,7 +153,7 @@ Sharing metadata uses usernames:
 }
 ```
 
-For public data:
+For public data, omit `username`:
 
 ```json
 {
@@ -71,51 +167,164 @@ For public data:
 
 ## Local Setup
 
-Create or update `.env` from `env.sample`:
+Python 3.12 is recommended to match the Render deployment. The application uses
+Django 5.2; exact dependency versions are pinned in
+[`requirements.txt`](requirements.txt).
+
+Clone this repository and open its directory. Create a virtual environment and
+install the dependencies:
+
+### Linux or macOS
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+### Windows PowerShell
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+### Development Configuration
+
+If `.env` does not already exist, create it from [`env.sample`](env.sample). Do not
+overwrite an existing configuration. Set a random secret key for your local
+installation in place of the placeholder:
 
 ```text
 DEBUG=True
 SECRET_KEY=<STRONG_KEY_HERE>
 ```
 
-Install dependencies and prepare the database:
+With `DEBUG=True`, the application uses the local `db.sqlite3` database. Cloud
+database settings are not needed for ordinary local development. Do not use
+`DEBUG=True` for a public deployment or commit `.env` to GitHub.
+
+Initialize the local database and start the development server:
+
+```bash
+.venv/bin/python manage.py migrate
+.venv/bin/python manage.py runserver 127.0.0.1:8001
+```
+
+On Windows, use:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py createsuperuser
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001
 ```
 
-Run the development server:
+Open [http://127.0.0.1:8001/](http://127.0.0.1:8001/) and create an ordinary account
+through the registration page. An administrator account is optional; create one
+locally with:
 
-```powershell
-.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+```bash
+.venv/bin/python manage.py createsuperuser
 ```
 
-Open:
+On Windows, replace `.venv/bin/python` with `.\.venv\Scripts\python.exe`.
 
-```text
-http://127.0.0.1:8000/
-```
+ORCID is optional for local development. It requires a client ID, client secret,
+and a registered redirect URI for the instance you are running. Do not reuse the
+hosted callback URL for a local server.
+
+## Hosted Deployment
+
+The pilot runs on Render with an external Supabase PostgreSQL database. See
+[`render.yaml`](render.yaml), [`build.sh`](build.sh), and the
+[public pilot operator runbook](docs/deployment/public-pilot.md) for environment
+variables, ORCID configuration, administrator setup, and deployment checks.
+
+Production requires `DEBUG=False`, a non-default secret key, and all required
+PostgreSQL connection settings. Keep database passwords and ORCID secrets in the
+deployment environment, not in repository files.
+
+The hosted service is configured to deploy commits pushed to `main`. Saving or
+committing locally does not update the website. After a push, wait for Render to
+finish deployment before checking the changes. The build installs dependencies,
+collects static files, and applies database migrations; it does not import local
+accounts or local data.
+
+Deployment does not require a public GitHub repository. Before making this
+repository public, review files and commit history for secrets and personal data,
+and read the license and third party notices below.
 
 ## Verification
 
-Run the core test suite:
+Run the test suite against Django's separate test database:
 
-```powershell
-.\.venv\Scripts\python.exe manage.py test
+```bash
+.venv/bin/python manage.py test
 ```
 
 Check migrations and Django configuration:
 
-```powershell
-.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
-.\.venv\Scripts\python.exe manage.py check
+```bash
+.venv/bin/python manage.py makemigrations --check --dry-run
+.venv/bin/python manage.py check
 ```
 
-## Near-Term Product Priorities
+Use the Windows interpreter path shown above when running these commands in
+PowerShell. Run these checks with local development settings, not production
+database credentials. The [operator runbook](docs/deployment/public-pilot.md#smoke-test-sequence)
+also describes manual registration, ORCID, upload, sharing, export, and persistence
+checks for the deployed website. Automated tests do not replace those checks.
+
+## Development Priorities
 
 1. Keep upload, validation, search, detail, access control, sharing, and export stable.
 2. Add only light microstructure visualization first, using a shared example object.
 3. Keep MimDat Studio as a workflow/local tool unless a small maintainable viewer is extracted.
 4. Treat ontology, knowledge graph, LLM assistant, and agent features as later enhancements.
+
+## Licenses
+
+The original software code and original modifications developed for FAIR
+Materials Data Platform are licensed under the **GNU Affero General Public
+License, version 3 only (AGPL-3.0-only)**. See [`LICENSE`](LICENSE) for the complete
+license text.
+
+The AGPL covers software used over a network as well as distributed copies.
+If you run a modified version of the covered software as a web service,
+section 13 requires an offer of its corresponding source code to users
+interacting with it. See [GNU's explanation](https://www.gnu.org/licenses/why-affero-gpl.html).
+
+The platform builds on Django Datta Able by App Generator (formerly AppSeed),
+with interface components by CodedThemes. Code and assets from other projects
+retain their own licenses and copyright notices; the AGPL declaration above
+does not relicense them or remove their conditions. In particular, the inherited
+AppSeed notice contains conditions beyond the standard MIT text. See
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the retained notices and
+their scope before redistributing bundled components.
+
+Uploaded datasets are separate from the platform's software: their `rights` and
+`rights_holder` metadata describe the supplied rights information. Making a record
+public in the application does not put it in the public domain or change its
+license. The software's AGPL license does not license uploaded data. Upload only
+data you have permission to store and share.
+
+## About
+
+FAIR Materials Data Platform supports the practical work of organizing materials
+simulation results: keeping data with its metadata, finding accessible records,
+and sharing selected results with other researchers. The current focus is a clear
+and usable research workflow, not a claim of FAIR certification or scientific
+validation.
+
+The application is built with Django, a Bootstrap interface, and a database JSON
+field for each data object. Development is maintained in
+[`JXRepo/database-manager-ui`](https://github.com/JXRepo/database-manager-ui).
+
+## Disclaimer
+
+This is experimental research software provided for testing and evaluation.
+Availability, data preservation, scientific correctness, and fitness for a
+particular purpose are not guaranteed. Keep independent copies of your files and
+validate results before relying on them in research or other decisions.
+
+Do not use the free pilot as the only copy of important data. Report problems to
+the maintainer without including passwords, API keys, personal information, or
+unpublished datasets in public reports or screenshots.
