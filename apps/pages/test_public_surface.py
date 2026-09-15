@@ -68,6 +68,26 @@ class PublicSurfaceTests(TestCase):
 
                 self.assertEqual(response.status_code, 200)
 
+    def test_registration_help_is_rendered_and_linked_to_inputs(self):
+        """
+        Show registration guidance and associate it with its input
+
+        Username and password guidance must be visible and available to
+        assistive technology when the registration page is rendered.
+        """
+        response = self.client.get(reverse("register"))
+        form = response.context["form"]
+
+        for field_name in ("username", "password1"):
+            with self.subTest(field=field_name):
+                field = form[field_name]
+                help_id = f"{field.auto_id}_helptext"
+
+                self.assertTrue(field.help_text)
+                self.assertContains(response, f'id="{help_id}"')
+                self.assertContains(response, f'aria-describedby="{help_id}"')
+                self.assertContains(response, field.help_text)
+
     def test_healthz_returns_ok_when_database_is_ready(self):
         """
         Health endpoint returns ok after a live database query succeeds
