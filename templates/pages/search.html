@@ -778,9 +778,6 @@
                     <input type="text" name="keywords" id="id_legacy_keywords" class="form-control" value="{{ keywords_value }}">
                   </div>
                 {% endif %}
-                {% if field_options_truncated %}
-                  <p class="text-muted small mb-2">The field list is limited to the first 500 fields.</p>
-                {% endif %}
                 <div id="dataFieldConditions" data-max-conditions="{{ max_conditions }}">
                   {% for row in condition_rows %}
                     <fieldset class="condition-row" data-condition-row>
@@ -790,7 +787,7 @@
                         <select name="condition_field" id="condition-{{ forloop.counter }}-field" class="form-select">
                           <option value="">Choose a field</option>
                           {% if row.field and not row.field_available %}
-                            <option value="{{ row.field }}" selected>{{ row.field_label }} (unavailable)</option>
+                            <option value="{{ row.field }}" selected>{{ row.field_label }} (previous selection)</option>
                           {% endif %}
                           {% for option in field_options %}
                             <option value="{{ option.value }}" {% if option.value == row.field %}selected{% endif %}>{{ option.label }}</option>

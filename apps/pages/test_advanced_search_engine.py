@@ -4,8 +4,7 @@ from unittest import TestCase
 from django.http import QueryDict
 
 from .advanced_search import (
-    discover_fields,
-    format_field_path,
+    DATA_FIELD_CHOICES,
     matches_conditions,
     parse_conditions,
 )
@@ -18,7 +17,7 @@ def condition_query(*rows):
     Parameters
     ----------
     *rows : tuple
-        Field JSON, operator, first value, and optional second value.
+        Field token or JSON path, operator, first value, and optional second value.
 
     Returns
     -------
@@ -57,6 +56,48 @@ class AdvancedSearchConditionTests(TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(rows[0]["field"], '["phase","Grain.Number","α β"]')
         self.assertTrue(matches_conditions({"phase": {"Grain.Number": {"α β": 100}}}, conditions))
+
+    def test_fixed_fields_keep_ronak_order_without_common_filters(self):
+        """
+        Present stable field choices even before any uploaded data exists
+        """
+        self.assertEqual(DATA_FIELD_CHOICES, (
+            ("Hash_Orientation", "Hash_Orientation"),
+            ("Texture_Type", "Texture_Type"),
+            ("Element_Number", "Element_Number"),
+            ("Grain_Number", "Grain_Number"),
+            ("Material_parameters", "Material_parameters (Whole array)"),
+            ("Load_Type", "Load_Type"),
+            ("Stress_Type", "Stress_Type"),
+            ("Load_Descriptor", "Load_Descriptor"),
+            ("Hash_load", "Hash_load"),
+            ("Scaling_Factor", "Scaling_Factor"),
+            ("Max_Total_Strain", "Max_Total_Strain"),
+        ))
+
+    def test_named_field_tokens_compile_without_becoming_json_paths(self):
+        """
+        Preserve fixed selection tokens while preparing named key matching
+        """
+        rows, conditions, errors = parse_conditions(condition_query(("Grain_Number", "contains", "150")))
+        self.assertEqual(errors, [])
+        self.assertEqual(rows[0]["field"], "Grain_Number")
+        self.assertEqual(conditions, [{"field_key": "Grain_Number", "operator": "contains", "value": "150"}])
+
+    def test_unknown_and_common_field_tokens_fail_closed(self):
+        """
+        Reject arbitrary named keys without dropping other submitted intent
+        """
+        for field in ("Grain_Number_Extra", "Unknown_Field", "Owner", "Abaqus-Version",
+                      "identifier", "creator", "software", "keywords"):
+            with self.subTest(field=field):
+                rows, conditions, errors = parse_conditions(condition_query(
+                    ("Grain_Number", "gt", "100"), (field, "contains", "steel"),
+                ))
+                self.assertTrue(errors)
+                self.assertEqual(conditions, [])
+                self.assertEqual(rows[1]["field"], field)
+                self.assertTrue(rows[1]["error"])
 
     def test_partial_rows_fail_without_discarding_form_values(self):
         """
@@ -311,54 +352,129 @@ class AdvancedSearchMatchingTests(TestCase):
             data = {"key": data}
         self.assertTrue(self.matches(data, (json.dumps(["key"] * 32), "eq", "2")))
 
+    def test_all_fixed_fields_match_at_the_root_and_inside_nested_arrays(self):
+        """
+        Find each Ronak key independently of its enclosing JSON structure
+        """
+        fields = (
+            "Hash_Orientation", "Texture_Type", "Element_Number",
+            "Grain_Number", "Material_parameters", "Load_Type", "Stress_Type",
+            "Load_Descriptor", "Hash_load", "Scaling_Factor", "Max_Total_Strain",
+        )
+        for field in fields:
+            for data in ({field: "TARGET"}, {"simulation": [{"phase": [{field: "TARGET"}]}]}):
+                with self.subTest(field=field, data=data):
+                    self.assertTrue(self.matches(data, (field, "exact", "target")))
 
-class AdvancedSearchFieldDiscoveryTests(TestCase):
-    """
-    Discover precise selectable paths from JSON data
-    """
+    def test_named_field_keys_ignore_case_but_not_suffixes_or_whitespace(self):
+        """
+        Match a complete stored key without treating it as a substring
+        """
+        row = ("Grain_Number", "gt", "100")
+        self.assertTrue(self.matches({"phase": [{"gRaIn_nUmBeR": 150}]}, row))
+        for data in ({"Grain_Number_Extra": 150}, {" Grain_Number ": 150}, {"Grain_Number": 50, "Other": 150}):
+            with self.subTest(data=data):
+                self.assertFalse(self.matches(data, row))
 
-    def test_discovery_traverses_arrays_and_skips_technical_fields(self):
+    def test_named_numeric_fields_keep_numeric_operators_and_precision(self):
         """
-        Expose numeric and textual leaves without metadata paths or indices
+        Compare named field scalars numerically rather than as ordered text
         """
-        data = {
-            "phase": [{"name": "steel", "Grain_Number": 12}, {"name": "copper"}],
-            "curve": [[1, 2], [3, 4]],
-            "keywords": ["a", "b"],
-            "flag": True,
-            "$schema": "schema.json",
-            " INPUT_PATH ": {"hidden": "path"},
-            "nested": {"results_path": "path", "visible": "text"},
-            "empty": [],
-            "missing": None,
-        }
-        self.assertEqual(set(discover_fields(data)), {
-            ("phase", "name"), ("phase", "Grain_Number"), ("curve",),
-            ("keywords",), ("flag",), ("nested", "visible"),
-        })
+        cases = (
+            ("eq", "2", "2.00", True), ("eq", "2", 3, False),
+            ("gt", "2", "10", True), ("gt", "2", 2, False),
+            ("gte", "2", 2, True), ("gte", "2", 1, False),
+            ("lt", "2", -1, True), ("lt", "2", 2, False),
+            ("lte", "2", 2, True), ("lte", "2", 10, False),
+            ("gt", "9007199254740992", 9007199254740993, True),
+        )
+        for operation, expected, value, matches in cases:
+            with self.subTest(operation=operation, value=value):
+                self.assertEqual(self.matches({"phase": [{"Grain_Number": value}]},
+                                              ("Grain_Number", operation, expected)), matches)
 
-    def test_paths_preserve_punctuation_and_format_readably(self):
+    def test_named_numeric_fields_ignore_boolean_null_and_nonnumeric_values(self):
         """
-        Keep literal dots and slashes as part of dictionary keys
+        Keep invalid numeric candidates from being coerced into a match
         """
-        self.assertEqual(set(discover_fields({"phase.key": {"a/b": 1}})), {("phase.key", "a/b")})
-        self.assertEqual(format_field_path(("phase", "Grain_Number")), "phase / Grain_Number")
+        values = (True, False, None, "NaN", "Infinity", float("nan"), float("inf"), "1_000", "150 GPa", {"value": 150})
+        for value in values:
+            with self.subTest(value=value):
+                self.assertFalse(self.matches({"Grain_Number": value}, ("Grain_Number", "gte", "0")))
 
-    def test_discovery_omits_paths_that_cannot_be_submitted(self):
+    def test_named_missing_and_null_fields_do_not_match_text(self):
         """
-        Avoid presenting overly long or invalid Unicode field keys
+        Avoid turning absent or null named fields into textual candidates
         """
-        self.assertEqual(set(discover_fields({"x" * 1024: 1, "\ud800": 2, "phase": "steel"})), {("phase",)})
+        for data in ({}, {"Grain_Number": None}, {"Grain_Number": ""}):
+            with self.subTest(data=data):
+                self.assertFalse(self.matches(data, ("Grain_Number", "contains", "none")))
 
-    def test_deep_json_is_bounded_for_discovery_and_matching(self):
+    def test_material_parameters_matches_whole_array_and_object_text(self):
         """
-        Stop excessive nesting while retaining ordinary fields nearby
+        Preserve Ronak text matching across complete material parameter values
+        """
+        self.assertTrue(self.matches({"phase": [{"Material_parameters": [1, 2, 3]}]},
+                                     ("Material_parameters", "contains", "[1, 2")))
+        self.assertTrue(self.matches({"Material_parameters": {"Elastic": [210000, 0.3]}},
+                                     ("Material_parameters", "contains", "elastic 210000")))
+        self.assertTrue(self.matches({"Material_parameters": [1, 2]},
+                                     ("Material_parameters", "exact", "[1, 2]")))
+
+    def test_named_ranges_require_one_array_scalar_within_both_bounds(self):
+        """
+        Evaluate numeric array entries without mixing bounds between values
+        """
+        row = ("Material_parameters", "between", "2", "8")
+        self.assertFalse(self.matches({"Material_parameters": [1, 9]}, row))
+        self.assertTrue(self.matches({"Material_parameters": [1, ["2"], 9]}, row))
+        self.assertTrue(self.matches({"phase": [{"Material_parameters": 8}]}, row))
+        self.assertFalse(self.matches({"phase": [{"Material_parameters": 1}, {"Material_parameters": 9}]}, row))
+
+    def test_named_conditions_are_combined_with_and(self):
+        """
+        Require every fixed field condition to match the same data object
+        """
+        rows = (("Grain_Number", "gt", "100"), ("Texture_Type", "exact", "random"))
+        self.assertTrue(self.matches({"Grain_Number": 150, "phase": {"Texture_Type": "random"}}, *rows))
+        self.assertFalse(self.matches({"Grain_Number": 150, "Texture_Type": "aligned"}, *rows))
+
+    def test_legacy_paths_remain_precise_when_the_same_named_field_exists_elsewhere(self):
+        """
+        Keep saved explicit paths separate from recursive named field matching
+        """
+        data = {"phase": [{"Grain_Number": 50}], "other": {"Grain_Number": 150}}
+        self.assertTrue(self.matches(data, ("Grain_Number", "gt", "100")))
+        self.assertFalse(self.matches(data, ('["phase","Grain_Number"]', "gt", "100")))
+        self.assertFalse(self.matches({"phase": {"grain_number": 150}},
+                                      ('["phase","Grain_Number"]', "gt", "100")))
+
+    def test_named_field_traversal_stops_after_the_supported_depth(self):
+        """
+        Keep the depth boundary inclusive without unbounded key discovery
+        """
+        data = {"Grain_Number": 150}
+        for index in range(31):
+            data = {"nested": data}
+        self.assertTrue(self.matches(data, ("Grain_Number", "gt", "100")))
+        self.assertFalse(self.matches({"nested": data}, ("Grain_Number", "gt", "100")))
+
+    def test_named_contains_treats_regex_punctuation_as_literal_text(self):
+        """
+        Keep search values literal even when they resemble regular expressions
+        """
+        row = ("Load_Descriptor", "contains", ".*")
+        self.assertFalse(self.matches({"Load_Descriptor": "tension"}, row))
+        self.assertTrue(self.matches({"Load_Descriptor": "literal .* pattern"}, row))
+
+    def test_legacy_path_matching_stops_after_the_supported_depth(self):
+        """
+        Keep legacy path evaluation bounded when arrays are deeply nested
         """
         nested = "steel"
         for index in range(40):
             nested = [nested]
         data = {"deep": nested, "phase": "steel"}
-        self.assertEqual(set(discover_fields(data)), {("phase",)})
         rows, conditions, errors = parse_conditions(condition_query(('["deep"]', "exact", "steel")))
         self.assertEqual(errors, [])
         self.assertFalse(matches_conditions(data, conditions))

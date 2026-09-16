@@ -15,8 +15,8 @@ function conditionRow() {
     <label data-condition-label="field">Data field</label>
     <select name="condition_field">
       <option value="">Choose a field</option>
-      <option value='["phase","Grain_Number"]'>phase / Grain_Number</option>
-      <option value='["metadata","title"]'>metadata / title</option>
+      <option value="Grain_Number">Grain_Number</option>
+      <option value="Load_Type">Load_Type</option>
     </select>
     <label data-condition-label="operator">Match</label>
     <select name="condition_operator">
@@ -213,7 +213,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
 
   test('removing the final condition leaves one clean optional row', async t => {
     const evaluate = await page(t, `
-      document.querySelector('[name="condition_field"]').value = '["phase","Grain_Number"]';
+      document.querySelector('[name="condition_field"]').value = 'Grain_Number';
       document.querySelector('[name="condition_value"]').value = '20';
       document.querySelector('[data-condition-error]').textContent = 'Invalid value';
     `);
@@ -251,7 +251,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
 
   test('an unexpected upper bound stays editable until the user clears it', async t => {
     const evaluate = await page(t, `
-      document.querySelector('[name="condition_field"]').value = '["metadata","title"]';
+      document.querySelector('[name="condition_field"]').value = 'Load_Type';
       document.querySelector('[name="condition_value"]').value = 'steel';
       document.querySelector('[name="condition_value_to"]').value = '10';
       const error = document.querySelector('[data-condition-error]');
@@ -277,7 +277,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
         values: [...new FormData(document.querySelector('form')).values()]};
     })()`);
     assert.deepEqual(cleared, {hidden: true,
-      values: ['["metadata","title"]', 'contains', 'steel', '']});
+      values: ['Load_Type', 'contains', 'steel', '']});
   });
 
   test('browser validation opens collapsed controls so an incomplete row can be corrected', async t => {

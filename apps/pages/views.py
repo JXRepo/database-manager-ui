@@ -27,9 +27,8 @@ from numbers import Number
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .advanced_search import (
+    DATA_FIELD_CHOICES,
     MAX_CONDITIONS,
-    discover_fields,
-    format_field_path,
     matches_conditions,
     parse_conditions,
 )
@@ -2182,8 +2181,8 @@ def search_view(request):
     """
     Search accessible records using common metadata and optional field conditions
 
-    Field suggestions and results use the same permission scope. Invalid
-    conditions leave the form editable without returning broader results.
+    Preset data fields are available independently of uploaded records. Results
+    respect access permissions, and invalid conditions never broaden a search.
 
     Parameters
     ----------
@@ -2193,7 +2192,7 @@ def search_view(request):
     Returns
     -------
     HttpResponse
-        Search form, accessible field choices, and matching records.
+        Search form, preset field choices, and matching accessible records.
     """
     keyword = request.GET.get("keyword", "").strip()
     title = request.GET.get("title", "").strip()
@@ -2239,9 +2238,6 @@ def search_view(request):
     }
 
     filtered_objects = []
-    field_paths = set()
-    max_field_options = 500
-    field_options_truncated = False
     data_objects = (
         JSONData.objects
         .filter(Q(owner=request.user) | Q(access_type="all") | Q(shared_users=request.user))
@@ -2250,20 +2246,11 @@ def search_view(request):
         .prefetch_related("shared_users")
         .order_by("-uploaded_at")
     )
+    if not search_performed or search_errors:
+        data_objects = data_objects.none()
 
     for obj in data_objects:
         data = obj.data if isinstance(obj.data, dict) else {}
-        if not field_options_truncated:
-            for path in discover_fields(data):
-                if path in field_paths:
-                    continue
-                if len(field_paths) >= max_field_options:
-                    field_options_truncated = True
-                    break
-                field_paths.add(path)
-
-        if not search_performed or search_errors:
-            continue
 
         specifically_shared = (
             obj.owner_id != request.user.id
@@ -2313,11 +2300,7 @@ def search_view(request):
         filtered_objects.append(_prepare_list_object(obj))
 
     field_options = [
-        {
-            "value": json.dumps(path, ensure_ascii=False, separators=(",", ":")),
-            "label": format_field_path(path),
-        }
-        for path in sorted(field_paths, key=lambda path: (format_field_path(path).casefold(), path))
+        {"value": value, "label": label} for value, label in DATA_FIELD_CHOICES
     ]
     option_labels = {option["value"]: option["label"] for option in field_options}
     for row in condition_rows:
@@ -2342,7 +2325,6 @@ def search_view(request):
         "advanced_open": advanced_open,
         "condition_rows": condition_rows,
         "field_options": field_options,
-        "field_options_truncated": field_options_truncated,
         "search_errors": search_errors,
         "max_conditions": MAX_CONDITIONS,
     }

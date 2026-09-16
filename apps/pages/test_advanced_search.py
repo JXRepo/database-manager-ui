@@ -30,6 +30,7 @@ class AdvancedSearchTests(TestCase):
                 "software": "Abaqus CAE",
                 "keywords": ["crystal", "plasticity"],
                 "phase": [{"phase_identifier": "Copper", "Grain_Number": 150}],
+                "simulation": {"Load_Type": "tension"},
             },
         )
         cls.public = JSONData.objects.create(
@@ -72,7 +73,7 @@ class AdvancedSearchTests(TestCase):
         Compare numeric values while keeping private records out of results
         """
         response = self.client.get(reverse("search"), {
-            "condition_field": '["phase","Grain_Number"]',
+            "condition_field": "Grain_Number",
             "condition_operator": "between",
             "condition_value": "100",
             "condition_value_to": "200",
@@ -85,16 +86,19 @@ class AdvancedSearchTests(TestCase):
 
     def test_common_filters_omit_redundant_keywords_input(self):
         """
-        Keep keywords available as a data field without a permanent extra input
+        Avoid repeating common metadata in the fixed parameter menu
         """
         response = self.client.get(reverse("search"))
         self.assertNotContains(response, '<input type="text" name="keywords"')
         for field in ("identifier", "creator", "software", "phase", "owner", "access", "title"):
             self.assertContains(response, f'name="{field}"')
-        self.assertIn(
-            '["keywords"]',
-            [option["value"] for option in response.context["field_options"]],
-        )
+        field_values = [option["value"] for option in response.context["field_options"]]
+        for field in (
+            "identifier", "creator", "software", "phase", "owner", "access",
+            "title", "keywords", "Abaqus-Version", "software_version",
+        ):
+            self.assertNotIn(field, field_values)
+            self.assertNotIn(json.dumps([field]), field_values)
 
     def test_legacy_keyword_filter_stays_visible_and_editable(self):
         """
@@ -108,16 +112,16 @@ class AdvancedSearchTests(TestCase):
             [obj.pk for obj in response.context["data_objects"]], [self.own.pk]
         )
 
-    def test_basic_common_and_dynamic_conditions_all_apply(self):
+    def test_basic_common_and_field_conditions_all_apply(self):
         """
         Require all kinds of conditions to match the same accessible record
         """
         response = self.client.get(reverse("search"), {
             "keyword": "copper experiment",
             "creator": "ICAMS Ronak",
-            "condition_field": ['["phase","Grain_Number"]', '["software"]'],
+            "condition_field": ["Grain_Number", "Load_Type"],
             "condition_operator": ["gt", "exact"],
-            "condition_value": ["100", "ABAQUS CAE"],
+            "condition_value": ["100", "TENSION"],
             "condition_value_to": ["", ""],
         })
         self.assertEqual(
@@ -143,32 +147,33 @@ class AdvancedSearchTests(TestCase):
                 })
                 self.assertFalse(response.context["data_objects"])
 
-    def test_field_choices_include_only_accessible_data(self):
+    def test_field_choices_do_not_disclose_custom_json_fields(self):
         """
         Exclude private field names even before a search is submitted
         """
         response = self.client.get(reverse("search"))
-        paths = [json.loads(option["value"]) for option in response.context["field_options"]]
-        self.assertIn(["phase", "Grain_Number"], paths)
-        self.assertIn(["shared_only_field"], paths)
-        self.assertNotIn(["private_secret_field"], paths)
+        fields = [option["value"] for option in response.context["field_options"]]
+        self.assertIn("Grain_Number", fields)
+        self.assertNotIn("shared_only_field", fields)
+        self.assertNotIn("private_secret_field", fields)
         self.assertNotContains(response, "private_secret_field")
         self.assertFalse(response.context["search_performed"])
 
-    def test_revoked_share_disappears_from_choices_and_results(self):
+    def test_revoked_share_disappears_from_results(self):
         """
-        Recheck permissions instead of caching another user's field names
+        Keep the fixed catalog while rechecking result permissions
         """
         self.shared.shared_users.remove(self.viewer)
         response = self.client.get(reverse("search"), {
-            "condition_field": '["shared_only_field"]',
-            "condition_operator": "contains",
-            "condition_value": "visible",
+            "condition_field": "Grain_Number",
+            "condition_operator": "eq",
+            "condition_value": "175",
             "condition_value_to": "",
         })
         self.assertFalse(response.context["data_objects"])
-        self.assertNotIn(
-            '["shared_only_field"]',
+        self.assertFalse(response.context["search_errors"])
+        self.assertIn(
+            "Grain_Number",
             [option["value"] for option in response.context["field_options"]],
         )
 
@@ -288,7 +293,7 @@ class AdvancedSearchTests(TestCase):
         })
         row = response.context["condition_rows"][0]
         self.assertEqual(row["field"], '["phase","Grain_Number"]')
-        self.assertTrue(row["field_available"])
+        self.assertFalse(row["field_available"])
         self.assertEqual(
             [obj.pk for obj in response.context["data_objects"]], [self.own.pk]
         )
@@ -320,3 +325,59 @@ class AdvancedSearchTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["search_errors"])
         self.assertFalse(response.context["data_objects"])
+
+    def test_fixed_fields_are_available_without_accessible_records(self):
+        """
+        Show Ronak's parameter choices before the user uploads any data
+        """
+        newcomer = User.objects.create_user(username="new_search_viewer")
+        self.client.force_login(newcomer)
+        self.public.access_type = "c"
+        self.public.save(update_fields=["access_type"])
+        response = self.client.get(reverse("search"))
+        self.assertEqual(
+            [option["value"] for option in response.context["field_options"]],
+            [
+                "Hash_Orientation", "Texture_Type",
+                "Element_Number", "Grain_Number", "Material_parameters",
+                "Load_Type", "Stress_Type", "Load_Descriptor", "Hash_load",
+                "Scaling_Factor", "Max_Total_Strain",
+            ],
+        )
+        self.assertFalse(response.context["search_performed"])
+
+    def test_missing_fixed_field_returns_no_matches_not_a_form_error(self):
+        """
+        Allow selecting a supported parameter absent from the current records
+        """
+        response = self.client.get(reverse("search"), {
+            "condition_field": "Texture_Type",
+            "condition_operator": "contains",
+            "condition_value": "random",
+            "condition_value_to": "",
+        })
+        self.assertFalse(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])
+        self.assertTrue(response.context["condition_rows"][0]["field_available"])
+
+    def test_legacy_path_search_does_not_broaden_to_other_locations(self):
+        """
+        Preserve exact paths in bookmarked searches after changing the dropdown
+        """
+        self.own.data["other"] = {"Grain_Number": 400}
+        self.own.save(update_fields=["data"])
+        params = {
+            "condition_field": '["phase","Grain_Number"]',
+            "condition_operator": "eq",
+            "condition_value": "400",
+            "condition_value_to": "",
+        }
+        response = self.client.get(reverse("search"), params)
+        self.assertFalse(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])
+        params["condition_field"] = "Grain_Number"
+        response = self.client.get(reverse("search"), params)
+        self.assertFalse(response.context["search_errors"])
+        self.assertEqual(
+            [obj.pk for obj in response.context["data_objects"]], [self.own.pk]
+        )

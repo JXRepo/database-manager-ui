@@ -124,14 +124,20 @@ The main search box and common Advanced Search fields require every word you
 enter to appear in the matching record or selected field. Word order and letter
 case do not matter. These are text matches, not a semantic search.
 
-In **Advanced Search**, **Common filters** provides frequently used fields.
-Use **Data field filters** to choose a field from accessible records, select a
-comparison, and enter a value. You can add up to
-10 conditions. All conditions, common fields, and the main search box must match
-the same data object.
+In **Advanced Search**, **Common filters** provides Identifier, Creator, Software,
+Phase, Owner, Access, and Title. **Data field filters** uses preset simulation
+parameters from [Ronak Shoghi's DatabaseManager](https://github.com/Ronakshoghi/DatabaseManager):
+`Hash_Orientation`, `Texture_Type`, `Element_Number`, `Grain_Number`,
+`Material_parameters` (whole array), `Load_Type`, `Stress_Type`, `Load_Descriptor`,
+`Hash_load`, `Scaling_Factor`, and `Max_Total_Strain`. Common metadata such as
+owner and software version is not included in this menu.
 
-Metadata keywords are included in the main search. To target only keywords,
-choose `keywords` under **Data field filters**. Existing bookmarked URLs with
+Choose a parameter, comparison, and value. You can add up to 10 conditions.
+All conditions, common fields, and the main search box must match the same data
+object. The preset choices are available even before any data is uploaded;
+records missing the selected field do not match.
+
+Metadata keywords are included in the main search. Existing bookmarked URLs with
 the older `keywords` parameter keep an editable Keywords input while it is active.
 
 - **Contains words** requires all entered words in the selected field.
@@ -140,19 +146,20 @@ the older `keywords` parameter keep an editable Keywords input while it is activ
   and **Between** with both endpoints included. Numeric strings are accepted;
   booleans and values containing units are not treated as numbers. Use the units
   stored in the record; search does not convert units.
-- Field labels show the full location, such as `phase / Grain_Number`. Arrays
-  are searched without entering an index. A numeric comparison or range must
+- A preset parameter matches that complete JSON key at any nesting level,
+  ignoring letter case. Arrays are searched without entering an index; text
+  searches also support the whole array. A numeric comparison or range must
   match one value. Separate conditions can match different entries within the
-  same data object.
+  same data object. Existing bookmarked field paths keep their exact location.
 - Invalid or incomplete conditions show an error and do not run a broader search.
 - **Clear** resets the search. Submitted conditions remain in the URL, so browser
   refresh and bookmarks preserve them. Do not put secrets in search terms.
 
-Field suggestions and results only include records you own, public records, and
-private records explicitly shared with you. **Live Data Objects** remains a
+Results only include records you own, public records, and private records
+explicitly shared with you. **Live Data Objects** remains a
 separate feed of the latest accessible uploads; it is not filtered by the form.
-The field list shows up to 500 distinct paths. This pilot searches stored JSON in
-the application; it is not intended for large scale indexed search.
+This pilot searches stored JSON in the application; it is not intended for large
+scale indexed search.
 
 ## Access Rules
 

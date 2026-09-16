@@ -1,5 +1,5 @@
 """
-Validate and evaluate bounded conditions against exact JSON field paths
+Validate and evaluate bounded conditions against named JSON fields or paths
 """
 
 import json
@@ -12,6 +12,20 @@ MAX_CONDITIONS = 10
 MAX_PATH_LENGTH = 1024
 MAX_VALUE_LENGTH = 200
 MAX_DEPTH = 32
+DATA_FIELD_CHOICES = (
+    ("Hash_Orientation", "Hash_Orientation"),
+    ("Texture_Type", "Texture_Type"),
+    ("Element_Number", "Element_Number"),
+    ("Grain_Number", "Grain_Number"),
+    ("Material_parameters", "Material_parameters (Whole array)"),
+    ("Load_Type", "Load_Type"),
+    ("Stress_Type", "Stress_Type"),
+    ("Load_Descriptor", "Load_Descriptor"),
+    ("Hash_load", "Hash_load"),
+    ("Scaling_Factor", "Scaling_Factor"),
+    ("Max_Total_Strain", "Max_Total_Strain"),
+)
+DATA_FIELD_KEYS = {key for key, label in DATA_FIELD_CHOICES}
 TECHNICAL_KEYS = {"$schema", "input_path", "results_path"}
 NUMERIC_OPERATORS = {
     "eq": operator.eq,
@@ -77,6 +91,8 @@ def _parse_row(row):
     """
     Validate a single condition and prepare comparison values
 
+    Fixed tokens select named keys, while existing JSON paths remain precise.
+
     Parameters
     ----------
     row : dict
@@ -85,7 +101,7 @@ def _parse_row(row):
     Returns
     -------
     dict
-        Exact path and comparison values for evaluation.
+        Named key or exact path and comparison values for evaluation.
 
     Raises
     ------
@@ -96,15 +112,19 @@ def _parse_row(row):
         raise ValueError("Choose a data field.")
     if len(row["field"]) > MAX_PATH_LENGTH:
         raise ValueError(f"The field path must be at most {MAX_PATH_LENGTH} characters.")
-    try:
-        path = json.loads(row["field"])
-    except (ValueError, RecursionError):
-        raise ValueError("Choose a valid data field.") from None
-    if not isinstance(path, list) or not path or len(path) > MAX_DEPTH:
-        raise ValueError("Choose a valid data field.")
-    if not all(_searchable_key(key) for key in path):
-        raise ValueError("Choose a valid data field.")
-    row["field"] = json.dumps(path, ensure_ascii=False, separators=(",", ":"))
+    if row["field"] in DATA_FIELD_KEYS:
+        condition = {"field_key": row["field"]}
+    else:
+        try:
+            path = json.loads(row["field"])
+        except (ValueError, RecursionError):
+            raise ValueError("Choose a valid data field.") from None
+        if not isinstance(path, list) or not path or len(path) > MAX_DEPTH:
+            raise ValueError("Choose a valid data field.")
+        if not all(_searchable_key(key) for key in path):
+            raise ValueError("Choose a valid data field.")
+        row["field"] = json.dumps(path, ensure_ascii=False, separators=(",", ":"))
+        condition = {"path": tuple(path)}
     operation = row["operator"]
     if operation not in OPERATORS:
         raise ValueError("Choose a valid comparison operator.")
@@ -117,7 +137,7 @@ def _parse_row(row):
     if operation != "between" and upper:
         raise ValueError("An upper value is only allowed for a numeric range.")
 
-    condition = {"path": tuple(path), "operator": operation}
+    condition["operator"] = operation
     if operation in {"contains", "exact"}:
         condition["value"] = value.casefold()
         return condition
@@ -185,60 +205,6 @@ def parse_conditions(query):
     return rows, [] if errors else conditions, errors
 
 
-def _walk_fields(data, path, depth, seen):
-    """
-    Yield each usable leaf path once while bounding recursion
-
-    Parameters
-    ----------
-    data : object
-        Current JSON value.
-    path : tuple of str
-        Dictionary keys traversed so far.
-    depth : int
-        Current nesting depth, including arrays.
-    seen : set
-        Paths already yielded for this object.
-
-    Yields
-    ------
-    tuple of str
-        Unique selectable scalar paths.
-    """
-    if depth > MAX_DEPTH:
-        return
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if _searchable_key(key):
-                yield from _walk_fields(value, path + (key,), depth + 1, seen)
-    elif isinstance(data, list):
-        for value in data:
-            if path in seen and not isinstance(value, (dict, list)):
-                continue
-            yield from _walk_fields(value, path, depth + 1, seen)
-    elif data is not None and path and path not in seen:
-        if len(json.dumps(path, ensure_ascii=False, separators=(",", ":"))) <= MAX_PATH_LENGTH:
-            seen.add(path)
-            yield path
-
-
-def discover_fields(data):
-    """
-    Discover scalar field paths in stored JSON
-
-    Parameters
-    ----------
-    data : object
-        Stored JSON value.
-
-    Returns
-    -------
-    iterable of tuple
-        Paths containing literal dictionary keys and no array indices.
-    """
-    return _walk_fields(data, (), 0, set())
-
-
 def _field_values(data, path, depth=0):
     """
     Yield scalars at an exact path with transparent array traversal
@@ -269,25 +235,66 @@ def _field_values(data, path, depth=0):
         yield data
 
 
+def _named_field_values(data, field_key, depth=0):
+    """
+    Yield values whose complete dictionary key matches a selected field
+
+    Containers remain available for text matching. Array scalars also remain
+    separate candidates for numeric comparisons.
+
+    Parameters
+    ----------
+    data : object
+        Current JSON value.
+    field_key : str
+        Selected key with case folding already applied.
+    depth : int, optional
+        Current nesting depth, including arrays.
+
+    Yields
+    ------
+    object
+        Nonnull matching values and their array scalars.
+    """
+    if depth >= MAX_DEPTH:
+        return
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if key.casefold() == field_key:
+                if isinstance(value, (dict, list)):
+                    yield value
+                yield from _field_values(value, (), depth + 1)
+            yield from _named_field_values(value, field_key, depth + 1)
+    elif isinstance(data, list):
+        for value in data:
+            yield from _named_field_values(value, field_key, depth + 1)
+
+
 def _matches_condition(data, condition):
     """
-    Evaluate one prepared comparison against scalar candidates
+    Evaluate one prepared comparison against matching field values
+
+    Named fields include complete containers for text matching. Explicit paths
+    retain their existing scalar matching rules.
 
     Parameters
     ----------
     data : object
         Stored JSON value.
     condition : dict
-        Validated path, operator, and comparison values.
+        Validated field selector, operator, and comparison values.
 
     Returns
     -------
     bool
-        Whether the condition matches any appropriate scalar candidates.
+        Whether the condition matches appropriate candidates.
     """
     operation = condition["operator"]
     expected = condition["value"]
-    values = _field_values(data, condition["path"])
+    if "field_key" in condition:
+        values = _named_field_values(data, condition["field_key"].casefold())
+    else:
+        values = _field_values(data, condition["path"])
     if operation == "contains":
         remaining = set(expected.split())
         for value in values:
@@ -327,20 +334,3 @@ def matches_conditions(data, conditions):
         Whether every condition matches.
     """
     return all(_matches_condition(data, condition) for condition in conditions)
-
-
-def format_field_path(path):
-    """
-    Format exact field keys as a readable path label
-
-    Parameters
-    ----------
-    path : tuple of str
-        Literal JSON dictionary keys.
-
-    Returns
-    -------
-    str
-        Human readable field label.
-    """
-    return " / ".join(path)
