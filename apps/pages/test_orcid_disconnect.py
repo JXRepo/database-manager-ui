@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from urllib.parse import urlsplit
 
 from .forms import AccountSettingsForm
 from .models import AccountProfile, JSONData
@@ -89,17 +90,19 @@ class ORCIDDisconnectTests(TestCase):
 
     def test_orcid_only_account_opens_username_and_password_setup(self):
         """
-        Offer credential setup instead of a direct destructive submit
+        Immediately require credentials before exposing account settings
         """
         self._use_orcid_only_account()
 
-        response = self.client.get(reverse("account_settings"))
+        response = self.client.get(reverse("account_settings"), follow=True)
 
-        self.assertContains(response, 'data-bs-target="#orcidSetupModal"')
+        self.assertTemplateUsed(response, "accounts/orcid_setup.html")
+        self.assertContains(response, 'id="orcidSetupModal"')
         self.assertContains(response, 'name="orcid_setup-username"')
         self.assertContains(response, 'name="orcid_setup-password1"')
         self.assertContains(response, 'name="orcid_setup-password2"')
         self.assertNotContains(response, 'form="orcid-disconnect-form"')
+        self.assertEqual(response.context["orcid_setup_form"]["username"].value(), "")
 
     def test_disconnect_preserves_account_data_and_local_login(self):
         """
@@ -149,7 +152,8 @@ class ORCIDDisconnectTests(TestCase):
 
         response = self.client.post(self.disconnect_url, {"orcid": self.orcid})
 
-        self.assertRedirects(response, reverse("account_settings"))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlsplit(response.url).path, self.setup_url)
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.authenticated_orcid, self.orcid)
         self.assertIsNone(self.profile.orcid_disconnected_at)
@@ -201,7 +205,7 @@ class ORCIDDisconnectTests(TestCase):
         for url in (self.disconnect_url, self.setup_url):
             with self.subTest(url=url):
                 response = self.client.get(url)
-                self.assertEqual(response.status_code, 405)
+                self.assertEqual(response.status_code, 405 if url == self.disconnect_url else 302)
                 protected_client = Client(enforce_csrf_checks=True)
                 protected_client.force_login(self.user)
                 response = protected_client.post(url, {"orcid": self.orcid})
@@ -213,18 +217,19 @@ class ORCIDDisconnectTests(TestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.authenticated_orcid, self.orcid)
 
-    def test_setup_updates_same_account_then_asks_before_disconnecting(self):
+    def test_setup_updates_same_account_then_allows_direct_disconnect(self):
         """
-        Save credentials without unlinking and require a separate yes action
+        Finish onboarding without unlinking or asking a disconnect question
         """
         self._use_orcid_only_account()
 
         response = self.client.post(self.setup_url, self._setup_data(), follow=True)
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.redirect_chain[-1][0], reverse("search"))
         self.assertContains(response, "Username and password set successfully.")
-        self.assertTrue(response.context["show_orcid_disconnect_confirmation"])
-        self.assertContains(response, "Continue disconnecting ORCID?")
+        self.assertNotContains(response, "Continue disconnecting ORCID?")
+        self.assertNotIn("orcid_disconnect_confirmation", self.client.session)
         self.user.refresh_from_db()
         self.profile.refresh_from_db()
         self.assertEqual(self.user.username, "chosen-researcher")
@@ -246,9 +251,9 @@ class ORCIDDisconnectTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(self.client.session[SESSION_KEY], str(self.user.pk))
 
-    def test_declining_confirmation_keeps_credentials_and_orcid(self):
+    def test_completed_setup_does_not_prompt_again_or_disconnect(self):
         """
-        Closing the confirmation performs no unlink and does not undo setup
+        Keep credentials and ORCID connected without repeating the setup modal
         """
         self._use_orcid_only_account()
         self.client.post(self.setup_url, self._setup_data(), follow=True)
@@ -256,7 +261,9 @@ class ORCIDDisconnectTests(TestCase):
         response = self.client.get(reverse("account_settings"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertFalse(response.context["show_orcid_disconnect_confirmation"])
+        self.assertNotContains(response, 'id="orcidSetupModal"')
+        self.assertNotContains(response, 'id="orcidDisconnectConfirmationModal"')
+        self.assertRedirects(self.client.get(self.setup_url), reverse("search"))
         self.user.refresh_from_db()
         self.profile.refresh_from_db()
         self.assertTrue(self.user.has_usable_password())
@@ -286,9 +293,9 @@ class ORCIDDisconnectTests(TestCase):
         self.assertTrue(self.user.check_password("Quartz!Mosaic72River"))
         self.assertIsNone(self.profile.authenticated_orcid)
 
-    def test_invalid_setup_keeps_profile_form_on_its_own_endpoint(self):
+    def test_invalid_setup_does_not_expose_profile_management(self):
         """
-        Keep profile edits working after the setup modal reports an error
+        Keep incomplete accounts in onboarding instead of account management
         """
         self._use_orcid_only_account()
 
@@ -296,10 +303,12 @@ class ORCIDDisconnectTests(TestCase):
             self.setup_url, self._setup_data(**{"orcid_setup-username": "has space"})
         )
 
-        self.assertContains(
+        self.assertNotContains(
             response,
             f'<form method="post" action="{reverse("account_settings")}" novalidate>',
         )
+        self.assertTemplateUsed(response, "accounts/orcid_setup.html")
+        self.assertNotContains(response, self.disconnect_url)
 
     def test_invalid_setup_keeps_modal_open_and_leaves_credentials_unchanged(self):
         """
@@ -308,6 +317,7 @@ class ORCIDDisconnectTests(TestCase):
         self._use_orcid_only_account()
         User.objects.create_user(username="already-taken")
         cases = (
+            ({"orcid_setup-username": ""}, "username"),
             ({"orcid_setup-username": "ALREADY-TAKEN"}, "username"),
             ({"orcid_setup-username": "has space"}, "username"),
             ({"orcid_setup-password1": "123", "orcid_setup-password2": "123"}, "password2"),
@@ -317,7 +327,7 @@ class ORCIDDisconnectTests(TestCase):
             with self.subTest(field=field, overrides=overrides):
                 response = self.client.post(self.setup_url, self._setup_data(**overrides))
                 self.assertEqual(response.status_code, 200)
-                self.assertTrue(response.context["show_orcid_setup"])
+                self.assertTemplateUsed(response, "accounts/orcid_setup.html")
                 form = response.context["orcid_setup_form"]
                 self.assertIn(field, form.errors)
                 self.assertContains(response, str(form.errors[field][0]))
@@ -333,7 +343,7 @@ class ORCIDDisconnectTests(TestCase):
         """
         response = self.client.post(self.setup_url, self._setup_data())
 
-        self.assertRedirects(response, reverse("account_settings"))
+        self.assertRedirects(response, reverse("search"))
         self.user.refresh_from_db()
         self.assertEqual(self.user.username, "local-researcher")
         self.assertTrue(self.user.check_password("Quartz!Mosaic72River"))
@@ -346,10 +356,71 @@ class ORCIDDisconnectTests(TestCase):
         response = self.client.post(
             self.setup_url, self._setup_data(orcid="0000-0002-1694-233X")
         )
-        self.assertRedirects(response, reverse("account_settings"))
+        self.assertRedirects(response, self.setup_url)
         self.profile.authenticated_orcid = None
         self.profile.save(update_fields=["authenticated_orcid"])
         response = self.client.post(self.setup_url, self._setup_data())
-        self.assertRedirects(response, reverse("account_settings"))
+        self.assertEqual(response.status_code, 403)
         self.user.refresh_from_db()
         self.assertFalse(self.user.has_usable_password())
+
+    def test_setup_get_does_not_change_username_password_or_connection(self):
+        """
+        Display required fields without saving generated or partial credentials
+        """
+        self._use_orcid_only_account()
+
+        response = self.client.get(self.setup_url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/orcid_setup.html")
+        self.user.refresh_from_db()
+        self.profile.refresh_from_db()
+        self.assertEqual(self.user.username, "orcid_0000000214512715")
+        self.assertFalse(self.user.has_usable_password())
+        self.assertEqual(self.profile.authenticated_orcid, self.orcid)
+
+    def test_setup_returns_to_the_requested_local_page(self):
+        """
+        Retain the local destination after the required credentials are saved
+        """
+        self._use_orcid_only_account()
+        next_url = reverse("json_data_list") + "?page=1"
+
+        response = self.client.post(self.setup_url, self._setup_data(next=next_url))
+
+        self.assertRedirects(response, next_url)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, "chosen-researcher")
+
+    def test_setup_rejects_external_or_incomplete_return_urls(self):
+        """
+        Keep the browser on this website after submitting an untrusted next URL
+        """
+        self._use_orcid_only_account()
+        for next_url in (
+            "https://outside.example/", "//outside.example/", "javascript:alert(1)",
+            "not-a-route", "#section", "?page=1",
+        ):
+            with self.subTest(next_url=next_url):
+                response = self.client.get(self.setup_url, {"next": next_url})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["next_url"], reverse("search"))
+
+        response = self.client.post(
+            self.setup_url, self._setup_data(next="https://outside.example/")
+        )
+        self.assertRedirects(response, reverse("search"))
+
+    def test_setup_handles_a_bare_return_target_without_rolling_back_credentials(self):
+        """
+        Treat malformed return targets as search rather than Django route names
+        """
+        self._use_orcid_only_account()
+
+        response = self.client.post(self.setup_url, self._setup_data(next="not-a-route"))
+
+        self.assertRedirects(response, reverse("search"))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, "chosen-researcher")
+        self.assertTrue(self.user.check_password("Quartz!Mosaic72River"))

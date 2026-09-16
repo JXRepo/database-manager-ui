@@ -2,6 +2,7 @@ import math
 import re
 import secrets
 from dataclasses import dataclass
+from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
@@ -10,9 +11,11 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError, transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 
+from .middleware import requires_orcid_account_setup
 from .models import AccountProfile
 
 
@@ -174,6 +177,7 @@ def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
     HttpResponse
         Local redirect after login or a controlled refusal.
     """
+    next_url = _sanitize_next_url(request, next_url)
     identity_profile = (
         AccountProfile.objects.select_related("user")
         .filter(authenticated_orcid=orcid)
@@ -188,6 +192,9 @@ def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
             and identity_profile.user.is_active
         ):
             messages.success(request, "Signed in with ORCID.")
+            if requires_orcid_account_setup(request.user):
+                setup_url = reverse("orcid_setup_credentials")
+                return redirect(f"{setup_url}?{urlencode({'next': next_url})}")
             return redirect(next_url)
 
         messages.error(
@@ -256,6 +263,9 @@ def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
 
         login(request, current_user)
     messages.success(request, "Signed in with ORCID.")
+    if requires_orcid_account_setup(current_user):
+        setup_url = reverse("orcid_setup_credentials")
+        return redirect(f"{setup_url}?{urlencode({'next': next_url})}")
     return redirect(next_url)
 
 

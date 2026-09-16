@@ -1,0 +1,111 @@
+{% extends "layouts/base-auth.html" %}
+
+{% block title %}Set your username and password{% endblock title %}
+
+{% block loader %}{% endblock loader %}
+
+{% block extrastyle %}
+<style>
+  .orcid-setup-page {
+    min-height: 100vh;
+    background: #f4f7fa;
+  }
+
+  #orcidSetupModal {
+    display: block;
+  }
+
+  #orcidSetupModal .modal-footer {
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  @media (max-width: 380px) {
+    #orcidSetupModal .modal-footer {
+      align-items: stretch;
+      flex-direction: column-reverse;
+    }
+
+    #orcidSetupModal .modal-footer form,
+    #orcidSetupModal .modal-footer .btn {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock extrastyle %}
+
+{% block content %}
+<main class="auth-main orcid-setup-page">
+  <div class="modal" id="orcidSetupModal" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="orcidSetupTitle" aria-describedby="orcidSetupDescription" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="orcidSetupTitle">Set your username and password</h5>
+        </div>
+        <div class="modal-body">
+          <p id="orcidSetupDescription">Choose a username and password for this website to continue. This does not change your ORCID login details.</p>
+
+          {% for message in messages %}
+            <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %}" role="alert">{{ message }}</div>
+          {% endfor %}
+
+          <form id="orcid-setup-form" method="post" action="{% url 'orcid_setup_credentials' %}" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="orcid" value="{{ profile.authenticated_orcid }}">
+            <input type="hidden" name="next" value="{{ next_url }}">
+
+            {% for error in orcid_setup_form.non_field_errors %}
+              <div class="alert alert-danger" role="alert">{{ error }}</div>
+            {% endfor %}
+
+            {% for field in orcid_setup_form %}
+              <div class="form-group mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                  <small id="{{ field.auto_id }}_helptext" class="d-block mt-1 text-muted">{{ field.help_text }}</small>
+                {% endif %}
+                {% if field.errors %}
+                  <div id="{{ field.auto_id }}_error">
+                    {% for error in field.errors %}
+                      <span class="d-block mt-1 text-danger">{{ error }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </form>
+        </div>
+        <div class="modal-footer">
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-secondary">Sign out</button>
+          </form>
+          <button type="submit" form="orcid-setup-form" class="btn btn-primary">Save and continue</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+  const setupModal = document.getElementById("orcidSetupModal");
+
+  function focusSetupInput() {
+    const input = setupModal.querySelector('[aria-invalid="true"]')
+      || setupModal.querySelector('input[name="orcid_setup-username"]');
+    if (input) {
+      input.focus();
+    }
+  }
+
+  if (window.bootstrap) {
+    setupModal.addEventListener("shown.bs.modal", focusSetupInput);
+    new bootstrap.Modal(setupModal, {backdrop: "static", keyboard: false}).show();
+  } else {
+    focusSetupInput();
+  }
+</script>
+{% endblock extra_js %}

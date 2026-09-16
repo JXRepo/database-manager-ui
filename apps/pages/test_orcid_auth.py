@@ -3,7 +3,7 @@ from collections import UserDict
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta, timezone as datetime_timezone
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 from unittest.mock import patch
 
 from django.conf import settings
@@ -1111,7 +1111,7 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
         )
         user = profile.user
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/search/")
+        self.assertEqual(response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
         self.assertEqual(user.username, "orcid_0000000214512715")
         self.assertFalse(user.has_usable_password())
         self.assertEqual(user.email, "")
@@ -1140,12 +1140,12 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
         first_profile = AccountProfile.objects.get(
             authenticated_orcid=self.primary_orcid
         )
-        self.assertEqual(first_response["Location"], "/search/")
+        self.assertEqual(first_response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
         self.client.logout()
 
         second_response = self._complete_login()
 
-        self.assertEqual(second_response["Location"], "/search/")
+        self.assertEqual(second_response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
         self.assertEqual(User.objects.count(), 1)
         self.assertEqual(AccountProfile.objects.count(), 1)
         self.assertEqual(
@@ -1168,7 +1168,7 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
         profile = AccountProfile.objects.select_related("user").get(
             authenticated_orcid=self.primary_orcid
         )
-        self.assertEqual(response["Location"], "/search/")
+        self.assertEqual(response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
         self.assertEqual(profile.user.username, "orcid_0000000214512715_2")
         self.assertNotEqual(profile.user_id, occupied.pk)
         self.assertEqual(
@@ -1218,7 +1218,7 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
         profile = AccountProfile.objects.select_related("user").get(
             authenticated_orcid=self.primary_orcid
         )
-        self.assertEqual(response["Location"], "/search/")
+        self.assertEqual(response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
         self.assertNotEqual(profile.user_id, matching_user.pk)
         self.assertEqual(profile.user.email, "")
         self.assertEqual(profile.user.first_name, "")
@@ -1258,7 +1258,7 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
             response = self._complete_login()
 
         winner = User.objects.get(username="race-winner")
-        self.assertEqual(response["Location"], "/search/")
+        self.assertEqual(response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
         self.assertEqual(int(self.client.session["_auth_user_id"]), winner.pk)
         self.assertEqual(User.objects.count(), 1)
         self.assertEqual(AccountProfile.objects.count(), 1)
@@ -1308,7 +1308,10 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
         response = self._complete_login(next_url="/search/?keyword=alloys")
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/search/?keyword=alloys")
+        self.assertEqual(
+            response["Location"],
+            "/settings/orcid/setup/?next=%2Fsearch%2F%3Fkeyword%3Dalloys",
+        )
 
     @override_settings(DEBUG=True)
     def test_callback_resanitizes_tampered_unsafe_next_targets(self):
@@ -1335,7 +1338,9 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
                 )
 
                 self.assertEqual(response.status_code, 302)
-                self.assertEqual(response["Location"], "/search/")
+                self.assertEqual(
+                    response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F"
+                )
                 self.assertEqual(urlsplit(response["Location"]).netloc, "")
                 self.assertNotIn(
                     ORCID_TRANSACTION_SESSION_KEY,
@@ -1367,7 +1372,7 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "/search/")
+        self.assertEqual(response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
         self.assertEqual(urlsplit(response["Location"]).netloc, "")
         self.assertNotIn(ORCID_TRANSACTION_SESSION_KEY, self.client.session)
 
@@ -1397,7 +1402,9 @@ class ORCIDLoginCallbackTests(ORCIDCallbackTestMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], next_url)
+        self.assertEqual(
+            response["Location"], "/settings/orcid/setup/?" + urlencode({"next": next_url})
+        )
         self.assertNotIn(ORCID_TRANSACTION_SESSION_KEY, self.client.session)
 
     def test_authenticated_same_identity_is_idempotent(self):
@@ -1867,6 +1874,14 @@ class ORCIDCallbackFailureTests(ORCIDCallbackTestMixin, TestCase):
         """
         A successful callback state cannot authorize a second callback
         """
+        completed_user = User.objects.create_user(
+            username="completed-replay-user", password="local-password"
+        )
+        AccountProfile.objects.create(
+            user=completed_user,
+            authenticated_orcid=self.primary_orcid,
+            orcid_authenticated_at=timezone.now(),
+        )
         first_response = self._complete_login()
         first_user = AccountProfile.objects.get(
             authenticated_orcid=self.primary_orcid
