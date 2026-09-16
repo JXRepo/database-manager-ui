@@ -124,10 +124,15 @@ The main search box and common Advanced Search fields require every word you
 enter to appear in the matching record or selected field. Word order and letter
 case do not matter. These are text matches, not a semantic search.
 
-In **Advanced Search**, use **Data field conditions** to choose a field from
-accessible records, select a comparison, and enter a value. You can add up to
+In **Advanced Search**, **Common filters** provides frequently used fields.
+Use **Data field filters** to choose a field from accessible records, select a
+comparison, and enter a value. You can add up to
 10 conditions. All conditions, common fields, and the main search box must match
 the same data object.
+
+Metadata keywords are included in the main search. To target only keywords,
+choose `keywords` under **Data field filters**. Existing bookmarked URLs with
+the older `keywords` parameter keep an editable Keywords input while it is active.
 
 - **Contains words** requires all entered words in the selected field.
 - **Equals text** matches a complete value, ignoring letter case.

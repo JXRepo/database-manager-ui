@@ -83,6 +83,31 @@ class AdvancedSearchTests(TestCase):
             [self.own.pk, self.shared.pk],
         )
 
+    def test_common_filters_omit_redundant_keywords_input(self):
+        """
+        Keep keywords available as a data field without a permanent extra input
+        """
+        response = self.client.get(reverse("search"))
+        self.assertNotContains(response, '<input type="text" name="keywords"')
+        for field in ("identifier", "creator", "software", "phase", "owner", "access", "title"):
+            self.assertContains(response, f'name="{field}"')
+        self.assertIn(
+            '["keywords"]',
+            [option["value"] for option in response.context["field_options"]],
+        )
+
+    def test_legacy_keyword_filter_stays_visible_and_editable(self):
+        """
+        Prevent old bookmarked keyword filters from silently restricting results
+        """
+        response = self.client.get(reverse("search"), {"keywords": "crystal"})
+        self.assertContains(response, 'id="id_legacy_keywords"')
+        self.assertContains(response, 'name="keywords"')
+        self.assertContains(response, 'value="crystal"')
+        self.assertEqual(
+            [obj.pk for obj in response.context["data_objects"]], [self.own.pk]
+        )
+
     def test_basic_common_and_dynamic_conditions_all_apply(self):
         """
         Require all kinds of conditions to match the same accessible record

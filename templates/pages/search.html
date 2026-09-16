@@ -108,8 +108,29 @@
     min-height: 44px;
   }
 
+  .advanced-filter-group {
+    min-width: 0;
+    border: 1px solid #dbe2ea;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .advanced-group-title {
+    margin: 0;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e9eef4;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  .advanced-group-body {
+    padding: 16px;
+  }
+
   .data-field-conditions {
-    margin-top: 22px;
+    margin-top: 16px;
   }
 
   .condition-row {
@@ -131,6 +152,11 @@
     min-width: 0;
   }
 
+  .condition-row:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
   .condition-remove {
     min-height: 44px;
   }
@@ -144,8 +170,7 @@
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     }
 
-    .condition-field,
-    .condition-values {
+    .condition-row > div {
       grid-column: 1 / -1;
     }
 
@@ -683,7 +708,7 @@
               class="collapse advanced-panel {% if advanced_open %}show{% endif %}"
             >
               <p class="text-muted small mb-3" id="advancedSearchHint">
-                All conditions must match. Words can appear in any order. Text matching ignores case.
+                All filters must match.
               </p>
               {% if search_errors %}
                 <div class="alert alert-danger py-2" role="alert" id="searchErrors">
@@ -695,7 +720,10 @@
                   </ul>
                 </div>
               {% endif %}
-              <div class="row g-3">
+              <section class="advanced-filter-group" aria-labelledby="commonFiltersTitle">
+                <h6 id="commonFiltersTitle" class="advanced-group-title">Common filters</h6>
+                <div class="advanced-group-body">
+                  <div class="row g-3">
                 <div class="col-md-3">
                   <label for="id_identifier" class="form-label">Identifier</label>
                   <input type="text" name="identifier" id="id_identifier" class="form-control" value="{{ identifier }}">
@@ -733,23 +761,23 @@
                 </div>
 
 
-                <div class="col-md-3">
+                <div class="col-md-6">
                   <label for="id_title" class="form-label">Title</label>
                   <input type="text" name="title" id="id_title" class="form-control" value="{{ title }}">
                 </div>
-
-
-                <div class="col-md-3">
-                  <label for="id_keywords" class="form-label">Metadata Keywords</label>
-                  <input type="text" name="keywords" id="id_keywords" class="form-control" value="{{ keywords_value }}">
                 </div>
-
-
               </div>
+              </section>
 
-              <section class="data-field-conditions" aria-labelledby="dataFieldConditionsTitle">
-                <h6 id="dataFieldConditionsTitle" class="mb-1">Data field conditions</h6>
-                <p class="text-muted small mb-2">Choose fields from data you can access. Add up to {{ max_conditions }} conditions.</p>
+              <section class="advanced-filter-group data-field-conditions" aria-labelledby="dataFieldConditionsTitle">
+                <h6 id="dataFieldConditionsTitle" class="advanced-group-title">Data field filters</h6>
+                <div class="advanced-group-body">
+                {% if keywords_value %}
+                  <div class="mb-3">
+                    <label for="id_legacy_keywords" class="form-label">Keywords</label>
+                    <input type="text" name="keywords" id="id_legacy_keywords" class="form-control" value="{{ keywords_value }}">
+                  </div>
+                {% endif %}
                 {% if field_options_truncated %}
                   <p class="text-muted small mb-2">The field list is limited to the first 500 fields.</p>
                 {% endif %}
@@ -803,6 +831,7 @@
                 <div class="d-flex align-items-center flex-wrap gap-2">
                   <button type="button" class="btn btn-outline-primary btn-sm" id="addConditionButton" hidden>Add condition</button>
                   <span class="text-muted small" id="conditionStatus" role="status" aria-live="polite"></span>
+                </div>
                 </div>
               </section>
 
