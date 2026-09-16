@@ -16,7 +16,7 @@
             <span class="r"></span>
           </div>
           <div class="card mb-0">
-            <form method="post" class="card-body">
+            <form method="post" class="card-body" data-credential-validation="{% url 'validate_account_credentials' %}" data-credential-mode="register">
               {% csrf_token %}
               
               <div class="text-center">
@@ -29,7 +29,7 @@
               </div>
               <h4 class="text-center f-w-500 mt-4 mb-3">Sign up</h4>
                 {% for field in form %}
-                <div class="form-group mb-3">
+                <div class="form-group mb-3" data-credential-field="{{ field.name }}">
                   {{ field }}
 
                   {% if field.name == "username" and field.help_text %}
@@ -43,11 +43,14 @@
                   {% endif %}
 
 
-                  {% for error in field.errors %}
-                    <span class="d-block mt-1 text-danger">{{ error }}</span>
-                  {% endfor %}
+                  <div id="{{ field.auto_id }}_errors" data-credential-errors aria-live="polite" aria-atomic="true">
+                    {% for error in field.errors %}
+                      <span class="d-block mt-1 text-danger">{{ error }}</span>
+                    {% endfor %}
+                  </div>
                 </div>
                 {% endfor %}
+              <small class="d-block text-muted mb-2" data-credential-status role="status" hidden></small>
               <div class="d-flex mt-1 justify-content-between">
                 <div class="form-check">
                   <input class="form-check-input input-primary" type="checkbox" id="customCheckc1" checked="">
@@ -69,3 +72,7 @@
   </div>
 
 {% endblock content %}
+
+{% block extra_js %}
+  <script src="{% static 'assets/js/credential-validation.js' %}" defer></script>
+{% endblock extra_js %}

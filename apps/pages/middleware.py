@@ -67,6 +67,7 @@ class ORCIDAccountSetupMiddleware(MiddlewareMixin):
             return None
         if request.resolver_match.view_name in {
             "orcid_setup_credentials",
+            "validate_account_credentials",
             "logout",
             "admin:logout",
         }:

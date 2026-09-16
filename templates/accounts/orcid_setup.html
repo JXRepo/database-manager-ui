@@ -1,4 +1,5 @@
 {% extends "layouts/base-auth.html" %}
+{% load static %}
 
 {% block title %}Set your username and password{% endblock title %}
 
@@ -49,7 +50,7 @@
             <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-info{% endif %}" role="alert">{{ message }}</div>
           {% endfor %}
 
-          <form id="orcid-setup-form" method="post" action="{% url 'orcid_setup_credentials' %}" novalidate>
+          <form id="orcid-setup-form" method="post" action="{% url 'orcid_setup_credentials' %}" data-credential-validation="{% url 'validate_account_credentials' %}" data-credential-mode="orcid_setup" novalidate>
             {% csrf_token %}
             <input type="hidden" name="orcid" value="{{ profile.authenticated_orcid }}">
             <input type="hidden" name="next" value="{{ next_url }}">
@@ -59,21 +60,20 @@
             {% endfor %}
 
             {% for field in orcid_setup_form %}
-              <div class="form-group mb-3">
+              <div class="form-group mb-3" data-credential-field="{{ field.name }}">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                 {{ field }}
                 {% if field.help_text %}
                   <small id="{{ field.auto_id }}_helptext" class="d-block mt-1 text-muted">{{ field.help_text }}</small>
                 {% endif %}
-                {% if field.errors %}
-                  <div id="{{ field.auto_id }}_error">
-                    {% for error in field.errors %}
-                      <span class="d-block mt-1 text-danger">{{ error }}</span>
-                    {% endfor %}
-                  </div>
-                {% endif %}
+                <div id="{{ field.auto_id }}_error" data-credential-errors aria-live="polite" aria-atomic="true">
+                  {% for error in field.errors %}
+                    <span class="d-block mt-1 text-danger">{{ error }}</span>
+                  {% endfor %}
+                </div>
               </div>
             {% endfor %}
+            <small class="d-block text-muted" data-credential-status role="status" hidden></small>
           </form>
         </div>
         <div class="modal-footer">
@@ -90,6 +90,7 @@
 {% endblock content %}
 
 {% block extra_js %}
+<script src="{% static 'assets/js/credential-validation.js' %}" defer></script>
 <script>
   const setupModal = document.getElementById("orcidSetupModal");
 

@@ -3,6 +3,7 @@ from django.urls import reverse_lazy
 from django.contrib.auth import views as auth_views
 from . import views
 from .auth_views import RateLimitedLoginView
+from .credential_validation import validate_account_credentials
 from .views import account_settings_view, register_view
 from .forms import StyledPasswordChangeForm
 from .views import upload_json_view
@@ -31,6 +32,11 @@ urlpatterns = [
     path("healthz/", views.healthz_view, name="healthz"),
     path("accounts/login/", RateLimitedLoginView.as_view()),
     path("accounts/register/", register_view),
+    path(
+        "accounts/validate-credentials/",
+        validate_account_credentials,
+        name="validate_account_credentials",
+    ),
     path(
         "login/",
         RateLimitedLoginView.as_view(),

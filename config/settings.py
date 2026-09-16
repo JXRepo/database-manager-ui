@@ -273,6 +273,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 PILOT_RATE_LIMITS = {
     "registration": {"limit": 5, "window_seconds": 3600},
+    "credential_validation": {"limit": 120, "window_seconds": 60},
     "password_login": {"limit": 10, "window_seconds": 900},
     "orcid_start": {"limit": 20, "window_seconds": 3600},
     "upload": {"limit": 20, "window_seconds": 3600},
