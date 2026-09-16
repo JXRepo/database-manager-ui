@@ -9,21 +9,29 @@ const {after, before, describe, test} = require('node:test');
 const chromiumPath = process.env.CHROMIUM_BIN || '/usr/bin/chromium';
 const scriptPath = join(__dirname, '../../static/assets/js/advanced-search.js');
 
+function operatorOptions() {
+  return `<option value="contains">Contains words</option><option value="exact">Equals text</option>
+    <option value="eq">Equals number</option><option value="gt">Greater than</option>
+    <option value="gte">At least</option><option value="lt">Less than</option>
+    <option value="lte">At most</option><option value="between">Between</option>`;
+}
+
 function conditionRow() {
   return `<fieldset data-condition-row>
     <legend data-condition-legend>Data field condition</legend>
     <label data-condition-label="field">Data field</label>
     <select name="condition_field">
       <option value="">Choose a field</option>
-      <option value="Grain_Number">Grain_Number</option>
-      <option value="Load_Type">Load_Type</option>
+      <option value="Grain_Number" data-field-type="number">Grain_Number</option>
+      <option value="Youngs_Modulus" data-field-type="number">Youngs_Modulus</option>
+      <option value="Load_Type" data-field-type="text">Load_Type</option>
+      <option value="Software" data-field-type="text">Software</option>
+      <option value="Stress" data-field-type="array">Stress</option>
+      <option value="Legacy_Field">Legacy_Field</option>
     </select>
     <label data-condition-label="operator">Match</label>
     <select name="condition_operator">
-      <option value="contains">Contains words</option><option value="exact">Equals text</option>
-      <option value="eq">Equals number</option><option value="gt">Greater than</option>
-      <option value="gte">At least</option><option value="lt">Less than</option>
-      <option value="lte">At most</option><option value="between">Between</option>
+      ${operatorOptions()}
     </select>
     <label data-condition-label="value">Value</label><input name="condition_value">
     <div data-condition-upper>
@@ -31,6 +39,7 @@ function conditionRow() {
       <input name="condition_value_to">
     </div>
     <button type="button" data-remove-condition hidden>Remove</button>
+    <span data-condition-hint hidden>Matches one number in the array.</span>
     <p data-condition-error hidden></p>
   </fieldset>`;
 }
@@ -90,10 +99,13 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     if (profile) rmSync(profile, {recursive: true, force: true});
   });
 
-  async function page(t, setup = '') {
+  async function page(t, setup = '', width = 1440) {
     const {targetId} = await send('Target.createTarget', {url: 'about:blank'});
     const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
     t.after(() => send('Target.closeTarget', {targetId}));
+    await send('Emulation.setDeviceMetricsOverride', {
+      width, height: 900, deviceScaleFactor: 1, mobile: false,
+    }, sessionId);
     const evaluate = async expression => {
       const response = await send('Runtime.evaluate', {expression, returnByValue: true}, sessionId);
       if (response.exceptionDetails) throw new Error(response.exceptionDetails.text);
@@ -106,6 +118,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
         <button type="button" id="addConditionButton" hidden>Add condition</button>
         <p id="conditionStatus" role="status"></p>
         <template id="conditionRowTemplate">${conditionRow()}</template>
+        <template id="conditionOperatorTemplate">${operatorOptions()}</template>
       </div>
     </form>`;
     await evaluate(`document.body.innerHTML = ${JSON.stringify(html)}; ${setup}`);
@@ -127,6 +140,209 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
       ['condition_field', ''], ['condition_operator', 'contains'],
       ['condition_value', ''], ['condition_value_to', ''],
     ]);
+  });
+
+  test('choosing a numeric field offers numeric matches and keeps the entered value', async t => {
+    const evaluate = await page(t);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      const value = document.querySelector('[name="condition_value"]');
+      value.value = '42';
+      field.value = 'Grain_Number';
+      field.dispatchEvent(new Event('change'));
+      const operator = document.querySelector('[name="condition_operator"]');
+      return {options: [...operator.options].map(option => option.value),
+        selected: operator.value, mode: value.inputMode, placeholder: value.placeholder,
+        required: [field.required, value.required],
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(state.options, ['eq', 'gt', 'gte', 'lt', 'lte', 'between']);
+    assert.equal(state.selected, 'eq');
+    assert.equal(state.mode, 'decimal');
+    assert.equal(state.placeholder, 'Number');
+    assert.deepEqual(state.required, [true, true]);
+    assert.deepEqual(state.submitted, ['Grain_Number', 'eq', '42', '']);
+  });
+
+  test('switching a numeric range to text clears only the upper bound', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'Grain_Number';
+      document.querySelector('[name="condition_operator"]').value = 'between';
+      document.querySelector('[name="condition_value"]').value = '10';
+      document.querySelector('[name="condition_value_to"]').value = '20';
+    `);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      field.value = 'Load_Type';
+      field.dispatchEvent(new Event('change'));
+      const operator = document.querySelector('[name="condition_operator"]');
+      const value = document.querySelector('[name="condition_value"]');
+      const upper = document.querySelector('[name="condition_value_to"]');
+      return {options: [...operator.options].map(option => option.value),
+        selected: operator.value, mode: value.inputMode, placeholder: value.placeholder,
+        upperHidden: document.querySelector('[data-condition-upper]').hidden,
+        upperRequired: upper.required, upperDisabled: upper.disabled,
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(state.options, ['contains', 'exact']);
+    assert.equal(state.selected, 'contains');
+    assert.equal(state.mode, 'text');
+    assert.equal(state.placeholder, 'Text to match');
+    assert.equal(state.upperHidden, true);
+    assert.equal(state.upperRequired, false);
+    assert.equal(state.upperDisabled, false);
+    assert.deepEqual(state.submitted, ['Load_Type', 'contains', '10', '']);
+  });
+
+  test('a compatible match is preserved when selecting another typed or legacy field', async t => {
+    const evaluate = await page(t);
+    const states = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      const operator = document.querySelector('[name="condition_operator"]');
+      const states = [];
+      for (const [first, match, second] of [
+        ['Grain_Number', 'gte', 'Youngs_Modulus'], ['Load_Type', 'exact', 'Software'],
+        ['Grain_Number', 'gte', 'Legacy_Field']
+      ]) {
+        field.value = first;
+        field.dispatchEvent(new Event('change'));
+        operator.value = match;
+        operator.dispatchEvent(new Event('change'));
+        field.value = second;
+        field.dispatchEvent(new Event('change'));
+        states.push({selected: operator.value,
+          options: [...operator.options].map(option => option.value)});
+      }
+      return states;
+    })()`);
+    assert.deepEqual(states, [
+      {selected: 'gte', options: ['eq', 'gt', 'gte', 'lt', 'lte', 'between']},
+      {selected: 'exact', options: ['contains', 'exact']},
+      {selected: 'gte', options: ['contains', 'exact', 'eq', 'gt', 'gte', 'lt', 'lte', 'between']},
+    ]);
+  });
+
+  test('numeric array matches explain that one element is tested without hiding other matches', async t => {
+    const evaluate = await page(t);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      const operator = document.querySelector('[name="condition_operator"]');
+      const value = document.querySelector('[name="condition_value"]');
+      const upper = document.querySelector('[name="condition_value_to"]');
+      const hint = document.querySelector('[data-condition-hint]');
+      field.value = 'Stress';
+      field.dispatchEvent(new Event('change'));
+      const textHidden = hint.hidden;
+      operator.value = 'between';
+      operator.dispatchEvent(new Event('change'));
+      const numeric = {hidden: hint.hidden, text: hint.textContent, mode: value.inputMode,
+        described: [value, upper].every(input =>
+          (input.getAttribute('aria-describedby') || '').split(' ').includes(hint.id)),
+        options: [...operator.options].map(option => option.value)};
+      operator.value = 'exact';
+      operator.dispatchEvent(new Event('change'));
+      return {textHidden, numeric, hiddenAgain: hint.hidden,
+        descriptionCleared: !value.hasAttribute('aria-describedby')};
+    })()`);
+    assert.equal(state.textHidden, true);
+    assert.equal(state.numeric.hidden, false);
+    assert.match(state.numeric.text, /one number.*array/i);
+    assert.equal(state.numeric.mode, 'decimal');
+    assert.equal(state.numeric.described, true);
+    assert.deepEqual(state.numeric.options, ['contains', 'exact', 'eq', 'gt', 'gte', 'lt', 'lte', 'between']);
+    assert.equal(state.hiddenAgain, true);
+    assert.equal(state.descriptionCleared, true);
+  });
+
+  test('an initial restricted operator list can expand when the field type changes', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'Load_Type';
+      const operator = document.querySelector('[name="condition_operator"]');
+      [...operator.options].filter(option => !['contains', 'exact'].includes(option.value))
+        .forEach(option => option.remove());
+      operator.value = 'exact';
+    `);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      field.value = 'Grain_Number';
+      field.dispatchEvent(new Event('change'));
+      const operator = document.querySelector('[name="condition_operator"]');
+      return {selected: operator.value, options: [...operator.options].map(option => option.value)};
+    })()`);
+    assert.deepEqual(state, {selected: 'eq', options: ['eq', 'gt', 'gte', 'lt', 'lte', 'between']});
+  });
+
+  test('initial incompatible matches remain submitted and editable with server errors', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'Load_Type';
+      document.querySelector('[name="condition_operator"]').value = 'between';
+      document.querySelector('[name="condition_value"]').value = '10';
+      document.querySelector('[name="condition_value_to"]').value = '20';
+      document.querySelector('[data-condition-error]').textContent = 'Choose a text match.';
+    `);
+    const initial = await evaluate(`(() => {
+      const operator = document.querySelector('[name="condition_operator"]');
+      const error = document.querySelector('[data-condition-error]');
+      return {submitted: [...new FormData(document.querySelector('form')).values()],
+        options: [...operator.options].map(option => option.value),
+        selectedLabel: operator.selectedOptions[0].textContent,
+        error: error.textContent, upperHidden: document.querySelector('[data-condition-upper]').hidden,
+        described: [...document.querySelectorAll('input, select')].every(input =>
+          input.getAttribute('aria-describedby') === error.id)};
+    })()`);
+    assert.deepEqual(initial.submitted, ['Load_Type', 'between', '10', '20']);
+    assert.deepEqual(initial.options, ['contains', 'exact', 'between']);
+    assert.match(initial.selectedLabel, /unsupported/i);
+    assert.equal(initial.error, 'Choose a text match.');
+    assert.equal(initial.upperHidden, false);
+    assert.equal(initial.described, true);
+
+    const corrected = await evaluate(`(() => {
+      const operator = document.querySelector('[name="condition_operator"]');
+      operator.value = 'exact';
+      operator.dispatchEvent(new Event('change'));
+      return {options: [...operator.options].map(option => option.value),
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(corrected, {options: ['contains', 'exact'],
+      submitted: ['Load_Type', 'exact', '10', '']});
+  });
+
+  test('pageshow refreshes field restrictions without changing restored invalid values', async t => {
+    const evaluate = await page(t);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      const value = document.querySelector('[name="condition_value"]');
+      field.value = 'Grain_Number';
+      value.value = 'steel';
+      window.dispatchEvent(new Event('pageshow'));
+      window.dispatchEvent(new Event('pageshow'));
+      const operator = document.querySelector('[name="condition_operator"]');
+      return {options: [...operator.options].map(option => option.value),
+        label: operator.selectedOptions[0].textContent,
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(state.options, ['eq', 'gt', 'gte', 'lt', 'lte', 'between', 'contains']);
+    assert.match(state.label, /unsupported/i);
+    assert.deepEqual(state.submitted, ['Grain_Number', 'contains', 'steel', '']);
+  });
+
+  test('added rows filter their matches while preserving the four parallel submitted fields', async t => {
+    const evaluate = await page(t);
+    const state = await evaluate(`(() => {
+      document.getElementById('addConditionButton').click();
+      const row = document.querySelectorAll('[data-condition-row]')[1];
+      const field = row.querySelector('[name="condition_field"]');
+      field.value = 'Grain_Number';
+      field.dispatchEvent(new Event('change'));
+      const data = new FormData(document.querySelector('form'));
+      return {options: [...row.querySelector('[name="condition_operator"]').options].map(option => option.value),
+        fields: data.getAll('condition_field'), operators: data.getAll('condition_operator'),
+        values: data.getAll('condition_value'), upperValues: data.getAll('condition_value_to')};
+    })()`);
+    assert.deepEqual(state, {options: ['eq', 'gt', 'gte', 'lt', 'lte', 'between'],
+      fields: ['', 'Grain_Number'], operators: ['contains', 'eq'],
+      values: ['', ''], upperValues: ['', '']});
   });
 
   test('adding stops at the limit and removing a row enables adding again', async t => {
@@ -229,8 +445,9 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
       valid: true, error: '', focused: 'condition_field'});
   });
 
-  test('restored numeric bounds and server errors survive initialization', async t => {
+  test('restored numeric bounds and server errors survive initialization with array guidance', async t => {
     const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'Stress';
       document.querySelector('[name="condition_operator"]').value = 'between';
       document.querySelector('[name="condition_value"]').value = '80';
       document.querySelector('[name="condition_value_to"]').value = '10';
@@ -242,9 +459,9 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
       values: [...new FormData(document.querySelector('form')).values()],
       error: document.querySelector('[data-condition-error]').textContent,
       described: [...document.querySelectorAll('input, select')].every(input =>
-        input.getAttribute('aria-describedby') === document.querySelector('[data-condition-error]').id)
+        input.getAttribute('aria-describedby').split(' ').includes(document.querySelector('[data-condition-error]').id))
     })`);
-    assert.deepEqual(state.values, ['', 'between', '80', '10']);
+    assert.deepEqual(state.values, ['Stress', 'between', '80', '10']);
     assert.match(state.error, /Maximum/);
     assert.equal(state.described, true);
   });
@@ -291,5 +508,48 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
         expanded: document.querySelector('[aria-controls]').getAttribute('aria-expanded')};
     })()`);
     assert.deepEqual(state, {open: true, expanded: 'true'});
+  });
+
+  test('live data rows stay compact and long lists scroll at desktop and mobile widths', async t => {
+    const searchTemplate = readFileSync(join(__dirname, '../../templates/pages/search.html'), 'utf8');
+    const searchStyles = searchTemplate.match(/<style>([\s\S]*?)<\/style>/)[1];
+    const bootstrapStyles = readFileSync(join(__dirname, '../../static/assets/css/plugins/bootstrap.min.css'), 'utf8');
+    for (const width of [1440, 390]) {
+      const evaluate = await page(t, '', width);
+      for (const count of [2, 20]) {
+        const item = `<a class="live-data-item" href="#data">
+          <div class="live-data-main">
+            <div class="live-data-name">Example materials simulation dataset with a long descriptive title</div>
+            <div class="live-data-meta">Uploaded by a researcher · 2026-09-16 · JSON simulation data</div>
+          </div>
+          <div class="live-data-badge-group"><span class="live-data-badge public">Public</span></div>
+        </a>`;
+        const html = `<style>${bootstrapStyles}${searchStyles}</style>
+          <div class="card search-bar-card search-live-expanded"><div class="card-body">
+            <div class="search-hero-wrap"><div class="live-data-panel">
+              <div class="live-data-list">${item.repeat(count)}</div>
+            </div></div>
+          </div></div>`;
+        const layout = await evaluate(`(() => {
+          document.body.innerHTML = ${JSON.stringify(html)};
+          const list = document.querySelector('.live-data-list');
+          return {rowHeights: [...document.querySelectorAll('.live-data-item')]
+              .map(row => row.getBoundingClientRect().height),
+            listHeight: list.getBoundingClientRect().height,
+            scrolls: list.scrollHeight > list.clientHeight,
+            widths: [document.documentElement, list, list.firstElementChild]
+              .map(element => ({client: element.clientWidth, scroll: element.scrollWidth})),
+            horizontalOverflow: document.documentElement.scrollWidth > window.innerWidth ||
+              list.scrollWidth > list.clientWidth};
+        })()`);
+        assert.equal(layout.rowHeights.every(height => height <= 100), true,
+          `${width}px/${count} rows: row heights ${layout.rowHeights}`);
+        assert.ok(layout.listHeight <= (count === 2 ? 220 : 320),
+          `${width}px/${count} rows: list height ${layout.listHeight}`);
+        assert.equal(layout.scrolls, count === 20, `${width}px/${count} rows: list scrolling`);
+        assert.equal(layout.horizontalOverflow, false,
+          `${width}px/${count} rows: horizontal overflow ${JSON.stringify(layout.widths)}`);
+      }
+    }
   });
 });

@@ -1,4 +1,5 @@
 import json
+import re
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -83,6 +84,69 @@ class AdvancedSearchTests(TestCase):
             [obj.pk for obj in response.context["data_objects"]],
             [self.own.pk, self.shared.pk],
         )
+
+    def test_rendered_match_options_follow_selected_field_type(self):
+        """
+        Render applicable comparisons even when JavaScript is unavailable
+        """
+        for field, operation, value, expected in [
+            ("Grain_Number", "eq", "150", ["eq", "gt", "gte", "lt", "lte", "between"]),
+            ("Load_Type", "contains", "tension", ["contains", "exact"]),
+            ("Material_parameters", "eq", "150",
+             ["contains", "exact", "eq", "gt", "gte", "lt", "lte", "between"]),
+        ]:
+            with self.subTest(field=field):
+                response = self.client.get(reverse("search"), {
+                    "condition_field": field,
+                    "condition_operator": operation,
+                    "condition_value": value,
+                })
+                html = response.content.decode()
+                select = re.search(
+                    r'<select[^>]*id="condition-1-operator"[^>]*>(.*?)</select>',
+                    html, re.DOTALL,
+                ).group(1)
+                self.assertEqual(re.findall(r'<option value="([^"]*)"', select), expected)
+
+    def test_incompatible_comparison_is_preserved_for_correction(self):
+        """
+        Reject crafted requests without silently changing their comparison
+        """
+        response = self.client.get(reverse("search"), {
+            "condition_field": "Grain_Number",
+            "condition_operator": "contains",
+            "condition_value": "15",
+        })
+        self.assertTrue(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])
+        self.assertEqual(response.context["condition_rows"][0]["operator"], "contains")
+        self.assertContains(response, 'value="contains" selected')
+
+    def test_field_type_metadata_reaches_initial_form(self):
+        """
+        Let newly selected fields use the same types as server validation
+        """
+        response = self.client.get(reverse("search"))
+        self.assertContains(response, 'value="Grain_Number" data-field-type="number"')
+        self.assertContains(response, 'value="Load_Type" data-field-type="text"')
+        self.assertContains(response, 'value="Material_parameters" data-field-type="array"')
+
+    def test_empty_match_stays_unselected_until_user_corrects_it(self):
+        """
+        Avoid displaying a default comparison for a rejected empty selection
+        """
+        response = self.client.get(reverse("search"), {
+            "condition_field": "Grain_Number",
+            "condition_operator": "",
+            "condition_value": "150",
+        })
+        self.assertTrue(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])
+        select = re.search(
+            r'<select[^>]*id="condition-1-operator"[^>]*>(.*?)</select>',
+            response.content.decode(), re.DOTALL,
+        ).group(1)
+        self.assertIn('<option value="" selected>', select)
 
     def test_common_filters_omit_redundant_keywords_input(self):
         """

@@ -26,6 +26,19 @@ DATA_FIELD_CHOICES = (
     ("Max_Total_Strain", "Max_Total_Strain"),
 )
 DATA_FIELD_KEYS = {key for key, label in DATA_FIELD_CHOICES}
+DATA_FIELD_TYPES = {
+    "Hash_Orientation": "text",
+    "Texture_Type": "text",
+    "Element_Number": "number",
+    "Grain_Number": "number",
+    "Material_parameters": "array",
+    "Load_Type": "text",
+    "Stress_Type": "text",
+    "Load_Descriptor": "text",
+    "Hash_load": "text",
+    "Scaling_Factor": "number",
+    "Max_Total_Strain": "number",
+}
 TECHNICAL_KEYS = {"$schema", "input_path", "results_path"}
 NUMERIC_OPERATORS = {
     "eq": operator.eq,
@@ -34,8 +47,45 @@ NUMERIC_OPERATORS = {
     "lt": operator.lt,
     "lte": operator.le,
 }
-OPERATORS = {"contains", "exact", "between", *NUMERIC_OPERATORS}
+OPERATOR_CHOICES = (
+    ("contains", "Contains words"),
+    ("exact", "Equals text"),
+    ("eq", "Equals number"),
+    ("gt", "Greater than"),
+    ("gte", "At least"),
+    ("lt", "Less than"),
+    ("lte", "At most"),
+    ("between", "Between"),
+)
+OPERATORS = {value for value, label in OPERATOR_CHOICES}
 NUMBER_PATTERN = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+
+
+def get_field_operators(field):
+    """
+    Return ordered comparison operators permitted for a named field
+
+    The parser and form share these choices. Arrays and legacy paths retain
+    every operator so their existing comparison behavior stays available.
+
+    Parameters
+    ----------
+    field : str
+        Named catalog token, explicit JSON path, or unrecognized form value.
+
+    Returns
+    -------
+    tuple of str
+        Permitted operators in display order.
+    """
+    field_type = DATA_FIELD_TYPES.get(field)
+    if field_type == "number":
+        allowed = {"between", *NUMERIC_OPERATORS}
+    elif field_type == "text":
+        allowed = {"contains", "exact"}
+    else:
+        allowed = OPERATORS
+    return tuple(value for value, label in OPERATOR_CHOICES if value in allowed)
 
 
 def _as_number(value):
@@ -128,6 +178,10 @@ def _parse_row(row):
     operation = row["operator"]
     if operation not in OPERATORS:
         raise ValueError("Choose a valid comparison operator.")
+    if operation not in get_field_operators(row["field"]):
+        if DATA_FIELD_TYPES[row["field"]] == "number":
+            raise ValueError(f"Choose a numeric comparison for {row['field']}.")
+        raise ValueError(f"Choose Contains words or Equals text for {row['field']}.")
     if len(row["value"]) > MAX_VALUE_LENGTH or len(row["value_to"]) > MAX_VALUE_LENGTH:
         raise ValueError(f"Each value must be at most {MAX_VALUE_LENGTH} characters.")
     value = row["value"].strip()

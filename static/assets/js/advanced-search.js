@@ -4,15 +4,42 @@
   const form = document.getElementById('advancedSearchForm');
   const container = document.getElementById('dataFieldConditions');
   const template = document.getElementById('conditionRowTemplate');
+  const operatorTemplate = document.getElementById('conditionOperatorTemplate');
   const addButton = document.getElementById('addConditionButton');
   const status = document.getElementById('conditionStatus');
-  if (!form || !container || !template || !addButton) return;
+  if (!form || !container || !template || !operatorTemplate || !addButton) return;
 
   const maxConditions = Number(container.dataset.maxConditions) || 10;
+  const operatorOptions = Array.from(operatorTemplate.content.querySelectorAll('option'));
+  const numericOperators = ['eq', 'gt', 'gte', 'lt', 'lte', 'between'];
   let nextId = 0;
 
   function rows() {
     return Array.from(container.querySelectorAll('[data-condition-row]'));
+  }
+
+  function updateOperators(row, preserveInvalid = false) {
+    const field = row.querySelector('[name="condition_field"]');
+    const operator = row.querySelector('[name="condition_operator"]');
+    const fieldType = field.selectedOptions[0]?.dataset.fieldType;
+    const selected = operator.value;
+    const allowed = operatorOptions.filter(option => {
+      if (fieldType === 'number') return numericOperators.includes(option.value);
+      if (fieldType === 'text') return ['contains', 'exact'].includes(option.value);
+      return true;
+    });
+    const compatible = allowed.some(option => option.value === selected);
+    operator.replaceChildren(...allowed.map(option => option.cloneNode(true)));
+    if (!compatible && preserveInvalid) {
+      const original = operatorOptions.find(option => option.value === selected);
+      const label = original ? original.textContent : selected || 'Empty match';
+      operator.add(new Option(`${label} (unsupported for this field)`, selected));
+    }
+    if (compatible || preserveInvalid) {
+      operator.value = selected;
+    } else {
+      operator.value = fieldType === 'number' ? 'eq' : 'contains';
+    }
   }
 
   function updateRow(row) {
@@ -21,7 +48,7 @@
     const value = row.querySelector('[name="condition_value"]');
     const upper = row.querySelector('[name="condition_value_to"]');
     const between = operator.value === 'between';
-    const numeric = ['eq', 'gt', 'gte', 'lt', 'lte', 'between'].includes(operator.value);
+    const numeric = numericOperators.includes(operator.value);
     const active = Boolean(field.value || value.value.trim() || upper.value.trim() ||
       operator.value !== 'contains');
 
@@ -34,6 +61,18 @@
     field.required = active;
     value.required = active;
     upper.required = active && between;
+
+    const hint = row.querySelector('[data-condition-hint]');
+    if (hint) {
+      hint.hidden = field.selectedOptions[0]?.dataset.fieldType !== 'array' || !numeric;
+      for (const input of [value, upper]) {
+        const descriptions = (input.getAttribute('aria-describedby') || '').split(' ')
+          .filter(id => id && id !== hint.id);
+        if (!hint.hidden) descriptions.push(hint.id);
+        if (descriptions.length) input.setAttribute('aria-describedby', descriptions.join(' '));
+        else input.removeAttribute('aria-describedby');
+      }
+    }
   }
 
   function updateCount() {
@@ -49,6 +88,8 @@
     const prefix = `condition-${++nextId}`;
     const error = row.querySelector('[data-condition-error]');
     error.id = `${prefix}-error`;
+    const hint = row.querySelector('[data-condition-hint]');
+    if (hint) hint.id = `${prefix}-hint`;
     for (const name of ['field', 'operator', 'value', 'value_to']) {
       const input = row.querySelector(`[name="condition_${name}"]`);
       input.id = `${prefix}-${name}`;
@@ -59,8 +100,11 @@
       }
       input.addEventListener('input', () => updateRow(row));
       input.addEventListener('change', () => {
-        if (name === 'operator' && input.value !== 'between') {
-          row.querySelector('[name="condition_value_to"]').value = '';
+        if (name === 'field' || name === 'operator') {
+          updateOperators(row);
+          if (row.querySelector('[name="condition_operator"]').value !== 'between') {
+            row.querySelector('[name="condition_value_to"]').value = '';
+          }
         }
         updateRow(row);
       });
@@ -78,6 +122,7 @@
       focusRow.querySelector('[name="condition_field"]').focus();
       status.textContent = 'Condition removed.';
     });
+    updateOperators(row, true);
     updateRow(row);
   }
 
@@ -102,7 +147,10 @@
   }, true);
 
   window.addEventListener('pageshow', () => {
-    rows().forEach(updateRow);
+    rows().forEach(row => {
+      updateOperators(row, true);
+      updateRow(row);
+    });
     updateCount();
   });
 })();

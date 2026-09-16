@@ -161,7 +161,8 @@
     min-height: 44px;
   }
 
-  .condition-error {
+  .condition-error,
+  .condition-hint {
     grid-column: 1 / -1;
   }
 
@@ -208,22 +209,6 @@
     margin-bottom: 20px;
   }
 
-  .search-live-expanded {
-    display: flex;
-    min-height: calc(100vh - 180px);
-  }
-
-  .search-live-expanded .card-body {
-    display: flex;
-    width: 100%;
-  }
-
-  .search-live-expanded .search-hero-wrap {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-  }
-
   .live-data-panel {
     margin-top: 18px;
     padding-top: 16px;
@@ -256,23 +241,13 @@
 
   .live-data-list {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    grid-auto-rows: max-content;
     gap: 8px;
-    max-height: 320px;
+    max-height: 280px;
     overflow-y: auto;
     padding-right: 2px;
-  }
-
-  .search-live-expanded .live-data-panel {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .search-live-expanded .live-data-list {
-    flex: 1;
-    max-height: none;
-    min-height: 420px;
   }
 
   .live-data-item {
@@ -295,6 +270,11 @@
     border-color: #cfe2ff;
     background: #f8fbff;
     color: inherit;
+  }
+
+  .live-data-item:focus-visible {
+    outline: 2px solid #0d6efd;
+    outline-offset: -2px;
   }
 
   .live-data-main {
@@ -335,6 +315,7 @@
   }
 
   .live-data-badge-group {
+    flex-shrink: 0;
     justify-content: flex-end;
   }
 
@@ -610,15 +591,6 @@
   }
 
   @media (max-width: 768px) {
-    .search-live-expanded {
-      min-height: auto;
-    }
-
-    .search-live-expanded .live-data-list {
-      max-height: 520px;
-      min-height: 340px;
-    }
-
     .live-data-header {
       flex-direction: column;
       gap: 4px;
@@ -665,7 +637,7 @@
       </div>
     {% endfor %}
 
-    <div class="card search-bar-card {% if not search_performed %}search-live-expanded{% endif %}">
+    <div class="card search-bar-card">
       <div class="card-body py-4">
         <div class="search-hero-wrap">
           <form method="get" id="advancedSearchForm">
@@ -790,24 +762,19 @@
                             <option value="{{ row.field }}" selected>{{ row.field_label }} (previous selection)</option>
                           {% endif %}
                           {% for option in field_options %}
-                            <option value="{{ option.value }}" {% if option.value == row.field %}selected{% endif %}>{{ option.label }}</option>
+                            <option value="{{ option.value }}" data-field-type="{{ option.type }}" {% if option.value == row.field %}selected{% endif %}>{{ option.label }}</option>
                           {% endfor %}
                         </select>
                       </div>
                       <div>
                         <label for="condition-{{ forloop.counter }}-operator" class="form-label" data-condition-label="operator">Match</label>
                         <select name="condition_operator" id="condition-{{ forloop.counter }}-operator" class="form-select">
-                          {% if row.operator and row.operator != "contains" and row.operator != "exact" and row.operator != "eq" and row.operator != "gt" and row.operator != "gte" and row.operator != "lt" and row.operator != "lte" and row.operator != "between" %}
-                            <option value="{{ row.operator }}" selected>{{ row.operator }} (unsupported)</option>
+                          {% if not row.operator_available %}
+                            <option value="{{ row.operator }}" selected>{{ row.operator_label }} (unsupported)</option>
                           {% endif %}
-                          <option value="contains" {% if row.operator == "contains" %}selected{% endif %}>Contains words</option>
-                          <option value="exact" {% if row.operator == "exact" %}selected{% endif %}>Equals text</option>
-                          <option value="eq" {% if row.operator == "eq" %}selected{% endif %}>Equals number</option>
-                          <option value="gt" {% if row.operator == "gt" %}selected{% endif %}>Greater than</option>
-                          <option value="gte" {% if row.operator == "gte" %}selected{% endif %}>At least</option>
-                          <option value="lt" {% if row.operator == "lt" %}selected{% endif %}>Less than</option>
-                          <option value="lte" {% if row.operator == "lte" %}selected{% endif %}>At most</option>
-                          <option value="between" {% if row.operator == "between" %}selected{% endif %}>Between</option>
+                          {% for value, label in row.operator_choices %}
+                            <option value="{{ value }}" {% if value == row.operator %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
                         </select>
                       </div>
                       <div class="condition-values">
@@ -821,6 +788,7 @@
                         </div>
                       </div>
                       <button type="button" class="btn btn-outline-secondary btn-sm condition-remove" data-remove-condition aria-label="Remove condition {{ forloop.counter }}" hidden>Remove</button>
+                      <span class="condition-hint text-muted small" data-condition-hint {% if not row.array_numeric %}hidden{% endif %}>Matches one number in the array.</span>
                       <p class="condition-error text-danger small mb-0" data-condition-error id="condition-{{ forloop.counter }}-error" {% if not row.error %}hidden{% endif %}>{{ row.error }}</p>
                     </fieldset>
                   {% endfor %}
@@ -832,6 +800,11 @@
                 </div>
               </section>
 
+              <template id="conditionOperatorTemplate">
+                {% for value, label in operator_choices %}
+                  <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </template>
               <template id="conditionRowTemplate">
                 <fieldset class="condition-row" data-condition-row>
                   <legend class="visually-hidden" data-condition-legend>Data field condition</legend>
@@ -840,21 +813,16 @@
                     <select name="condition_field" class="form-select">
                       <option value="">Choose a field</option>
                       {% for option in field_options %}
-                        <option value="{{ option.value }}">{{ option.label }}</option>
+                        <option value="{{ option.value }}" data-field-type="{{ option.type }}">{{ option.label }}</option>
                       {% endfor %}
                     </select>
                   </div>
                   <div>
                     <label class="form-label" data-condition-label="operator">Match</label>
                     <select name="condition_operator" class="form-select">
-                      <option value="contains">Contains words</option>
-                      <option value="exact">Equals text</option>
-                      <option value="eq">Equals number</option>
-                      <option value="gt">Greater than</option>
-                      <option value="gte">At least</option>
-                      <option value="lt">Less than</option>
-                      <option value="lte">At most</option>
-                      <option value="between">Between</option>
+                      {% for value, label in operator_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                      {% endfor %}
                     </select>
                   </div>
                   <div class="condition-values">
@@ -868,6 +836,7 @@
                     </div>
                   </div>
                   <button type="button" class="btn btn-outline-secondary btn-sm condition-remove" data-remove-condition hidden>Remove</button>
+                  <span class="condition-hint text-muted small" data-condition-hint hidden>Matches one number in the array.</span>
                   <p class="condition-error text-danger small mb-0" data-condition-error hidden></p>
                 </fieldset>
               </template>
@@ -889,7 +858,7 @@
             <div class="live-data-header">
               <div>
                 <div class="live-data-title">Live Data Objects</div>
-                <div class="live-data-subtitle">Latest accessible uploads</div>
+                <div class="live-data-subtitle">Latest public uploads</div>
               </div>
               <div class="live-data-status" id="liveDataStatus">Loading</div>
             </div>
@@ -1191,7 +1160,7 @@
       if (!objects.length) {
         const emptyMessage = document.createElement("div");
         emptyMessage.className = "live-data-empty";
-        emptyMessage.textContent = "No accessible data objects yet";
+        emptyMessage.textContent = "No public data objects yet";
         liveDataList.appendChild(emptyMessage);
         return;
       }

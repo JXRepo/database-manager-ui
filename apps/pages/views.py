@@ -28,7 +28,10 @@ from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .advanced_search import (
     DATA_FIELD_CHOICES,
+    DATA_FIELD_TYPES,
     MAX_CONDITIONS,
+    OPERATOR_CHOICES,
+    get_field_operators,
     matches_conditions,
     parse_conditions,
 )
@@ -2300,14 +2303,28 @@ def search_view(request):
         filtered_objects.append(_prepare_list_object(obj))
 
     field_options = [
-        {"value": value, "label": label} for value, label in DATA_FIELD_CHOICES
+        {"value": value, "label": label, "type": DATA_FIELD_TYPES[value]}
+        for value, label in DATA_FIELD_CHOICES
     ]
     option_labels = {option["value"]: option["label"] for option in field_options}
+    operator_labels = dict(OPERATOR_CHOICES)
+    if not condition_rows:
+        condition_rows = [{"field": "", "operator": "contains", "value": "", "value_to": ""}]
     for row in condition_rows:
         row["field_available"] = row["field"] in option_labels
         row["field_label"] = option_labels.get(row["field"], row["field"])
-    if not condition_rows:
-        condition_rows = [{"field": "", "operator": "contains", "value": "", "value_to": ""}]
+        allowed_operators = get_field_operators(row["field"])
+        row["operator_choices"] = [
+            (value, label) for value, label in OPERATOR_CHOICES
+            if value in allowed_operators
+        ]
+        row["operator_available"] = row["operator"] in allowed_operators
+        row["operator_label"] = operator_labels.get(row["operator"], row["operator"] or "Choose a comparison")
+        row["array_numeric"] = (
+            DATA_FIELD_TYPES.get(row["field"]) == "array"
+            and row["operator"] not in {"contains", "exact"}
+            and row["operator_available"]
+        )
 
     context = {
         "segment": "search",
@@ -2325,6 +2342,7 @@ def search_view(request):
         "advanced_open": advanced_open,
         "condition_rows": condition_rows,
         "field_options": field_options,
+        "operator_choices": OPERATOR_CHOICES,
         "search_errors": search_errors,
         "max_conditions": MAX_CONDITIONS,
     }
@@ -2334,7 +2352,9 @@ def search_view(request):
 @login_required
 def search_live_data_objects_view(request):
     """
-    Return recent data objects the current user can access
+    Return the latest public data objects for the live activity feed
+
+    Private objects are excluded even when the current user can access them.
 
     Parameters
     ----------
@@ -2344,27 +2364,18 @@ def search_live_data_objects_view(request):
     Returns
     -------
     JsonResponse
-        Compact data object summaries.
+        Compact summaries of the twenty most recent public objects.
     """
     data_objects = (
         JSONData.objects
-        .filter(
-            Q(owner=request.user)
-            | Q(access_type="all")
-            | Q(shared_users=request.user, access_type="c")
-        )
+        .filter(access_type="all")
         .select_related("owner")
-        .prefetch_related("shared_users")
-        .distinct()
-        .order_by("-uploaded_at")[:20]
+        .order_by("-uploaded_at", "-pk")[:20]
     )
 
     objects = []
 
     for obj in data_objects:
-        if not _user_can_access_object(obj, request.user):
-            continue
-
         data = obj.data or {}
         uploaded_at = timezone.localtime(obj.uploaded_at)
         display_name = str(data.get("title") or data.get("identifier") or "Object")

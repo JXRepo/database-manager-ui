@@ -489,14 +489,21 @@ class JSONDataSharingTests(TestCase):
         self.assertContains(response, "listed-notification-object")
         self.assertContains(response, reverse("notification_open", args=[notification.pk]))
 
-    def test_live_data_endpoint_returns_accessible_objects_only(self):
+    def test_live_data_endpoint_returns_public_objects_only(self):
         """
-        Live data endpoint returns only objects the current user can access
+        Live data endpoint excludes even accessible private objects
+
+        Own and shared private data must stay out of the public activity feed.
         """
-        own_obj = JSONData.objects.create(
+        own_private_obj = JSONData.objects.create(
             owner=self.viewer,
-            data={"identifier": "own-object", "phase": "alpha"},
+            data={"identifier": "own-private-object", "phase": "alpha"},
             access_type="c",
+        )
+        own_public_obj = JSONData.objects.create(
+            owner=self.viewer,
+            data={"identifier": "own-public-object", "phase": "alpha"},
+            access_type="all",
         )
         public_obj = JSONData.objects.create(
             owner=self.owner,
@@ -523,16 +530,116 @@ class JSONDataSharingTests(TestCase):
         object_ids = {item["id"] for item in objects}
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn(own_obj.id, object_ids)
-        self.assertIn(public_obj.id, object_ids)
-        self.assertIn(shared_obj.id, object_ids)
+        self.assertEqual(object_ids, {own_public_obj.id, public_obj.id})
+        self.assertNotIn(own_private_obj.id, object_ids)
+        self.assertNotIn(shared_obj.id, object_ids)
         self.assertNotIn(private_obj.id, object_ids)
-        self.assertEqual(objects_by_id[own_obj.id]["access_badges"], ["Private"])
+        self.assertEqual(objects_by_id[own_public_obj.id]["access_badges"], ["Public"])
         self.assertEqual(objects_by_id[public_obj.id]["access_badges"], ["Public"])
+        self.assertEqual(objects_by_id[public_obj.id]["access"], "Public")
+        self.assertEqual(objects_by_id[public_obj.id]["display_name"], "public-object")
+        self.assertEqual(objects_by_id[public_obj.id]["identifier"], "public-object")
+        self.assertEqual(objects_by_id[public_obj.id]["owner"], "owner")
         self.assertEqual(
-            objects_by_id[shared_obj.id]["access_badges"],
-            ["Private", "Shared"],
+            objects_by_id[public_obj.id]["detail_url"],
+            reverse("json_data_detail", args=[public_obj.pk]),
         )
+        self.assertTrue(objects_by_id[public_obj.id]["uploaded_at"])
+
+    def test_live_data_endpoint_removes_newly_private_object_on_next_poll(self):
+        """
+        A public object disappears after its owner makes it private
+
+        Polling must recheck public visibility even for the object's owner.
+        """
+        obj = JSONData.objects.create(
+            owner=self.viewer,
+            data={"identifier": "changed-access-object", "phase": "alpha"},
+            access_type="all",
+        )
+        self.client.force_login(self.viewer)
+        url = reverse("search_live_data_objects")
+
+        first_response = self.client.get(url)
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual([item["id"] for item in first_response.json()["objects"]], [obj.pk])
+
+        obj.access_type = "c"
+        obj.save(update_fields=["access_type"])
+        next_response = self.client.get(url)
+
+        self.assertEqual(next_response.status_code, 200)
+        self.assertEqual(next_response.json()["objects"], [])
+
+    def test_live_data_endpoint_limits_public_objects_after_filtering_private_uploads(self):
+        """
+        Recent private uploads do not displace the latest twenty public objects
+
+        The result limit applies to public objects, not all accessible uploads.
+        """
+        public_ids = []
+        for index in range(21):
+            obj = JSONData.objects.create(
+                owner=self.owner,
+                data={"identifier": f"public-object-{index}", "phase": "alpha"},
+                access_type="all",
+            )
+            public_ids.append(obj.pk)
+        for index in range(21):
+            JSONData.objects.create(
+                owner=self.viewer,
+                data={"identifier": f"private-object-{index}", "phase": "alpha"},
+                access_type="c",
+            )
+        self.client.force_login(self.viewer)
+
+        response = self.client.get(reverse("search_live_data_objects"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in response.json()["objects"]],
+            list(reversed(public_ids[1:])),
+        )
+
+    def test_live_data_endpoint_orders_equal_timestamps_by_latest_object(self):
+        """
+        Simultaneous uploads retain a stable newest first order
+
+        The object ID resolves ties in the upload timestamp between polls.
+        """
+        older_obj = JSONData.objects.create(
+            owner=self.owner,
+            data={"identifier": "older-public-object", "phase": "alpha"},
+            access_type="all",
+        )
+        newer_obj = JSONData.objects.create(
+            owner=self.owner,
+            data={"identifier": "newer-public-object", "phase": "alpha"},
+            access_type="all",
+        )
+        JSONData.objects.filter(pk=newer_obj.pk).update(uploaded_at=older_obj.uploaded_at)
+        self.client.force_login(self.viewer)
+
+        response = self.client.get(reverse("search_live_data_objects"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in response.json()["objects"]],
+            [newer_obj.pk, older_obj.pk],
+        )
+
+    def test_live_data_endpoint_requires_login(self):
+        """
+        Anonymous live feed requests are redirected to login
+
+        The public activity feed remains part of the signed in search page.
+        """
+        url = reverse("search_live_data_objects")
+
+        response = self.client.get(url)
+
+        self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
 
     def test_prepared_summary_access_keeps_private_badge_when_shared(self):
         """

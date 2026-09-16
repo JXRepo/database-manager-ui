@@ -5,6 +5,7 @@ from django.http import QueryDict
 
 from .advanced_search import (
     DATA_FIELD_CHOICES,
+    get_field_operators,
     matches_conditions,
     parse_conditions,
 )
@@ -79,10 +80,74 @@ class AdvancedSearchConditionTests(TestCase):
         """
         Preserve fixed selection tokens while preparing named key matching
         """
-        rows, conditions, errors = parse_conditions(condition_query(("Grain_Number", "contains", "150")))
+        rows, conditions, errors = parse_conditions(condition_query(("Texture_Type", "contains", "random")))
         self.assertEqual(errors, [])
-        self.assertEqual(rows[0]["field"], "Grain_Number")
-        self.assertEqual(conditions, [{"field_key": "Grain_Number", "operator": "contains", "value": "150"}])
+        self.assertEqual(rows[0]["field"], "Texture_Type")
+        self.assertEqual(conditions, [{"field_key": "Texture_Type", "operator": "contains", "value": "random"}])
+
+    def test_numeric_named_fields_reject_text_operators_without_losing_rows(self):
+        """
+        Require numeric comparisons and preserve incompatible submitted intent
+
+        A stale or manually edited URL must be corrected before any rows run.
+        """
+        for field in ("Grain_Number", "Element_Number", "Scaling_Factor", "Max_Total_Strain"):
+            for operation in ("contains", "exact"):
+                with self.subTest(field=field, operation=operation):
+                    rows, conditions, errors = parse_conditions(condition_query(
+                        ("Texture_Type", "exact", "random"),
+                        (field, operation, " 150 ", ""),
+                    ))
+                    self.assertTrue(errors)
+                    self.assertEqual(conditions, [])
+                    self.assertEqual(rows[1]["field"], field)
+                    self.assertEqual(rows[1]["operator"], operation)
+                    self.assertEqual(rows[1]["value"], " 150 ")
+                    self.assertEqual(rows[1]["value_to"], "")
+                    self.assertIn(field, rows[1]["error"])
+
+    def test_text_named_fields_reject_numeric_operators_without_losing_values(self):
+        """
+        Reject numeric comparisons even when a text query looks like a number
+
+        Validation must retain range bounds so the user can correct the row.
+        """
+        fields = ("Hash_Orientation", "Texture_Type", "Load_Type", "Stress_Type", "Load_Descriptor", "Hash_load")
+        for field in fields:
+            for operation in ("eq", "gt", "gte", "lt", "lte", "between"):
+                upper = "8" if operation == "between" else ""
+                with self.subTest(field=field, operation=operation):
+                    rows, conditions, errors = parse_conditions(condition_query((field, operation, "2", upper)))
+                    self.assertTrue(errors)
+                    self.assertEqual(conditions, [])
+                    self.assertEqual(rows[0]["field"], field)
+                    self.assertEqual(rows[0]["operator"], operation)
+                    self.assertEqual(rows[0]["value"], "2")
+                    self.assertEqual(rows[0]["value_to"], upper)
+                    self.assertIn(field, rows[0]["error"])
+
+    def test_field_operator_choices_are_ordered_for_each_type_and_legacy_fields(self):
+        """
+        Give the form the same permitted comparisons that the parser accepts
+
+        Legacy paths and unrecognized tokens retain the complete operator list.
+        """
+        numeric = ("eq", "gt", "gte", "lt", "lte", "between")
+        text = ("contains", "exact")
+        all_operators = ("contains", "exact", "eq", "gt", "gte", "lt", "lte", "between")
+        cases = (
+            ("Grain_Number", numeric), ("Element_Number", numeric),
+            ("Scaling_Factor", numeric), ("Max_Total_Strain", numeric),
+            ("Hash_Orientation", text), ("Texture_Type", text),
+            ("Load_Type", text), ("Stress_Type", text),
+            ("Load_Descriptor", text), ("Hash_load", text),
+            ("Material_parameters", all_operators), ("", all_operators),
+            ('["phase","Grain_Number"]', all_operators),
+            ("Unknown_Field", all_operators),
+        )
+        for field, expected in cases:
+            with self.subTest(field=field):
+                self.assertEqual(get_field_operators(field), expected)
 
     def test_unknown_and_common_field_tokens_fail_closed(self):
         """
@@ -356,15 +421,23 @@ class AdvancedSearchMatchingTests(TestCase):
         """
         Find each Ronak key independently of its enclosing JSON structure
         """
-        fields = (
-            "Hash_Orientation", "Texture_Type", "Element_Number",
-            "Grain_Number", "Material_parameters", "Load_Type", "Stress_Type",
-            "Load_Descriptor", "Hash_load", "Scaling_Factor", "Max_Total_Strain",
+        cases = (
+            ("Hash_Orientation", "exact", "target"),
+            ("Texture_Type", "exact", "target"),
+            ("Element_Number", "eq", "150"),
+            ("Grain_Number", "eq", "150"),
+            ("Material_parameters", "exact", "target"),
+            ("Load_Type", "exact", "target"),
+            ("Stress_Type", "exact", "target"),
+            ("Load_Descriptor", "exact", "target"),
+            ("Hash_load", "exact", "target"),
+            ("Scaling_Factor", "eq", "150"),
+            ("Max_Total_Strain", "eq", "150"),
         )
-        for field in fields:
-            for data in ({field: "TARGET"}, {"simulation": [{"phase": [{field: "TARGET"}]}]}):
+        for field, operation, value in cases:
+            for data in ({field: value.upper()}, {"simulation": [{"phase": [{field: value.upper()}]}]}):
                 with self.subTest(field=field, data=data):
-                    self.assertTrue(self.matches(data, (field, "exact", "target")))
+                    self.assertTrue(self.matches(data, (field, operation, value)))
 
     def test_named_field_keys_ignore_case_but_not_suffixes_or_whitespace(self):
         """
@@ -406,9 +479,41 @@ class AdvancedSearchMatchingTests(TestCase):
         """
         Avoid turning absent or null named fields into textual candidates
         """
-        for data in ({}, {"Grain_Number": None}, {"Grain_Number": ""}):
+        for data in ({}, {"Texture_Type": None}, {"Texture_Type": ""}):
             with self.subTest(data=data):
-                self.assertFalse(self.matches(data, ("Grain_Number", "contains", "none")))
+                self.assertFalse(self.matches(data, ("Texture_Type", "contains", "none")))
+
+    def test_all_allowed_named_field_operators_match_values_of_their_type(self):
+        """
+        Keep every permitted comparison usable for scalar and array fields
+
+        Array comparisons retain whole value text and individual numeric values.
+        """
+        numeric_fields = ("Grain_Number", "Element_Number", "Scaling_Factor", "Max_Total_Strain", "Material_parameters")
+        numeric_rows = (
+            ("eq", "5", ""), ("gt", "4", ""), ("gte", "5", ""),
+            ("lt", "6", ""), ("lte", "5", ""), ("between", "4", "6"),
+        )
+        for field in numeric_fields:
+            value = [1, 5, 9] if field == "Material_parameters" else 5
+            for operation, lower, upper in numeric_rows:
+                with self.subTest(field=field, operation=operation):
+                    self.assertTrue(self.matches({field: value}, (field, operation, lower, upper)))
+        text_fields = ("Hash_Orientation", "Texture_Type", "Load_Type", "Stress_Type", "Load_Descriptor", "Hash_load")
+        for field in text_fields:
+            for operation, value in (("contains", "target"), ("exact", "target value")):
+                with self.subTest(field=field, operation=operation):
+                    self.assertTrue(self.matches({field: "TARGET VALUE"}, (field, operation, value)))
+
+    def test_legacy_paths_keep_operators_that_are_invalid_for_the_named_field(self):
+        """
+        Preserve saved explicit path semantics independently of the new types
+
+        Only named catalog tokens use the field specific operator restrictions.
+        """
+        self.assertTrue(self.matches({"phase": {"Grain_Number": 150}},
+                                     ('["phase","Grain_Number"]', "contains", "15")))
+        self.assertTrue(self.matches({"Texture_Type": "150"}, ('["Texture_Type"]', "gt", "100")))
 
     def test_material_parameters_matches_whole_array_and_object_text(self):
         """

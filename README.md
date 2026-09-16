@@ -142,6 +142,10 @@ the older `keywords` parameter keep an editable Keywords input while it is activ
 
 - **Contains words** requires all entered words in the selected field.
 - **Equals text** matches a complete value, ignoring letter case.
+- **Match** follows the selected field: counts, scaling factor, and maximum
+  total strain offer number comparisons; hashes, types, and descriptors offer
+  text matching. Material parameter arrays offer both. When comparing numbers
+  in an array, the form explains that one array value must match.
 - Number comparisons support equals, greater or less than, inclusive limits,
   and **Between** with both endpoints included. Numeric strings are accepted;
   booleans and values containing units are not treated as numbers. Use the units
@@ -156,8 +160,10 @@ the older `keywords` parameter keep an editable Keywords input while it is activ
   refresh and bookmarks preserve them. Do not put secrets in search terms.
 
 Results only include records you own, public records, and private records
-explicitly shared with you. **Live Data Objects** remains a
-separate feed of the latest accessible uploads; it is not filtered by the form.
+explicitly shared with you. **Live Data Objects** is a separate, compact feed of
+the latest 20 public uploads; it excludes all private data, including your own
+and data shared with you. It is not filtered by the search form. Longer feeds
+scroll within the panel rather than stretching each card.
 This pilot searches stored JSON in the application; it is not intended for large
 scale indexed search.
 
