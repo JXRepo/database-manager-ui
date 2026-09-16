@@ -83,6 +83,18 @@ class SignInForm(AuthenticationForm):
         )
     )
 
+    remember_me = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Remember me",
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "form-check-input input-primary",
+                "aria-describedby": "remember-me-help",
+            }
+        ),
+    )
+
 
 class AccountSettingsForm(forms.ModelForm):
     """Update basic account profile fields"""

@@ -91,6 +91,7 @@ class ORCIDTransactionTests(TestCase):
             "user_id": None,
             "created_at": self.now.timestamp(),
             "next": "/search/",
+            "remember_me": False,
         }
         payload.update(overrides)
         return payload
@@ -128,6 +129,7 @@ class ORCIDTransactionTests(TestCase):
                 "user_id": 42,
                 "created_at": self.now.timestamp(),
                 "next": "/search/?q=alloys",
+                "remember_me": False,
             },
         )
         self.assertIsInstance(json.dumps(payload), str)
@@ -163,6 +165,54 @@ class ORCIDTransactionTests(TestCase):
 
         with self.assertRaises(ORCIDFlowError):
             consume_orcid_transaction(self.request, state)
+
+    def test_start_defaults_to_an_unremembered_transaction(self):
+        """
+        Use an ordinary ORCID session unless the browser explicitly opts in
+        """
+        state = start_orcid_transaction(self.request, "login")
+
+        self.assertIs(
+            self.request.session[ORCID_TRANSACTION_SESSION_KEY].get("remember_me"),
+            False,
+        )
+        consumed = consume_orcid_transaction(self.request, state)
+        self.assertIs(consumed.remember_me, False)
+
+    def test_non_boolean_remember_values_are_consumed_before_rejection(self):
+        """
+        Reject malformed persistence choices without leaving reusable state
+        """
+        for remember_me in (None, "on", "false", 0, 1, [], {}):
+            with self.subTest(remember_me=remember_me):
+                self._store_payload(self._payload(remember_me=remember_me))
+                with self.assertRaises(ORCIDFlowError):
+                    consume_orcid_transaction(self.request, "stored-state")
+                self.assertNotIn(ORCID_TRANSACTION_SESSION_KEY, self.request.session)
+
+    def test_start_rejects_non_boolean_remember_values(self):
+        """
+        Refuse ambiguous persistence choices before creating authorization state
+        """
+        for remember_me in (None, "on", "false", 0, 1, [], {}):
+            with self.subTest(remember_me=remember_me):
+                self._store_payload(self._payload())
+                with self.assertRaises(ORCIDFlowError):
+                    start_orcid_transaction(self.request, "login", remember_me=remember_me)
+                self.assertNotIn(ORCID_TRANSACTION_SESSION_KEY, self.request.session)
+
+    def test_missing_remember_choice_is_consumed_before_rejection(self):
+        """
+        Keep the transaction schema strict when a persistence field is missing
+        """
+        payload = self._payload()
+        payload.pop("remember_me")
+        self._store_payload(payload)
+
+        with self.assertRaises(ORCIDFlowError):
+            consume_orcid_transaction(self.request, "stored-state")
+
+        self.assertNotIn(ORCID_TRANSACTION_SESSION_KEY, self.request.session)
 
     def test_returned_transaction_is_frozen(self):
         """Consumed transaction values cannot be changed by later flow code"""
@@ -503,6 +553,7 @@ class ORCIDStartTests(TestCase):
             "user_id": None,
             "created_at": 1,
             "next": "/obsolete/",
+            "remember_me": False,
         }
         session.save()
 
@@ -737,7 +788,7 @@ class ORCIDStartTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
-            f'<a href="{expected_orcid_url}"',
+            f'href="{expected_orcid_url}"',
             html=False,
         )
         self.assertContains(response, "Sign in with ORCID")
@@ -835,6 +886,7 @@ class ORCIDCallbackTestMixin:
             "user_id": user_id,
             "created_at": created_at,
             "next": next_url,
+            "remember_me": False,
         }
         session.save()
         return state
@@ -2112,3 +2164,180 @@ class ORCIDCallbackFailureTests(ORCIDCallbackTestMixin, TestCase):
         self.assertEqual(response.status_code, 405)
         self.assertIn(ORCID_TRANSACTION_SESSION_KEY, self.client.session)
         self.exchange.assert_not_called()
+
+
+@override_settings(
+    ORCID_CLIENT_ID="APP-TEST",
+    ORCID_CLIENT_SECRET="super-secret-value",
+    ORCID_BASE_URL="https://sandbox.orcid.org",
+)
+class ORCIDRememberSessionTests(ORCIDCallbackTestMixin, TestCase):
+    """
+    Exercise session persistence through real ORCID start and callback views
+    """
+
+    def test_start_accepts_only_the_checked_checkbox_value(self):
+        """
+        Record an explicit checkbox choice without accepting truthy strings
+        """
+        for submitted, expected in ((None, False), ("on", True), ("false", False), ("1", False)):
+            with self.subTest(submitted=submitted):
+                query = {} if submitted is None else {"remember_me": submitted}
+                response = self.client.get(reverse("orcid_login"), query)
+
+                self.assertEqual(response.status_code, 302)
+                self.assertIs(
+                    self.client.session[ORCID_TRANSACTION_SESSION_KEY].get("remember_me"),
+                    expected,
+                )
+
+    def test_callback_uses_stored_choice_and_the_initial_login_deadline(self):
+        """
+        Ignore callback persistence values and apply the original login choice
+        """
+        user = User.objects.create_user(username="remembered-orcid", password="password")
+        AccountProfile.objects.create(user=user, authenticated_orcid=self.primary_orcid)
+        now = timezone.now()
+
+        for remember_me, lifetime in ((False, 30 * 24 * 60 * 60), (True, 365 * 24 * 60 * 60)):
+            with self.subTest(remember_me=remember_me):
+                self.client.logout()
+                with patch("apps.pages.orcid_auth.timezone.now", return_value=now):
+                    self.client.get(
+                        reverse("orcid_login"),
+                        {"remember_me": "on" if remember_me else ""},
+                    )
+                    state = self.client.session[ORCID_TRANSACTION_SESSION_KEY]["state"]
+                    response = self.client.get(
+                        reverse("orcid_callback"),
+                        {
+                            "state": state,
+                            "code": self.authorization_code,
+                            "remember_me": "" if remember_me else "on",
+                        },
+                    )
+
+                self.assertEqual(response["Location"], "/search/")
+                session = self.client.session
+                self.assertEqual(session["_auth_user_id"], str(user.pk))
+                self.assertEqual(session.get("login_expires_at"), now.timestamp() + lifetime)
+                self.assertIs(session.get("login_remember_me"), remember_me)
+                self.assertFalse(session.get_expire_at_browser_close())
+                cookie = response.cookies[settings.SESSION_COOKIE_NAME]
+                self.assertTrue(cookie["max-age"])
+                self.assertTrue(cookie["expires"])
+
+    def test_only_remembered_orcid_sessions_renew_on_later_visits(self):
+        """
+        Renew remembered ORCID sessions without extending ordinary login sessions
+
+        A normal page visit two days later exercises the shared policy using
+        the choice stored by the real authorization start and callback views.
+        """
+        user = User.objects.create_user(username="returning-orcid", password="password")
+        AccountProfile.objects.create(user=user, authenticated_orcid=self.primary_orcid)
+        now = timezone.now()
+
+        for remember_me, expected_days in ((False, 30), (True, 367)):
+            with self.subTest(remember_me=remember_me):
+                self.client.logout()
+                with patch("apps.pages.orcid_auth.timezone.now", return_value=now):
+                    self.client.get(
+                        reverse("orcid_login"),
+                        {"remember_me": "on" if remember_me else ""},
+                    )
+                    state = self.client.session[ORCID_TRANSACTION_SESSION_KEY]["state"]
+                    callback = self.client.get(
+                        reverse("orcid_callback"),
+                        {"state": state, "code": self.authorization_code},
+                    )
+                self.assertEqual(callback["Location"], "/search/")
+
+                with patch(
+                    "apps.pages.orcid_auth.timezone.now",
+                    return_value=now + timedelta(days=2),
+                ):
+                    response = self.client.get(
+                        reverse("search"),
+                        HTTP_SEC_FETCH_DEST="document",
+                        HTTP_SEC_FETCH_MODE="navigate",
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                session = self.client.session
+                self.assertEqual(session["_auth_user_id"], str(user.pk))
+                self.assertIs(session.get("login_remember_me"), remember_me)
+                self.assertEqual(
+                    session.get("login_expires_at"),
+                    (now + timedelta(days=expected_days)).timestamp(),
+                )
+                self.assertFalse(session.get_expire_at_browser_close())
+
+    def test_first_orcid_login_retains_persistence_during_required_setup(self):
+        """
+        Apply the remembered deadline before redirecting a new account to setup
+        """
+        now = timezone.now()
+        with patch("apps.pages.orcid_auth.timezone.now", return_value=now):
+            self.client.get(reverse("orcid_login"), {"remember_me": "on"})
+            state = self.client.session[ORCID_TRANSACTION_SESSION_KEY]["state"]
+            response = self.client.get(
+                reverse("orcid_callback"),
+                {"state": state, "code": self.authorization_code},
+            )
+
+        self.assertEqual(response["Location"], "/settings/orcid/setup/?next=%2Fsearch%2F")
+        self.assertEqual(
+            self.client.session.get("login_expires_at"),
+            now.timestamp() + 365 * 24 * 60 * 60,
+        )
+        self.assertIs(self.client.session.get("login_remember_me"), True)
+        self.assertFalse(self.client.session.get_expire_at_browser_close())
+
+    def test_authenticated_login_and_link_do_not_extend_existing_deadlines(self):
+        """
+        Preserve the current session when ORCID verifies an authenticated user
+        """
+        user = User.objects.create_user(username="signed-in-orcid", password="password")
+        AccountProfile.objects.create(user=user, authenticated_orcid=self.primary_orcid)
+
+        for route in ("orcid_login", "orcid_connect"):
+            with self.subTest(route=route):
+                self.client.force_login(user)
+                session = self.client.session
+                deadline = timezone.now() + timedelta(hours=2)
+                session["login_expires_at"] = deadline.timestamp()
+                session.set_expiry(0)
+                session.save()
+
+                self.client.get(reverse(route), {"remember_me": "on"})
+                state = self.client.session[ORCID_TRANSACTION_SESSION_KEY]["state"]
+                response = self.client.get(
+                    reverse("orcid_callback"),
+                    {"state": state, "code": self.authorization_code},
+                )
+
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(self.client.session["login_expires_at"], deadline.timestamp())
+                self.assertTrue(self.client.session.get_expire_at_browser_close())
+
+    def test_registration_auto_login_uses_an_unremembered_deadline(self):
+        """
+        Use an ordinary fixed session after registration even if remember is submitted
+        """
+        now = timezone.now()
+        with patch("apps.pages.views.timezone.now", return_value=now):
+            response = self.client.post(
+                reverse("register"),
+                {
+                    "username": "new-unremembered-user",
+                    "password1": "Sample!StrongPass924",
+                    "password2": "Sample!StrongPass924",
+                    "remember_me": "on",
+                },
+            )
+
+        self.assertEqual(response["Location"], "/search/")
+        self.assertEqual(self.client.session.get("login_expires_at"), now.timestamp() + 30 * 24 * 60 * 60)
+        self.assertIs(self.client.session.get("login_remember_me"), False)
+        self.assertFalse(self.client.session.get_expire_at_browser_close())

@@ -25,6 +25,14 @@ from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS, validate_json
 from numbers import Number
 
 from .rate_limits import consume_rate_limit, get_client_identifier
+from .session_policy import apply_login_session_policy
+from .advanced_search import (
+    MAX_CONDITIONS,
+    discover_fields,
+    format_field_path,
+    matches_conditions,
+    parse_conditions,
+)
 from .orcid_auth import (
     ORCID_TRANSACTION_SESSION_KEY,
     ORCIDFlowError,
@@ -119,7 +127,21 @@ def sample_page(request):
 
 
 def register_view(request):
-  """Register a new user and log them in"""
+  """
+  Register a new user and start an ordinary fixed login session
+
+  Registration uses the thirty day default without remembered session renewal.
+
+  Parameters
+  ----------
+  request : HttpRequest
+      Request to display or submit the registration form.
+
+  Returns
+  -------
+  HttpResponse
+      Registration form, rate limit response, or redirect after login.
+  """
   if request.method == "POST":
     try:
       decision = consume_rate_limit(
@@ -138,6 +160,7 @@ def register_view(request):
     if form.is_valid():
       user = form.save()
       login(request, user)
+      apply_login_session_policy(request)
       return redirect("search")
   else:
     form = SignUpForm()
@@ -360,6 +383,26 @@ def _exchange_orcid_authorization_code(code, redirect_uri):
 def _start_orcid_authorization(request, intent, user_id, failure_url, message):
     """
     Start one rate limited ORCID authorization transaction
+
+    Store the browser's login preference without changing an existing session.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Request carrying a local redirect and optional persistence choice.
+    intent : str
+        Login or link action to authorize.
+    user_id : int or None
+        Account initiating a link action.
+    failure_url : str
+        Local destination when provider setup is unavailable.
+    message : str
+        User facing explanation when provider setup is unavailable.
+
+    Returns
+    -------
+    HttpResponse
+        Provider authorization redirect or a controlled failure response.
     """
     had_transaction = ORCID_TRANSACTION_SESSION_KEY in request.session
     request.session.pop(ORCID_TRANSACTION_SESSION_KEY, None)
@@ -394,6 +437,7 @@ def _start_orcid_authorization(request, intent, user_id, failure_url, message):
         intent,
         user_id=user_id,
         next_url=request.GET.get("next", ""),
+        remember_me=intent == "login" and request.GET.get("remember_me") == "on",
     )
     return redirect(
         _build_orcid_authorization_url(
@@ -513,6 +557,7 @@ def orcid_callback_view(request):
         request,
         orcid,
         orcid_transaction.next_url,
+        remember_me=orcid_transaction.remember_me,
     )
 
 
@@ -2135,7 +2180,20 @@ def notification_mark_all_read_view(request):
 @login_required
 def search_view(request):
     """
-    Display the dedicated advanced global search page
+    Search accessible records using common metadata and optional field conditions
+
+    Field suggestions and results use the same permission scope. Invalid
+    conditions leave the form editable without returning broader results.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated request containing optional search parameters.
+
+    Returns
+    -------
+    HttpResponse
+        Search form, accessible field choices, and matching records.
     """
     keyword = request.GET.get("keyword", "").strip()
     title = request.GET.get("title", "").strip()
@@ -2147,12 +2205,12 @@ def search_view(request):
     owner_name = request.GET.get("owner", "").strip()
     access = request.GET.get("access", "").strip()
 
-    if access not in {"public", "my_private"}:
+    if access not in {"public", "my_private", "my_data", "shared_with_me"}:
         access = ""
 
-    search_performed = any(
+    condition_rows, conditions, search_errors = parse_conditions(request.GET)
+    advanced_open = any(
         [
-            keyword,
             title,
             identifier,
             creator,
@@ -2161,37 +2219,69 @@ def search_view(request):
             keywords_value,
             owner_name,
             access,
+            condition_rows,
+            search_errors,
         ]
     )
+    search_performed = bool(keyword or advanced_open)
+    keyword_terms = _split_keyword_terms(keyword)
+    common_queries = {
+        "title": title,
+        "identifier": identifier,
+        "creator": creator,
+        "software": software,
+        "phase": phase,
+        "keywords": keywords_value,
+        "owner": owner_name,
+    }
+    common_terms = {
+        key: _split_keyword_terms(value) for key, value in common_queries.items()
+    }
 
     filtered_objects = []
+    field_paths = set()
+    max_field_options = 500
+    field_options_truncated = False
+    data_objects = (
+        JSONData.objects
+        .filter(Q(owner=request.user) | Q(access_type="all") | Q(shared_users=request.user))
+        .distinct()
+        .select_related("owner")
+        .prefetch_related("shared_users")
+        .order_by("-uploaded_at")
+    )
 
-    if search_performed:
-        data_objects = (
-            JSONData.objects
-            .select_related("owner")
-            .prefetch_related("shared_users")
-            .order_by("-uploaded_at")
+    for obj in data_objects:
+        data = obj.data if isinstance(obj.data, dict) else {}
+        if not field_options_truncated:
+            for path in discover_fields(data):
+                if path in field_paths:
+                    continue
+                if len(field_paths) >= max_field_options:
+                    field_options_truncated = True
+                    break
+                field_paths.add(path)
+
+        if not search_performed or search_errors:
+            continue
+
+        specifically_shared = (
+            obj.owner_id != request.user.id
+            and obj.access_type != "all"
+            and any(user.pk == request.user.pk for user in obj.shared_users.all())
         )
-
-        for obj in data_objects:
-            if not _user_can_access_object(obj, request.user):
+        if access == "public" and obj.access_type != "all":
+            continue
+        if access == "my_data" and obj.owner_id != request.user.id:
+            continue
+        if access == "my_private":
+            if not (obj.owner_id == request.user.id and obj.access_type == "c"):
                 continue
+        if access == "shared_with_me" and not specifically_shared:
+            continue
 
-            data = obj.data or {}
-
-            title_text = _normalize_search_value(data.get("title", ""))
-            identifier_text = _normalize_search_value(data.get("identifier", ""))
-            creator_text = _normalize_search_value(data.get("creator", ""))
-            creator_affiliation_text = _normalize_search_value(
-                data.get("creator_affiliation", "")
-            )
-            software_text = _normalize_search_value(data.get("software", ""))
-            keywords_text = _normalize_search_value(data.get("keywords", ""))
-            phase_text = _normalize_search_value(data.get("phase", ""))
-            owner_text = _normalize_search_value(obj.owner.username)
-
-            if _user_has_specific_share(obj, request.user):
+        if keyword_terms:
+            if specifically_shared:
                 access_text = "shared with me"
             elif obj.owner_id == request.user.id and obj.access_type == "c":
                 access_text = "my private"
@@ -2199,47 +2289,42 @@ def search_view(request):
                 access_text = "public"
             else:
                 access_text = "shared"
-
             full_text = _build_basic_search_text(obj, access_text)
-
-            keyword_terms = _split_keyword_terms(keyword)
-
-            if keyword_terms and not all(term in full_text for term in keyword_terms):
+            if not all(term in full_text for term in keyword_terms):
                 continue
 
-            if title and title.casefold() not in title_text.casefold():
+        common_match = True
+        for field, terms in common_terms.items():
+            if not terms:
                 continue
+            if field == "owner":
+                value = obj.owner.username
+            elif field == "creator":
+                value = [data.get("creator"), data.get("creator_affiliation")]
+            else:
+                value = data.get(field)
+            text = _normalize_search_value(value).casefold()
+            if not all(term in text for term in terms):
+                common_match = False
+                break
+        if not common_match or not matches_conditions(data, conditions):
+            continue
 
-            if identifier and identifier.casefold() not in identifier_text.casefold():
-                continue
+        filtered_objects.append(_prepare_list_object(obj))
 
-            creator_full_text = " ".join(
-                [creator_text, creator_affiliation_text]
-            ).casefold()
-
-            if creator and creator.casefold() not in creator_full_text:
-                continue
-
-            if software and software.casefold() not in software_text.casefold():
-                continue
-
-            if phase and phase.casefold() not in phase_text.casefold():
-                continue
-
-            if keywords_value and keywords_value.casefold() not in keywords_text.casefold():
-                continue
-
-            if owner_name and owner_name.casefold() not in owner_text.casefold():
-                continue
-
-            if access == "public" and obj.access_type != "all":
-                continue
-
-            if access == "my_private":
-                if not (obj.owner_id == request.user.id and obj.access_type == "c"):
-                    continue
-
-            filtered_objects.append(_prepare_list_object(obj))
+    field_options = [
+        {
+            "value": json.dumps(path, ensure_ascii=False, separators=(",", ":")),
+            "label": format_field_path(path),
+        }
+        for path in sorted(field_paths, key=lambda path: (format_field_path(path).casefold(), path))
+    ]
+    option_labels = {option["value"]: option["label"] for option in field_options}
+    for row in condition_rows:
+        row["field_available"] = row["field"] in option_labels
+        row["field_label"] = option_labels.get(row["field"], row["field"])
+    if not condition_rows:
+        condition_rows = [{"field": "", "operator": "contains", "value": "", "value_to": ""}]
 
     context = {
         "segment": "search",
@@ -2254,6 +2339,12 @@ def search_view(request):
         "keywords_value": keywords_value,
         "owner_name": owner_name,
         "access": access,
+        "advanced_open": advanced_open,
+        "condition_rows": condition_rows,
+        "field_options": field_options,
+        "field_options_truncated": field_options_truncated,
+        "search_errors": search_errors,
+        "max_conditions": MAX_CONDITIONS,
     }
     return render(request, "pages/search.html", context)
 

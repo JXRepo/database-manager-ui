@@ -35,6 +35,19 @@ on the hosted website; deploying the code does not copy them to the cloud.
   consist only of numbers, be commonly used, or be too similar to account details.
 - Email is optional. Email verification and email password recovery are not
   available during the pilot.
+- Remember me is off by default. Without it, a password or ORCID login lasts
+  30 days from sign in, even across browser restarts. Activity does not extend
+  this limit. Selecting Remember me starts a persistent session lasting 365 days.
+  Normal page visits renew it for another 365 days, at most once a day;
+  background refreshes do not renew it. Regular use therefore avoids a fixed
+  monthly or quarterly sign in requirement. A remembered session can still
+  expire after a long absence, and clearing cookies or security changes may
+  require signing in again. Sign out ends the session immediately; always
+  sign out on shared or public computers.
+  Registration uses the fixed default of 30 days. Sessions without login policy
+  metadata receive that default on their next authenticated request.
+  Admin login remains separate: it lasts at most 8 hours and normally ends
+  when the browser session closes.
 - To connect ORCID to an existing platform account, sign in to that account first
   and select Connect ORCID in Account Settings. Signing in directly with an
   unlinked ORCID identity creates a separate account; matching names or email
@@ -94,7 +107,7 @@ write data.
 - Unwrap a single object, a list of objects, or a dict with a top-level `data` list.
 - Validate required top-level fields before saving.
 - Save each valid data object as one `JSONData` record.
-- Search accessible data by practical metadata fields.
+- Search accessible data by metadata, nested fields, and numeric comparisons.
 - View compact detail pages with plots and mechanical boundary condition summaries.
 - Manage owned data in My Data.
 - Share private data with specific usernames.
@@ -104,6 +117,37 @@ Each valid data object becomes a separate `JSONData` record. The original
 uploaded file is not retained. An upload with both valid and invalid objects can
 save the valid objects and report errors for the others; a resource limit failure
 rejects the submission.
+
+## Search
+
+The main search box and common Advanced Search fields require every word you
+enter to appear in the matching record or selected field. Word order and letter
+case do not matter. These are text matches, not a semantic search.
+
+In **Advanced Search**, use **Data field conditions** to choose a field from
+accessible records, select a comparison, and enter a value. You can add up to
+10 conditions. All conditions, common fields, and the main search box must match
+the same data object.
+
+- **Contains words** requires all entered words in the selected field.
+- **Equals text** matches a complete value, ignoring letter case.
+- Number comparisons support equals, greater or less than, inclusive limits,
+  and **Between** with both endpoints included. Numeric strings are accepted;
+  booleans and values containing units are not treated as numbers. Use the units
+  stored in the record; search does not convert units.
+- Field labels show the full location, such as `phase / Grain_Number`. Arrays
+  are searched without entering an index. A numeric comparison or range must
+  match one value. Separate conditions can match different entries within the
+  same data object.
+- Invalid or incomplete conditions show an error and do not run a broader search.
+- **Clear** resets the search. Submitted conditions remain in the URL, so browser
+  refresh and bookmarks preserve them. Do not put secrets in search terms.
+
+Field suggestions and results only include records you own, public records, and
+private records explicitly shared with you. **Live Data Objects** remains a
+separate feed of the latest accessible uploads; it is not filtered by the form.
+The field list shows up to 500 distinct paths. This pilot searches stored JSON in
+the application; it is not intended for large scale indexed search.
 
 ## Access Rules
 

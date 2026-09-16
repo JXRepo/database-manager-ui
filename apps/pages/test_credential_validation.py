@@ -324,6 +324,8 @@ class ORCIDCredentialValidationTests(TestCase):
         """
         Pass through the setup gate while preserving user, profile, and session
         """
+        # initialize the login policy before the page starts credential previews
+        self.assertEqual(self.client.get(reverse("orcid_setup_credentials")).status_code, 200)
         user_before = User.objects.values().get(pk=self.user.pk)
         profile_before = AccountProfile.objects.values().get(pk=self.profile.pk)
         session_before = dict(self.client.session)

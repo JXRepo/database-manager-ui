@@ -1,4 +1,5 @@
 {% extends "layouts/base.html" %}
+{% load static %}
 
 {% block title %}Search{% endblock title %}
 
@@ -105,6 +106,53 @@
   .advanced-panel .form-control,
   .advanced-panel .form-select {
     min-height: 44px;
+  }
+
+  .data-field-conditions {
+    margin-top: 22px;
+  }
+
+  .condition-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.5fr) auto;
+    align-items: end;
+    gap: 10px;
+    min-width: 0;
+    padding: 14px 0;
+    margin: 0;
+    border: 0;
+    border-top: 1px solid #eef2f7;
+  }
+
+  .condition-values {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .condition-remove {
+    min-height: 44px;
+  }
+
+  .condition-error {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 768px) {
+    .condition-row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .condition-field,
+    .condition-values {
+      grid-column: 1 / -1;
+    }
+
+    .condition-remove {
+      grid-column: 2;
+      justify-self: end;
+    }
   }
 
 
@@ -556,6 +604,12 @@
     }
   }
 </style>
+<noscript>
+  <style>
+    #advancedSearchPanel { display: block; }
+    .advanced-toggle-btn { display: none; }
+  </style>
+</noscript>
 
 <div class="pc-container">
   <div class="pc-content">
@@ -589,7 +643,7 @@
     <div class="card search-bar-card {% if not search_performed %}search-live-expanded{% endif %}">
       <div class="card-body py-4">
         <div class="search-hero-wrap">
-          <form method="get">
+          <form method="get" id="advancedSearchForm">
 
 
             <div class="search-main-row">
@@ -598,6 +652,7 @@
                 name="keyword"
                 id="id_keyword"
                 class="form-control search-main-input"
+                aria-label="Search accessible data"
                 placeholder="Search by keyword, phase, creator, software, or identifier"
                 value="{{ keyword }}"
               >
@@ -611,7 +666,7 @@
                     type="button"
                     data-bs-toggle="collapse"
                     data-bs-target="#advancedSearchPanel"
-                    aria-expanded="{% if title or identifier or creator or software or phase or keywords_value or owner_name or access %}true{% else %}false{% endif %}"
+                    aria-expanded="{% if advanced_open %}true{% else %}false{% endif %}"
                     aria-controls="advancedSearchPanel"
                   >
                     <i data-feather="sliders"></i>
@@ -623,24 +678,23 @@
                   </a>
                 </div>
 
-<!--            <div class="advanced-toggle-row">-->
-<!--              <button-->
-<!--                class="advanced-toggle-btn"-->
-<!--                type="button"-->
-<!--                data-bs-toggle="collapse"-->
-<!--                data-bs-target="#advancedSearchPanel"-->
-<!--                aria-expanded="{% if title or identifier or creator or software or phase or keywords_value or owner_name or access %}true{% else %}false{% endif %}"-->
-<!--                aria-controls="advancedSearchPanel"-->
-<!--              >-->
-<!--                Advanced Search-->
-<!--              </button>-->
-<!--            </div>-->
-
-
             <div
               id="advancedSearchPanel"
-              class="collapse advanced-panel {% if title or identifier or creator or software or phase or keywords_value or owner_name or access %}show{% endif %}"
+              class="collapse advanced-panel {% if advanced_open %}show{% endif %}"
             >
+              <p class="text-muted small mb-3" id="advancedSearchHint">
+                All conditions must match. Words can appear in any order. Text matching ignores case.
+              </p>
+              {% if search_errors %}
+                <div class="alert alert-danger py-2" role="alert" id="searchErrors">
+                  <p class="mb-1">Check your search conditions:</p>
+                  <ul class="mb-0 ps-3">
+                    {% for error in search_errors %}
+                      <li>{{ error }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
               <div class="row g-3">
                 <div class="col-md-3">
                   <label for="id_identifier" class="form-label">Identifier</label>
@@ -663,28 +717,134 @@
                 </div>
 
                 <div class="col-md-3">
+                  <label for="id_owner" class="form-label">Owner</label>
+                  <input type="text" name="owner" id="id_owner" class="form-control" value="{{ owner_name }}">
+                </div>
+
+                <div class="col-md-3">
                   <label for="id_access" class="form-label">Access</label>
                   <select name="access" id="id_access" class="form-select">
                     <option value="" {% if not access %}selected{% endif %}>Any Accessible</option>
                     <option value="public" {% if access == "public" %}selected{% endif %}>Public</option>
+                    <option value="my_data" {% if access == "my_data" %}selected{% endif %}>My Data</option>
                     <option value="my_private" {% if access == "my_private" %}selected{% endif %}>My Private</option>
+                    <option value="shared_with_me" {% if access == "shared_with_me" %}selected{% endif %}>Shared with Me</option>
                   </select>
                 </div>
 
 
-                <div class="col-md-6">
+                <div class="col-md-3">
                   <label for="id_title" class="form-label">Title</label>
                   <input type="text" name="title" id="id_title" class="form-control" value="{{ title }}">
                 </div>
 
 
-                <div class="col-md-6">
+                <div class="col-md-3">
                   <label for="id_keywords" class="form-label">Metadata Keywords</label>
                   <input type="text" name="keywords" id="id_keywords" class="form-control" value="{{ keywords_value }}">
                 </div>
 
 
               </div>
+
+              <section class="data-field-conditions" aria-labelledby="dataFieldConditionsTitle">
+                <h6 id="dataFieldConditionsTitle" class="mb-1">Data field conditions</h6>
+                <p class="text-muted small mb-2">Choose fields from data you can access. Add up to {{ max_conditions }} conditions.</p>
+                {% if field_options_truncated %}
+                  <p class="text-muted small mb-2">The field list is limited to the first 500 fields.</p>
+                {% endif %}
+                <div id="dataFieldConditions" data-max-conditions="{{ max_conditions }}">
+                  {% for row in condition_rows %}
+                    <fieldset class="condition-row" data-condition-row>
+                      <legend class="visually-hidden" data-condition-legend>Data field condition {{ forloop.counter }}</legend>
+                      <div class="condition-field">
+                        <label for="condition-{{ forloop.counter }}-field" class="form-label" data-condition-label="field">Data field</label>
+                        <select name="condition_field" id="condition-{{ forloop.counter }}-field" class="form-select">
+                          <option value="">Choose a field</option>
+                          {% if row.field and not row.field_available %}
+                            <option value="{{ row.field }}" selected>{{ row.field_label }} (unavailable)</option>
+                          {% endif %}
+                          {% for option in field_options %}
+                            <option value="{{ option.value }}" {% if option.value == row.field %}selected{% endif %}>{{ option.label }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div>
+                        <label for="condition-{{ forloop.counter }}-operator" class="form-label" data-condition-label="operator">Match</label>
+                        <select name="condition_operator" id="condition-{{ forloop.counter }}-operator" class="form-select">
+                          {% if row.operator and row.operator != "contains" and row.operator != "exact" and row.operator != "eq" and row.operator != "gt" and row.operator != "gte" and row.operator != "lt" and row.operator != "lte" and row.operator != "between" %}
+                            <option value="{{ row.operator }}" selected>{{ row.operator }} (unsupported)</option>
+                          {% endif %}
+                          <option value="contains" {% if row.operator == "contains" %}selected{% endif %}>Contains words</option>
+                          <option value="exact" {% if row.operator == "exact" %}selected{% endif %}>Equals text</option>
+                          <option value="eq" {% if row.operator == "eq" %}selected{% endif %}>Equals number</option>
+                          <option value="gt" {% if row.operator == "gt" %}selected{% endif %}>Greater than</option>
+                          <option value="gte" {% if row.operator == "gte" %}selected{% endif %}>At least</option>
+                          <option value="lt" {% if row.operator == "lt" %}selected{% endif %}>Less than</option>
+                          <option value="lte" {% if row.operator == "lte" %}selected{% endif %}>At most</option>
+                          <option value="between" {% if row.operator == "between" %}selected{% endif %}>Between</option>
+                        </select>
+                      </div>
+                      <div class="condition-values">
+                        <div>
+                          <label for="condition-{{ forloop.counter }}-value" class="form-label" data-condition-label="value">{% if row.operator == "between" %}Minimum{% else %}Value{% endif %}</label>
+                          <input type="text" name="condition_value" id="condition-{{ forloop.counter }}-value" class="form-control" value="{{ row.value }}">
+                        </div>
+                        <div data-condition-upper>
+                          <label for="condition-{{ forloop.counter }}-value_to" class="form-label" data-condition-label="value_to">Maximum (Between only)</label>
+                          <input type="text" name="condition_value_to" id="condition-{{ forloop.counter }}-value_to" class="form-control" value="{{ row.value_to }}" inputmode="decimal">
+                        </div>
+                      </div>
+                      <button type="button" class="btn btn-outline-secondary btn-sm condition-remove" data-remove-condition aria-label="Remove condition {{ forloop.counter }}" hidden>Remove</button>
+                      <p class="condition-error text-danger small mb-0" data-condition-error id="condition-{{ forloop.counter }}-error" {% if not row.error %}hidden{% endif %}>{{ row.error }}</p>
+                    </fieldset>
+                  {% endfor %}
+                </div>
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="addConditionButton" hidden>Add condition</button>
+                  <span class="text-muted small" id="conditionStatus" role="status" aria-live="polite"></span>
+                </div>
+              </section>
+
+              <template id="conditionRowTemplate">
+                <fieldset class="condition-row" data-condition-row>
+                  <legend class="visually-hidden" data-condition-legend>Data field condition</legend>
+                  <div class="condition-field">
+                    <label class="form-label" data-condition-label="field">Data field</label>
+                    <select name="condition_field" class="form-select">
+                      <option value="">Choose a field</option>
+                      {% for option in field_options %}
+                        <option value="{{ option.value }}">{{ option.label }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="form-label" data-condition-label="operator">Match</label>
+                    <select name="condition_operator" class="form-select">
+                      <option value="contains">Contains words</option>
+                      <option value="exact">Equals text</option>
+                      <option value="eq">Equals number</option>
+                      <option value="gt">Greater than</option>
+                      <option value="gte">At least</option>
+                      <option value="lt">Less than</option>
+                      <option value="lte">At most</option>
+                      <option value="between">Between</option>
+                    </select>
+                  </div>
+                  <div class="condition-values">
+                    <div>
+                      <label class="form-label" data-condition-label="value">Value</label>
+                      <input type="text" name="condition_value" class="form-control">
+                    </div>
+                    <div data-condition-upper>
+                      <label class="form-label" data-condition-label="value_to">Maximum</label>
+                      <input type="text" name="condition_value_to" class="form-control" inputmode="decimal">
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-outline-secondary btn-sm condition-remove" data-remove-condition hidden>Remove</button>
+                  <p class="condition-error text-danger small mb-0" data-condition-error hidden></p>
+                </fieldset>
+              </template>
             </div>
 
 
@@ -715,7 +875,7 @@
 
 
 
-          {% if search_performed %}
+          {% if search_performed and not search_errors %}
             <div class="mt-3 text-muted small">
               Showing {{ data_objects|length }} result{{ data_objects|length|pluralize }}
             </div>
@@ -851,7 +1011,7 @@
       {% else %}
       <div class="card">
         <div class="card-body">
-          <p class="mb-0">No matching data found</p>
+          <p class="mb-0">{% if search_errors %}Correct the search conditions above and search again.{% else %}No matching data found{% endif %}</p>
         </div>
       </div>
       {% endif %}
@@ -861,6 +1021,7 @@
 
 {% include "includes/fair_assistant.html" with assistant_page="search" %}
 
+<script src="{% static 'assets/js/advanced-search.js' %}"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const collapses = document.querySelectorAll(".soft-accordion .accordion-collapse");

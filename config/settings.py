@@ -129,6 +129,8 @@ if RENDER_EXTERNAL_HOSTNAME:
 
 X_FRAME_OPTIONS = "DENY"
 SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_AGE = 8 * 60 * 60
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 TRUSTED_PROXY_HOPS = int(os.getenv("TRUSTED_PROXY_HOPS", "1" if not DEBUG else "0"))
 
 if not DEBUG:
@@ -177,6 +179,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "apps.pages.session_policy.LoginSessionExpiryMiddleware",
     "apps.pages.middleware.ORCIDAccountSetupMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",

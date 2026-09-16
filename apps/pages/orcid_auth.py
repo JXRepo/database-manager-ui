@@ -17,6 +17,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from .middleware import requires_orcid_account_setup
 from .models import AccountProfile
+from .session_policy import apply_login_session_policy
 
 
 ORCID_TRANSACTION_SESSION_KEY = "orcid_oauth_transaction"
@@ -29,6 +30,7 @@ _TRANSACTION_FIELDS = {
     "user_id",
     "created_at",
     "next",
+    "remember_me",
 }
 _VALID_INTENTS = {"login", "link"}
 _TRANSACTION_LIFETIME_SECONDS = 600
@@ -49,6 +51,7 @@ class ORCIDTransaction:
     user_id: int | None
     created_at: float
     next_url: str
+    remember_me: bool = False
 
 
 def normalize_orcid(value) -> str:
@@ -78,8 +81,31 @@ def start_orcid_transaction(
     intent,
     user_id=None,
     next_url="",
+    remember_me=False,
 ) -> str:
-    """Create and store one ORCID OAuth transaction"""
+    """
+    Create and store one ORCID OAuth transaction
+
+    Bind the persistence choice to the same single use state as the redirect.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Browser request with a session for the authorization transaction.
+    intent : str
+        Login or link action to authorize.
+    user_id : int or None
+        Local account initiating a link action.
+    next_url : str
+        Requested local destination after login.
+    remember_me : bool
+        Whether a successful login may renew during normal use.
+
+    Returns
+    -------
+    str
+        Random state to include in the provider authorization request.
+    """
     request.session.pop(ORCID_TRANSACTION_SESSION_KEY, None)
 
     if not isinstance(intent, str) or intent not in _VALID_INTENTS:
@@ -88,6 +114,8 @@ def start_orcid_transaction(
         not isinstance(user_id, int) or isinstance(user_id, bool)
     ):
         raise ORCIDFlowError("ORCID transaction user is invalid")
+    if not isinstance(remember_me, bool):
+        raise ORCIDFlowError("ORCID transaction persistence is invalid")
 
     state = secrets.token_urlsafe(24)
     request.session[ORCID_TRANSACTION_SESSION_KEY] = {
@@ -96,12 +124,34 @@ def start_orcid_transaction(
         "user_id": user_id,
         "created_at": timezone.now().timestamp(),
         "next": _sanitize_next_url(request, next_url),
+        "remember_me": remember_me,
     }
     return state
 
 
 def consume_orcid_transaction(request, received_state) -> ORCIDTransaction:
-    """Consume and validate one ORCID OAuth transaction"""
+    """
+    Consume and validate one ORCID OAuth transaction
+
+    Discard stored state before validating every value used by the callback.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Callback request containing the initiating browser session.
+    received_state : str
+        OAuth state returned by the provider.
+
+    Returns
+    -------
+    ORCIDTransaction
+        Immutable validated transaction values.
+
+    Raises
+    ------
+    ORCIDFlowError
+        If the transaction is missing, malformed, expired, or mismatched.
+    """
     payload = request.session.pop(ORCID_TRANSACTION_SESSION_KEY, None)
     if not isinstance(payload, dict) or set(payload) != _TRANSACTION_FIELDS:
         raise ORCIDFlowError("ORCID transaction is invalid")
@@ -123,6 +173,9 @@ def consume_orcid_transaction(request, received_state) -> ORCIDTransaction:
     user_id = payload["user_id"]
     created_at = payload["created_at"]
     next_url = payload["next"]
+    remember_me = payload["remember_me"]
+    if not isinstance(remember_me, bool):
+        raise ORCIDFlowError("ORCID transaction is invalid")
     if not isinstance(intent, str) or intent not in _VALID_INTENTS:
         raise ORCIDFlowError("ORCID transaction is invalid")
     if user_id is not None and (
@@ -154,10 +207,11 @@ def consume_orcid_transaction(request, received_state) -> ORCIDTransaction:
         user_id=user_id,
         created_at=created_at_value,
         next_url=next_url,
+        remember_me=remember_me,
     )
 
 
-def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
+def complete_orcid_login(request, orcid, next_url, remember_me=False) -> HttpResponse:
     """
     Resolve a verified ORCID identity into one safe local login
 
@@ -171,6 +225,8 @@ def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
         Canonical verified ORCID identity.
     next_url : str
         Sanitized local redirect from the consumed transaction.
+    remember_me : bool
+        Validated persistence choice from the consumed transaction.
 
     Returns
     -------
@@ -262,6 +318,7 @@ def complete_orcid_login(request, orcid, next_url) -> HttpResponse:
             return redirect(settings.LOGIN_URL)
 
         login(request, current_user)
+        apply_login_session_policy(request, remember_me=remember_me)
     messages.success(request, "Signed in with ORCID.")
     if requires_orcid_account_setup(current_user):
         setup_url = reverse("orcid_setup_credentials")

@@ -5,6 +5,7 @@ from django.http import Http404, HttpResponse
 
 from .forms import SignInForm
 from .rate_limits import consume_rate_limit, get_client_identifier
+from .session_policy import apply_login_session_policy
 
 
 def _password_login_limit_response(request):
@@ -56,7 +57,14 @@ def rate_limited_admin_login(request):
         if limit_response is not None:
             return limit_response
 
-    return admin.site.login(request)
+    response = admin.site.login(request)
+    if (
+        request.method == "POST"
+        and response.status_code == 302
+        and request.user.is_authenticated
+    ):
+        apply_login_session_policy(request, browser_session=True)
+    return response
 
 
 def pilot_disabled_auth_view(request, *args, **kwargs):
@@ -111,3 +119,27 @@ class RateLimitedLoginView(LoginView):
             return limit_response
 
         return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        """
+        Apply the remember choice only after a successful password login
+
+        The normal login flow retains Django's session rotation and redirect
+        checks before setting the new session lifetime.
+
+        Parameters
+        ----------
+        form : SignInForm
+            Validated credentials and the optional remember choice.
+
+        Returns
+        -------
+        HttpResponseRedirect
+            Redirect returned by the normal successful login flow.
+        """
+        response = super().form_valid(form)
+        apply_login_session_policy(
+            self.request,
+            remember_me=form.cleaned_data["remember_me"],
+        )
+        return response
