@@ -2,9 +2,8 @@
 
 ## Start here when resuming
 
-- Read `docs/HANDOFF.md` for the latest progress, decisions, verification, and next steps
 - Read the relevant sections of `README.md` for setup and current functionality
-- Check `git status --short` and recent commits before changing files; the handoff is a snapshot, not a substitute for current code
+- Check `git status --short` and recent commits before changing files
 - Do not assume another computer or Codex session has the previous chat, local environment, or credentials
 
 ## Project overview
@@ -123,14 +122,13 @@ When explaining changes:
 - Give concrete implementation guidance
 - Avoid broad abstract recommendations when direct code changes are possible
 
-## Collaboration and handoff
+## Collaboration
 
 - Explain work to the user in concise Chinese; keep application UI text in English
 - The user prefers direct implementation of clearly requested changes, without approval at every routine step; still ask about material ambiguity or destructive actions
 - After requested changes are complete and verified, the user wants `git add .`, a meaningful commit, and `git push`; inspect the diff first and do not include secrets or unrelated changes
 - Never force push or discard another computer's uncommitted work to resolve a sync problem
 - A successful push is not proof that Render has finished deployment; distinguish those states when reporting
-- Keep `docs/HANDOFF.md` current when ending a work session or switching computers, including concrete remaining work and checks actually performed
 
 ## Local development and verification
 
