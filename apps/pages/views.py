@@ -51,6 +51,7 @@ from .upload_services import (
     PreparedJSONData,
     UploadResourceLimitError,
     canonical_json_size,
+    data_fingerprint,
     generate_data_identifier,
     save_prepared_json_data,
     validate_json_depth,
@@ -973,8 +974,10 @@ def upload_json_view(request):
                     for obj in valid_objects:
                         object_index = object_indexes.get(id(obj), 1)
                         identifier = obj.get("identifier")
+                        fingerprint = ""
                         if identifier is None or not identifier.strip():
-                            identifier = generate_data_identifier(obj)
+                            fingerprint = data_fingerprint(obj)
+                            identifier = generate_data_identifier(obj, prepared_objects)
                             obj["identifier"] = identifier
                         object_label = f"{file_name} data object {object_index}"
 
@@ -1024,10 +1027,13 @@ def upload_json_view(request):
                                 access_type=access_type,
                                 shared_users=tuple(shared_users),
                                 size_bytes=canonical_json_size(obj),
+                                identifier_fingerprint=fingerprint,
                             )
                         )
                         prepared_object_labels[identifier] = object_label
                         seen_identifiers.add(identifier)
+                        if fingerprint:
+                            seen_identifiers.add(fingerprint)
                         prepared_count += 1
 
                     processed_file_count += 1
@@ -1061,7 +1067,8 @@ def upload_json_view(request):
                         upload_issues,
                         "duplicate_identifier",
                         (
-                            f'{object_label}: identifier "{identifier}" already exists. '
+                            f'{object_label}: identifier "{identifier}" or its generated '
+                            "content already exists. "
                             "Please remove the duplicate, or provide a different "
                             "identifier if this is a distinct data object."
                         ),

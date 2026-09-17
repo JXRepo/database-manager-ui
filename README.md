@@ -233,31 +233,52 @@ silently replaced. Identifiers are compared exactly, including letter case.
 
 Generation follows the required content hashing approach in
 [Ronak Shoghi's MiMeDat template](https://github.com/Ronakshoghi/MiMeDat/blob/main/metadata_template.py),
-but uses a full SHA-256 digest (64 hexadecimal characters), not an eight
-character MD5 prefix. The input is a JSON mapping of the 24 required fields
+but uses SHA-256 for its internal content fingerprint, not an MD5 prefix.
+The public identifier starts at **8 characters**, using **0–9 and a–z**.
+If another object with different required content occupies that identifier,
+only the new identifier grows, one character at a time, until it is available.
+Previously assigned identifiers never change to accommodate new uploads.
+
+The fingerprint input is a JSON mapping of the 24 required fields
 above, serialized with sorted keys, compact separators, and ASCII escaping.
 Field names and nested content are included; array order, zero, and false values
 are preserved. The upload does not remove empty optional values or change other
 fields. This is not byte-for-byte compatible with Ronak's eight character IDs;
 existing supplied IDs, including hers, are retained.
 
-Identical required content produces the same generated identifier. JSON object
-key order and optional fields such as `description` and `keywords` do not affect
-it. An identifier is assigned at upload, not continually recalculated when
-sharing settings later change. An identifier check is not full content
-deduplication: different supplied identifiers can refer to identical content.
+The complete fingerprint is stored separately from the JSON for generated IDs,
+so uploading the same required content again is still reported as a duplicate,
+even if its short identifier was extended or a conflicting record was deleted.
+Old 64 character SHA-256 identifiers remain recognized without rewriting them.
+JSON key order and optional fields such as `description` and `keywords` do not
+affect the fingerprint. Different supplied identifiers may still refer to the
+same content; user supplied identifiers are not automatically changed.
+Reimported JSON with a matching extended identifier is recognized from its
+required content even though the exported file does not contain the internal fingerprint.
+
+For reproducibility, candidates use the SHA-256 digest encoded as 50 lowercase
+base36 digits, read from the least significant digit first, with zero padding
+at the end. The allocator tries prefixes of length 8, 9, and so on up to 50.
+If no candidate is available, the upload reports an error rather than overwriting
+data. Short IDs depend on existing assignments in this database, not just content;
+retain assigned identifiers when moving or exporting data to another installation.
 
 All identifiers, supplied or generated, are checked against every stored record
 (including private records), other objects in the same file, and all files in
-the submission. A transactional recheck protects against simultaneous uploads.
+the submission. Final allocation and duplicate checks share a transaction lock
+across uploads, so a newly occupied short ID can be extended safely before saving.
+Within a submission, a supplied identifier that repeats an earlier accepted
+identifier is reported as a duplicate; supplied values are never silently renamed.
 Duplicates are not overwritten; errors identify the filename, object number,
 and identifier, with instructions to remove the duplicate or supply another
 identifier for a distinct object. Other valid objects can still save, except
-that a conflict found during the final transactional recheck rejects the batch.
+that a duplicate identifier or duplicate content found during the final
+transactional recheck rejects the batch. Distinct content with an automatically
+generated short ID is extended instead of rejected.
 
 Generated identifiers are part of the stored JSON, its quota size, and exported
-JSON. The original file on the user's computer and previously stored records
-are not modified.
+JSON. Internal fingerprints are not added to exported JSON. The original file
+on the user's computer and previously stored records are not modified.
 
 ### Sharing metadata
 

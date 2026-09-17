@@ -1,14 +1,15 @@
 import hashlib
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Sequence
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
+from django.utils.http import int_to_base36
 
 from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
 
@@ -50,15 +51,17 @@ class PreparedJSONData:
     access_type: str
     shared_users: tuple[User, ...]
     size_bytes: int
+    identifier_fingerprint: str = ""
 
 
-def generate_data_identifier(data: dict) -> str:
+def data_fingerprint(data: dict) -> str:
     """
     Hash the required metadata of one validated data object
 
     Following Ronak Shoghi's MiMeDat content based identifier approach, this
     uses required fields only. A canonical mapping preserves field boundaries,
-    zero and false values; a full SHA256 digest avoids an eight digit hash.
+    zero and false values. The full digest identifies generated content even
+    when its public identifier has been extended to avoid a collision.
 
     Parameters
     ----------
@@ -68,7 +71,7 @@ def generate_data_identifier(data: dict) -> str:
     Returns
     -------
     str
-        Deterministic 64 character hexadecimal identifier.
+        Deterministic 64 character hexadecimal fingerprint.
     """
     content = {}
     for field in REQUIRED_TOP_LEVEL_FIELDS:
@@ -78,6 +81,135 @@ def generate_data_identifier(data: dict) -> str:
         allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _identifier_candidates(fingerprint: str):
+    """
+    Yield progressively longer lowercase base36 identifiers
+
+    Start at eight characters. Reading the least significant digits first
+    keeps the short prefix from being restricted by leading zero padding.
+
+    Parameters
+    ----------
+    fingerprint : str
+        Full SHA256 hexadecimal digest.
+
+    Yields
+    ------
+    str
+        Prefixes from eight to fifty characters, extending one at a time.
+    """
+    digits = int_to_base36(int(fingerprint, 16)).zfill(50)[::-1]
+    for length in range(8, len(digits) + 1):
+        yield digits[:length]
+
+
+def _has_fingerprint(data: dict, fingerprint: str) -> bool:
+    """
+    Compare content while tolerating incomplete historical objects
+
+    Parameters
+    ----------
+    data : dict
+        Existing JSON, which may predate current upload validation.
+    fingerprint : str
+        Fingerprint of the incoming validated object.
+
+    Returns
+    -------
+    bool
+        Whether the required content has the same fingerprint.
+    """
+    try:
+        return data_fingerprint(data) == fingerprint
+    except (KeyError, TypeError, ValueError, RecursionError):
+        return False
+
+
+def _resolve_generated_identifier(
+    fingerprint: str, pending_objects: Sequence[PreparedJSONData],
+) -> str:
+    """
+    Recognize repeated content or allocate its shortest available identifier
+
+    Existing matches are returned so callers can report duplicates instead
+    of giving identical content a new identifier. The final save invokes
+    this again under the upload transaction lock.
+
+    Parameters
+    ----------
+    fingerprint : str
+        Digest captured before adding the identifier to the uploaded JSON.
+    pending_objects : sequence of PreparedJSONData
+        Other objects already prepared or reserved in this upload.
+
+    Returns
+    -------
+    str
+        Existing identifier for duplicate content, or an available candidate.
+
+    Raises
+    ------
+    UploadResourceLimitError
+        If all candidate lengths are occupied by different content.
+    """
+    pending = {}
+    for prepared in pending_objects:
+        identifier = prepared.data.get("identifier")
+        if prepared.identifier_fingerprint == fingerprint or identifier == fingerprint:
+            return identifier
+        pending[identifier] = prepared
+
+    existing = JSONData.objects.filter(
+        Q(identifier_fingerprint=fingerprint) | Q(data__identifier=fingerprint)
+    ).values_list("data", flat=True).first()
+    if isinstance(existing, dict) and isinstance(existing.get("identifier"), str):
+        return existing["identifier"]
+
+    candidates = list(_identifier_candidates(fingerprint))
+    for identifier, prepared in pending.items():
+        if identifier in candidates and _has_fingerprint(prepared.data, fingerprint):
+            return identifier
+
+    occupied = set()
+    for data in JSONData.objects.filter(
+        data__identifier__in=candidates,
+    ).values_list("data", flat=True):
+        identifier = data["identifier"]
+        if _has_fingerprint(data, fingerprint):
+            return identifier
+        occupied.add(identifier)
+
+    for candidate in candidates:
+        if candidate not in pending and candidate not in occupied:
+            return candidate
+
+    raise UploadResourceLimitError(
+        "Could not allocate a unique identifier. Please provide your own unique "
+        "identifier for this data object and upload it again."
+    )
+
+
+def generate_data_identifier(
+    data: dict, pending_objects: Sequence[PreparedJSONData] = (),
+) -> str:
+    """
+    Preview a short identifier without reserving or saving it
+
+    Parameters
+    ----------
+    data : dict
+        Validated uploaded object.
+    pending_objects : sequence of PreparedJSONData, optional
+        Other accepted objects in the same upload.
+
+    Returns
+    -------
+    str
+        Identifier to check for a duplicate or prepare for final allocation.
+    """
+    return _resolve_generated_identifier(data_fingerprint(data), pending_objects)
 
 
 def canonical_json_size(value: object) -> int:
@@ -166,8 +298,6 @@ def save_prepared_json_data(
     """
     Atomically save prepared objects inside the owner's live quota
     """
-    incoming_size = sum(item.size_bytes for item in objects)
-
     with transaction.atomic():
         global_lock_user = (
             User.objects.select_for_update()
@@ -185,22 +315,35 @@ def save_prepared_json_data(
 
         conflicts = []
         seen_identifiers = set()
+        resolved_objects = []
+        supplied_objects = [item for item in objects if not item.identifier_fingerprint]
 
         for prepared in objects:
-            identifier = str(prepared.data.get("identifier", "")).strip()
+            original_identifier = str(prepared.data.get("identifier", "")).strip()
+            identifier = original_identifier
+            if prepared.identifier_fingerprint:
+                identifier = _resolve_generated_identifier(
+                    prepared.identifier_fingerprint, resolved_objects + supplied_objects,
+                )
+                data = dict(prepared.data, identifier=identifier)
+                prepared = replace(prepared, data=data, size_bytes=canonical_json_size(data))
 
             if identifier in seen_identifiers:
-                conflicts.append(identifier)
+                conflicts.append(original_identifier)
             elif JSONData.objects.filter(
                 data__identifier=identifier
             ).exists():
-                conflicts.append(identifier)
+                conflicts.append(original_identifier)
 
             seen_identifiers.add(identifier)
+            if prepared.identifier_fingerprint:
+                seen_identifiers.add(prepared.identifier_fingerprint)
+            resolved_objects.append(prepared)
 
         if conflicts:
             raise UploadIdentifierConflict(conflicts)
 
+        incoming_size = sum(item.size_bytes for item in resolved_objects)
         used_size = (
             JSONData.objects.filter(owner=locked_owner).aggregate(
                 total=Sum("size_bytes")
@@ -215,10 +358,11 @@ def save_prepared_json_data(
 
         saved_objects = []
 
-        for prepared in objects:
+        for prepared in resolved_objects:
             data_object = JSONData.objects.create(
                 owner=locked_owner,
                 data=prepared.data,
+                identifier_fingerprint=prepared.identifier_fingerprint,
                 access_type=prepared.access_type,
                 size_bytes=prepared.size_bytes,
             )

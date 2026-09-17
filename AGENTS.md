@@ -53,10 +53,11 @@ Current priority:
 - Empty required fields must produce clear user-facing error messages
 - Only valid data objects should be saved
 - Current required top-level fields include `phase`, not `material`, unless code is explicitly changed
-- `identifier` is not a required upload field: missing, null, or blank values receive a full SHA-256 digest of the canonical JSON mapping of the 24 required fields
+- `identifier` is not a required upload field: missing, null, or blank values receive an 8 character lowercase base36 identifier derived from the 24 required fields; collisions with different content extend it one character at a time
 - Preserve valid supplied text identifiers; reject malformed values and surrounding whitespace with actionable errors
 - Check generated and supplied identifiers against all stored records and the whole upload batch; retain the transactional recheck and never overwrite duplicates
-- Identical required content gets the same generated identifier; optional metadata is excluded and existing stored identifiers are never recalculated automatically
+- Store the full SHA-256 fingerprint internally for generated identifiers; use it to recognize repeated required content even after extension, and also check legacy 64 character identifiers
+- Allocate and recheck generated identifiers under the final upload transaction lock, then account for their final JSON byte size; optional metadata is excluded from the fingerprint and existing identifiers are never recalculated automatically
 
 ## Access control rules
 

@@ -38,6 +38,8 @@ class JSONData(models.Model):
         Owner of the data object
     data : dict
         Raw JSON object
+    identifier_fingerprint : str
+        Internal full digest for automatically assigned identifiers
     size_bytes : int
         Persisted UTF-8 byte size for the JSON object
     access_type : str
@@ -48,6 +50,9 @@ class JSONData(models.Model):
 
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     data = models.JSONField()
+    identifier_fingerprint = models.CharField(
+        max_length=64, blank=True, default="", db_index=True, editable=False,
+    )
     size_bytes = models.PositiveBigIntegerField(default=0)
     access_type = models.CharField(max_length=10, default="c")
     shared_users = models.ManyToManyField(
