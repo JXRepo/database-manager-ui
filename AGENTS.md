@@ -86,7 +86,8 @@ Current priority:
 - Keep search practical and understandable
 - Basic search requires all entered words, in any order, ignoring case; do not return records matching only some query words
 - Keep the two advanced groups distinct: Common filters for general metadata and Data field filters for preset simulation parameters
-- Common filters currently contains Identifier, Creator, Software, Phase, Owner, Access, and Title; do not add fields without a request
+- Common filters currently contains Title, Creator, Software, Phase, Identifier, Uploaded by, and Access; keep the `owner` query parameter for Uploaded by and do not add fields without a request
+- Top and advanced-panel Search buttons submit the same combined GET form; both Clear links reset all conditions, and a keyword is optional
 - Data field filters uses 11 preset simulation fields with explicit paths to the actual JSON schema in `apps/pages/advanced_search.py`; do not populate it from arbitrary uploaded JSON keys or duplicate common metadata such as owner or software version
 - Test every offered field against `example_json_files`; friendly labels must map to real paths, including array entries, not merely similar sounding keys
 - Keep old Ronak tokens working in bookmarked URLs with their original named key semantics, but do not offer them as new presets

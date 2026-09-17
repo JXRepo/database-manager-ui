@@ -133,6 +133,26 @@
     margin-top: 16px;
   }
 
+  .advanced-search-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: stretch;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .advanced-search-actions > * {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .advanced-search-actions .search-main-submit {
+    height: 44px;
+    width: auto;
+  }
+
   .condition-row {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.5fr) auto;
@@ -178,6 +198,11 @@
     .condition-remove {
       grid-column: 2;
       justify-self: end;
+    }
+
+    .advanced-search-actions > * {
+      flex: 1;
+      min-width: 0;
     }
   }
 
@@ -713,9 +738,9 @@
                 <h6 id="commonFiltersTitle" class="advanced-group-title">Common filters</h6>
                 <div class="advanced-group-body">
                   <div class="row g-3">
-                <div class="col-md-3">
-                  <label for="id_identifier" class="form-label">Identifier</label>
-                  <input type="text" name="identifier" id="id_identifier" class="form-control" value="{{ identifier }}">
+                <div class="col-md-6">
+                  <label for="id_title" class="form-label">Title</label>
+                  <input type="text" name="title" id="id_title" class="form-control" value="{{ title }}">
                 </div>
 
                 <div class="col-md-3">
@@ -734,7 +759,12 @@
                 </div>
 
                 <div class="col-md-3">
-                  <label for="id_owner" class="form-label">Owner</label>
+                  <label for="id_identifier" class="form-label">Identifier</label>
+                  <input type="text" name="identifier" id="id_identifier" class="form-control" value="{{ identifier }}">
+                </div>
+
+                <div class="col-md-3">
+                  <label for="id_owner" class="form-label">Uploaded by</label>
                   <input type="text" name="owner" id="id_owner" class="form-control" value="{{ owner_name }}">
                 </div>
 
@@ -747,12 +777,6 @@
                     <option value="my_private" {% if access == "my_private" %}selected{% endif %}>My Private</option>
                     <option value="shared_with_me" {% if access == "shared_with_me" %}selected{% endif %}>Shared with Me</option>
                   </select>
-                </div>
-
-
-                <div class="col-md-6">
-                  <label for="id_title" class="form-label">Title</label>
-                  <input type="text" name="title" id="id_title" class="form-control" value="{{ title }}">
                 </div>
                 </div>
               </div>
@@ -816,6 +840,11 @@
                 </div>
                 </div>
               </section>
+
+              <div class="advanced-search-actions">
+                <a href="{% url 'search' %}" class="clear-btn text-decoration-none">Clear</a>
+                <button type="submit" class="btn btn-primary search-main-submit">Search</button>
+              </div>
 
               <template id="conditionOperatorTemplate">
                 {% for value, label in operator_choices %}

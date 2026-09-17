@@ -562,6 +562,39 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     assert.deepEqual(state, {open: true, expanded: 'true'});
   });
 
+  test('advanced footer actions stay usable inside their form at desktop and mobile widths', async t => {
+    const template = readFileSync(join(__dirname, '../../templates/pages/search.html'), 'utf8');
+    const styles = template.match(/<style>([\s\S]*?)<\/style>/)[1];
+    const footer = template.match(/<div class="advanced-search-actions">[\s\S]*?<\/div>/)?.[0] || '';
+    const bootstrap = readFileSync(join(__dirname, '../../static/assets/css/plugins/bootstrap.min.css'), 'utf8');
+    for (const width of [1440, 390, 320]) {
+      const evaluate = await page(t, '', width);
+      const html = `<style>${bootstrap}${styles}</style>
+        <form id="search" style="margin:20px;max-width:980px">${footer}</form>`;
+      const state = await evaluate(`(() => {
+        document.body.innerHTML = ${JSON.stringify(html)};
+        const form = document.getElementById('search');
+        const search = form.querySelector('button[type="submit"]');
+        const clear = form.querySelector('a');
+        if (!search || !clear) return {actionsPresent: false};
+        const bounds = element => {
+          const rect = element.getBoundingClientRect();
+          return {width: rect.width, height: rect.height, left: rect.left, right: rect.right};
+        };
+        return {actionsPresent: true, belongsToForm: search.form === form,
+          search: bounds(search), clear: bounds(clear),
+          pageOverflow: document.documentElement.scrollWidth > innerWidth};
+      })()`);
+      assert.equal(state.actionsPresent, true, `${width}px: missing footer controls`);
+      assert.equal(state.belongsToForm, true);
+      for (const button of [state.search, state.clear]) {
+        assert.ok(button.height >= 44 && button.width >= 70, `${width}px: ${JSON.stringify(button)}`);
+        assert.ok(button.left >= 0 && button.right <= width);
+      }
+      assert.equal(state.pageOverflow, false);
+    }
+  });
+
   test('long identifier errors wrap inside the upload page on mobile', async t => {
     const template = readFileSync(join(__dirname, '../../templates/pages/upload.html'), 'utf8');
     const styles = [...template.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('\n');

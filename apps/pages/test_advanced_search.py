@@ -4,9 +4,33 @@ from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.test.html import parse_html
 from django.urls import reverse
 
 from .models import JSONData
+
+
+def _html_elements(element):
+    """
+    Traverse rendered elements outside inert HTML templates
+
+    This keeps condition row templates out of active form assertions.
+
+    Parameters
+    ----------
+    element : django.test.html.Element
+        Parsed HTML element to traverse.
+
+    Yields
+    ------
+    django.test.html.Element
+        Active elements in document order.
+    """
+    if isinstance(element, str) or element.name == "template":
+        return
+    yield element
+    for child in element.children:
+        yield from _html_elements(child)
 
 
 class AdvancedSearchTests(TestCase):
@@ -201,6 +225,106 @@ class AdvancedSearchTests(TestCase):
         ):
             self.assertNotIn(field, field_values)
             self.assertNotIn(json.dumps([field]), field_values)
+
+    def test_title_is_the_first_common_filter(self):
+        """
+        Put the title input first without changing the seven common fields
+        """
+        response = self.client.get(reverse("search"))
+        elements = _html_elements(parse_html(response.content.decode()))
+        common = next(element for element in elements if
+                      ("aria-labelledby", "commonFiltersTitle") in element.attributes)
+        fields = [dict(element.attributes) for element in _html_elements(common)
+                  if element.name in ("input", "select")]
+        self.assertEqual(fields[0]["name"], "title")
+        self.assertEqual(fields[0]["id"], "id_title")
+        self.assertCountEqual(
+            [field["name"] for field in fields],
+            ["title", "identifier", "creator", "software", "phase", "owner", "access"],
+        )
+
+    def test_uploaded_by_label_keeps_the_owner_filter_binding(self):
+        """
+        Describe the uploader while preserving owner links and submitted values
+        """
+        response = self.client.get(reverse("search"), {"owner": "search_viewer"})
+        elements = list(_html_elements(parse_html(response.content.decode())))
+        label = next(element for element in elements if element.name == "label"
+                     and ("for", "id_owner") in element.attributes)
+        self.assertEqual(label.children, ["Uploaded by"])
+        owner = next(element for element in elements if
+                     ("id", "id_owner") in element.attributes)
+        self.assertEqual(dict(owner.attributes)["name"], "owner")
+        self.assertEqual(dict(owner.attributes)["value"], "search_viewer")
+
+    def test_bottom_search_shares_the_complete_keyword_form(self):
+        """
+        Keep both search buttons in one GET form containing every filter group
+        """
+        response = self.client.get(reverse("search"))
+        elements = list(_html_elements(parse_html(response.content.decode())))
+        forms = [element for element in elements if
+                 ("id", "advancedSearchForm") in element.attributes]
+        self.assertEqual(len(forms), 1)
+        form = forms[0]
+        self.assertEqual(form.name, "form")
+        self.assertEqual(dict(form.attributes)["method"].lower(), "get")
+        form_elements = list(_html_elements(form))
+        self.assertEqual(sum(element.name == "form" for element in form_elements), 1)
+        panel = next(element for element in form_elements if
+                     ("id", "advancedSearchPanel") in element.attributes)
+        actions = [element for element in panel.children if not isinstance(element, str)
+                   and "advanced-search-actions" in dict(element.attributes).get("class", "").split()]
+        self.assertEqual(len(actions), 1, "Bottom actions must be inside the advanced panel")
+        groups = [element for element in panel.children if not isinstance(element, str)
+                  and element.name == "section"]
+        self.assertEqual(len(groups), 2)
+        for group in groups:
+            self.assertLess(panel.children.index(group), panel.children.index(actions[0]))
+        submits = [element for element in form_elements if element.name == "button"
+                   and ("type", "submit") in element.attributes]
+        self.assertEqual(len(submits), 2)
+        self.assertTrue(any(element is submits[1] for element in _html_elements(actions[0])))
+        self.assertFalse(any(element is submits[0] for element in _html_elements(panel)))
+        for button in submits:
+            self.assertIn("Search", button.children)
+            self.assertFalse({"form", "formaction", "formmethod"} & dict(button.attributes).keys())
+        fields = [dict(element.attributes) for element in form_elements
+                  if element.name in ("input", "select")]
+        self.assertCountEqual(
+            [field["name"] for field in fields],
+            ["keyword", "title", "identifier", "creator", "software", "phase", "owner", "access",
+             "condition_field", "condition_operator", "condition_value", "condition_value_to"],
+        )
+        for field in fields:
+            self.assertNotIn("form", field)
+            self.assertNotIn("disabled", field)
+
+    def test_both_clear_links_discard_every_filter(self):
+        """
+        Clear the complete search from either the top or bottom control
+        """
+        response = self.client.get(reverse("search"), {
+            "keyword": "copper", "title": "experiment", "owner": "search_viewer",
+            "identifier": "own", "creator": "Ronak", "software": "Abaqus",
+            "phase": "Copper", "access": "my_data", "keywords": "crystal",
+            "condition_field": "Grain_Number", "condition_operator": "between",
+            "condition_value": "100", "condition_value_to": "200",
+        })
+        elements = _html_elements(parse_html(response.content.decode()))
+        form = next(element for element in elements if
+                    ("id", "advancedSearchForm") in element.attributes)
+        links = [element for element in _html_elements(form)
+                 if element.name == "a" and "Clear" in element.children]
+        self.assertEqual(len(links), 2)
+        for link in links:
+            with self.subTest(link=str(link)):
+                self.assertEqual(dict(link.attributes)["href"], reverse("search"))
+                cleared = self.client.get(dict(link.attributes)["href"])
+                self.assertFalse(cleared.wsgi_request.GET)
+                self.assertFalse(cleared.context["search_performed"])
+                self.assertFalse(cleared.context["advanced_open"])
+                self.assertNotContains(cleared, 'id="id_legacy_keywords"')
 
     def test_legacy_keyword_filter_stays_visible_and_editable(self):
         """
