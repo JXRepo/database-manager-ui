@@ -138,7 +138,7 @@ The 12 choices are grouped within one dropdown and search these field names:
 | Group | Data field | JSON field | Match type |
 | --- | --- | --- | --- |
 | Microstructure | Texture type | `texture_type` | Text |
-| Microstructure | Grain count | `grain_count`, or the count alias `grain_number` | Number |
+| Microstructure | Grain number | `grain_count`, or the count alias `grain_number` | Number |
 | Microstructure | Crystal structure | `lattice_structure` | Text |
 | Microstructure | Orientation identifier | `orientation_identifier` | Text, defaults to Equals text |
 | Discretization and boundaries | Discretization type | `discretization_type` | Text |

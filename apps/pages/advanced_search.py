@@ -14,7 +14,7 @@ MAX_VALUE_LENGTH = 200
 MAX_DEPTH = 32
 DATA_FIELD_PRESETS = (
     ("texture_type", "Texture type", "text", "Microstructure"),
-    ("grain_count", "Grain count", "number", "Microstructure"),
+    ("grain_count", "Grain number", "number", "Microstructure"),
     ("lattice_structure", "Crystal structure", "text", "Microstructure"),
     ("orientation_identifier", "Orientation identifier", "text", "Microstructure"),
     ("discretization_type", "Discretization type", "text", "Discretization and boundaries"),
@@ -64,9 +64,9 @@ OPERATOR_CHOICES = (
     ("exact", "Equals text"),
     ("eq", "Equals number"),
     ("gt", "Greater than"),
-    ("gte", "At least"),
+    ("gte", "Greater than or equal to"),
     ("lt", "Less than"),
-    ("lte", "At most"),
+    ("lte", "Less than or equal to"),
     ("between", "Between"),
     ("is", "Is"),
 )

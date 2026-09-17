@@ -12,8 +12,8 @@ const scriptPath = join(__dirname, '../../static/assets/js/advanced-search.js');
 function operatorOptions() {
   return `<option value="contains">Contains words</option><option value="exact">Equals text</option>
     <option value="eq">Equals number</option><option value="gt">Greater than</option>
-    <option value="gte">At least</option><option value="lt">Less than</option>
-    <option value="lte">At most</option><option value="between">Between</option>
+    <option value="gte">Greater than or equal to</option><option value="lt">Less than</option>
+    <option value="lte">Less than or equal to</option><option value="between">Between</option>
     <option value="is">Is</option>`;
 }
 
@@ -25,7 +25,7 @@ function conditionRow() {
       <option value="">Choose a field</option>
       <optgroup label="Microstructure">
         <option value="texture_type" data-field-type="text" data-default-operator="contains">Texture type</option>
-        <option value="grain_count" data-field-type="number" data-default-operator="eq">Grain count</option>
+        <option value="grain_count" data-field-type="number" data-default-operator="eq">Grain number</option>
         <option value="lattice_structure" data-field-type="text" data-default-operator="contains">Crystal structure</option>
         <option value="orientation_identifier" data-field-type="text" data-default-operator="exact">Orientation identifier</option>
       </optgroup>
