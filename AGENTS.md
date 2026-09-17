@@ -53,6 +53,10 @@ Current priority:
 - Empty required fields must produce clear user-facing error messages
 - Only valid data objects should be saved
 - Current required top-level fields include `phase`, not `material`, unless code is explicitly changed
+- `identifier` is not a required upload field: missing, null, or blank values receive a full SHA-256 digest of the canonical JSON mapping of the 24 required fields
+- Preserve valid supplied text identifiers; reject malformed values and surrounding whitespace with actionable errors
+- Check generated and supplied identifiers against all stored records and the whole upload batch; retain the transactional recheck and never overwrite duplicates
+- Identical required content gets the same generated identifier; optional metadata is excluded and existing stored identifiers are never recalculated automatically
 
 ## Access control rules
 
@@ -83,7 +87,9 @@ Current priority:
 - Basic search requires all entered words, in any order, ignoring case; do not return records matching only some query words
 - Keep the two advanced groups distinct: Common filters for general metadata and Data field filters for preset simulation parameters
 - Common filters currently contains Identifier, Creator, Software, Phase, Owner, Access, and Title; do not add fields without a request
-- Data field filters uses the 11 preset keys in `apps/pages/advanced_search.py`; do not populate it from arbitrary uploaded JSON keys or duplicate common metadata such as owner or software version
+- Data field filters uses 11 preset simulation fields with explicit paths to the actual JSON schema in `apps/pages/advanced_search.py`; do not populate it from arbitrary uploaded JSON keys or duplicate common metadata such as owner or software version
+- Test every offered field against `example_json_files`; friendly labels must map to real paths, including array entries, not merely similar sounding keys
+- Keep old Ronak tokens working in bookmarked URLs with their original named key semantics, but do not offer them as new presets
 - Match choices follow the field type and must also be validated on the server
 - All active conditions must match the same accessible record; invalid conditions show errors and must not broaden the search
 - Preserve existing bookmarked JSON paths with their exact-path semantics

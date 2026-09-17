@@ -1,4 +1,6 @@
 import json
+from copy import deepcopy
+from pathlib import Path
 from unittest import TestCase
 
 from django.http import QueryDict
@@ -57,24 +59,6 @@ class AdvancedSearchConditionTests(TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(rows[0]["field"], '["phase","Grain.Number","α β"]')
         self.assertTrue(matches_conditions({"phase": {"Grain.Number": {"α β": 100}}}, conditions))
-
-    def test_fixed_fields_keep_ronak_order_without_common_filters(self):
-        """
-        Present stable field choices even before any uploaded data exists
-        """
-        self.assertEqual(DATA_FIELD_CHOICES, (
-            ("Hash_Orientation", "Hash_Orientation"),
-            ("Texture_Type", "Texture_Type"),
-            ("Element_Number", "Element_Number"),
-            ("Grain_Number", "Grain_Number"),
-            ("Material_parameters", "Material_parameters (Whole array)"),
-            ("Load_Type", "Load_Type"),
-            ("Stress_Type", "Stress_Type"),
-            ("Load_Descriptor", "Load_Descriptor"),
-            ("Hash_load", "Hash_load"),
-            ("Scaling_Factor", "Scaling_Factor"),
-            ("Max_Total_Strain", "Max_Total_Strain"),
-        ))
 
     def test_named_field_tokens_compile_without_becoming_json_paths(self):
         """
@@ -298,6 +282,139 @@ class AdvancedSearchConditionTests(TestCase):
         query = condition_query(('["number"]', "eq", "1"))
         query.appendlist("condition_value_to", "2")
         self.assertTrue(parse_conditions(query)[2])
+
+
+class ExamplePresetSearchTests(TestCase):
+    """
+    Exercise the preset catalog against the repository's real simulation files
+    """
+
+    example_rows = (
+        ("orientation_identifier", "exact", "0abb1"),
+        ("texture_type", "exact", "GOSS"),
+        ("grain_count", "eq", "343"),
+        ("discretization_count", "eq", "2744"),
+        ("elastic_model_name", "contains", "anisotropic elasticity"),
+        ("elastic_parameters", "contains", "C11 170000"),
+        ("plastic_model_name", "exact", "crystal plasticity"),
+        ("plastic_parameters", "contains", "reference_shear_rate 0.001"),
+        ("loading_type", "exact", "force"),
+        ("loading_mode", "exact", "static"),
+        ("global_temperature", "eq", "298"),
+    )
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Read public example files without substituting synthetic field names
+        """
+        super().setUpClass()
+        example_dir = Path(__file__).resolve().parents[2] / "example_json_files"
+        cls.examples = {}
+        for path in sorted(example_dir.glob("*.json")):
+            cls.examples[path.name] = json.loads(path.read_text(encoding="utf-8"))
+
+    def test_every_offered_preset_matches_the_repository_examples(self):
+        """
+        Catch presets that cannot find the actual schema paths and value types
+        """
+        self.assertTrue(self.examples)
+        rows_by_field = {row[0]: row for row in self.example_rows}
+        self.assertEqual(set(dict(DATA_FIELD_CHOICES)), set(rows_by_field))
+        for field, label in DATA_FIELD_CHOICES:
+            with self.subTest(field=field):
+                rows, conditions, errors = parse_conditions(condition_query(rows_by_field[field]))
+                self.assertEqual(errors, [])
+                for name, data in self.examples.items():
+                    with self.subTest(example=name):
+                        self.assertTrue(matches_conditions(data, conditions))
+
+    def test_preset_paths_do_not_search_unrelated_locations(self):
+        """
+        Reject matching keys or entire simulation structures under other roots
+        """
+        example = self.examples["a46fde6c1_public.json"]
+        for row in self.example_rows:
+            with self.subTest(field=row[0]):
+                rows, conditions, errors = parse_conditions(condition_query(row))
+                self.assertEqual(errors, [])
+                self.assertFalse(matches_conditions({"unrelated": example}, conditions))
+                self.assertFalse(matches_conditions({"other": {row[0]: row[2]}}, conditions))
+
+    def test_grain_count_uses_orientation_with_transparent_phase_arrays(self):
+        """
+        Find the selected path in later phases without accepting sibling counts
+        """
+        row = ("grain_count", "eq", "343")
+        rows, conditions, errors = parse_conditions(condition_query(row))
+        self.assertEqual(errors, [])
+        data = {"phase": [{"orientation": {"grain_count": 10}}, {"orientation": {"grain_count": "343"}}]}
+        self.assertTrue(matches_conditions(data, conditions))
+        data = {"phase": [{"grain_count": 343, "orientation": {"grain_count": 10}}]}
+        self.assertFalse(matches_conditions(data, conditions))
+
+    def test_preset_text_keys_keep_the_exact_schema_spelling(self):
+        """
+        Keep new path matching separate from case insensitive legacy key searches
+        """
+        example = deepcopy(self.examples["a46fde6c1_public.json"])
+        orientation = example["phase"][0]["orientation"]
+        orientation["Texture_Type"] = orientation.pop("texture_type")
+        for field, expected in (("texture_type", False), ("Texture_Type", True)):
+            with self.subTest(field=field):
+                rows, conditions, errors = parse_conditions(condition_query((field, "exact", "goss")))
+                self.assertEqual(errors, [])
+                self.assertEqual(matches_conditions(example, conditions), expected)
+
+    def test_presets_enforce_numeric_and_text_comparisons(self):
+        """
+        Prevent crafted URLs from bypassing the types used by the preset menu
+        """
+        for field, operation, value in self.example_rows:
+            invalid_operation = "contains" if operation == "eq" else "gt"
+            with self.subTest(field=field):
+                rows, conditions, errors = parse_conditions(condition_query((field, invalid_operation, "2")))
+                self.assertTrue(errors)
+                self.assertEqual(conditions, [])
+                self.assertNotIn("Choose a valid data field", rows[0]["error"])
+
+    def test_parameter_presets_reject_exact_and_numeric_comparisons(self):
+        """
+        Restrict parameter objects to word searches without representation equality
+        """
+        for field in ("elastic_parameters", "plastic_parameters"):
+            for operation in ("exact", "eq", "gt", "gte", "lt", "lte", "between"):
+                upper = "2" if operation == "between" else ""
+                with self.subTest(field=field, operation=operation):
+                    rows, conditions, errors = parse_conditions(condition_query(
+                        ("texture_type", "exact", "goss"),
+                        (field, operation, "1", upper),
+                    ))
+                    self.assertTrue(errors)
+                    self.assertEqual(conditions, [])
+                    self.assertEqual(rows[1]["operator"], operation)
+                    self.assertEqual(rows[1]["value"], "1")
+                    self.assertIn("Choose Contains words", rows[1]["error"])
+                    self.assertNotIn("Equals text", rows[1]["error"])
+
+    def test_legacy_tokens_do_not_become_aliases_for_different_scientific_fields(self):
+        """
+        Retain old named key meanings instead of remapping them to new concepts
+        """
+        example = self.examples["a46fde6c1_public.json"]
+        cases = (
+            ("Hash_Orientation", "exact", "0abb1"),
+            ("Element_Number", "eq", "2744"),
+            ("Grain_Number", "eq", "343"),
+            ("Material_parameters", "contains", "C11 170000"),
+            ("Load_Type", "exact", "force"),
+            ("Stress_Type", "exact", "static"),
+        )
+        for row in cases:
+            with self.subTest(field=row[0]):
+                rows, conditions, errors = parse_conditions(condition_query(row))
+                self.assertEqual(errors, [])
+                self.assertFalse(matches_conditions(example, conditions))
 
 
 class AdvancedSearchMatchingTests(TestCase):

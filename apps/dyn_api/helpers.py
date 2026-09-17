@@ -10,7 +10,6 @@ from rest_framework import serializers
 
 
 REQUIRED_TOP_LEVEL_FIELDS = [
-    "identifier",
     "title",
     "creator",
     "creator_affiliation",
@@ -180,6 +179,21 @@ def validate_json(data):
                 )
             continue
 
+
+        identifier = obj.get("identifier")
+        if identifier is not None:
+            if not isinstance(identifier, str):
+                errors.append(
+                    f"Data object {index}: identifier must be a text value. "
+                    "Please use a JSON string, or omit identifier to generate one automatically."
+                )
+                continue
+            if identifier.strip() and identifier != identifier.strip():
+                errors.append(
+                    f"Data object {index}: identifier has leading or trailing whitespace. "
+                    "Please remove the surrounding whitespace and upload the JSON file again."
+                )
+                continue
 
         valid_data.append(obj)
 

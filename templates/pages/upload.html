@@ -4,6 +4,11 @@
 {% block title %}Upload Data{% endblock title %}
 
 {% block content %}
+<style>
+  .pc-content > .alert {
+    overflow-wrap: anywhere;
+  }
+</style>
 <div class="pc-container">
   <div class="pc-content">
     <div class="page-header">
@@ -72,6 +77,10 @@
             {% for error in form.file.errors %}
               <div class="text-danger mt-1">{{ error }}</div>
             {% endfor %}
+            <p class="small text-muted mt-2 mb-0">
+              Each data object needs a unique identifier. Missing or blank identifiers are
+              generated from required fields; identical required content gets the same identifier.
+            </p>
 
           </div>
 

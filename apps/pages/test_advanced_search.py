@@ -1,5 +1,6 @@
 import json
 import re
+from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -94,6 +95,8 @@ class AdvancedSearchTests(TestCase):
             ("Load_Type", "contains", "tension", ["contains", "exact"]),
             ("Material_parameters", "eq", "150",
              ["contains", "exact", "eq", "gt", "gte", "lt", "lte", "between"]),
+            ("elastic_parameters", "contains", "C11 170000", ["contains"]),
+            ("plastic_parameters", "contains", "reference_shear_rate 0.001", ["contains"]),
         ]:
             with self.subTest(field=field):
                 response = self.client.get(reverse("search"), {
@@ -127,9 +130,44 @@ class AdvancedSearchTests(TestCase):
         Let newly selected fields use the same types as server validation
         """
         response = self.client.get(reverse("search"))
+        self.assertContains(response, 'value="grain_count" data-field-type="number"')
+        self.assertContains(response, 'value="loading_type" data-field-type="text"')
+        self.assertContains(response, 'value="elastic_parameters" data-field-type="parameters"')
+        self.assertContains(response, 'value="plastic_parameters" data-field-type="parameters"')
+
+    def test_parameter_exact_requests_fail_without_changing_submitted_intent(self):
+        """
+        Keep unsupported dictionary equality visible for correction without searching
+        """
+        for field in ("elastic_parameters", "plastic_parameters"):
+            with self.subTest(field=field):
+                response = self.client.get(reverse("search"), {
+                    "condition_field": field,
+                    "condition_operator": "exact",
+                    "condition_value": "{'C11': 170000, 'C12': 124000, 'C44': 75000}",
+                })
+                self.assertTrue(response.context["search_errors"])
+                self.assertFalse(response.context["data_objects"])
+                self.assertEqual(response.context["condition_rows"][0]["operator"], "exact")
+                self.assertContains(response, 'value="exact" selected')
+                self.assertContains(response, "Choose Contains words")
+
+    def test_only_active_legacy_tokens_are_restored_with_their_original_types(self):
+        """
+        Keep bookmarked comparisons editable without offering obsolete new choices
+        """
+        response = self.client.get(reverse("search"), {
+            "condition_field": ["Grain_Number", "Material_parameters"],
+            "condition_operator": ["eq", "eq"],
+            "condition_value": ["150", "170000"],
+        })
+        self.assertFalse(response.context["search_errors"])
         self.assertContains(response, 'value="Grain_Number" data-field-type="number"')
-        self.assertContains(response, 'value="Load_Type" data-field-type="text"')
         self.assertContains(response, 'value="Material_parameters" data-field-type="array"')
+        fields = {option["value"]: option for option in response.context["field_options"]}
+        self.assertIn("legacy", fields["Grain_Number"]["label"].casefold())
+        self.assertNotIn("Stress_Type", fields)
+        self.assertNotIn("Load_Descriptor", fields)
 
     def test_empty_match_stays_unselected_until_user_corrects_it(self):
         """
@@ -217,7 +255,7 @@ class AdvancedSearchTests(TestCase):
         """
         response = self.client.get(reverse("search"))
         fields = [option["value"] for option in response.context["field_options"]]
-        self.assertIn("Grain_Number", fields)
+        self.assertIn("grain_count", fields)
         self.assertNotIn("shared_only_field", fields)
         self.assertNotIn("private_secret_field", fields)
         self.assertNotContains(response, "private_secret_field")
@@ -392,7 +430,7 @@ class AdvancedSearchTests(TestCase):
 
     def test_fixed_fields_are_available_without_accessible_records(self):
         """
-        Show Ronak's parameter choices before the user uploads any data
+        Offer the example schema's parameter choices before any upload
         """
         newcomer = User.objects.create_user(username="new_search_viewer")
         self.client.force_login(newcomer)
@@ -402,10 +440,10 @@ class AdvancedSearchTests(TestCase):
         self.assertEqual(
             [option["value"] for option in response.context["field_options"]],
             [
-                "Hash_Orientation", "Texture_Type",
-                "Element_Number", "Grain_Number", "Material_parameters",
-                "Load_Type", "Stress_Type", "Load_Descriptor", "Hash_load",
-                "Scaling_Factor", "Max_Total_Strain",
+                "orientation_identifier", "texture_type", "grain_count",
+                "discretization_count", "elastic_model_name", "elastic_parameters",
+                "plastic_model_name", "plastic_parameters", "loading_type",
+                "loading_mode", "global_temperature",
             ],
         )
         self.assertFalse(response.context["search_performed"])
@@ -415,7 +453,7 @@ class AdvancedSearchTests(TestCase):
         Allow selecting a supported parameter absent from the current records
         """
         response = self.client.get(reverse("search"), {
-            "condition_field": "Texture_Type",
+            "condition_field": "texture_type",
             "condition_operator": "contains",
             "condition_value": "random",
             "condition_value_to": "",
@@ -445,3 +483,34 @@ class AdvancedSearchTests(TestCase):
         self.assertEqual(
             [obj.pk for obj in response.context["data_objects"]], [self.own.pk]
         )
+
+    def test_example_presets_keep_and_logic_and_access_boundaries(self):
+        """
+        Search real nested parameters only within the same accessible object
+        """
+        example_path = Path(__file__).resolve().parents[2] / "example_json_files" / "a46fde6c1_public.json"
+        example = json.loads(example_path.read_text(encoding="utf-8"))
+        for obj in (self.own, self.public, self.shared, self.hidden):
+            obj.data = dict(example, identifier=obj.data["identifier"])
+            obj.save(update_fields=["data"])
+        params = {
+            "creator": "XUE JUN",
+            "condition_field": ["grain_count", "texture_type", "elastic_parameters", "loading_type"],
+            "condition_operator": ["eq", "exact", "contains", "exact"],
+            "condition_value": ["343", "GOSS", "C11 170000", "force"],
+        }
+        response = self.client.get(reverse("search"), params)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["search_errors"])
+        self.assertCountEqual(
+            [obj.pk for obj in response.context["data_objects"]],
+            [self.own.pk, self.public.pk, self.shared.pk],
+        )
+        params["condition_value"][-1] = "displacement"
+        response = self.client.get(reverse("search"), params)
+        self.assertFalse(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])
+        params["condition_operator"][0] = "contains"
+        response = self.client.get(reverse("search"), params)
+        self.assertTrue(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])

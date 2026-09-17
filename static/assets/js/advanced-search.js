@@ -26,6 +26,7 @@
     const allowed = operatorOptions.filter(option => {
       if (fieldType === 'number') return numericOperators.includes(option.value);
       if (fieldType === 'text') return ['contains', 'exact'].includes(option.value);
+      if (fieldType === 'parameters') return option.value === 'contains';
       return true;
     });
     const compatible = allowed.some(option => option.value === selected);
@@ -57,6 +58,9 @@
     row.querySelector('[data-condition-label="value_to"]').textContent = between ? 'Maximum' : 'Maximum (Between only)';
     value.inputMode = numeric ? 'decimal' : 'text';
     value.placeholder = between ? 'Minimum' : numeric ? 'Number' : 'Text to match';
+    if (field.selectedOptions[0]?.dataset.fieldType === 'parameters' && !numeric) {
+      value.placeholder = 'Parameter name or value';
+    }
     upper.inputMode = 'decimal';
     field.required = active;
     value.required = active;

@@ -126,11 +126,26 @@ case do not matter. These are text matches, not a semantic search.
 
 In **Advanced Search**, **Common filters** provides Identifier, Creator, Software,
 Phase, Owner, Access, and Title. **Data field filters** uses preset simulation
-parameters from [Ronak Shoghi's DatabaseManager](https://github.com/Ronakshoghi/DatabaseManager):
-`Hash_Orientation`, `Texture_Type`, `Element_Number`, `Grain_Number`,
-`Material_parameters` (whole array), `Load_Type`, `Stress_Type`, `Load_Descriptor`,
-`Hash_load`, `Scaling_Factor`, and `Max_Total_Strain`. Common metadata such as
-owner and software version is not included in this menu.
+parameters, following the preset search approach in
+[Ronak Shoghi's DatabaseManager](https://github.com/Ronakshoghi/DatabaseManager).
+The presets map to actual fields in this repository's JSON examples:
+
+| Data field | JSON location | Match type |
+| --- | --- | --- |
+| Orientation identifier | `phase[].orientation.orientation_identifier` | Text |
+| Texture type | `phase[].orientation.texture_type` | Text |
+| Grain count | `phase[].orientation.grain_count` | Number |
+| Discretization count | `discretization_count` | Number |
+| Elastic model | `phase[].constitutive_model.elastic_model_name` | Text |
+| Elastic parameters | `phase[].constitutive_model.elastic_parameters` | Contains words |
+| Plastic model | `phase[].constitutive_model.plastic_model_name` | Text |
+| Plastic parameters | `phase[].constitutive_model.plastic_parameters` | Contains words |
+| Loading type | `mechanical_BC[].loading_type` | Text |
+| Loading mode | `mechanical_BC[].loading_mode` | Text |
+| Global temperature | `global_temperature` | Number |
+
+Here, `[]` means entries in an array; users do not need to enter an index.
+Common metadata such as owner and software version is not included in this menu.
 
 Choose a parameter, comparison, and value. You can add up to 10 conditions.
 All conditions, common fields, and the main search box must match the same data
@@ -142,19 +157,24 @@ the older `keywords` parameter keep an editable Keywords input while it is activ
 
 - **Contains words** requires all entered words in the selected field.
 - **Equals text** matches a complete value, ignoring letter case.
-- **Match** follows the selected field: counts, scaling factor, and maximum
-  total strain offer number comparisons; hashes, types, and descriptors offer
-  text matching. Material parameter arrays offer both. When comparing numbers
-  in an array, the form explains that one array value must match.
+- **Match** follows the selected field: counts and temperature offer number
+  comparisons; identifiers, models, types, and modes offer text matching.
+  Elastic and plastic parameter dictionaries offer **Contains words** only,
+  matching names and values, for example `C11 170000`. They do not offer whole
+  dictionary equality or numeric comparisons across parameters with different
+  meanings or units.
 - Number comparisons support equals, greater or less than, inclusive limits,
   and **Between** with both endpoints included. Numeric strings are accepted;
   booleans and values containing units are not treated as numbers. Use the units
   stored in the record; search does not convert units.
-- A preset parameter matches that complete JSON key at any nesting level,
-  ignoring letter case. Arrays are searched without entering an index; text
-  searches also support the whole array. A numeric comparison or range must
-  match one value. Separate conditions can match different entries within the
-  same data object. Existing bookmarked field paths keep their exact location.
+- Presets search only the JSON locations listed above, with case sensitive
+  JSON keys and case insensitive text values. Unrelated fields with the same
+  name do not match. A numeric comparison or range must match one value.
+  Separate conditions can match different array entries within the same data
+  object. Existing bookmarked JSON paths keep their exact location. Older
+  Ronak field tokens, such as `Grain_Number`, remain usable in existing URLs
+  with their original recursive key matching; active legacy fields are marked
+  in the form and are not offered as new presets.
 - Invalid or incomplete conditions show an error and do not run a broader search.
 - **Clear** resets the search. Submitted conditions remain in the URL, so browser
   refresh and bookmarks preserve them. Do not put secrets in search terms.
@@ -188,16 +208,54 @@ Uploads also undergo resource, identifier, and sharing checks.
 Required fields include:
 
 ```text
-identifier, title, creator, creator_affiliation, date, shared_with, rights,
+title, creator, creator_affiliation, date, shared_with, rights,
 rights_holder, software, software_version, system, system_version,
 processor_specifications, input_path, results_path, RVE_size, RVE_continuity,
 discretization_type, discretization_unit_size, discretization_count,
 mechanical_BC, phase, stress, total_strain, units
 ```
 
-Use `phase`, not `material`. Each `identifier` must be unique across stored
-records. See the [validation implementation](apps/dyn_api/helpers.py) for the
-current required fields.
+Use `phase`, not `material`. See the
+[validation implementation](apps/dyn_api/helpers.py) for the current required
+fields.
+
+### Data object identifiers
+
+Each saved object has its own top-level `identifier`, alongside `title` and
+`creator`. A missing, null, or blank identifier is generated automatically.
+A supplied identifier is preserved and must be a JSON string without leading
+or trailing whitespace; malformed values produce an error instead of being
+silently replaced. Identifiers are compared exactly, including letter case.
+
+Generation follows the required content hashing approach in
+[Ronak Shoghi's MiMeDat template](https://github.com/Ronakshoghi/MiMeDat/blob/main/metadata_template.py),
+but uses a full SHA-256 digest (64 hexadecimal characters), not an eight
+character MD5 prefix. The input is a JSON mapping of the 24 required fields
+above, serialized with sorted keys, compact separators, and ASCII escaping.
+Field names and nested content are included; array order, zero, and false values
+are preserved. The upload does not remove empty optional values or change other
+fields. This is not byte-for-byte compatible with Ronak's eight character IDs;
+existing supplied IDs, including hers, are retained.
+
+Identical required content produces the same generated identifier. JSON object
+key order and optional fields such as `description` and `keywords` do not affect
+it. An identifier is assigned at upload, not continually recalculated when
+sharing settings later change. An identifier check is not full content
+deduplication: different supplied identifiers can refer to identical content.
+
+All identifiers, supplied or generated, are checked against every stored record
+(including private records), other objects in the same file, and all files in
+the submission. A transactional recheck protects against simultaneous uploads.
+Duplicates are not overwritten; errors identify the filename, object number,
+and identifier, with instructions to remove the duplicate or supply another
+identifier for a distinct object. Other valid objects can still save, except
+that a conflict found during the final transactional recheck rejects the batch.
+
+Generated identifiers are part of the stored JSON, its quota size, and exported
+JSON. The original file on the user's computer and previously stored records
+are not modified.
+
+### Sharing metadata
 
 The following examples show only the `shared_with` metadata. They are not complete
 upload files; the other required fields must also be present.

@@ -529,6 +529,23 @@
     flex-shrink: 0;
   }
 
+  @media (max-width: 768px) {
+    .summary-title-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 3px;
+    }
+
+    .summary-title-row .time {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .summary-separator {
+      display: none;
+    }
+  }
+
   .summary-identifier {
     color: #6b7280;
     font-size: 0.82rem;
@@ -927,7 +944,7 @@
                         <span class="main">
                           {{ obj.search_display_name }}
                         </span>
-                        &nbsp;|&nbsp;
+                        <span class="summary-separator" aria-hidden="true">&nbsp;|&nbsp;</span>
                         <span class="time">
                           {{ obj.owner.username }} | {{ obj.uploaded_at|date:"Y-m-d H:i" }}
                         </span>

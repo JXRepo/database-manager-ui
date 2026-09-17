@@ -51,6 +51,7 @@ from .upload_services import (
     PreparedJSONData,
     UploadResourceLimitError,
     canonical_json_size,
+    generate_data_identifier,
     save_prepared_json_data,
     validate_json_depth,
     validate_upload_files,
@@ -971,7 +972,10 @@ def upload_json_view(request):
 
                     for obj in valid_objects:
                         object_index = object_indexes.get(id(obj), 1)
-                        identifier = str(obj.get("identifier", "")).strip()
+                        identifier = obj.get("identifier")
+                        if identifier is None or not identifier.strip():
+                            identifier = generate_data_identifier(obj)
+                            obj["identifier"] = identifier
                         object_label = f"{file_name} data object {object_index}"
 
                         if identifier in seen_identifiers:
@@ -980,7 +984,8 @@ def upload_json_view(request):
                                 "duplicate_identifier",
                                 (
                                     f'{object_label}: identifier "{identifier}" is duplicated '
-                                    "in this upload. Please use a unique identifier."
+                                    "in this upload. Please remove the duplicate, or provide "
+                                    "a different identifier if this is a distinct data object."
                                 ),
                             )
                             continue
@@ -991,7 +996,8 @@ def upload_json_view(request):
                                 "duplicate_identifier",
                                 (
                                     f'{object_label}: identifier "{identifier}" already exists. '
-                                    "Please use a unique identifier."
+                                    "Please remove the duplicate, or provide a different "
+                                    "identifier if this is a distinct data object."
                                 ),
                             )
                             continue
@@ -1056,7 +1062,8 @@ def upload_json_view(request):
                         "duplicate_identifier",
                         (
                             f'{object_label}: identifier "{identifier}" already exists. '
-                            "Please use a unique identifier."
+                            "Please remove the duplicate, or provide a different "
+                            "identifier if this is a distinct data object."
                         ),
                     )
 
@@ -2307,6 +2314,12 @@ def search_view(request):
         for value, label in DATA_FIELD_CHOICES
     ]
     option_labels = {option["value"]: option["label"] for option in field_options}
+    for row in condition_rows:
+        field = row["field"]
+        if field in DATA_FIELD_TYPES and field not in option_labels:
+            label = f"{field} (legacy key)"
+            field_options.append({"value": field, "label": label, "type": DATA_FIELD_TYPES[field]})
+            option_labels[field] = label
     operator_labels = dict(OPERATOR_CHOICES)
     if not condition_rows:
         condition_rows = [{"field": "", "operator": "contains", "value": "", "value_to": ""}]

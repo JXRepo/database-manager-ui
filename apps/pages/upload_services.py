@@ -1,3 +1,4 @@
+import hashlib
 import json
 import math
 from dataclasses import dataclass
@@ -8,6 +9,8 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.db.models import Sum
+
+from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
 
 from .models import DataNotification, JSONData
 from .notifications import build_shared_data_notification_message
@@ -47,6 +50,34 @@ class PreparedJSONData:
     access_type: str
     shared_users: tuple[User, ...]
     size_bytes: int
+
+
+def generate_data_identifier(data: dict) -> str:
+    """
+    Hash the required metadata of one validated data object
+
+    Following Ronak Shoghi's MiMeDat content based identifier approach, this
+    uses required fields only. A canonical mapping preserves field boundaries,
+    zero and false values; a full SHA256 digest avoids an eight digit hash.
+
+    Parameters
+    ----------
+    data : dict
+        Object that has passed required field and numeric validation.
+
+    Returns
+    -------
+    str
+        Deterministic 64 character hexadecimal identifier.
+    """
+    content = {}
+    for field in REQUIRED_TOP_LEVEL_FIELDS:
+        content[field] = data[field]
+    encoded = json.dumps(
+        content, sort_keys=True, ensure_ascii=True, separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def canonical_json_size(value: object) -> int:

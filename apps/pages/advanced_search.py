@@ -1,5 +1,5 @@
 """
-Validate and evaluate bounded conditions against named JSON fields or paths
+Validate and evaluate bounded conditions against preset JSON paths or legacy keys
 """
 
 import json
@@ -12,21 +12,24 @@ MAX_CONDITIONS = 10
 MAX_PATH_LENGTH = 1024
 MAX_VALUE_LENGTH = 200
 MAX_DEPTH = 32
-DATA_FIELD_CHOICES = (
-    ("Hash_Orientation", "Hash_Orientation"),
-    ("Texture_Type", "Texture_Type"),
-    ("Element_Number", "Element_Number"),
-    ("Grain_Number", "Grain_Number"),
-    ("Material_parameters", "Material_parameters (Whole array)"),
-    ("Load_Type", "Load_Type"),
-    ("Stress_Type", "Stress_Type"),
-    ("Load_Descriptor", "Load_Descriptor"),
-    ("Hash_load", "Hash_load"),
-    ("Scaling_Factor", "Scaling_Factor"),
-    ("Max_Total_Strain", "Max_Total_Strain"),
+DATA_FIELD_PRESETS = (
+    ("orientation_identifier", "Orientation identifier", "text",
+     ("phase", "orientation", "orientation_identifier")),
+    ("texture_type", "Texture type", "text", ("phase", "orientation", "texture_type")),
+    ("grain_count", "Grain count", "number", ("phase", "orientation", "grain_count")),
+    ("discretization_count", "Discretization count", "number", ("discretization_count",)),
+    ("elastic_model_name", "Elastic model", "text", ("phase", "constitutive_model", "elastic_model_name")),
+    ("elastic_parameters", "Elastic parameters", "parameters", ("phase", "constitutive_model", "elastic_parameters")),
+    ("plastic_model_name", "Plastic model", "text", ("phase", "constitutive_model", "plastic_model_name")),
+    ("plastic_parameters", "Plastic parameters", "parameters", ("phase", "constitutive_model", "plastic_parameters")),
+    ("loading_type", "Loading type", "text", ("mechanical_BC", "loading_type")),
+    ("loading_mode", "Loading mode", "text", ("mechanical_BC", "loading_mode")),
+    ("global_temperature", "Global temperature", "number", ("global_temperature",)),
 )
-DATA_FIELD_KEYS = {key for key, label in DATA_FIELD_CHOICES}
-DATA_FIELD_TYPES = {
+DATA_FIELD_CHOICES = tuple((key, label) for key, label, field_type, path in DATA_FIELD_PRESETS)
+DATA_FIELD_PATHS = {key: path for key, label, field_type, path in DATA_FIELD_PRESETS}
+# saved Ronak tokens keep their original named key meaning, not aliases to new paths
+LEGACY_FIELD_TYPES = {
     "Hash_Orientation": "text",
     "Texture_Type": "text",
     "Element_Number": "number",
@@ -39,6 +42,8 @@ DATA_FIELD_TYPES = {
     "Scaling_Factor": "number",
     "Max_Total_Strain": "number",
 }
+DATA_FIELD_TYPES = dict(LEGACY_FIELD_TYPES)
+DATA_FIELD_TYPES.update({key: field_type for key, label, field_type, path in DATA_FIELD_PRESETS})
 TECHNICAL_KEYS = {"$schema", "input_path", "results_path"}
 NUMERIC_OPERATORS = {
     "eq": operator.eq,
@@ -65,8 +70,8 @@ def get_field_operators(field):
     """
     Return ordered comparison operators permitted for a named field
 
-    The parser and form share these choices. Arrays and legacy paths retain
-    every operator so their existing comparison behavior stays available.
+    The parser and form share these choices. Parameter objects support word
+    searches only; legacy arrays and paths retain every original operator.
 
     Parameters
     ----------
@@ -83,6 +88,8 @@ def get_field_operators(field):
         allowed = {"between", *NUMERIC_OPERATORS}
     elif field_type == "text":
         allowed = {"contains", "exact"}
+    elif field_type == "parameters":
+        allowed = {"contains"}
     else:
         allowed = OPERATORS
     return tuple(value for value, label in OPERATOR_CHOICES if value in allowed)
@@ -141,7 +148,8 @@ def _parse_row(row):
     """
     Validate a single condition and prepare comparison values
 
-    Fixed tokens select named keys, while existing JSON paths remain precise.
+    New presets select schema paths. Saved tokens retain their original named
+    key meanings, and explicit JSON paths keep scalar matching only.
 
     Parameters
     ----------
@@ -162,7 +170,9 @@ def _parse_row(row):
         raise ValueError("Choose a data field.")
     if len(row["field"]) > MAX_PATH_LENGTH:
         raise ValueError(f"The field path must be at most {MAX_PATH_LENGTH} characters.")
-    if row["field"] in DATA_FIELD_KEYS:
+    if row["field"] in DATA_FIELD_PATHS:
+        condition = {"path": DATA_FIELD_PATHS[row["field"]], "include_containers": True}
+    elif row["field"] in LEGACY_FIELD_TYPES:
         condition = {"field_key": row["field"]}
     else:
         try:
@@ -181,6 +191,8 @@ def _parse_row(row):
     if operation not in get_field_operators(row["field"]):
         if DATA_FIELD_TYPES[row["field"]] == "number":
             raise ValueError(f"Choose a numeric comparison for {row['field']}.")
+        if DATA_FIELD_TYPES[row["field"]] == "parameters":
+            raise ValueError(f"Choose Contains words for {row['field']}.")
         raise ValueError(f"Choose Contains words or Equals text for {row['field']}.")
     if len(row["value"]) > MAX_VALUE_LENGTH or len(row["value_to"]) > MAX_VALUE_LENGTH:
         raise ValueError(f"Each value must be at most {MAX_VALUE_LENGTH} characters.")
@@ -259,9 +271,12 @@ def parse_conditions(query):
     return rows, [] if errors else conditions, errors
 
 
-def _field_values(data, path, depth=0):
+def _field_values(data, path, depth=0, include_containers=False):
     """
-    Yield scalars at an exact path with transparent array traversal
+    Yield values at an exact path with transparent array traversal
+
+    Presets can search parameter dictionaries as text. Explicit bookmarked
+    paths retain the original scalar candidates unless containers are requested.
 
     Parameters
     ----------
@@ -271,20 +286,24 @@ def _field_values(data, path, depth=0):
         Remaining dictionary keys to traverse.
     depth : int, optional
         Current nesting depth, including arrays.
+    include_containers : bool, optional
+        Include complete dictionaries and arrays at the selected path.
 
     Yields
     ------
     object
-        Nonnull scalar candidates at the requested path only.
+        Nonnull candidates at the requested path only.
     """
     if depth > MAX_DEPTH:
         return
+    if not path and include_containers and isinstance(data, (dict, list)):
+        yield data
     if isinstance(data, list):
         for value in data:
-            yield from _field_values(value, path, depth + 1)
+            yield from _field_values(value, path, depth + 1, include_containers)
     elif path:
         if isinstance(data, dict) and path[0] in data:
-            yield from _field_values(data[path[0]], path[1:], depth + 1)
+            yield from _field_values(data[path[0]], path[1:], depth + 1, include_containers)
     elif data is not None and not isinstance(data, dict):
         yield data
 
@@ -328,8 +347,8 @@ def _matches_condition(data, condition):
     """
     Evaluate one prepared comparison against matching field values
 
-    Named fields include complete containers for text matching. Explicit paths
-    retain their existing scalar matching rules.
+    Presets and legacy named fields include complete containers for text
+    matching. Explicit paths retain their existing scalar matching rules.
 
     Parameters
     ----------
@@ -348,7 +367,7 @@ def _matches_condition(data, condition):
     if "field_key" in condition:
         values = _named_field_values(data, condition["field_key"].casefold())
     else:
-        values = _field_values(data, condition["path"])
+        values = _field_values(data, condition["path"], include_containers=condition.get("include_containers", False))
     if operation == "contains":
         remaining = set(expected.split())
         for value in values:

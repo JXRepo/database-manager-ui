@@ -247,6 +247,21 @@
 }
 
 @media (max-width: 768px) {
+  .summary-value {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+  }
+
+  .summary-value .time {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .summary-separator {
+    display: none;
+  }
+
   .detail-grid {
     grid-template-columns: 1fr;
   }
@@ -425,7 +440,7 @@
                             <span class="main">
                               {{ obj.list_display_name }}
                             </span>
-                            &nbsp;|&nbsp;
+                            <span class="summary-separator" aria-hidden="true">&nbsp;|&nbsp;</span>
                             <span class="time">
                               {{ obj.owner.username }} | {{ obj.uploaded_at|date:"Y-m-d H:i" }}
                             </span>

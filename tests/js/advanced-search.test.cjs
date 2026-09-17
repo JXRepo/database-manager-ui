@@ -27,6 +27,8 @@ function conditionRow() {
       <option value="Load_Type" data-field-type="text">Load_Type</option>
       <option value="Software" data-field-type="text">Software</option>
       <option value="Stress" data-field-type="array">Stress</option>
+      <option value="elastic_parameters" data-field-type="parameters">Elastic parameters</option>
+      <option value="plastic_parameters" data-field-type="parameters">Plastic parameters</option>
       <option value="Legacy_Field">Legacy_Field</option>
     </select>
     <label data-condition-label="operator">Match</label>
@@ -162,6 +164,56 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     assert.equal(state.placeholder, 'Number');
     assert.deepEqual(state.required, [true, true]);
     assert.deepEqual(state.submitted, ['Grain_Number', 'eq', '42', '']);
+  });
+
+  test('parameter objects offer only word matching and clear an obsolete numeric upper bound', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'Grain_Number';
+      document.querySelector('[name="condition_operator"]').value = 'between';
+      document.querySelector('[name="condition_value"]').value = '170000';
+      document.querySelector('[name="condition_value_to"]').value = '180000';
+    `);
+    const states = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      const operator = document.querySelector('[name="condition_operator"]');
+      const value = document.querySelector('[name="condition_value"]');
+      return ['elastic_parameters', 'plastic_parameters'].map(name => {
+        field.value = name;
+        field.dispatchEvent(new Event('change'));
+        return {options: [...operator.options].map(option => option.value),
+          submitted: [...new FormData(document.querySelector('form')).values()],
+          placeholder: value.placeholder, inputMode: value.inputMode};
+      });
+    })()`);
+    for (const [index, state] of states.entries()) {
+      assert.deepEqual(state.options, ['contains']);
+      assert.deepEqual(state.submitted,
+        [index ? 'plastic_parameters' : 'elastic_parameters', 'contains', '170000', '']);
+      assert.equal(state.placeholder, 'Parameter name or value');
+      assert.equal(state.inputMode, 'text');
+    }
+  });
+
+  test('restored parameter equality remains an explicit error until corrected', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'elastic_parameters';
+      document.querySelector('[name="condition_operator"]').value = 'exact';
+      document.querySelector('[name="condition_value"]').value = 'C11';
+    `);
+    const initial = await evaluate(`(() => {
+      const operator = document.querySelector('[name="condition_operator"]');
+      return {options: [...operator.options].map(option => option.value),
+        label: operator.selectedOptions[0].textContent};
+    })()`);
+    assert.deepEqual(initial.options, ['contains', 'exact']);
+    assert.match(initial.label, /unsupported/i);
+    const corrected = await evaluate(`(() => {
+      const operator = document.querySelector('[name="condition_operator"]');
+      operator.value = 'contains';
+      operator.dispatchEvent(new Event('change'));
+      return [...operator.options].map(option => option.value);
+    })()`);
+    assert.deepEqual(corrected, ['contains']);
   });
 
   test('switching a numeric range to text clears only the upper bound', async t => {
@@ -508,6 +560,54 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
         expanded: document.querySelector('[aria-controls]').getAttribute('aria-expanded')};
     })()`);
     assert.deepEqual(state, {open: true, expanded: 'true'});
+  });
+
+  test('long identifier errors wrap inside the upload page on mobile', async t => {
+    const template = readFileSync(join(__dirname, '../../templates/pages/upload.html'), 'utf8');
+    const styles = [...template.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('\n');
+    const bootstrap = readFileSync(join(__dirname, '../../static/assets/css/plugins/bootstrap.min.css'), 'utf8');
+    const evaluate = await page(t, '', 390);
+    const html = `<style>${bootstrap}${styles}</style><div class="pc-content" style="margin:15px">
+      <div class="alert alert-danger">file.json data object 2: identifier "${'a'.repeat(64)}"
+      already exists. Please remove the duplicate.</div></div>`;
+    const layout = await evaluate(`(() => {
+      document.body.innerHTML = ${JSON.stringify(html)};
+      const alert = document.querySelector('.alert');
+      return {page: document.documentElement.scrollWidth, viewport: innerWidth,
+        content: alert.scrollWidth, available: alert.clientWidth};
+    })()`);
+    assert.ok(layout.page <= layout.viewport, JSON.stringify(layout));
+    assert.ok(layout.content <= layout.available, JSON.stringify(layout));
+  });
+
+  test('record names remain visible beside long upload metadata on desktop and mobile', async t => {
+    const bootstrap = readFileSync(join(__dirname, '../../static/assets/css/plugins/bootstrap.min.css'), 'utf8');
+    for (const [filename, selector] of [['data_list.html', 'summary-value'], ['search.html', 'summary-title-row']]) {
+      const template = readFileSync(join(__dirname, '../../templates/pages', filename), 'utf8');
+      const styles = [...template.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('\n');
+      for (const width of [1440, 390]) {
+        const evaluate = await page(t, '', width);
+        const html = `<style>${bootstrap}${styles}</style>
+          <div style="width:min(700px, calc(100vw - 160px));margin:20px">
+            <div class="${selector}"><span class="main">${'a'.repeat(64)}</span>
+              <span class="summary-separator">&nbsp;|&nbsp;</span>
+              <span class="time">browser-qa-viewer | 2026-09-17 10:20</span>
+            </div></div>`;
+        const layout = await evaluate(`(() => {
+          document.body.innerHTML = ${JSON.stringify(html)};
+          const row = document.querySelector('.${selector}');
+          const main = row.querySelector('.main').getBoundingClientRect();
+          const time = row.querySelector('.time').getBoundingClientRect();
+          return {nameWidth: main.width, timeRight: time.right, rowRight: row.getBoundingClientRect().right,
+            sameLine: Math.abs(main.y - time.y) < 2,
+            pageOverflow: document.documentElement.scrollWidth > innerWidth};
+        })()`);
+        assert.ok(layout.nameWidth > 100, `${filename}/${width}: ${JSON.stringify(layout)}`);
+        assert.ok(layout.timeRight <= layout.rowRight + 1, `${filename}/${width}: ${JSON.stringify(layout)}`);
+        assert.equal(layout.sameLine, width > 768, `${filename}/${width}: ${JSON.stringify(layout)}`);
+        assert.equal(layout.pageOverflow, false);
+      }
+    }
   });
 
   test('live data rows stay compact and long lists scroll at desktop and mobile widths', async t => {
