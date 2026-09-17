@@ -155,7 +155,7 @@
 
   .condition-row {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) minmax(0, 1.5fr) auto;
+    grid-template-columns: minmax(0, 1.6fr) minmax(230px, 1.6fr) minmax(0, 1.5fr) auto;
     align-items: end;
     gap: 10px;
     min-width: 0;
@@ -170,6 +170,10 @@
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
     gap: 10px;
     min-width: 0;
+  }
+
+  .condition-row-text {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) auto;
   }
 
   .condition-row:first-child {
@@ -203,6 +207,14 @@
     .advanced-search-actions > * {
       flex: 1;
       min-width: 0;
+    }
+  }
+
+  @media (max-width: 360px) {
+    [data-condition-match] .form-select {
+      padding-left: 8px;
+      padding-right: 28px;
+      background-position: right 8px center;
     }
   }
 
@@ -641,6 +653,11 @@
   <style>
     #advancedSearchPanel { display: block; }
     .advanced-toggle-btn { display: none; }
+    [data-condition-match][hidden] { display: block !important; }
+    .condition-row-text { grid-template-columns: minmax(0, 1.6fr) minmax(230px, 1.6fr) minmax(0, 1.5fr) auto; }
+    @media (max-width: 768px) {
+      .condition-row-text { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    }
   </style>
 </noscript>
 
@@ -788,7 +805,7 @@
                 {% regroup field_options by group as field_groups %}
                 <div id="dataFieldConditions" data-max-conditions="{{ max_conditions }}">
                   {% for row in condition_rows %}
-                    <fieldset class="condition-row" data-condition-row>
+                    <fieldset class="condition-row{% if row.simple_text %} condition-row-text{% endif %}" data-condition-row>
                       <legend class="visually-hidden" data-condition-legend>Data field condition {{ forloop.counter }}</legend>
                       <div class="condition-field">
                         <label for="condition-{{ forloop.counter }}-field" class="form-label" data-condition-label="field">Data field</label>
@@ -806,7 +823,7 @@
                           {% endfor %}
                         </select>
                       </div>
-                      <div>
+                      <div data-condition-match{% if row.simple_text %} hidden{% endif %}>
                         <label for="condition-{{ forloop.counter }}-operator" class="form-label" data-condition-label="operator">Match</label>
                         <select name="condition_operator" id="condition-{{ forloop.counter }}-operator" class="form-select">
                           {% if not row.operator_available %}
@@ -839,7 +856,7 @@
                         </div>
                       </div>
                       <button type="button" class="btn btn-outline-secondary btn-sm condition-remove" data-remove-condition aria-label="Remove condition {{ forloop.counter }}" hidden>Remove</button>
-                      <span class="condition-hint text-muted small" data-condition-hint {% if not row.array_numeric and not row.unit %}hidden{% endif %}>{% if row.unit %}Enter temperature in K (kelvin).{% else %}Matches one number in the array.{% endif %}</span>
+                      <span class="condition-hint text-muted small" data-condition-hint {% if not row.array_numeric and not row.unit and not row.simple_text %}hidden{% endif %}>{% if row.simple_text %}All words must appear as whole words, in any order. Case is ignored.{% elif row.unit %}Enter temperature in K (kelvin).{% else %}Matches one number in the array.{% endif %}</span>
                       <p class="condition-error text-danger small mb-0" data-condition-error id="condition-{{ forloop.counter }}-error" {% if not row.error %}hidden{% endif %}>{{ row.error }}</p>
                     </fieldset>
                   {% endfor %}
@@ -877,11 +894,11 @@
                       {% endfor %}
                     </select>
                   </div>
-                  <div>
+                  <div data-condition-match>
                     <label class="form-label" data-condition-label="operator">Match</label>
                     <select name="condition_operator" class="form-select">
                       {% for value, label in operator_choices %}
-                        <option value="{{ value }}">{{ label }}</option>
+                        <option value="{{ value }}"{% if value == "words" %} selected{% endif %}>{{ label }}</option>
                       {% endfor %}
                     </select>
                   </div>

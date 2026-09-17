@@ -234,6 +234,68 @@ class AdvancedSearchTests(TestCase):
         self.assertNotContains(response, 'value="elastic_parameters"')
         self.assertNotContains(response, 'value="plastic_parameters"')
 
+    def test_whole_word_filters_hide_match_and_preserve_access_boundaries(self):
+        """
+        Render the fixed word comparison while matching only accessible objects
+        """
+        for obj, model in [
+            (self.public, "Isotropic Elasticity"),
+            (self.own, "Anisotropic Elasticity"),
+            (self.hidden, "Isotropic Elasticity"),
+        ]:
+            obj.data["phase"] = [{"constitutive_model": {"elastic_model_name": model}}]
+            obj.save(update_fields=["data"])
+        response = self.client.get(reverse("search"), {
+            "condition_field": "elastic_model_name",
+            "condition_operator": "words",
+            "condition_value": "ELASTICITY isotropic",
+        })
+        self.assertFalse(response.context["search_errors"])
+        self.assertEqual([obj.pk for obj in response.context["data_objects"]], [self.public.pk])
+        self.assertEqual(response.context["result_count"], 1)
+        row = response.context["condition_rows"][0]
+        self.assertTrue(row["simple_text"])
+        self.assertEqual(row["operator_choices"], [("words", "All words")])
+        self.assertContains(response, 'data-condition-match hidden')
+        self.assertContains(response, 'value="words" selected')
+
+    def test_saved_text_comparisons_remain_visible_with_their_original_meaning(self):
+        """
+        Keep a saved comparison editable without offering it to new text searches
+        """
+        self.public.data["elastic_model_name"] = "Anisotropic Elasticity"
+        self.public.save(update_fields=["data"])
+        for operation, count in [("contains", 1), ("exact", 0)]:
+            with self.subTest(operation=operation):
+                response = self.client.get(reverse("search"), {
+                    "condition_field": "elastic_model_name",
+                    "condition_operator": operation,
+                    "condition_value": "isotropic",
+                })
+                self.assertFalse(response.context["search_errors"])
+                self.assertEqual(response.context["result_count"], count)
+                row = response.context["condition_rows"][0]
+                self.assertFalse(row["simple_text"])
+                self.assertEqual(row["operator"], operation)
+                self.assertCountEqual(
+                    [value for value, label in row["operator_choices"]], ["words", operation]
+                )
+
+    def test_initial_word_comparison_remains_optional_and_available_without_javascript(self):
+        """
+        Offer whole words on the initial form and ignore its untouched blank row
+        """
+        response = self.client.get(reverse("search"))
+        row = response.context["condition_rows"][0]
+        self.assertEqual(row["operator"], "words")
+        self.assertIn(("words", "All words"), row["operator_choices"])
+        response = self.client.get(reverse("search"), {
+            "keyword": "copper", "condition_field": "",
+            "condition_operator": "words", "condition_value": "", "condition_value_to": "",
+        })
+        self.assertFalse(response.context["search_errors"])
+        self.assertEqual(response.context["result_count"], 2)
+
     def test_parameter_exact_requests_fail_without_changing_submitted_intent(self):
         """
         Keep unsupported dictionary equality visible for correction without searching
@@ -265,17 +327,17 @@ class AdvancedSearchTests(TestCase):
         ])
         fields = {option["value"]: option for option in response.context["field_options"]}
         cases = (
-            ("texture_type", "Microstructure", "contains", ""),
+            ("texture_type", "Microstructure", "words", ""),
             ("grain_count", "Microstructure", "eq", ""),
-            ("lattice_structure", "Microstructure", "contains", ""),
-            ("orientation_identifier", "Microstructure", "exact", ""),
-            ("discretization_type", "Discretization and boundaries", "contains", ""),
+            ("lattice_structure", "Microstructure", "words", ""),
+            ("orientation_identifier", "Microstructure", "words", ""),
+            ("discretization_type", "Discretization and boundaries", "words", ""),
             ("discretization_count", "Discretization and boundaries", "eq", ""),
             ("RVE_continuity", "Discretization and boundaries", "is", ""),
-            ("elastic_model_name", "Material models", "contains", ""),
-            ("plastic_model_name", "Material models", "contains", ""),
-            ("loading_type", "Loading and temperature", "contains", ""),
-            ("loading_mode", "Loading and temperature", "contains", ""),
+            ("elastic_model_name", "Material models", "words", ""),
+            ("plastic_model_name", "Material models", "words", ""),
+            ("loading_type", "Loading and temperature", "words", ""),
+            ("loading_mode", "Loading and temperature", "words", ""),
             ("global_temperature", "Loading and temperature", "eq", "K"),
         )
         for value, group, default, unit in cases:

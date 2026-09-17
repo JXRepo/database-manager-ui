@@ -2329,14 +2329,23 @@ def search_view(request):
             field_options.append(option)
             option_labels[field] = option["label"]
     operator_labels = dict(OPERATOR_CHOICES)
+    option_defaults = {option["value"]: option["default_operator"] for option in field_options}
     if not condition_rows:
-        condition_rows = [{"field": "", "operator": "contains", "value": "", "value_to": ""}]
+        condition_rows = [{"field": "", "operator": "words", "value": "", "value_to": ""}]
     for row in condition_rows:
         row["field_available"] = row["field"] in option_labels
         row["field_label"] = option_labels.get(row["field"], row["field"])
         row["boolean_value"] = DATA_FIELD_TYPES.get(row["field"]) == "boolean"
         row["unit"] = "K" if row["field"] == "global_temperature" else ""
         allowed_operators = get_field_operators(row["field"])
+        text_preset = option_defaults.get(row["field"]) == "words"
+        row["simple_text"] = text_preset and row["operator"] == "words"
+        if text_preset:
+            allowed_operators = tuple(
+                value for value in allowed_operators if value in {"words", row["operator"]}
+            )
+        elif not row["field"]:
+            allowed_operators = ("words", "eq", "gt", "gte", "lt", "lte", "between")
         row["operator_choices"] = [
             (value, label) for value, label in OPERATOR_CHOICES
             if value in allowed_operators

@@ -7,6 +7,8 @@ from django.http import QueryDict
 
 from .advanced_search import (
     DATA_FIELD_CHOICES,
+    DATA_FIELD_PRESETS,
+    get_field_option,
     get_field_operators,
     matches_conditions,
     parse_conditions,
@@ -43,7 +45,8 @@ class AdvancedSearchConditionTests(TestCase):
         """
         Ignore untouched rows instead of rejecting the initial form
         """
-        for query in (QueryDict(encoding="utf-8"), condition_query(("", "contains", "", ""))):
+        for query in (QueryDict(encoding="utf-8"), condition_query(("", "contains", "", "")),
+                      condition_query(("", "words", "", ""))):
             with self.subTest(query=query):
                 rows, conditions, errors = parse_conditions(query)
                 self.assertEqual(conditions, [])
@@ -148,6 +151,33 @@ class AdvancedSearchConditionTests(TestCase):
                 self.assertEqual(rows[1]["field"], field)
                 self.assertTrue(rows[1]["error"])
 
+    def test_words_is_the_default_only_for_current_text_presets(self):
+        """
+        Offer complete word matching for text presets while keeping saved comparisons
+        """
+        for field, label, field_type, group in DATA_FIELD_PRESETS:
+            with self.subTest(field=field):
+                if field_type == "text":
+                    self.assertEqual(get_field_option(field)["default_operator"], "words")
+                    self.assertEqual(get_field_operators(field), ("contains", "words", "exact"))
+                else:
+                    self.assertNotIn("words", get_field_operators(field))
+        self.assertEqual(get_field_option("Texture_Type")["default_operator"], "contains")
+
+    def test_words_is_rejected_for_legacy_paths_parameters_and_nontext_fields(self):
+        """
+        Keep saved selector meanings and reject incompatible new word comparisons
+        """
+        for field in ("Texture_Type", "Hash_Orientation", "Material_parameters", "elastic_parameters",
+                      "plastic_parameters", '["phase","name"]', "grain_count", "global_temperature",
+                      "RVE_continuity", "Unknown_Field"):
+            with self.subTest(field=field):
+                self.assertNotIn("words", get_field_operators(field))
+                rows, conditions, errors = parse_conditions(condition_query((field, "words", "random")))
+                self.assertTrue(errors)
+                self.assertEqual(conditions, [])
+                self.assertEqual(rows[0]["operator"], "words")
+
     def test_partial_rows_fail_without_discarding_form_values(self):
         """
         Reject incomplete intent rather than silently broadening the search
@@ -159,6 +189,8 @@ class AdvancedSearchConditionTests(TestCase):
             ('["phase"]', "", "steel", ""),
             ('["phase"]', "between", "1", ""),
             ('["phase"]', "contains", "steel", "unexpected"),
+            ("texture_type", "words", "  ", ""),
+            ("texture_type", "words", "random", "unexpected"),
         ]
         for submitted in invalid_rows:
             with self.subTest(row=submitted):
@@ -344,6 +376,20 @@ class ExamplePresetSearchTests(TestCase):
                 self.assertEqual(errors, [])
                 self.assertTrue(matches_conditions({"simulation": [self.example]}, conditions))
 
+    def test_default_comparisons_match_every_preset_in_fixtures_and_local_examples(self):
+        """
+        Exercise the current form defaults with synthetic and locally available data
+        """
+        for field, operation, value in self.example_rows:
+            operation = get_field_option(field)["default_operator"]
+            with self.subTest(field=field):
+                rows, conditions, errors = parse_conditions(condition_query((field, operation, value)))
+                self.assertEqual(errors, [])
+                self.assertTrue(matches_conditions({"simulation": [self.example]}, conditions))
+                for name, data in self.examples.items():
+                    with self.subTest(example=name):
+                        self.assertEqual(matches_conditions(data, conditions), field != "lattice_structure")
+
     def test_grain_count_searches_both_orientation_and_phase_counts(self):
         """
         Find numeric counts in different phase locations and later array entries
@@ -474,6 +520,66 @@ class RecursivePresetSearchTests(TestCase):
         self.assertFalse(self.matches(data, ("texture_type", "exact", "random copper")))
         self.assertFalse(self.matches({"texture_type": "random", "title": "copper"},
                                       ("texture_type", "contains", "random copper")))
+
+    def test_words_requires_complete_terms_without_prefix_or_suffix_matches(self):
+        """
+        Exclude substring matches while requiring every entered word in any order
+        """
+        row = ("elastic_model_name", "words", "  ELASTICITY\tIsotropic\n")
+        for value, expected in (("Isotropic Elasticity", True), ("Elasticity: isotropic", True),
+                                ("Anisotropic Elasticity", False), ("Isotropically elastic", False),
+                                ("Isotropic", False), ("Isotropic ElasticityExtra", False)):
+            with self.subTest(value=value):
+                self.assertEqual(self.matches({"elastic_model_name": value}, row), expected)
+        self.assertTrue(self.matches({"elastic_model_name": "Anisotropic Elasticity"},
+                                     ("elastic_model_name", "contains", "isotropic")))
+        self.assertFalse(self.matches({"elastic_model_name": "Isotropic Elasticity"},
+                                      ("elastic_model_name", "exact", "isotropic")))
+        self.assertTrue(self.matches({"elastic_model_name": "Isotropic Elasticity"},
+                                     ("elastic_model_name", "exact", "ISOTROPIC ELASTICITY")))
+
+    def test_words_handles_unicode_and_literal_technical_terms(self):
+        """
+        Preserve Unicode case folding and punctuation without interpreting patterns
+        """
+        cases = (
+            ("Straße α", "STRASSE Α", True),
+            ("Straßen α", "STRASSE Α", False),
+            ("orientation-123", "orientation-123", True),
+            ("orientation-1234", "orientation-123", False),
+            ("preorientation-123", "orientation-123", False),
+            ("C++ model", "C++", True),
+            ("C model", "C++", False),
+            ("XC++ model", "C++", False),
+            ("model (a|b)", "(a|b)", True),
+            ("model a", "(a|b)", False),
+            ("model .*", ".*", True),
+            ("model any", ".*", False),
+        )
+        for value, query, expected in cases:
+            with self.subTest(value=value, query=query):
+                self.assertEqual(self.matches({"orientation_identifier": value},
+                                              ("orientation_identifier", "words", query)), expected)
+
+    def test_words_only_reads_selected_text_values_within_the_same_object(self):
+        """
+        Combine selected scalar values without searching other fields or containers
+        """
+        row = ("texture_type", "words", "COPPER random")
+        self.assertTrue(self.matches({"phase": [{"texture_type": "random"},
+                                               {"Texture-Type": ["copper"]}]}, row))
+        self.assertFalse(self.matches({"texture_type": "random", "title": "copper"}, row))
+        self.assertFalse(self.matches({"texture_type": "randomized copper"}, row))
+        for value, query in ((150, "150"), (True, "true"), (None, "null"),
+                             ({"description": "random"}, "random"), ({"random": "texture"}, "random")):
+            with self.subTest(value=value):
+                self.assertFalse(self.matches({"texture_type": value}, ("texture_type", "words", query)))
+        for field, value in (("loading_type", "force"), ("loading_mode", "static")):
+            row = (field, "words", value)
+            with self.subTest(field=field):
+                self.assertTrue(self.matches({"mechanical_BC": [{field: value}]}, row))
+                self.assertFalse(self.matches({"thermal_BC": [{field: value}]}, row))
+                self.assertFalse(self.matches({field: value}, row))
 
     def test_count_presets_accept_only_named_counts_and_explicit_grain_number_alias(self):
         """

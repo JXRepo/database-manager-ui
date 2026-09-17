@@ -140,7 +140,7 @@ The 12 choices are grouped within one dropdown and search these field names:
 | Microstructure | Texture type | `texture_type` | Text |
 | Microstructure | Grain number | `grain_count`, or the count alias `grain_number` | Number |
 | Microstructure | Crystal structure | `lattice_structure` | Text |
-| Microstructure | Orientation identifier | `orientation_identifier` | Text, defaults to Equals text |
+| Microstructure | Orientation identifier | `orientation_identifier` | Text |
 | Discretization and boundaries | Discretization type | `discretization_type` | Text |
 | Discretization and boundaries | Discretization count | `discretization_count` | Number |
 | Discretization and boundaries | RVE continuity | `RVE_continuity` | Is: Periodic or Non-periodic |
@@ -161,7 +161,9 @@ A small synthetic search fixture in `apps/pages/fixtures/search_fields.json`
 covers all 12 fields, including `lattice_structure: "FCC"`; it is not a complete
 upload template. Local example files, when available, provide additional coverage.
 
-Choose a parameter, comparison, and value. You can add up to 10 conditions.
+Choose a parameter and enter its value. Text fields automatically require every
+entered word; they do not need a Match selection. Numeric fields retain a
+comparison dropdown. You can add up to 10 conditions.
 All conditions, common fields, and the main search box must match the same data
 object. The preset choices are available even before any data is uploaded;
 records missing the selected field do not match.
@@ -169,11 +171,19 @@ records missing the selected field do not match.
 Metadata keywords are included in the main search. Existing bookmarked URLs with
 the older `keywords` parameter keep an editable Keywords input while it is active.
 
-- **Contains words** requires all entered words among the selected field's text
-  values, in any order. It does not search parameter names or arbitrary objects.
-- **Equals text** matches a complete value, ignoring letter case.
+- Text presets match **whole words**, ignoring order and letter case. Separate
+  search terms with spaces; all terms must appear among the selected field's
+  text values. For example, `elasticity isotropic` matches `Isotropic Elasticity`
+  but not `Anisotropic Elasticity`. Punctuation within a term is literal, so an
+  identifier such as `orientation-123` does not match `orientation-1234`.
+  The search does not include parameter names or arbitrary objects.
+- Saved **Contains words** and **Equals text** searches retain their previous
+  comparisons. Contains words requires all terms but permits substrings;
+  Equals text compares a complete value, ignoring letter case. Their Match
+  selection stays visible while the saved comparison is active.
 - **Match** follows the selected field: counts and temperature offer number
-  comparisons; identifiers, models, types, and modes offer text matching.
+  comparisons, including Greater than or equal to and Less than or equal to;
+  identifiers, models, types, and modes use the automatic whole word search.
   **RVE continuity** uses **Is**, with Periodic (`true`) or Non-periodic (`false`).
   Only actual JSON booleans match; strings and zero or one do not.
 - Number comparisons support equals, greater or less than, inclusive limits,
@@ -195,6 +205,9 @@ the older `keywords` parameter keep an editable Keywords input while it is activ
   parameter selectors remain editable under Saved filters when present in a URL,
   retaining their original exact paths and Contains words behavior. These old
   dictionary searches do not bind a parameter name to its particular value.
+- Without JavaScript, Match stays visible so a different comparison can be
+  selected when changing field types. Use All words for text presets. An
+  incompatible comparison produces an error and must be corrected before searching.
 - Invalid or incomplete conditions show an error and do not run a broader search.
 - **Clear** resets the search. Submitted conditions remain in the URL, so browser
   refresh and bookmarks preserve them. Do not put secrets in search terms.

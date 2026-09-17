@@ -23,13 +23,18 @@
     const operator = row.querySelector('[name="condition_operator"]');
     const metadata = field.selectedOptions[0]?.dataset || {};
     const fieldType = metadata.fieldType;
+    const textPreset = metadata.defaultOperator === 'words';
     const selected = operator.value;
     const allowed = operatorOptions.filter(option => {
       if (fieldType === 'number') return numericOperators.includes(option.value);
+      if (textPreset) {
+        return option.value === 'words' || (!fieldChanged &&
+          ['contains', 'exact'].includes(selected) && option.value === selected);
+      }
       if (fieldType === 'text') return ['contains', 'exact'].includes(option.value);
       if (fieldType === 'parameters') return option.value === 'contains';
       if (fieldType === 'boolean') return option.value === 'is';
-      return option.value !== 'is';
+      return option.value !== 'is' && (option.value !== 'words' || !field.value);
     });
     const compatible = allowed.some(option => option.value === selected);
     operator.replaceChildren(...allowed.map(option => option.cloneNode(true)));
@@ -38,8 +43,8 @@
       const label = original ? original.textContent : selected || 'Empty match';
       operator.add(new Option(`${label} (unsupported for this field)`, selected));
     }
-    if (fieldChanged && metadata.defaultOperator === 'exact') {
-      operator.value = 'exact';
+    if (fieldChanged && textPreset) {
+      operator.value = 'words';
     } else if (compatible || preserveInvalid) {
       operator.value = selected;
     } else {
@@ -82,11 +87,15 @@
     const value = updateValueControl(row);
     const upper = row.querySelector('[name="condition_value_to"]');
     const metadata = field.selectedOptions[0]?.dataset || {};
+    const simpleText = metadata.defaultOperator === 'words' && operator.value === 'words';
+    const matchControl = row.querySelector('[data-condition-match]');
+    if (matchControl) matchControl.hidden = simpleText;
+    row.classList.toggle('condition-row-text', simpleText);
     const unit = metadata.unit ? ` (${metadata.unit})` : '';
     const between = operator.value === 'between';
     const numeric = numericOperators.includes(operator.value);
     const active = Boolean(field.value || value.value.trim() || upper.value.trim() ||
-      operator.value !== 'contains');
+      !['contains', 'words'].includes(operator.value));
 
     row.querySelector('[data-condition-upper]').hidden = !between && !upper.value;
     row.querySelector('[data-condition-label="value"]').textContent = (between ? 'Minimum' : 'Value') + unit;
@@ -95,6 +104,7 @@
     if (value.tagName === 'INPUT') {
       value.inputMode = numeric ? 'decimal' : 'text';
       value.placeholder = (between ? 'Minimum' : numeric ? 'Number' : 'Text to match') + unit;
+      if (simpleText) value.placeholder = 'Words to match';
       if (metadata.fieldType === 'parameters' && !numeric) {
         value.placeholder = 'Parameter name or value';
       }
@@ -106,8 +116,10 @@
 
     const hint = row.querySelector('[data-condition-hint]');
     if (hint) {
-      hint.hidden = !metadata.unit && (metadata.fieldType !== 'array' || !numeric);
-      hint.textContent = metadata.unit ? 'Enter temperature in K (kelvin).' : 'Matches one number in the array.';
+      hint.hidden = !simpleText && !metadata.unit && (metadata.fieldType !== 'array' || !numeric);
+      hint.textContent = simpleText
+        ? 'All words must appear as whole words, in any order. Case is ignored.'
+        : metadata.unit ? 'Enter temperature in K (kelvin).' : 'Matches one number in the array.';
       for (const input of [value, upper]) {
         const descriptions = (input.getAttribute('aria-describedby') || '').split(' ')
           .filter(id => id && id !== hint.id);

@@ -10,7 +10,8 @@ const chromiumPath = process.env.CHROMIUM_BIN || '/usr/bin/chromium';
 const scriptPath = join(__dirname, '../../static/assets/js/advanced-search.js');
 
 function operatorOptions() {
-  return `<option value="contains">Contains words</option><option value="exact">Equals text</option>
+  return `<option value="contains">Contains words</option><option value="words" selected>All words</option>
+    <option value="exact">Equals text</option>
     <option value="eq">Equals number</option><option value="gt">Greater than</option>
     <option value="gte">Greater than or equal to</option><option value="lt">Less than</option>
     <option value="lte">Less than or equal to</option><option value="between">Between</option>
@@ -24,23 +25,23 @@ function conditionRow() {
     <select name="condition_field">
       <option value="">Choose a field</option>
       <optgroup label="Microstructure">
-        <option value="texture_type" data-field-type="text" data-default-operator="contains">Texture type</option>
+        <option value="texture_type" data-field-type="text" data-default-operator="words">Texture type</option>
         <option value="grain_count" data-field-type="number" data-default-operator="eq">Grain number</option>
-        <option value="lattice_structure" data-field-type="text" data-default-operator="contains">Crystal structure</option>
-        <option value="orientation_identifier" data-field-type="text" data-default-operator="exact">Orientation identifier</option>
+        <option value="lattice_structure" data-field-type="text" data-default-operator="words">Crystal structure</option>
+        <option value="orientation_identifier" data-field-type="text" data-default-operator="words">Orientation identifier</option>
       </optgroup>
       <optgroup label="Discretization and boundaries">
-        <option value="discretization_type" data-field-type="text" data-default-operator="contains">Discretization type</option>
+        <option value="discretization_type" data-field-type="text" data-default-operator="words">Discretization type</option>
         <option value="discretization_count" data-field-type="number" data-default-operator="eq">Discretization count</option>
         <option value="RVE_continuity" data-field-type="boolean" data-default-operator="is">RVE continuity</option>
       </optgroup>
       <optgroup label="Material models">
-        <option value="elastic_model_name" data-field-type="text" data-default-operator="contains">Elastic model</option>
-        <option value="plastic_model_name" data-field-type="text" data-default-operator="contains">Plastic model</option>
+        <option value="elastic_model_name" data-field-type="text" data-default-operator="words">Elastic model</option>
+        <option value="plastic_model_name" data-field-type="text" data-default-operator="words">Plastic model</option>
       </optgroup>
       <optgroup label="Loading and temperature">
-        <option value="loading_type" data-field-type="text" data-default-operator="contains">Loading type</option>
-        <option value="loading_mode" data-field-type="text" data-default-operator="contains">Loading mode</option>
+        <option value="loading_type" data-field-type="text" data-default-operator="words">Loading type</option>
+        <option value="loading_mode" data-field-type="text" data-default-operator="words">Loading mode</option>
         <option value="global_temperature" data-field-type="number" data-default-operator="eq" data-unit="K">Global temperature (K)</option>
       </optgroup>
       <optgroup label="Saved filters">
@@ -54,10 +55,12 @@ function conditionRow() {
       <option value="Legacy_Field">Legacy_Field</option>
       </optgroup>
     </select>
-    <label data-condition-label="operator">Match</label>
-    <select name="condition_operator">
-      ${operatorOptions()}
-    </select>
+    <div data-condition-match>
+      <label data-condition-label="operator">Match</label>
+      <select name="condition_operator">
+        ${operatorOptions()}
+      </select>
+    </div>
     <label data-condition-label="value">Value</label><input name="condition_value">
     <div data-condition-upper>
       <label data-condition-label="value_to">Maximum (Between only)</label>
@@ -162,7 +165,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     assert.equal(state.optional, true);
     assert.equal(state.upperHidden, true);
     assert.deepEqual(state.values, [
-      ['condition_field', ''], ['condition_operator', 'contains'],
+      ['condition_field', ''], ['condition_operator', 'words'],
       ['condition_value', ''], ['condition_value_to', ''],
     ]);
   });
@@ -189,19 +192,182 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     assert.deepEqual(state.submitted, ['Grain_Number', 'eq', '42', '']);
   });
 
-  test('orientation identifiers default to whole text matching when selected', async t => {
+  test('text presets use whole words without a visible Match or missing query slot', async t => {
     const evaluate = await page(t);
-    const state = await evaluate(`(() => {
+    const states = await evaluate(`(() => {
       const field = document.querySelector('[name="condition_field"]');
       document.querySelector('[name="condition_value"]').value = 'orientation-123';
-      field.value = 'orientation_identifier';
-      field.dispatchEvent(new Event('change'));
+      return [...field.options].filter(option => option.dataset.defaultOperator === 'words').map(option => {
+        field.value = option.value;
+        field.dispatchEvent(new Event('change'));
+        const operator = document.querySelector('[name="condition_operator"]');
+        const hint = document.querySelector('[data-condition-hint]');
+        return {field: field.value, operator: operator.value,
+          options: [...operator.options].map(option => option.value),
+          hidden: document.querySelector('[data-condition-match]').hidden,
+          disabled: operator.disabled, compact: operator.closest('[data-condition-row]').classList.contains('condition-row-text'),
+          hint: hint.hidden ? '' : hint.textContent,
+          submitted: [...new FormData(document.querySelector('form')).values()]};
+      });
+    })()`);
+    assert.equal(states.length, 8);
+    for (const state of states) {
+      assert.deepEqual(state, {field: state.field, operator: 'words', options: ['words'],
+        hidden: true, disabled: false, compact: true,
+        hint: 'All words must appear as whole words, in any order. Case is ignored.',
+        submitted: [state.field, 'words', 'orientation-123', '']});
+    }
+  });
+
+  test('saved text comparisons remain visible until explicitly changed to whole words', async t => {
+    for (const saved of ['contains', 'exact']) {
+      const evaluate = await page(t, `
+        document.querySelector('[name="condition_field"]').value = 'elastic_model_name';
+        document.querySelector('[name="condition_operator"]').value = ${JSON.stringify(saved)};
+        document.querySelector('[name="condition_value"]').value = 'isotropic';
+      `);
+      const state = await evaluate(`(() => {
+        window.dispatchEvent(new Event('pageshow'));
+        window.dispatchEvent(new Event('pageshow'));
+        const operator = document.querySelector('[name="condition_operator"]');
+        return {options: [...operator.options].map(option => option.value),
+          hidden: document.querySelector('[data-condition-match]').hidden,
+          compact: operator.closest('[data-condition-row]').classList.contains('condition-row-text'),
+          hintHidden: document.querySelector('[data-condition-hint]').hidden,
+          submitted: [...new FormData(document.querySelector('form')).values()]};
+      })()`);
+      assert.deepEqual(state, {options: saved === 'contains' ? ['contains', 'words'] : ['words', 'exact'], hidden: false, compact: false,
+        hintHidden: true, submitted: ['elastic_model_name', saved, 'isotropic', '']});
+      const changed = await evaluate(`(() => {
+        const operator = document.querySelector('[name="condition_operator"]');
+        operator.value = 'words';
+        operator.dispatchEvent(new Event('change'));
+        window.dispatchEvent(new Event('pageshow'));
+        return {options: [...operator.options].map(option => option.value),
+          hidden: document.querySelector('[data-condition-match]').hidden,
+          disabled: operator.disabled,
+          submitted: [...new FormData(document.querySelector('form')).values()]};
+      })()`);
+      assert.deepEqual(changed, {options: ['words'], hidden: true, disabled: false,
+        submitted: ['elastic_model_name', 'words', 'isotropic', '']});
+    }
+  });
+
+  test('invalid text operators and upper bounds remain visible through restoration', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'texture_type';
+      document.querySelector('[name="condition_operator"]').value = 'between';
+      document.querySelector('[name="condition_value"]').value = '10';
+      document.querySelector('[name="condition_value_to"]').value = '20';
+      document.querySelector('[data-condition-error]').textContent = 'Choose a text match.';
+    `);
+    const restored = await evaluate(`(() => {
+      window.dispatchEvent(new Event('pageshow'));
+      window.dispatchEvent(new Event('pageshow'));
       const operator = document.querySelector('[name="condition_operator"]');
-      return {operator: operator.value, options: [...operator.options].map(option => option.value),
+      return {options: [...operator.options].map(option => option.value),
+        label: operator.selectedOptions[0].textContent,
+        hidden: document.querySelector('[data-condition-match]').hidden,
+        upperHidden: document.querySelector('[data-condition-upper]').hidden,
+        invalid: operator.getAttribute('aria-invalid'),
         submitted: [...new FormData(document.querySelector('form')).values()]};
     })()`);
-    assert.deepEqual(state, {operator: 'exact', options: ['contains', 'exact'],
-      submitted: ['orientation_identifier', 'exact', 'orientation-123', '']});
+    assert.deepEqual(restored.options, ['words', 'between']);
+    assert.match(restored.label, /unsupported/i);
+    assert.equal(restored.hidden, false);
+    assert.equal(restored.upperHidden, false);
+    assert.equal(restored.invalid, 'true');
+    assert.deepEqual(restored.submitted, ['texture_type', 'between', '10', '20']);
+    const corrected = await evaluate(`(() => {
+      const operator = document.querySelector('[name="condition_operator"]');
+      operator.value = 'words';
+      operator.dispatchEvent(new Event('change'));
+      return {hidden: document.querySelector('[data-condition-match]').hidden,
+        upperHidden: document.querySelector('[data-condition-upper]').hidden,
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(corrected, {hidden: true, upperHidden: true,
+      submitted: ['texture_type', 'words', '10', '']});
+  });
+
+  test('switching text presets resets saved comparisons while preserving the entered value', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'elastic_model_name';
+      document.querySelector('[name="condition_operator"]').value = 'exact';
+      document.querySelector('[name="condition_value"]').value = 'Crystal Plasticity';
+    `);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      field.value = 'plastic_model_name';
+      field.dispatchEvent(new Event('change'));
+      return {hidden: document.querySelector('[data-condition-match]').hidden,
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(state, {hidden: true,
+      submitted: ['plastic_model_name', 'words', 'Crystal Plasticity', '']});
+  });
+
+  test('mixed text numeric and boolean rows retain ordered query slots after removal', async t => {
+    const evaluate = await page(t);
+    const state = await evaluate(`(() => {
+      const add = document.getElementById('addConditionButton');
+      const entries = [['elastic_model_name', 'isotropic elasticity'],
+        ['grain_count', '50'], ['RVE_continuity', 'false']];
+      entries.forEach(([name, value], index) => {
+        if (index) add.click();
+        const row = document.querySelectorAll('[data-condition-row]')[index];
+        const field = row.querySelector('[name="condition_field"]');
+        field.value = name;
+        field.dispatchEvent(new Event('change'));
+        const input = row.querySelector('[name="condition_value"]');
+        input.value = value;
+        input.dispatchEvent(new Event('input'));
+      });
+      const form = document.querySelector('form');
+      const before = [...new FormData(form).entries()];
+      const disabled = [...form.querySelectorAll('[name="condition_operator"]')].some(input => input.disabled);
+      document.querySelectorAll('[data-remove-condition]')[1].click();
+      window.dispatchEvent(new Event('pageshow'));
+      return {before, disabled, after: [...new FormData(form).entries()], valid: form.checkValidity()};
+    })()`);
+    const textEntries = [['condition_field', 'elastic_model_name'], ['condition_operator', 'words'],
+      ['condition_value', 'isotropic elasticity'], ['condition_value_to', '']];
+    const booleanEntries = [['condition_field', 'RVE_continuity'], ['condition_operator', 'is'],
+      ['condition_value', 'false'], ['condition_value_to', '']];
+    assert.deepEqual(state.before, [...textEntries,
+      ['condition_field', 'grain_count'], ['condition_operator', 'eq'],
+      ['condition_value', '50'], ['condition_value_to', ''], ...booleanEntries]);
+    assert.deepEqual(state.after, [...textEntries, ...booleanEntries]);
+    assert.equal(state.disabled, false);
+    assert.equal(state.valid, true);
+  });
+
+  test('number text and boolean transitions restore Match visibility and clear only range bounds', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'grain_count';
+      document.querySelector('[name="condition_operator"]').value = 'between';
+      document.querySelector('[name="condition_value"]').value = '10';
+      document.querySelector('[name="condition_value_to"]').value = '20';
+    `);
+    const states = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      return ['texture_type', 'grain_count', 'texture_type', 'RVE_continuity', 'texture_type'].map(name => {
+        field.value = name;
+        field.dispatchEvent(new Event('change'));
+        const value = document.querySelector('[name="condition_value"]');
+        const operator = document.querySelector('[name="condition_operator"]');
+        return {hidden: document.querySelector('[data-condition-match]').hidden,
+          disabled: operator.disabled, tag: value.tagName,
+          submitted: [...new FormData(document.querySelector('form')).values()]};
+      });
+    })()`);
+    assert.deepEqual(states, [
+      {hidden: true, disabled: false, tag: 'INPUT', submitted: ['texture_type', 'words', '10', '']},
+      {hidden: false, disabled: false, tag: 'INPUT', submitted: ['grain_count', 'eq', '10', '']},
+      {hidden: true, disabled: false, tag: 'INPUT', submitted: ['texture_type', 'words', '10', '']},
+      {hidden: false, disabled: false, tag: 'SELECT', submitted: ['RVE_continuity', 'is', '10', '']},
+      {hidden: true, disabled: false, tag: 'INPUT', submitted: ['texture_type', 'words', '10', '']},
+    ]);
   });
 
   test('boolean choices preserve false and the ordered condition slots after a numeric range', async t => {
@@ -273,7 +439,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
       ['SELECT', 'random', 'true'], ['INPUT', 'true', 'legacy'],
     ]);
     assert.deepEqual(states.map(state => state.submitted), [
-      ['RVE_continuity', 'is', 'false', ''], ['texture_type', 'contains', 'random', ''],
+      ['RVE_continuity', 'is', 'false', ''], ['texture_type', 'words', 'random', ''],
       ['RVE_continuity', 'is', 'true', ''], ['Legacy_Field', 'contains', 'legacy', ''],
     ]);
     assert.deepEqual(states[3].options, ['contains', 'exact', 'eq', 'gt', 'gte', 'lt', 'lte', 'between']);
@@ -542,6 +708,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
       const field = document.querySelector('[name="condition_field"]');
       const value = document.querySelector('[name="condition_value"]');
       field.value = 'Grain_Number';
+      document.querySelector('[name="condition_operator"]').value = 'contains';
       value.value = 'steel';
       window.dispatchEvent(new Event('pageshow'));
       window.dispatchEvent(new Event('pageshow'));
@@ -569,7 +736,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
         values: data.getAll('condition_value'), upperValues: data.getAll('condition_value_to')};
     })()`);
     assert.deepEqual(state, {options: ['eq', 'gt', 'gte', 'lt', 'lte', 'between'],
-      fields: ['', 'Grain_Number'], operators: ['contains', 'eq'],
+      fields: ['', 'Grain_Number'], operators: ['words', 'eq'],
       values: ['', ''], upperValues: ['', '']});
   });
 
@@ -669,7 +836,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
         error: document.querySelector('[data-condition-error]').textContent,
         focused: document.activeElement.name};
     })()`);
-    assert.deepEqual(state, {count: 1, values: ['', 'contains', '', ''],
+    assert.deepEqual(state, {count: 1, values: ['', 'words', '', ''],
       valid: true, error: '', focused: 'condition_field'});
   });
 
@@ -697,6 +864,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
   test('an unexpected upper bound stays editable until the user clears it', async t => {
     const evaluate = await page(t, `
       document.querySelector('[name="condition_field"]').value = 'Load_Type';
+      document.querySelector('[name="condition_operator"]').value = 'contains';
       document.querySelector('[name="condition_value"]').value = 'steel';
       document.querySelector('[name="condition_value_to"]').value = '10';
       const error = document.querySelector('[data-condition-error]');

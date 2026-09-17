@@ -100,6 +100,8 @@ Current priority:
 - Keep retired elastic and plastic parameter selectors usable only in active saved searches, with their original exact paths and Contains words behavior
 - Keep old Ronak tokens working in bookmarked URLs with their original named key semantics, but do not offer them as new presets
 - Match choices follow the field type and must also be validated on the server
+- New text preset conditions use all entered whole words, ignoring order and case, with Match hidden; retain active saved Contains words and Equals text comparisons and all legacy selector semantics
+- Keep Grain number as the displayed label for the grain_count preset and use Greater than or equal to / Less than or equal to for inclusive numeric comparisons
 - All active conditions must match the same accessible record; invalid conditions show errors and must not broaden the search
 - Preserve existing bookmarked JSON paths with their exact-path semantics
 - Keep search-page access and detail-page access aligned

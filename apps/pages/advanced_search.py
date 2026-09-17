@@ -61,6 +61,7 @@ NUMERIC_OPERATORS = {
 }
 OPERATOR_CHOICES = (
     ("contains", "Contains words"),
+    ("words", "All words"),
     ("exact", "Equals text"),
     ("eq", "Equals number"),
     ("gt", "Greater than"),
@@ -90,8 +91,8 @@ def get_field_option(field):
     """
     field_type = DATA_FIELD_TYPES[field]
     default_operator = {"number": "eq", "boolean": "is"}.get(field_type, "contains")
-    if field == "orientation_identifier":
-        default_operator = "exact"
+    if field in DATA_FIELD_LABELS and field_type == "text":
+        default_operator = "words"
     return {
         "value": field,
         "label": DATA_FIELD_LABELS.get(field, f"{field} (legacy key)"),
@@ -124,12 +125,14 @@ def get_field_operators(field):
         allowed = {"between", *NUMERIC_OPERATORS}
     elif field_type == "text":
         allowed = {"contains", "exact"}
+        if field in DATA_FIELD_LABELS:
+            allowed.add("words")
     elif field_type == "parameters":
         allowed = {"contains"}
     elif field_type == "boolean":
         allowed = {"is"}
     else:
-        allowed = OPERATORS - {"is"}
+        allowed = OPERATORS - {"is", "words"}
     return tuple(value for value, label in OPERATOR_CHOICES if value in allowed)
 
 
@@ -238,6 +241,8 @@ def _parse_row(row):
             raise ValueError(f"Choose Contains words for {row['field']}.")
         if field_type not in {"text", "parameters"}:
             raise ValueError("Choose a supported comparison for this field.")
+        if row["field"] in DATA_FIELD_LABELS:
+            raise ValueError(f"Choose a supported text comparison for {row['field']}.")
         raise ValueError(f"Choose Contains words or Equals text for {row['field']}.")
     if len(row["value"]) > MAX_VALUE_LENGTH or len(row["value_to"]) > MAX_VALUE_LENGTH:
         raise ValueError(f"Each value must be at most {MAX_VALUE_LENGTH} characters.")
@@ -255,7 +260,7 @@ def _parse_row(row):
         row["value"] = value
         condition["value"] = value == "true"
         return condition
-    if operation in {"contains", "exact"}:
+    if operation in {"contains", "words", "exact"}:
         condition["value"] = value.casefold()
         return condition
 
@@ -312,7 +317,7 @@ def parse_conditions(query):
         for name, values in columns.items():
             row[name] = values[index] if index < len(values) else ""
         if not any(row[name].strip() for name in ("field", "value", "value_to")):
-            if row["operator"] in ("", "contains"):
+            if row["operator"] in ("", "contains", "words"):
                 continue
         try:
             condition = _parse_row(row)
@@ -571,6 +576,15 @@ def _matches_condition(data, condition):
         values = _field_values(data, condition["path"], include_containers=condition.get("include_containers", False))
     if operation == "is":
         return any(value is expected for value in values)
+    if operation == "words":
+        remaining = [re.compile(r"(?<!\w)" + re.escape(term) + r"(?!\w)")
+                     for term in set(expected.split())]
+        for value in values:
+            text = value.casefold()
+            remaining = [pattern for pattern in remaining if not pattern.search(text)]
+            if not remaining:
+                return True
+        return False
     if operation == "contains":
         remaining = set(expected.split())
         for value in values:
