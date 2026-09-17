@@ -606,7 +606,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     const populated = {identifier: 'a'.repeat(64), access: 'shared_with_me',
       owner: 'researcher.with.a.long.username', creator: 'Materials Research Group',
       software: 'DAMASK 3.0', phase: 'Ferrite', title: 'A long materials simulation title'};
-    for (const width of [1440, 1024, 390, 320]) {
+    for (const width of [1440, 1024, 768, 390, 320]) {
       const evaluate = await page(t, '', width);
       for (const values of [{}, populated]) {
         const html = `<style>${bootstrap}${styles}</style>
@@ -647,15 +647,15 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
             `${context}/${field.name}: label does not overlap control`);
           assert.ok(field.labelBounds.right <= field.column.right,
             `${context}/${field.name}: label fits column`);
-          const fraction = width < 768 ? 1 : index === 0 ? 0.5 : 0.25;
+          const fraction = width < 768 ? 1 : field.name === 'title' ? 0.5 : 0.25;
           assert.ok(Math.abs(field.column.width - state.row.width * fraction) < 1,
             `${context}/${field.name}: column width ${field.column.width}`);
-          const rowStart = width < 768 ? index : index < 3 ? 0 : 3;
+          const rowStart = width < 768 ? index : index < 4 ? 0 : 4;
           assert.ok(Math.abs(field.control.top - state.fields[rowStart].control.top) < 1,
             `${context}/${field.name}: aligned row`);
           if (index > 0) {
             const previous = state.fields[index - 1];
-            if (width < 768 || index === 3) {
+            if (width < 768 || index === 4) {
               assert.ok(field.labelBounds.top > previous.control.bottom,
                 `${context}/${field.name}: follows previous row`);
             } else {
