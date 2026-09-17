@@ -18,16 +18,18 @@
     return Array.from(container.querySelectorAll('[data-condition-row]'));
   }
 
-  function updateOperators(row, preserveInvalid = false) {
+  function updateOperators(row, preserveInvalid = false, fieldChanged = false) {
     const field = row.querySelector('[name="condition_field"]');
     const operator = row.querySelector('[name="condition_operator"]');
-    const fieldType = field.selectedOptions[0]?.dataset.fieldType;
+    const metadata = field.selectedOptions[0]?.dataset || {};
+    const fieldType = metadata.fieldType;
     const selected = operator.value;
     const allowed = operatorOptions.filter(option => {
       if (fieldType === 'number') return numericOperators.includes(option.value);
       if (fieldType === 'text') return ['contains', 'exact'].includes(option.value);
       if (fieldType === 'parameters') return option.value === 'contains';
-      return true;
+      if (fieldType === 'boolean') return option.value === 'is';
+      return option.value !== 'is';
     });
     const compatible = allowed.some(option => option.value === selected);
     operator.replaceChildren(...allowed.map(option => option.cloneNode(true)));
@@ -36,30 +38,66 @@
       const label = original ? original.textContent : selected || 'Empty match';
       operator.add(new Option(`${label} (unsupported for this field)`, selected));
     }
-    if (compatible || preserveInvalid) {
+    if (fieldChanged && metadata.defaultOperator === 'exact') {
+      operator.value = 'exact';
+    } else if (compatible || preserveInvalid) {
       operator.value = selected;
     } else {
-      operator.value = fieldType === 'number' ? 'eq' : 'contains';
+      operator.value = metadata.defaultOperator || (fieldType === 'number' ? 'eq' : 'contains');
     }
+  }
+
+  function updateValueControl(row) {
+    const field = row.querySelector('[name="condition_field"]');
+    const boolean = field.selectedOptions[0]?.dataset.fieldType === 'boolean';
+    let control = row.querySelector('[name="condition_value"]');
+    const value = control.value;
+    const tagName = boolean ? 'SELECT' : 'INPUT';
+    if (control.tagName !== tagName) {
+      const replacement = document.createElement(tagName.toLowerCase());
+      for (const attribute of control.attributes) {
+        if (!['type', 'inputmode', 'placeholder'].includes(attribute.name)) {
+          replacement.setAttribute(attribute.name, attribute.value);
+        }
+      }
+      replacement.classList.remove(boolean ? 'form-control' : 'form-select');
+      replacement.classList.add(boolean ? 'form-select' : 'form-control');
+      control.replaceWith(replacement);
+      control = replacement;
+    }
+    if (boolean) {
+      control.replaceChildren(new Option('Choose continuity', ''),
+        new Option('Periodic', 'true'), new Option('Non-periodic', 'false'));
+      if (!['', 'true', 'false'].includes(value)) {
+        control.add(new Option(`${value} (unsupported)`, value));
+      }
+    }
+    control.value = value;
+    return control;
   }
 
   function updateRow(row) {
     const field = row.querySelector('[name="condition_field"]');
     const operator = row.querySelector('[name="condition_operator"]');
-    const value = row.querySelector('[name="condition_value"]');
+    const value = updateValueControl(row);
     const upper = row.querySelector('[name="condition_value_to"]');
+    const metadata = field.selectedOptions[0]?.dataset || {};
+    const unit = metadata.unit ? ` (${metadata.unit})` : '';
     const between = operator.value === 'between';
     const numeric = numericOperators.includes(operator.value);
     const active = Boolean(field.value || value.value.trim() || upper.value.trim() ||
       operator.value !== 'contains');
 
     row.querySelector('[data-condition-upper]').hidden = !between && !upper.value;
-    row.querySelector('[data-condition-label="value"]').textContent = between ? 'Minimum' : 'Value';
-    row.querySelector('[data-condition-label="value_to"]').textContent = between ? 'Maximum' : 'Maximum (Between only)';
-    value.inputMode = numeric ? 'decimal' : 'text';
-    value.placeholder = between ? 'Minimum' : numeric ? 'Number' : 'Text to match';
-    if (field.selectedOptions[0]?.dataset.fieldType === 'parameters' && !numeric) {
-      value.placeholder = 'Parameter name or value';
+    row.querySelector('[data-condition-label="value"]').textContent = (between ? 'Minimum' : 'Value') + unit;
+    row.querySelector('[data-condition-label="value_to"]').textContent =
+      (between ? 'Maximum' : 'Maximum (Between only)') + unit;
+    if (value.tagName === 'INPUT') {
+      value.inputMode = numeric ? 'decimal' : 'text';
+      value.placeholder = (between ? 'Minimum' : numeric ? 'Number' : 'Text to match') + unit;
+      if (metadata.fieldType === 'parameters' && !numeric) {
+        value.placeholder = 'Parameter name or value';
+      }
     }
     upper.inputMode = 'decimal';
     field.required = active;
@@ -68,7 +106,8 @@
 
     const hint = row.querySelector('[data-condition-hint]');
     if (hint) {
-      hint.hidden = field.selectedOptions[0]?.dataset.fieldType !== 'array' || !numeric;
+      hint.hidden = !metadata.unit && (metadata.fieldType !== 'array' || !numeric);
+      hint.textContent = metadata.unit ? 'Enter temperature in K (kelvin).' : 'Matches one number in the array.';
       for (const input of [value, upper]) {
         const descriptions = (input.getAttribute('aria-describedby') || '').split(' ')
           .filter(id => id && id !== hint.id);
@@ -102,17 +141,18 @@
         input.setAttribute('aria-describedby', error.id);
         input.setAttribute('aria-invalid', 'true');
       }
-      input.addEventListener('input', () => updateRow(row));
-      input.addEventListener('change', () => {
-        if (name === 'field' || name === 'operator') {
-          updateOperators(row);
-          if (row.querySelector('[name="condition_operator"]').value !== 'between') {
-            row.querySelector('[name="condition_value_to"]').value = '';
-          }
-        }
-        updateRow(row);
-      });
     }
+    row.addEventListener('input', () => updateRow(row), true);
+    row.addEventListener('change', event => {
+      const name = event.target.name;
+      if (name === 'condition_field' || name === 'condition_operator') {
+        updateOperators(row, false, name === 'condition_field');
+        if (row.querySelector('[name="condition_operator"]').value !== 'between') {
+          row.querySelector('[name="condition_value_to"]').value = '';
+        }
+      }
+      updateRow(row);
+    }, true);
 
     const removeButton = row.querySelector('[data-remove-condition]');
     removeButton.hidden = false;

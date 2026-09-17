@@ -1,11 +1,11 @@
 """
-Validate and evaluate bounded conditions against preset JSON paths or legacy keys
+Validate and evaluate scientific field conditions and saved JSON selectors
 """
 
 import json
 import operator
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, DecimalException, InvalidOperation, MAX_EMAX, MIN_EMIN, localcontext
 
 
 MAX_CONDITIONS = 10
@@ -13,22 +13,27 @@ MAX_PATH_LENGTH = 1024
 MAX_VALUE_LENGTH = 200
 MAX_DEPTH = 32
 DATA_FIELD_PRESETS = (
-    ("orientation_identifier", "Orientation identifier", "text",
-     ("phase", "orientation", "orientation_identifier")),
-    ("texture_type", "Texture type", "text", ("phase", "orientation", "texture_type")),
-    ("grain_count", "Grain count", "number", ("phase", "orientation", "grain_count")),
-    ("discretization_count", "Discretization count", "number", ("discretization_count",)),
-    ("elastic_model_name", "Elastic model", "text", ("phase", "constitutive_model", "elastic_model_name")),
-    ("elastic_parameters", "Elastic parameters", "parameters", ("phase", "constitutive_model", "elastic_parameters")),
-    ("plastic_model_name", "Plastic model", "text", ("phase", "constitutive_model", "plastic_model_name")),
-    ("plastic_parameters", "Plastic parameters", "parameters", ("phase", "constitutive_model", "plastic_parameters")),
-    ("loading_type", "Loading type", "text", ("mechanical_BC", "loading_type")),
-    ("loading_mode", "Loading mode", "text", ("mechanical_BC", "loading_mode")),
-    ("global_temperature", "Global temperature", "number", ("global_temperature",)),
+    ("texture_type", "Texture type", "text", "Microstructure"),
+    ("grain_count", "Grain count", "number", "Microstructure"),
+    ("lattice_structure", "Crystal structure", "text", "Microstructure"),
+    ("orientation_identifier", "Orientation identifier", "text", "Microstructure"),
+    ("discretization_type", "Discretization type", "text", "Discretization and boundaries"),
+    ("discretization_count", "Discretization count", "number", "Discretization and boundaries"),
+    ("RVE_continuity", "RVE continuity", "boolean", "Discretization and boundaries"),
+    ("elastic_model_name", "Elastic model", "text", "Material models"),
+    ("plastic_model_name", "Plastic model", "text", "Material models"),
+    ("loading_type", "Loading type", "text", "Loading and temperature"),
+    ("loading_mode", "Loading mode", "text", "Loading and temperature"),
+    ("global_temperature", "Global temperature", "number", "Loading and temperature"),
 )
-DATA_FIELD_CHOICES = tuple((key, label) for key, label, field_type, path in DATA_FIELD_PRESETS)
-DATA_FIELD_PATHS = {key: path for key, label, field_type, path in DATA_FIELD_PRESETS}
-# saved Ronak tokens keep their original named key meaning, not aliases to new paths
+DATA_FIELD_CHOICES = tuple((key, label) for key, label, field_type, group in DATA_FIELD_PRESETS)
+DATA_FIELD_LABELS = dict(DATA_FIELD_CHOICES)
+DATA_FIELD_GROUPS = {key: group for key, label, field_type, group in DATA_FIELD_PRESETS}
+SAVED_PARAMETER_PATHS = {
+    "elastic_parameters": ("phase", "constitutive_model", "elastic_parameters"),
+    "plastic_parameters": ("phase", "constitutive_model", "plastic_parameters"),
+}
+# saved Ronak tokens keep their original named key meaning
 LEGACY_FIELD_TYPES = {
     "Hash_Orientation": "text",
     "Texture_Type": "text",
@@ -41,9 +46,11 @@ LEGACY_FIELD_TYPES = {
     "Hash_load": "text",
     "Scaling_Factor": "number",
     "Max_Total_Strain": "number",
+    "elastic_parameters": "parameters",
+    "plastic_parameters": "parameters",
 }
 DATA_FIELD_TYPES = dict(LEGACY_FIELD_TYPES)
-DATA_FIELD_TYPES.update({key: field_type for key, label, field_type, path in DATA_FIELD_PRESETS})
+DATA_FIELD_TYPES.update({key: field_type for key, label, field_type, group in DATA_FIELD_PRESETS})
 TECHNICAL_KEYS = {"$schema", "input_path", "results_path"}
 NUMERIC_OPERATORS = {
     "eq": operator.eq,
@@ -61,17 +68,46 @@ OPERATOR_CHOICES = (
     ("lt", "Less than"),
     ("lte", "At most"),
     ("between", "Between"),
+    ("is", "Is"),
 )
 OPERATORS = {value for value, label in OPERATOR_CHOICES}
 NUMBER_PATTERN = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+
+
+def get_field_option(field):
+    """
+    Describe a selectable preset or active saved field for the form
+
+    Parameters
+    ----------
+    field : str
+        Validated preset or legacy selector token.
+
+    Returns
+    -------
+    dict
+        Display group, type, default comparison, and input unit.
+    """
+    field_type = DATA_FIELD_TYPES[field]
+    default_operator = {"number": "eq", "boolean": "is"}.get(field_type, "contains")
+    if field == "orientation_identifier":
+        default_operator = "exact"
+    return {
+        "value": field,
+        "label": DATA_FIELD_LABELS.get(field, f"{field} (legacy key)"),
+        "type": field_type,
+        "group": DATA_FIELD_GROUPS.get(field, "Saved filters"),
+        "default_operator": default_operator,
+        "unit": "K" if field == "global_temperature" else "",
+    }
 
 
 def get_field_operators(field):
     """
     Return ordered comparison operators permitted for a named field
 
-    The parser and form share these choices. Parameter objects support word
-    searches only; legacy arrays and paths retain every original operator.
+    The parser and form share these choices. Saved parameter objects support
+    word searches only; legacy arrays and paths retain their original operators.
 
     Parameters
     ----------
@@ -90,8 +126,10 @@ def get_field_operators(field):
         allowed = {"contains", "exact"}
     elif field_type == "parameters":
         allowed = {"contains"}
+    elif field_type == "boolean":
+        allowed = {"is"}
     else:
-        allowed = OPERATORS
+        allowed = OPERATORS - {"is"}
     return tuple(value for value, label in OPERATOR_CHOICES if value in allowed)
 
 
@@ -148,8 +186,8 @@ def _parse_row(row):
     """
     Validate a single condition and prepare comparison values
 
-    New presets select schema paths. Saved tokens retain their original named
-    key meanings, and explicit JSON paths keep scalar matching only.
+    New presets select recursive scientific fields. Saved tokens retain their
+    original meaning, and explicit JSON paths keep scalar matching only.
 
     Parameters
     ----------
@@ -170,8 +208,10 @@ def _parse_row(row):
         raise ValueError("Choose a data field.")
     if len(row["field"]) > MAX_PATH_LENGTH:
         raise ValueError(f"The field path must be at most {MAX_PATH_LENGTH} characters.")
-    if row["field"] in DATA_FIELD_PATHS:
-        condition = {"path": DATA_FIELD_PATHS[row["field"]], "include_containers": True}
+    if row["field"] in DATA_FIELD_LABELS:
+        condition = {"preset": row["field"]}
+    elif row["field"] in SAVED_PARAMETER_PATHS:
+        condition = {"path": SAVED_PARAMETER_PATHS[row["field"]], "include_containers": True}
     elif row["field"] in LEGACY_FIELD_TYPES:
         condition = {"field_key": row["field"]}
     else:
@@ -189,10 +229,15 @@ def _parse_row(row):
     if operation not in OPERATORS:
         raise ValueError("Choose a valid comparison operator.")
     if operation not in get_field_operators(row["field"]):
-        if DATA_FIELD_TYPES[row["field"]] == "number":
+        field_type = DATA_FIELD_TYPES.get(row["field"])
+        if field_type == "number":
             raise ValueError(f"Choose a numeric comparison for {row['field']}.")
-        if DATA_FIELD_TYPES[row["field"]] == "parameters":
+        if field_type == "boolean":
+            raise ValueError("Choose Is for RVE continuity.")
+        if field_type == "parameters":
             raise ValueError(f"Choose Contains words for {row['field']}.")
+        if field_type not in {"text", "parameters"}:
+            raise ValueError("Choose a supported comparison for this field.")
         raise ValueError(f"Choose Contains words or Equals text for {row['field']}.")
     if len(row["value"]) > MAX_VALUE_LENGTH or len(row["value_to"]) > MAX_VALUE_LENGTH:
         raise ValueError(f"Each value must be at most {MAX_VALUE_LENGTH} characters.")
@@ -204,6 +249,12 @@ def _parse_row(row):
         raise ValueError("An upper value is only allowed for a numeric range.")
 
     condition["operator"] = operation
+    if operation == "is":
+        if value not in {"true", "false"}:
+            raise ValueError("Choose Periodic or Non-periodic for RVE continuity.")
+        row["value"] = value
+        condition["value"] = value == "true"
+        return condition
     if operation in {"contains", "exact"}:
         condition["value"] = value.casefold()
         return condition
@@ -219,6 +270,9 @@ def _parse_row(row):
         if upper_number < number:
             raise ValueError("The upper number must be greater than or equal to the lower number.")
         condition["value_to"] = upper_number
+    if row["field"] == "global_temperature":
+        if number < 0 or (operation == "between" and condition["value_to"] < 0):
+            raise ValueError("Enter a temperature at or above 0 K.")
     return condition
 
 
@@ -343,12 +397,157 @@ def _named_field_values(data, field_key, depth=0):
             yield from _named_field_values(value, field_key, depth + 1)
 
 
+def _normalize_field_name(key):
+    """
+    Normalize spelling separators without guessing semantic aliases
+
+    Parameters
+    ----------
+    key : str
+        JSON dictionary key.
+
+    Returns
+    -------
+    str
+        Case folded name without whitespace, underscores, or hyphens.
+    """
+    return re.sub(r"[\s_-]+", "", key).casefold()
+
+
+def _enclosing_temperature_unit(data, inherited):
+    """
+    Read a local temperature unit without borrowing sibling metadata
+
+    Parameters
+    ----------
+    data : dict
+        Current JSON object.
+    inherited : object
+        Temperature unit declared by an enclosing object, if any.
+
+    Returns
+    -------
+    object
+        Local declaration or the inherited unit. Ambiguous declarations
+        return None rather than selecting a unit by dictionary order.
+    """
+    declarations = [value for key, value in data.items() if _normalize_field_name(key) == "units"]
+    if not declarations:
+        return inherited
+    if len(declarations) != 1 or not isinstance(declarations[0], dict):
+        return None
+    units = [value for key, value in declarations[0].items() if _normalize_field_name(key) == "temperature"]
+    if not units:
+        return inherited
+    return units[0] if len(units) == 1 else None
+
+
+def _temperature_in_kelvin(value, unit):
+    """
+    Convert a finite temperature with an explicit supported unit to kelvin
+
+    Parameters
+    ----------
+    value : object
+        Stored numeric scalar or numeric string.
+    unit : object
+        Kelvin, Celsius, or Fahrenheit unit declaration.
+
+    Returns
+    -------
+    Decimal or None
+        Converted temperature, excluding missing units and values below
+        absolute zero. Invalid arithmetic does not interrupt a search.
+    """
+    number = _as_number(value)
+    if number is None or not isinstance(unit, str):
+        return None
+    unit = re.sub(r"[\s°]+", "", unit).casefold()
+    try:
+        with localcontext() as context:
+            context.prec = MAX_VALUE_LENGTH + 16
+            context.Emax = MAX_EMAX
+            context.Emin = MIN_EMIN
+            if unit in {"k", "kelvin", "kelvins"}:
+                temperature = number
+            elif unit in {"c", "celsius", "degc", "degreecelsius", "degreescelsius"}:
+                temperature = number + Decimal("273.15")
+            elif unit in {"f", "fahrenheit", "degf", "degreefahrenheit", "degreesfahrenheit"}:
+                temperature = (number - Decimal("32")) * Decimal("5") / Decimal("9") + Decimal("273.15")
+            else:
+                return None
+    except DecimalException:
+        return None
+    return temperature if temperature.is_finite() and temperature >= 0 else None
+
+
+def _preset_field_values(data, field, depth=0, in_mechanical=False, temperature_unit=None):
+    """
+    Find preset values recursively while preserving scientific context
+
+    Loading selectors exclude thermal boundary conditions. Temperature units
+    follow the enclosing objects, never another phase or sibling branch.
+
+    Parameters
+    ----------
+    data : object
+        Current JSON value.
+    field : str
+        Validated scientific preset token.
+    depth : int, optional
+        Current recursion depth, including arrays.
+    in_mechanical : bool, optional
+        Whether this branch belongs to mechanical boundary conditions.
+    temperature_unit : object, optional
+        Inherited temperature unit.
+
+    Yields
+    ------
+    object
+        Scalar candidates of the preset's type. Temperatures are in kelvin.
+    """
+    if depth >= MAX_DEPTH:
+        return
+    if isinstance(data, list):
+        for item in data:
+            yield from _preset_field_values(item, field, depth + 1, in_mechanical, temperature_unit)
+        return
+    if not isinstance(data, dict):
+        return
+    if field == "global_temperature":
+        temperature_unit = _enclosing_temperature_unit(data, temperature_unit)
+    names = {_normalize_field_name(field)}
+    if field == "grain_count":
+        names.add("grainnumber")
+    mechanical_only = field in {"loading_type", "loading_mode"}
+    field_type = DATA_FIELD_TYPES[field]
+    for key, value in data.items():
+        name = _normalize_field_name(key)
+        if mechanical_only and name == "thermalbc":
+            continue
+        if name in names and (not mechanical_only or in_mechanical):
+            for candidate in _field_values(value, (), depth + 1):
+                if field == "global_temperature":
+                    candidate = _temperature_in_kelvin(candidate, temperature_unit)
+                    if candidate is not None:
+                        yield candidate
+                elif field_type == "text" and isinstance(candidate, str):
+                    yield candidate
+                elif field_type == "boolean" and isinstance(candidate, bool):
+                    yield candidate
+                elif field_type == "number":
+                    yield candidate
+        yield from _preset_field_values(
+            value, field, depth + 1, in_mechanical or name == "mechanicalbc", temperature_unit,
+        )
+
+
 def _matches_condition(data, condition):
     """
     Evaluate one prepared comparison against matching field values
 
-    Presets and legacy named fields include complete containers for text
-    matching. Explicit paths retain their existing scalar matching rules.
+    Presets match typed scalar values. Saved named fields and paths retain
+    their previous container and numeric matching rules.
 
     Parameters
     ----------
@@ -364,10 +563,14 @@ def _matches_condition(data, condition):
     """
     operation = condition["operator"]
     expected = condition["value"]
-    if "field_key" in condition:
+    if "preset" in condition:
+        values = _preset_field_values(data, condition["preset"])
+    elif "field_key" in condition:
         values = _named_field_values(data, condition["field_key"].casefold())
     else:
         values = _field_values(data, condition["path"], include_containers=condition.get("include_containers", False))
+    if operation == "is":
+        return any(value is expected for value in values)
     if operation == "contains":
         remaining = set(expected.split())
         for value in values:
@@ -379,7 +582,7 @@ def _matches_condition(data, condition):
     if operation == "exact":
         return any(str(value).strip().casefold() == expected for value in values)
     for value in values:
-        number = _as_number(value)
+        number = value if isinstance(value, Decimal) else _as_number(value)
         if number is None:
             continue
         if operation == "between":

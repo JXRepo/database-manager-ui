@@ -13,7 +13,8 @@ function operatorOptions() {
   return `<option value="contains">Contains words</option><option value="exact">Equals text</option>
     <option value="eq">Equals number</option><option value="gt">Greater than</option>
     <option value="gte">At least</option><option value="lt">Less than</option>
-    <option value="lte">At most</option><option value="between">Between</option>`;
+    <option value="lte">At most</option><option value="between">Between</option>
+    <option value="is">Is</option>`;
 }
 
 function conditionRow() {
@@ -22,6 +23,27 @@ function conditionRow() {
     <label data-condition-label="field">Data field</label>
     <select name="condition_field">
       <option value="">Choose a field</option>
+      <optgroup label="Microstructure">
+        <option value="texture_type" data-field-type="text" data-default-operator="contains">Texture type</option>
+        <option value="grain_count" data-field-type="number" data-default-operator="eq">Grain count</option>
+        <option value="lattice_structure" data-field-type="text" data-default-operator="contains">Crystal structure</option>
+        <option value="orientation_identifier" data-field-type="text" data-default-operator="exact">Orientation identifier</option>
+      </optgroup>
+      <optgroup label="Discretization and boundaries">
+        <option value="discretization_type" data-field-type="text" data-default-operator="contains">Discretization type</option>
+        <option value="discretization_count" data-field-type="number" data-default-operator="eq">Discretization count</option>
+        <option value="RVE_continuity" data-field-type="boolean" data-default-operator="is">RVE continuity</option>
+      </optgroup>
+      <optgroup label="Material models">
+        <option value="elastic_model_name" data-field-type="text" data-default-operator="contains">Elastic model</option>
+        <option value="plastic_model_name" data-field-type="text" data-default-operator="contains">Plastic model</option>
+      </optgroup>
+      <optgroup label="Loading and temperature">
+        <option value="loading_type" data-field-type="text" data-default-operator="contains">Loading type</option>
+        <option value="loading_mode" data-field-type="text" data-default-operator="contains">Loading mode</option>
+        <option value="global_temperature" data-field-type="number" data-default-operator="eq" data-unit="K">Global temperature (K)</option>
+      </optgroup>
+      <optgroup label="Saved filters">
       <option value="Grain_Number" data-field-type="number">Grain_Number</option>
       <option value="Youngs_Modulus" data-field-type="number">Youngs_Modulus</option>
       <option value="Load_Type" data-field-type="text">Load_Type</option>
@@ -30,6 +52,7 @@ function conditionRow() {
       <option value="elastic_parameters" data-field-type="parameters">Elastic parameters</option>
       <option value="plastic_parameters" data-field-type="parameters">Plastic parameters</option>
       <option value="Legacy_Field">Legacy_Field</option>
+      </optgroup>
     </select>
     <label data-condition-label="operator">Match</label>
     <select name="condition_operator">
@@ -164,6 +187,159 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     assert.equal(state.placeholder, 'Number');
     assert.deepEqual(state.required, [true, true]);
     assert.deepEqual(state.submitted, ['Grain_Number', 'eq', '42', '']);
+  });
+
+  test('orientation identifiers default to whole text matching when selected', async t => {
+    const evaluate = await page(t);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      document.querySelector('[name="condition_value"]').value = 'orientation-123';
+      field.value = 'orientation_identifier';
+      field.dispatchEvent(new Event('change'));
+      const operator = document.querySelector('[name="condition_operator"]');
+      return {operator: operator.value, options: [...operator.options].map(option => option.value),
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(state, {operator: 'exact', options: ['contains', 'exact'],
+      submitted: ['orientation_identifier', 'exact', 'orientation-123', '']});
+  });
+
+  test('boolean choices preserve false and the ordered condition slots after a numeric range', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'grain_count';
+      document.querySelector('[name="condition_operator"]').value = 'between';
+      document.querySelector('[name="condition_value"]').value = '10';
+      document.querySelector('[name="condition_value_to"]').value = '20';
+    `);
+    const state = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      field.value = 'RVE_continuity';
+      field.dispatchEvent(new Event('change'));
+      let value = document.querySelector('[name="condition_value"]');
+      const initial = {tag: value.tagName, value: value.value,
+        label: value.selectedOptions?.[0]?.textContent,
+        options: [...document.querySelector('[name="condition_operator"]').options].map(option => option.value)};
+      value.value = 'false';
+      value.dispatchEvent(new Event('change'));
+      document.getElementById('addConditionButton').click();
+      const second = document.querySelectorAll('[data-condition-row]')[1];
+      second.querySelector('[name="condition_field"]').value = 'grain_count';
+      second.querySelector('[name="condition_field"]').dispatchEvent(new Event('change'));
+      second.querySelector('[name="condition_value"]').value = '30';
+      return {initial, options: value.options ? [...value.options].map(option => [option.value, option.textContent]) : [],
+        labeled: value.labels.length === 1, required: value.required,
+        upperHidden: document.querySelector('[data-condition-upper]').hidden,
+        submitted: [...new FormData(document.querySelector('form')).entries()]};
+    })()`);
+    assert.equal(state.initial.tag, 'SELECT');
+    assert.equal(state.initial.value, '10');
+    assert.match(state.initial.label, /unsupported/i);
+    assert.deepEqual(state.initial.options, ['is']);
+    assert.deepEqual(state.options, [['', 'Choose continuity'], ['true', 'Periodic'], ['false', 'Non-periodic']]);
+    assert.equal(state.labeled, true);
+    assert.equal(state.required, true);
+    assert.equal(state.upperHidden, true);
+    assert.deepEqual(state.submitted, [
+      ['condition_field', 'RVE_continuity'], ['condition_operator', 'is'],
+      ['condition_value', 'false'], ['condition_value_to', ''],
+      ['condition_field', 'grain_count'], ['condition_operator', 'eq'],
+      ['condition_value', '30'], ['condition_value_to', ''],
+    ]);
+  });
+
+  test('boolean controls switch to text and back without stale or duplicate submitted values', async t => {
+    const evaluate = await page(t);
+    const states = await evaluate(`(() => {
+      const field = document.querySelector('[name="condition_field"]');
+      const states = [];
+      for (const [name, entered] of [['RVE_continuity', 'false'], ['texture_type', 'random'],
+        ['RVE_continuity', 'true'], ['Legacy_Field', 'legacy']]) {
+        field.value = name;
+        field.dispatchEvent(new Event('change'));
+        const value = document.querySelector('[name="condition_value"]');
+        const before = value.value;
+        value.value = entered;
+        value.dispatchEvent(new Event('input'));
+        value.dispatchEvent(new Event('change'));
+        const operator = document.querySelector('[name="condition_operator"]');
+        states.push({tag: value.tagName, before, value: value.value,
+          options: [...operator.options].map(option => option.value),
+          submitted: [...new FormData(document.querySelector('form')).values()]});
+      }
+      return states;
+    })()`);
+    assert.deepEqual(states.map(state => [state.tag, state.before, state.value]), [
+      ['SELECT', '', 'false'], ['INPUT', 'false', 'random'],
+      ['SELECT', 'random', 'true'], ['INPUT', 'true', 'legacy'],
+    ]);
+    assert.deepEqual(states.map(state => state.submitted), [
+      ['RVE_continuity', 'is', 'false', ''], ['texture_type', 'contains', 'random', ''],
+      ['RVE_continuity', 'is', 'true', ''], ['Legacy_Field', 'contains', 'legacy', ''],
+    ]);
+    assert.deepEqual(states[3].options, ['contains', 'exact', 'eq', 'gt', 'gte', 'lt', 'lte', 'between']);
+  });
+
+  test('restored invalid boolean values and operators stay visible through pageshow until corrected', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'RVE_continuity';
+      document.querySelector('[name="condition_operator"]').value = 'contains';
+      document.querySelector('[name="condition_value"]').value = 'False';
+      document.querySelector('[data-condition-error]').textContent = 'Choose Periodic or Non-periodic.';
+    `);
+    const initial = await evaluate(`(() => {
+      window.dispatchEvent(new Event('pageshow'));
+      window.dispatchEvent(new Event('pageshow'));
+      const value = document.querySelector('[name="condition_value"]');
+      const operator = document.querySelector('[name="condition_operator"]');
+      return {tag: value.tagName, valueLabel: value.selectedOptions?.[0]?.textContent,
+        operatorLabel: operator.selectedOptions[0].textContent,
+        error: value.getAttribute('aria-invalid'),
+        described: value.getAttribute('aria-describedby'),
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.equal(initial.tag, 'SELECT');
+    assert.match(initial.valueLabel, /False.*unsupported/i);
+    assert.match(initial.operatorLabel, /unsupported/i);
+    assert.equal(initial.error, 'true');
+    assert.match(initial.described, /error/);
+    assert.deepEqual(initial.submitted, ['RVE_continuity', 'contains', 'False', '']);
+    const corrected = await evaluate(`(() => {
+      const operator = document.querySelector('[name="condition_operator"]');
+      operator.value = 'is';
+      operator.dispatchEvent(new Event('change'));
+      const value = document.querySelector('[name="condition_value"]');
+      value.value = 'false';
+      value.dispatchEvent(new Event('change'));
+      window.dispatchEvent(new Event('pageshow'));
+      return {count: document.querySelectorAll('[name="condition_value"]').length,
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(corrected, {count: 1, submitted: ['RVE_continuity', 'is', 'false', '']});
+  });
+
+  test('temperature range labels and guidance use kelvin without changing the numeric query', async t => {
+    const evaluate = await page(t, `
+      document.querySelector('[name="condition_field"]').value = 'global_temperature';
+      document.querySelector('[name="condition_operator"]').value = 'between';
+      document.querySelector('[name="condition_value"]').value = '273.15';
+      document.querySelector('[name="condition_value_to"]').value = '300';
+    `);
+    const state = await evaluate(`(() => {
+      const value = document.querySelector('[name="condition_value"]');
+      const hint = document.querySelector('[data-condition-hint]');
+      return {labels: ['value', 'value_to'].map(name =>
+          document.querySelector('[data-condition-label="' + name + '"]').textContent),
+        hint: hint.textContent, hintHidden: hint.hidden,
+        described: (value.getAttribute('aria-describedby') || '').split(' ').includes(hint.id),
+        options: [...document.querySelector('[name="condition_operator"]').options].map(option => option.value),
+        submitted: [...new FormData(document.querySelector('form')).values()]};
+    })()`);
+    assert.deepEqual(state.labels, ['Minimum (K)', 'Maximum (K)']);
+    assert.match(state.hint, /K.*kelvin/i);
+    assert.equal(state.hintHidden, false);
+    assert.equal(state.described, true);
+    assert.deepEqual(state.options, ['eq', 'gt', 'gte', 'lt', 'lte', 'between']);
+    assert.deepEqual(state.submitted, ['global_temperature', 'between', '273.15', '300']);
   });
 
   test('parameter objects offer only word matching and clear an obsolete numeric upper bound', async t => {

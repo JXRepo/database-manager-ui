@@ -791,6 +791,7 @@
                     <input type="text" name="keywords" id="id_legacy_keywords" class="form-control" value="{{ keywords_value }}">
                   </div>
                 {% endif %}
+                {% regroup field_options by group as field_groups %}
                 <div id="dataFieldConditions" data-max-conditions="{{ max_conditions }}">
                   {% for row in condition_rows %}
                     <fieldset class="condition-row" data-condition-row>
@@ -802,8 +803,12 @@
                           {% if row.field and not row.field_available %}
                             <option value="{{ row.field }}" selected>{{ row.field_label }} (previous selection)</option>
                           {% endif %}
-                          {% for option in field_options %}
-                            <option value="{{ option.value }}" data-field-type="{{ option.type }}" {% if option.value == row.field %}selected{% endif %}>{{ option.label }}</option>
+                          {% for group in field_groups %}
+                            <optgroup label="{{ group.grouper }}">
+                              {% for option in group.list %}
+                                <option value="{{ option.value }}" data-field-type="{{ option.type }}" data-default-operator="{{ option.default_operator }}" data-unit="{{ option.unit }}" {% if option.value == row.field %}selected{% endif %}>{{ option.label }}{% if option.unit %} ({{ option.unit }}){% endif %}</option>
+                              {% endfor %}
+                            </optgroup>
                           {% endfor %}
                         </select>
                       </div>
@@ -820,16 +825,27 @@
                       </div>
                       <div class="condition-values">
                         <div>
-                          <label for="condition-{{ forloop.counter }}-value" class="form-label" data-condition-label="value">{% if row.operator == "between" %}Minimum{% else %}Value{% endif %}</label>
-                          <input type="text" name="condition_value" id="condition-{{ forloop.counter }}-value" class="form-control" value="{{ row.value }}">
+                          <label for="condition-{{ forloop.counter }}-value" class="form-label" data-condition-label="value">{% if row.operator == "between" %}Minimum{% else %}Value{% endif %}{% if row.unit %} ({{ row.unit }}){% endif %}</label>
+                          {% if row.boolean_value %}
+                            <select name="condition_value" id="condition-{{ forloop.counter }}-value" class="form-select">
+                              <option value="" {% if not row.value %}selected{% endif %}>Choose continuity</option>
+                              <option value="true" {% if row.value == "true" %}selected{% endif %}>Periodic</option>
+                              <option value="false" {% if row.value == "false" %}selected{% endif %}>Non-periodic</option>
+                              {% if row.value and row.value != "true" and row.value != "false" %}
+                                <option value="{{ row.value }}" selected>{{ row.value }} (unsupported)</option>
+                              {% endif %}
+                            </select>
+                          {% else %}
+                            <input type="text" name="condition_value" id="condition-{{ forloop.counter }}-value" class="form-control" value="{{ row.value }}">
+                          {% endif %}
                         </div>
                         <div data-condition-upper>
-                          <label for="condition-{{ forloop.counter }}-value_to" class="form-label" data-condition-label="value_to">Maximum (Between only)</label>
+                          <label for="condition-{{ forloop.counter }}-value_to" class="form-label" data-condition-label="value_to">Maximum{% if row.operator != "between" %} (Between only){% endif %}{% if row.unit %} ({{ row.unit }}){% endif %}</label>
                           <input type="text" name="condition_value_to" id="condition-{{ forloop.counter }}-value_to" class="form-control" value="{{ row.value_to }}" inputmode="decimal">
                         </div>
                       </div>
                       <button type="button" class="btn btn-outline-secondary btn-sm condition-remove" data-remove-condition aria-label="Remove condition {{ forloop.counter }}" hidden>Remove</button>
-                      <span class="condition-hint text-muted small" data-condition-hint {% if not row.array_numeric %}hidden{% endif %}>Matches one number in the array.</span>
+                      <span class="condition-hint text-muted small" data-condition-hint {% if not row.array_numeric and not row.unit %}hidden{% endif %}>{% if row.unit %}Enter temperature in K (kelvin).{% else %}Matches one number in the array.{% endif %}</span>
                       <p class="condition-error text-danger small mb-0" data-condition-error id="condition-{{ forloop.counter }}-error" {% if not row.error %}hidden{% endif %}>{{ row.error }}</p>
                     </fieldset>
                   {% endfor %}
@@ -858,8 +874,12 @@
                     <label class="form-label" data-condition-label="field">Data field</label>
                     <select name="condition_field" class="form-select">
                       <option value="">Choose a field</option>
-                      {% for option in field_options %}
-                        <option value="{{ option.value }}" data-field-type="{{ option.type }}">{{ option.label }}</option>
+                      {% for group in field_groups %}
+                        <optgroup label="{{ group.grouper }}">
+                          {% for option in group.list %}
+                            <option value="{{ option.value }}" data-field-type="{{ option.type }}" data-default-operator="{{ option.default_operator }}" data-unit="{{ option.unit }}">{{ option.label }}{% if option.unit %} ({{ option.unit }}){% endif %}</option>
+                          {% endfor %}
+                        </optgroup>
                       {% endfor %}
                     </select>
                   </div>

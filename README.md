@@ -133,24 +133,33 @@ Both Clear links reset all conditions, and the main keyword can be left blank.
 
 **Data field filters** uses preset simulation parameters, following the preset search approach in
 [Ronak Shoghi's DatabaseManager](https://github.com/Ronakshoghi/DatabaseManager).
-The presets map to actual fields in this repository's JSON examples:
+The 12 choices are grouped within one dropdown and search these field names:
 
-| Data field | JSON location | Match type |
-| --- | --- | --- |
-| Orientation identifier | `phase[].orientation.orientation_identifier` | Text |
-| Texture type | `phase[].orientation.texture_type` | Text |
-| Grain count | `phase[].orientation.grain_count` | Number |
-| Discretization count | `discretization_count` | Number |
-| Elastic model | `phase[].constitutive_model.elastic_model_name` | Text |
-| Elastic parameters | `phase[].constitutive_model.elastic_parameters` | Contains words |
-| Plastic model | `phase[].constitutive_model.plastic_model_name` | Text |
-| Plastic parameters | `phase[].constitutive_model.plastic_parameters` | Contains words |
-| Loading type | `mechanical_BC[].loading_type` | Text |
-| Loading mode | `mechanical_BC[].loading_mode` | Text |
-| Global temperature | `global_temperature` | Number |
+| Group | Data field | JSON field | Match type |
+| --- | --- | --- | --- |
+| Microstructure | Texture type | `texture_type` | Text |
+| Microstructure | Grain count | `grain_count`, or the count alias `grain_number` | Number |
+| Microstructure | Crystal structure | `lattice_structure` | Text |
+| Microstructure | Orientation identifier | `orientation_identifier` | Text, defaults to Equals text |
+| Discretization and boundaries | Discretization type | `discretization_type` | Text |
+| Discretization and boundaries | Discretization count | `discretization_count` | Number |
+| Discretization and boundaries | RVE continuity | `RVE_continuity` | Is: Periodic or Non-periodic |
+| Material models | Elastic model | `elastic_model_name` | Text |
+| Material models | Plastic model | `plastic_model_name` | Text |
+| Loading and temperature | Loading type | `loading_type` within `mechanical_BC` | Text |
+| Loading and temperature | Loading mode | `loading_mode` within `mechanical_BC` | Text |
+| Loading and temperature | Global temperature | `global_temperature` | Number, in K |
 
-Here, `[]` means entries in an array; users do not need to enter an index.
-Common metadata such as owner and software version is not included in this menu.
+Presets recursively traverse objects and arrays, including extra nesting levels,
+up to the search depth limit of 32. Field names ignore letter case, whitespace,
+underscores, and hyphens: `Grain Count` and `grain_count` are equivalent.
+Only explicit aliases are recognized; arbitrary synonyms are not inferred.
+`grain_number` must mean a count, not a grain identifier. Loading fields stay
+within mechanical boundary conditions and do not match thermal boundary conditions.
+Common metadata such as owner and software version is not duplicated here.
+A small synthetic search fixture in `apps/pages/fixtures/search_fields.json`
+covers all 12 fields, including `lattice_structure: "FCC"`; it is not a complete
+upload template. Local example files, when available, provide additional coverage.
 
 Choose a parameter, comparison, and value. You can add up to 10 conditions.
 All conditions, common fields, and the main search box must match the same data
@@ -160,26 +169,32 @@ records missing the selected field do not match.
 Metadata keywords are included in the main search. Existing bookmarked URLs with
 the older `keywords` parameter keep an editable Keywords input while it is active.
 
-- **Contains words** requires all entered words in the selected field.
+- **Contains words** requires all entered words among the selected field's text
+  values, in any order. It does not search parameter names or arbitrary objects.
 - **Equals text** matches a complete value, ignoring letter case.
 - **Match** follows the selected field: counts and temperature offer number
   comparisons; identifiers, models, types, and modes offer text matching.
-  Elastic and plastic parameter dictionaries offer **Contains words** only,
-  matching names and values, for example `C11 170000`. They do not offer whole
-  dictionary equality or numeric comparisons across parameters with different
-  meanings or units.
+  **RVE continuity** uses **Is**, with Periodic (`true`) or Non-periodic (`false`).
+  Only actual JSON booleans match; strings and zero or one do not.
 - Number comparisons support equals, greater or less than, inclusive limits,
   and **Between** with both endpoints included. Numeric strings are accepted;
-  booleans and values containing units are not treated as numbers. Use the units
-  stored in the record; search does not convert units.
-- Presets search only the JSON locations listed above, with case sensitive
-  JSON keys and case insensitive text values. Unrelated fields with the same
-  name do not match. A numeric comparison or range must match one value.
-  Separate conditions can match different array entries within the same data
-  object. Existing bookmarked JSON paths keep their exact location. Older
+  booleans and values containing units are not treated as numbers. A comparison
+  or range must match one value, not different values for its two bounds.
+- **Global temperature** inputs are in kelvin (K). Stored values with explicit
+  Kelvin, Celsius, or Fahrenheit units are converted before comparison. The
+  nearest enclosing `units.Temperature` declaration takes precedence; units from
+  a sibling object are never borrowed. Missing or unknown units and values below
+  absolute zero do not match. Negative search bounds are rejected.
+- Separate conditions can match different array entries within the same data
+  object; they do not require the same phase or boundary condition entry.
+  Existing bookmarked JSON paths keep their exact location and original value
+  semantics, including raw numeric comparisons without unit conversion. Older
   Ronak field tokens, such as `Grain_Number`, remain usable in existing URLs
   with their original recursive key matching; active legacy fields are marked
-  in the form and are not offered as new presets.
+  in the form and are not offered as new presets. Retired elastic and plastic
+  parameter selectors remain editable under Saved filters when present in a URL,
+  retaining their original exact paths and Contains words behavior. These old
+  dictionary searches do not bind a parameter name to its particular value.
 - Invalid or incomplete conditions show an error and do not run a broader search.
 - **Clear** resets the search. Submitted conditions remain in the URL, so browser
   refresh and bookmarks preserve them. Do not put secrets in search terms.

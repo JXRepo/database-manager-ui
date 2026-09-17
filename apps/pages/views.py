@@ -31,6 +31,7 @@ from .advanced_search import (
     DATA_FIELD_TYPES,
     MAX_CONDITIONS,
     OPERATOR_CHOICES,
+    get_field_option,
     get_field_operators,
     matches_conditions,
     parse_conditions,
@@ -2316,23 +2317,22 @@ def search_view(request):
 
         filtered_objects.append(_prepare_list_object(obj))
 
-    field_options = [
-        {"value": value, "label": label, "type": DATA_FIELD_TYPES[value]}
-        for value, label in DATA_FIELD_CHOICES
-    ]
+    field_options = [get_field_option(value) for value, label in DATA_FIELD_CHOICES]
     option_labels = {option["value"]: option["label"] for option in field_options}
     for row in condition_rows:
         field = row["field"]
         if field in DATA_FIELD_TYPES and field not in option_labels:
-            label = f"{field} (legacy key)"
-            field_options.append({"value": field, "label": label, "type": DATA_FIELD_TYPES[field]})
-            option_labels[field] = label
+            option = get_field_option(field)
+            field_options.append(option)
+            option_labels[field] = option["label"]
     operator_labels = dict(OPERATOR_CHOICES)
     if not condition_rows:
         condition_rows = [{"field": "", "operator": "contains", "value": "", "value_to": ""}]
     for row in condition_rows:
         row["field_available"] = row["field"] in option_labels
         row["field_label"] = option_labels.get(row["field"], row["field"])
+        row["boolean_value"] = DATA_FIELD_TYPES.get(row["field"]) == "boolean"
+        row["unit"] = "K" if row["field"] == "global_temperature" else ""
         allowed_operators = get_field_operators(row["field"])
         row["operator_choices"] = [
             (value, label) for value, label in OPERATOR_CHOICES

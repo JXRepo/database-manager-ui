@@ -1,0 +1,25 @@
+{
+  "identifier": "search-demo",
+  "title": "Synthetic copper search example",
+  "RVE_continuity": true,
+  "discretization_type": "Structured",
+  "discretization_count": 2744,
+  "global_temperature": 298,
+  "units": {"Temperature": "Kelvin"},
+  "mechanical_BC": [{"loading_type": "force", "loading_mode": "static"}],
+  "phase": [{
+    "phase_name": "Copper",
+    "lattice_structure": "FCC",
+    "orientation": {
+      "orientation_identifier": "0abb1",
+      "texture_type": "Goss",
+      "grain_count": 343
+    },
+    "constitutive_model": {
+      "elastic_model_name": "Anisotropic Elasticity",
+      "elastic_parameters": {"C11": 170000, "C12": 124000, "C44": 75000},
+      "plastic_model_name": "Crystal Plasticity",
+      "plastic_parameters": {"reference_shear_rate": 0.001, "hardening_exponent": 2.5}
+    }
+  }]
+}

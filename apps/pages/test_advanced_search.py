@@ -121,6 +121,7 @@ class AdvancedSearchTests(TestCase):
              ["contains", "exact", "eq", "gt", "gte", "lt", "lte", "between"]),
             ("elastic_parameters", "contains", "C11 170000", ["contains"]),
             ("plastic_parameters", "contains", "reference_shear_rate 0.001", ["contains"]),
+            ("RVE_continuity", "is", "true", ["is"]),
         ]:
             with self.subTest(field=field):
                 response = self.client.get(reverse("search"), {
@@ -156,8 +157,9 @@ class AdvancedSearchTests(TestCase):
         response = self.client.get(reverse("search"))
         self.assertContains(response, 'value="grain_count" data-field-type="number"')
         self.assertContains(response, 'value="loading_type" data-field-type="text"')
-        self.assertContains(response, 'value="elastic_parameters" data-field-type="parameters"')
-        self.assertContains(response, 'value="plastic_parameters" data-field-type="parameters"')
+        self.assertContains(response, 'value="RVE_continuity" data-field-type="boolean"')
+        self.assertNotContains(response, 'value="elastic_parameters"')
+        self.assertNotContains(response, 'value="plastic_parameters"')
 
     def test_parameter_exact_requests_fail_without_changing_submitted_intent(self):
         """
@@ -175,6 +177,119 @@ class AdvancedSearchTests(TestCase):
                 self.assertEqual(response.context["condition_rows"][0]["operator"], "exact")
                 self.assertContains(response, 'value="exact" selected')
                 self.assertContains(response, "Choose Contains words")
+
+    def test_preset_choices_are_grouped_with_defaults_and_temperature_units(self):
+        """
+        Expose the scientific groups and comparison defaults in the rendered form
+        """
+        response = self.client.get(reverse("search"))
+        elements = list(_html_elements(parse_html(response.content.decode())))
+        field = next(element for element in elements if
+                     ("id", "condition-1-field") in element.attributes)
+        groups = [element for element in _html_elements(field) if element.name == "optgroup"]
+        self.assertEqual([dict(group.attributes)["label"] for group in groups], [
+            "Microstructure", "Discretization and boundaries", "Material models", "Loading and temperature",
+        ])
+        fields = {option["value"]: option for option in response.context["field_options"]}
+        cases = (
+            ("texture_type", "Microstructure", "contains", ""),
+            ("grain_count", "Microstructure", "eq", ""),
+            ("lattice_structure", "Microstructure", "contains", ""),
+            ("orientation_identifier", "Microstructure", "exact", ""),
+            ("discretization_type", "Discretization and boundaries", "contains", ""),
+            ("discretization_count", "Discretization and boundaries", "eq", ""),
+            ("RVE_continuity", "Discretization and boundaries", "is", ""),
+            ("elastic_model_name", "Material models", "contains", ""),
+            ("plastic_model_name", "Material models", "contains", ""),
+            ("loading_type", "Loading and temperature", "contains", ""),
+            ("loading_mode", "Loading and temperature", "contains", ""),
+            ("global_temperature", "Loading and temperature", "eq", "K"),
+        )
+        for value, group, default, unit in cases:
+            with self.subTest(field=value):
+                self.assertEqual(fields[value]["group"], group)
+                self.assertEqual(fields[value]["default_operator"], default)
+                self.assertEqual(fields[value]["unit"], unit)
+        self.assertEqual(fields["lattice_structure"]["label"], "Crystal structure")
+
+    def test_boolean_value_renders_as_select_and_preserves_false_or_invalid_input(self):
+        """
+        Keep continuity usable without JavaScript and preserve rejected URL values
+        """
+        for value, invalid in (("true", False), ("false", False), ("yes", True)):
+            with self.subTest(value=value):
+                response = self.client.get(reverse("search"), {
+                    "condition_field": "RVE_continuity",
+                    "condition_operator": "is",
+                    "condition_value": value,
+                })
+                row = response.context["condition_rows"][0]
+                self.assertIn("boolean_value", row)
+                self.assertTrue(row["boolean_value"])
+                self.assertEqual(bool(response.context["search_errors"]), invalid)
+                elements = list(_html_elements(parse_html(response.content.decode())))
+                control = next(element for element in elements if
+                               ("id", "condition-1-value") in element.attributes)
+                self.assertEqual(control.name, "select")
+                options = [dict(element.attributes) for element in _html_elements(control)
+                           if element.name == "option"]
+                self.assertTrue({"true", "false"}.issubset({option["value"] for option in options}))
+                self.assertEqual([option["value"] for option in options if "selected" in option], [value])
+                self.assertEqual(row["value"], value)
+                if invalid:
+                    self.assertFalse(response.context["data_objects"])
+
+    def test_valid_boolean_values_with_spaces_restore_the_supported_choice(self):
+        """
+        Render the same boolean choice that the parser accepts after trimming
+        """
+        for submitted, expected in ((" true ", "true"), ("\tfalse\n", "false")):
+            with self.subTest(value=submitted):
+                response = self.client.get(reverse("search"), {
+                    "condition_field": "RVE_continuity",
+                    "condition_operator": "is",
+                    "condition_value": submitted,
+                })
+                self.assertFalse(response.context["search_errors"])
+                self.assertEqual(response.context["condition_rows"][0]["value"], expected)
+                self.assertContains(response, f'value="{expected}" selected')
+                self.assertNotContains(response, "(unsupported)")
+
+    def test_temperature_rows_display_kelvin_and_preserve_invalid_bounds(self):
+        """
+        Label both temperature bounds in Kelvin while retaining rejected input
+        """
+        response = self.client.get(reverse("search"), {
+            "condition_field": "global_temperature",
+            "condition_operator": "between",
+            "condition_value": "-1",
+            "condition_value_to": "300",
+        })
+        row = response.context["condition_rows"][0]
+        self.assertIn("unit", row)
+        self.assertEqual(row["unit"], "K")
+        self.assertEqual(row["value"], "-1")
+        self.assertEqual(row["value_to"], "300")
+        self.assertTrue(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])
+        self.assertContains(response, "(K)")
+
+    def test_removed_parameter_choices_return_only_when_used_by_a_saved_url(self):
+        """
+        Keep old parameter conditions editable in the saved filter group
+        """
+        response = self.client.get(reverse("search"), {
+            "condition_field": ["elastic_parameters", "plastic_parameters"],
+            "condition_operator": ["contains", "contains"],
+            "condition_value": ["C11 170000", "reference_shear_rate 0.001"],
+        })
+        self.assertFalse(response.context["search_errors"])
+        fields = {option["value"]: option for option in response.context["field_options"]}
+        for field in ("elastic_parameters", "plastic_parameters"):
+            self.assertEqual(fields[field]["group"], "Saved filters")
+            self.assertEqual(fields[field]["type"], "parameters")
+            self.assertEqual(fields[field]["default_operator"], "contains")
+        self.assertContains(response, '<optgroup label="Saved filters">')
 
     def test_only_active_legacy_tokens_are_restored_with_their_original_types(self):
         """
@@ -563,10 +678,10 @@ class AdvancedSearchTests(TestCase):
         self.assertEqual(
             [option["value"] for option in response.context["field_options"]],
             [
-                "orientation_identifier", "texture_type", "grain_count",
-                "discretization_count", "elastic_model_name", "elastic_parameters",
-                "plastic_model_name", "plastic_parameters", "loading_type",
-                "loading_mode", "global_temperature",
+                "texture_type", "grain_count", "lattice_structure", "orientation_identifier",
+                "discretization_type", "discretization_count", "RVE_continuity",
+                "elastic_model_name", "plastic_model_name", "loading_type", "loading_mode",
+                "global_temperature",
             ],
         )
         self.assertFalse(response.context["search_performed"])
@@ -611,16 +726,15 @@ class AdvancedSearchTests(TestCase):
         """
         Search real nested parameters only within the same accessible object
         """
-        example_path = Path(__file__).resolve().parents[2] / "example_json_files" / "a46fde6c1_public.json"
+        example_path = Path(__file__).with_name("fixtures") / "search_fields.json"
         example = json.loads(example_path.read_text(encoding="utf-8"))
         for obj in (self.own, self.public, self.shared, self.hidden):
             obj.data = dict(example, identifier=obj.data["identifier"])
             obj.save(update_fields=["data"])
         params = {
-            "creator": "XUE JUN",
-            "condition_field": ["grain_count", "texture_type", "elastic_parameters", "loading_type"],
+            "condition_field": ["grain_count", "texture_type", "elastic_model_name", "loading_type"],
             "condition_operator": ["eq", "exact", "contains", "exact"],
-            "condition_value": ["343", "GOSS", "C11 170000", "force"],
+            "condition_value": ["343", "GOSS", "anisotropic elasticity", "force"],
         }
         response = self.client.get(reverse("search"), params)
         self.assertEqual(response.status_code, 200)
@@ -636,4 +750,37 @@ class AdvancedSearchTests(TestCase):
         params["condition_operator"][0] = "contains"
         response = self.client.get(reverse("search"), params)
         self.assertTrue(response.context["search_errors"])
+        self.assertFalse(response.context["data_objects"])
+
+    def test_recursive_boolean_and_kelvin_conditions_keep_search_and_feed_permissions(self):
+        """
+        Match recursive fields on accessible records without exposing private activity
+        """
+        for obj in (self.own, self.public, self.shared, self.hidden):
+            obj.data = {
+                "identifier": obj.data["identifier"],
+                "title": "Copper simulation",
+                "simulation": [{"Grain Number": "343", "RVE-Continuity": True,
+                                "global temperature": 25, "units": {"Temperature": "C"}}],
+            }
+            obj.save(update_fields=["data"])
+        params = {
+            "keyword": "copper", "title": "simulation",
+            "condition_field": ["grain_count", "RVE_continuity", "global_temperature"],
+            "condition_operator": ["gte", "is", "eq"],
+            "condition_value": ["300", "true", "298.15"],
+        }
+        response = self.client.get(reverse("search"), params)
+        self.assertFalse(response.context["search_errors"])
+        self.assertCountEqual([obj.pk for obj in response.context["data_objects"]],
+                              [self.own.pk, self.public.pk, self.shared.pk])
+        feed = self.client.get(reverse("search_live_data_objects"))
+        self.assertEqual([obj["id"] for obj in feed.json()["objects"]], [self.public.pk])
+        self.shared.shared_users.remove(self.viewer)
+        response = self.client.get(reverse("search"), params)
+        self.assertCountEqual([obj.pk for obj in response.context["data_objects"]],
+                              [self.own.pk, self.public.pk])
+        params["condition_value"][1] = "false"
+        response = self.client.get(reverse("search"), params)
+        self.assertFalse(response.context["search_errors"])
         self.assertFalse(response.context["data_objects"])

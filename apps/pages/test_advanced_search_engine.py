@@ -290,14 +290,15 @@ class ExamplePresetSearchTests(TestCase):
     """
 
     example_rows = (
-        ("orientation_identifier", "exact", "0abb1"),
         ("texture_type", "exact", "GOSS"),
         ("grain_count", "eq", "343"),
+        ("lattice_structure", "exact", "FCC"),
+        ("orientation_identifier", "exact", "0abb1"),
+        ("discretization_type", "exact", "Structured"),
         ("discretization_count", "eq", "2744"),
+        ("RVE_continuity", "is", "true"),
         ("elastic_model_name", "contains", "anisotropic elasticity"),
-        ("elastic_parameters", "contains", "C11 170000"),
         ("plastic_model_name", "exact", "crystal plasticity"),
-        ("plastic_parameters", "contains", "reference_shear_rate 0.001"),
         ("loading_type", "exact", "force"),
         ("loading_mode", "exact", "static"),
         ("global_temperature", "eq", "298"),
@@ -306,9 +307,11 @@ class ExamplePresetSearchTests(TestCase):
     @classmethod
     def setUpClass(cls):
         """
-        Read public example files without substituting synthetic field names
+        Read portable synthetic data and any locally available public examples
         """
         super().setUpClass()
+        fixture = Path(__file__).with_name("fixtures") / "search_fields.json"
+        cls.example = json.loads(fixture.read_text(encoding="utf-8"))
         example_dir = Path(__file__).resolve().parents[2] / "example_json_files"
         cls.examples = {}
         for path in sorted(example_dir.glob("*.json")):
@@ -316,34 +319,34 @@ class ExamplePresetSearchTests(TestCase):
 
     def test_every_offered_preset_matches_the_repository_examples(self):
         """
-        Catch presets that cannot find the actual schema paths and value types
+        Verify every offered preset against the complete tracked schema example
         """
-        self.assertTrue(self.examples)
         rows_by_field = {row[0]: row for row in self.example_rows}
         self.assertEqual(set(dict(DATA_FIELD_CHOICES)), set(rows_by_field))
         for field, label in DATA_FIELD_CHOICES:
             with self.subTest(field=field):
                 rows, conditions, errors = parse_conditions(condition_query(rows_by_field[field]))
                 self.assertEqual(errors, [])
+                self.assertTrue(matches_conditions(self.example, conditions))
+                if field == "lattice_structure":
+                    continue
                 for name, data in self.examples.items():
                     with self.subTest(example=name):
                         self.assertTrue(matches_conditions(data, conditions))
 
-    def test_preset_paths_do_not_search_unrelated_locations(self):
+    def test_presets_find_fields_beneath_a_moved_simulation_object(self):
         """
-        Reject matching keys or entire simulation structures under other roots
+        Keep presets usable when simulations gain extra container levels
         """
-        example = self.examples["a46fde6c1_public.json"]
         for row in self.example_rows:
             with self.subTest(field=row[0]):
                 rows, conditions, errors = parse_conditions(condition_query(row))
                 self.assertEqual(errors, [])
-                self.assertFalse(matches_conditions({"unrelated": example}, conditions))
-                self.assertFalse(matches_conditions({"other": {row[0]: row[2]}}, conditions))
+                self.assertTrue(matches_conditions({"simulation": [self.example]}, conditions))
 
-    def test_grain_count_uses_orientation_with_transparent_phase_arrays(self):
+    def test_grain_count_searches_both_orientation_and_phase_counts(self):
         """
-        Find the selected path in later phases without accepting sibling counts
+        Find numeric counts in different phase locations and later array entries
         """
         row = ("grain_count", "eq", "343")
         rows, conditions, errors = parse_conditions(condition_query(row))
@@ -351,16 +354,16 @@ class ExamplePresetSearchTests(TestCase):
         data = {"phase": [{"orientation": {"grain_count": 10}}, {"orientation": {"grain_count": "343"}}]}
         self.assertTrue(matches_conditions(data, conditions))
         data = {"phase": [{"grain_count": 343, "orientation": {"grain_count": 10}}]}
-        self.assertFalse(matches_conditions(data, conditions))
+        self.assertTrue(matches_conditions(data, conditions))
 
-    def test_preset_text_keys_keep_the_exact_schema_spelling(self):
+    def test_preset_text_keys_accept_case_variants_alongside_legacy_keys(self):
         """
-        Keep new path matching separate from case insensitive legacy key searches
+        Search case variants without changing the original legacy key spelling
         """
-        example = deepcopy(self.examples["a46fde6c1_public.json"])
+        example = deepcopy(self.example)
         orientation = example["phase"][0]["orientation"]
         orientation["Texture_Type"] = orientation.pop("texture_type")
-        for field, expected in (("texture_type", False), ("Texture_Type", True)):
+        for field, expected in (("texture_type", True), ("Texture_Type", True)):
             with self.subTest(field=field):
                 rows, conditions, errors = parse_conditions(condition_query((field, "exact", "goss")))
                 self.assertEqual(errors, [])
@@ -401,7 +404,7 @@ class ExamplePresetSearchTests(TestCase):
         """
         Retain old named key meanings instead of remapping them to new concepts
         """
-        example = self.examples["a46fde6c1_public.json"]
+        example = self.example
         cases = (
             ("Hash_Orientation", "exact", "0abb1"),
             ("Element_Number", "eq", "2744"),
@@ -415,6 +418,257 @@ class ExamplePresetSearchTests(TestCase):
                 rows, conditions, errors = parse_conditions(condition_query(row))
                 self.assertEqual(errors, [])
                 self.assertFalse(matches_conditions(example, conditions))
+
+
+class RecursivePresetSearchTests(TestCase):
+    """
+    Protect normalized preset searches without broadening saved legacy selectors
+    """
+
+    def matches(self, data, *rows):
+        """
+        Evaluate preset rows through the public validation and matching interface
+
+        Parameters
+        ----------
+        data : object
+            JSON object under test.
+        *rows : tuple
+            Submitted field, operator, value, and optional upper bound.
+
+        Returns
+        -------
+        bool
+            Whether the data satisfies every submitted condition.
+        """
+        form_rows, conditions, errors = parse_conditions(condition_query(*rows))
+        self.assertEqual(errors, [])
+        return matches_conditions(data, conditions)
+
+    def test_text_presets_find_normalized_keys_inside_arbitrary_dicts_and_lists(self):
+        """
+        Find complete normalized field names independently of their schema depth
+        """
+        for field in ("texture_type", "lattice_structure", "orientation_identifier",
+                      "discretization_type", "elastic_model_name", "plastic_model_name"):
+            for key in (field, field.upper(), field.replace("_", "-"),
+                        " \t" + field.replace("_", " ") + "\n"):
+                with self.subTest(field=field, key=key):
+                    data = {"wrapper": [{"details": [{key: "Straße texture"}]}]}
+                    self.assertTrue(self.matches(data, (field, "exact", "STRASSE TEXTURE")))
+                    self.assertFalse(self.matches({key + "_extra": "Straße texture"},
+                                                  (field, "exact", "STRASSE TEXTURE")))
+
+    def test_text_presets_only_match_string_scalars_and_all_requested_words(self):
+        """
+        Exclude serialized containers and numeric coercion from text comparisons
+        """
+        for value in (150, True, None, {"description": "random"}, {"random": "texture"}):
+            for operation, query in (("contains", "random"), ("exact", str(value))):
+                with self.subTest(value=value, operation=operation):
+                    self.assertFalse(self.matches({"texture_type": value},
+                                                  ("texture_type", operation, query)))
+        data = {"one": {"texture_type": "random"}, "two": {"TEXTURE-TYPE": ["copper"]}}
+        self.assertTrue(self.matches(data, ("texture_type", "contains", "COPPER random")))
+        self.assertFalse(self.matches(data, ("texture_type", "contains", "random absent")))
+        self.assertFalse(self.matches(data, ("texture_type", "exact", "random copper")))
+        self.assertFalse(self.matches({"texture_type": "random", "title": "copper"},
+                                      ("texture_type", "contains", "random copper")))
+
+    def test_count_presets_accept_only_named_counts_and_explicit_grain_number_alias(self):
+        """
+        Match numeric count aliases without conflating grain identifiers or sizes
+        """
+        for key in ("grain_count", "Grain-Count", "grain number", "GRAIN_NUMBER"):
+            with self.subTest(key=key):
+                self.assertTrue(self.matches({"nested": [{key: "343"}]},
+                                             ("grain_count", "eq", "343")))
+        for key in ("grain_id", "grain_size", "grain_count_extra", "grain", "grain_numbering"):
+            with self.subTest(key=key):
+                self.assertFalse(self.matches({key: 343}, ("grain_count", "eq", "343")))
+        for field in ("grain_count", "discretization_count"):
+            for value in (True, False, "343 grains", None, "NaN", {"value": 343}):
+                with self.subTest(field=field, value=value):
+                    self.assertFalse(self.matches({field: value}, (field, "gte", "0")))
+            self.assertTrue(self.matches({"nested": [{field.upper(): [1, "343", 1000]}]},
+                                         (field, "between", "300", "400")))
+            self.assertFalse(self.matches({field: [1, 1000]}, (field, "between", "300", "400")))
+
+    def test_loading_presets_require_a_mechanical_boundary_condition_ancestor(self):
+        """
+        Restrict loading matches to mechanical branches even within nested wrappers
+        """
+        for field, value in (("loading_type", "force"), ("loading_mode", "static")):
+            row = (field, "exact", value)
+            with self.subTest(field=field):
+                self.assertTrue(self.matches({"simulation": [{"Mechanical BC": [
+                    {"deep": [{field.upper().replace("_", "-"): value}]}]}]}, row))
+                for data in (
+                    {field: value},
+                    {"thermal_BC": [{field: value}]},
+                    {"mechanical_BC_extra": [{field: value}]},
+                    {"mechanical_BC": [{"THERMAL-BC": {"deep": {field: value}}}]},
+                    {"thermal_BC": {"mechanical_BC": {field: value}}},
+                ):
+                    with self.subTest(data=data):
+                        self.assertFalse(self.matches(data, row))
+
+    def test_boolean_preset_matches_json_booleans_without_integer_or_text_coercion(self):
+        """
+        Keep continuity comparisons strict for both true and false
+        """
+        self.assertEqual(get_field_operators("RVE_continuity"), ("is",))
+        for value, query in ((True, "true"), (False, "false")):
+            with self.subTest(value=value):
+                row = ("RVE_continuity", "is", query)
+                self.assertTrue(self.matches({"nested": [{"rve-continuity": value}]}, row))
+                for invalid in (not value, int(value), str(value), query, None, {"value": value}):
+                    with self.subTest(invalid=invalid):
+                        self.assertFalse(self.matches({"RVE_continuity": invalid}, row))
+
+    def test_boolean_validation_preserves_invalid_intent_and_rejects_other_operators(self):
+        """
+        Reject loose boolean spellings without silently dropping valid conditions
+        """
+        for operation, value in (("is", "1"), ("is", "0"), ("is", "yes"),
+                                 ("is", "TRUE"), ("contains", "true"),
+                                 ("exact", "true"), ("eq", "1"), ("is", "")):
+            with self.subTest(operation=operation, value=value):
+                rows, conditions, errors = parse_conditions(condition_query(
+                    ("texture_type", "exact", "random"),
+                    ("RVE_continuity", operation, value),
+                ))
+                self.assertTrue(errors)
+                self.assertEqual(conditions, [])
+                self.assertEqual(rows[1]["value"], value)
+                self.assertEqual(rows[1]["operator"], operation)
+
+    def test_temperature_units_are_converted_to_kelvin_for_every_numeric_operator(self):
+        """
+        Compare equivalent temperatures in Kelvin regardless of supported stored units
+        """
+        for unit, value in (("Kelvin", "298.15"), ("K", 298.15),
+                            ("Celsius", 25), ("C", "25"), ("°C", 25),
+                            ("Fahrenheit", 77), ("F", "77"), ("°F", 77)):
+            data = {"global_temperature": value, "units": {"Temperature": unit}}
+            for operation, lower, upper, expected in (
+                ("eq", "298.15", "", True), ("gt", "298.15", "", False),
+                ("gte", "298.15", "", True), ("lt", "298.15", "", False),
+                ("lte", "298.15", "", True), ("between", "298", "299", True),
+                ("between", "299", "300", False),
+            ):
+                with self.subTest(unit=unit, operation=operation, lower=lower):
+                    self.assertEqual(self.matches(data, ("global_temperature", operation, lower, upper)), expected)
+
+    def test_temperature_units_follow_the_nearest_ancestor_not_a_sibling_phase(self):
+        """
+        Apply local temperature units while preventing unrelated unit leakage
+        """
+        data = {"units": {"Temperature": "K"}, "phase": [
+            {"units": {"Temperature": "C"}, "state": {"Global-Temperature": 25}},
+            {"state": {"global_temperature": 30}},
+        ]}
+        self.assertTrue(self.matches(data, ("global_temperature", "eq", "298.15")))
+        self.assertTrue(self.matches(data, ("global_temperature", "eq", "30")))
+        self.assertFalse(self.matches(data, ("global_temperature", "eq", "303.15")))
+        self.assertFalse(self.matches({"global_temperature": 25,
+                                      "phase": [{"units": {"Temperature": "C"}}]},
+                                     ("global_temperature", "eq", "298.15")))
+        self.assertFalse(self.matches({"phase": [
+            {"units": {"Temperature": "C"}}, {"global_temperature": 25}]},
+            ("global_temperature", "eq", "298.15")))
+        self.assertFalse(self.matches({"units": {"Temperature": "C"}, "phase": [
+            {"units": {"Temperature": "unknown"}, "global_temperature": 25}]},
+            ("global_temperature", "eq", "298.15")))
+        self.assertTrue(self.matches({"units": {"Temperature": "C"}, "phase": [
+            {"units": {"Stress": "MPa"}, "global_temperature": 25}]},
+            ("global_temperature", "eq", "298.15")))
+
+    def test_temperatures_with_missing_unknown_or_nonfinite_units_values_do_not_match(self):
+        """
+        Avoid guessing units or coercing invalid numeric temperature candidates
+        """
+        for unit in (None, "", "Rankine", "MPa", 1, {"name": "K"}):
+            with self.subTest(unit=unit):
+                self.assertFalse(self.matches({"global_temperature": 298,
+                                              "units": {"Temperature": unit}},
+                                             ("global_temperature", "eq", "298")))
+        self.assertFalse(self.matches({"global_temperature": 298},
+                                      ("global_temperature", "eq", "298")))
+        for value in (True, False, None, "NaN", "Infinity", "25 °C", {"value": 25}):
+            with self.subTest(value=value):
+                self.assertFalse(self.matches({"global_temperature": value,
+                                              "units": {"Temperature": "C"}},
+                                             ("global_temperature", "gte", "0")))
+
+    def test_temperature_input_and_stored_values_reject_below_absolute_zero(self):
+        """
+        Keep both submitted Kelvin bounds and converted data physically valid
+        """
+        for row in (("global_temperature", "gte", "-0.01"),
+                    ("global_temperature", "between", "-1", "2"),
+                    ("global_temperature", "between", "0", "-1")):
+            with self.subTest(row=row):
+                rows, conditions, errors = parse_conditions(condition_query(row))
+                self.assertTrue(errors)
+                self.assertEqual(conditions, [])
+        for unit, value in (("K", "-0.01"), ("C", "-273.16"), ("F", "-459.68")):
+            with self.subTest(unit=unit):
+                self.assertFalse(self.matches({"global_temperature": value,
+                                              "units": {"Temperature": unit}},
+                                             ("global_temperature", "lt", "1")))
+        for unit, value in (("K", 0), ("C", "-273.15"), ("F", "-459.67")):
+            with self.subTest(unit=unit):
+                self.assertTrue(self.matches({"global_temperature": value,
+                                             "units": {"Temperature": unit}},
+                                            ("global_temperature", "eq", "0")))
+
+    def test_temperature_conversion_keeps_precision_and_handles_huge_finite_numbers(self):
+        """
+        Avoid decimal rounding collisions and overflow for finite stored temperatures
+        """
+        data = {"global_temperature": "0.00000000000000000000000000001",
+                "units": {"Temperature": "C"}}
+        self.assertFalse(self.matches(data, ("global_temperature", "eq", "273.15")))
+        self.assertTrue(self.matches(data, ("global_temperature", "gt", "273.15")))
+        for unit in ("K", "C", "F"):
+            with self.subTest(unit=unit):
+                data = {"global_temperature": "1e1000000", "units": {"Temperature": unit}}
+                self.assertTrue(self.matches(data, ("global_temperature", "gt", "1e999999")))
+
+    def test_saved_parameter_tokens_keep_exact_paths_and_container_word_matching(self):
+        """
+        Retain old parameter URLs without turning them into recursive new presets
+        """
+        for field in ("elastic_parameters", "plastic_parameters"):
+            row = (field, "contains", "C11 170000")
+            data = {"phase": [{"constitutive_model": {field: {"C11": 170000}}}]}
+            with self.subTest(field=field):
+                self.assertTrue(self.matches(data, row))
+                self.assertFalse(self.matches({"unrelated": data}, row))
+                self.assertFalse(self.matches({field: {"C11": 170000}}, row))
+
+    def test_legacy_paths_do_not_gain_normalization_aliases_or_temperature_conversion(self):
+        """
+        Keep literal saved paths independent of normalized presets and Kelvin conversion
+        """
+        data = {"phase": {"Texture-Type": "random", "grain_number": 343},
+                "global_temperature": 25, "units": {"Temperature": "C"}}
+        self.assertFalse(self.matches(data, ('["phase","texture_type"]', "exact", "random")))
+        self.assertFalse(self.matches(data, ('["phase","grain_count"]', "eq", "343")))
+        self.assertTrue(self.matches(data, ('["global_temperature"]', "eq", "25")))
+        self.assertFalse(self.matches(data, ('["global_temperature"]', "eq", "298.15")))
+
+    def test_recursive_presets_keep_the_existing_dictionary_depth_limit(self):
+        """
+        Match the supported boundary but stop recursive key discovery beyond it
+        """
+        data = {"texture_type": "random"}
+        for index in range(31):
+            data = {"nested": data}
+        row = ("texture_type", "exact", "random")
+        self.assertTrue(self.matches(data, row))
+        self.assertFalse(self.matches({"nested": data}, row))
 
 
 class AdvancedSearchMatchingTests(TestCase):

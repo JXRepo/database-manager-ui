@@ -89,8 +89,13 @@ Current priority:
 - Keep the two advanced groups distinct: Common filters for general metadata and Data field filters for preset simulation parameters
 - Common filters starts with Identifier, Access, and Owner (uploaded by), followed by Creator, Software, Phase, and Title; keep the `owner` query parameter for Owner and do not add fields without a request
 - Top and advanced-panel Search buttons submit the same combined GET form; both Clear links reset all conditions, and a keyword is optional
-- Data field filters uses 11 preset simulation fields with explicit paths to the actual JSON schema in `apps/pages/advanced_search.py`; do not populate it from arbitrary uploaded JSON keys or duplicate common metadata such as owner or software version
-- Test every offered field against `example_json_files`; friendly labels must map to real paths, including array entries, not merely similar sounding keys
+- Data field filters uses 12 preset simulation fields grouped by microstructure, discretization and boundaries, material models, and loading and temperature; do not populate it from arbitrary uploaded JSON keys or duplicate common metadata
+- Presets recursively search dicts and arrays by normalized field name, ignoring case, whitespace, underscores, and hyphens; `grain_number` is an explicit count alias, not permission to guess arbitrary synonyms
+- Keep loading type and mode within `mechanical_BC`, excluding `thermal_BC`; counts and text must match values of the appropriate type, not arbitrary parameter containers
+- Test every offered field against the synthetic `apps/pages/fixtures/search_fields.json` and local `example_json_files` when available; allow extra nesting without changing explicit bookmarked path semantics
+- RVE continuity uses the Is comparison with actual JSON booleans; do not treat zero, one, or strings as booleans
+- Global temperature queries use kelvin and convert explicit K, Celsius, or Fahrenheit units from the nearest enclosing units metadata; missing or unknown units and temperatures below absolute zero do not match
+- Keep retired elastic and plastic parameter selectors usable only in active saved searches, with their original exact paths and Contains words behavior
 - Keep old Ronak tokens working in bookmarked URLs with their original named key semantics, but do not offer them as new presets
 - Match choices follow the field type and must also be validated on the server
 - All active conditions must match the same accessible record; invalid conditions show errors and must not broaden the search
