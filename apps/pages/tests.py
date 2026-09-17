@@ -531,6 +531,7 @@ class JSONDataSharingTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(object_ids, {own_public_obj.id, public_obj.id})
+        self.assertEqual(response.json().get("total_count"), 2)
         self.assertNotIn(own_private_obj.id, object_ids)
         self.assertNotIn(shared_obj.id, object_ids)
         self.assertNotIn(private_obj.id, object_ids)
@@ -564,6 +565,7 @@ class JSONDataSharingTests(TestCase):
 
         self.assertEqual(first_response.status_code, 200)
         self.assertEqual([item["id"] for item in first_response.json()["objects"]], [obj.pk])
+        self.assertEqual(first_response.json().get("total_count"), 1)
 
         obj.access_type = "c"
         obj.save(update_fields=["access_type"])
@@ -571,6 +573,7 @@ class JSONDataSharingTests(TestCase):
 
         self.assertEqual(next_response.status_code, 200)
         self.assertEqual(next_response.json()["objects"], [])
+        self.assertEqual(next_response.json().get("total_count"), 0)
 
     def test_live_data_endpoint_limits_public_objects_after_filtering_private_uploads(self):
         """
@@ -601,6 +604,7 @@ class JSONDataSharingTests(TestCase):
             [item["id"] for item in response.json()["objects"]],
             list(reversed(public_ids[1:])),
         )
+        self.assertEqual(response.json().get("total_count"), 21)
 
     def test_live_data_endpoint_orders_equal_timestamps_by_latest_object(self):
         """

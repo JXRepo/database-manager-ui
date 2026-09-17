@@ -81,6 +81,8 @@ Current priority:
 - Preserve the existing visual style unless a change is requested
 - Avoid large redesigns unless explicitly requested
 - Keep Live Data Objects compact, with natural row heights and a bounded scrolling list; do not stretch rows to fill the screen
+- Live Data Objects omits per-row Public badges and shows the total of all public objects, even when only the latest 20 are displayed
+- Search results show Public or Private without expanding the row, show the matching total, and place public objects before private ones; retain newest-first ordering within each group
 
 ## Search rules
 

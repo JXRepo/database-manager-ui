@@ -869,11 +869,12 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
       const styles = [...template.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('\n');
       for (const width of [1440, 390]) {
         const evaluate = await page(t, '', width);
+        const owner = filename === 'search.html' ? 'researcher'.repeat(16) : 'browser-qa-viewer';
         const html = `<style>${bootstrap}${styles}</style>
           <div style="width:min(700px, calc(100vw - 160px));margin:20px">
             <div class="${selector}"><span class="main">${'a'.repeat(64)}</span>
               <span class="summary-separator">&nbsp;|&nbsp;</span>
-              <span class="time">browser-qa-viewer | 2026-09-17 10:20</span>
+              <span class="time">${owner} | 2026-09-17 10:20</span>
             </div></div>`;
         const layout = await evaluate(`(() => {
           document.body.innerHTML = ${JSON.stringify(html)};
@@ -892,6 +893,45 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     }
   });
 
+  test('live feed shows the full public total and updates it independently of its limited list', async t => {
+    const template = readFileSync(join(__dirname, '../../templates/pages/search.html'), 'utf8');
+    const source = [...template.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+      .map(match => match[1]).find(script => script.includes('refreshLiveDataObjects'));
+    const evaluate = await page(t);
+    await evaluate(`
+      document.body.innerHTML = '<div id="liveDataCount" hidden></div>' +
+        '<div id="liveDataSubtitle"></div><div id="liveDataStatus"></div><div id="liveDataList"></div>';
+      window.livePayload = {total_count: 25, objects: Array.from({length: 20}, (_, id) => ({
+        id, display_name: 'Public dataset ' + id, identifier: 'dataset-' + id,
+        owner: 'researcher', uploaded_at: '2026-09-17 10:20', detail_url: '#data-' + id,
+        access: 'Public', access_badges: ['Public']
+      }))};
+      window.fetch = async () => ({ok: true, json: async () => window.livePayload});
+      window.setInterval = callback => { window.pollLiveData = callback; };
+      ${source}
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+    `);
+    let state = await evaluate(`({count: document.getElementById('liveDataCount').textContent,
+      hidden: document.getElementById('liveDataCount').hidden,
+      rows: document.querySelectorAll('.live-data-item').length,
+      accessLabels: [...document.querySelectorAll('.live-data-item')]
+        .some(row => row.querySelector('.live-data-badge')),
+      subtitle: document.getElementById('liveDataSubtitle').textContent})`);
+    assert.equal(state.count, '25 total');
+    assert.equal(state.hidden, false);
+    assert.equal(state.rows, 20);
+    assert.equal(state.accessLabels, false);
+    assert.equal(state.subtitle, 'Latest 20 public uploads');
+
+    await evaluate('window.livePayload = {total_count: 0, objects: []}; window.pollLiveData();');
+    state = await evaluate(`({count: document.getElementById('liveDataCount').textContent,
+      rows: document.querySelectorAll('.live-data-item').length,
+      empty: document.querySelector('.live-data-empty')?.textContent})`);
+    assert.equal(state.count, '0 total');
+    assert.equal(state.rows, 0);
+    assert.equal(state.empty, 'No public data objects yet');
+  });
+
   test('live data rows stay compact and long lists scroll at desktop and mobile widths', async t => {
     const searchTemplate = readFileSync(join(__dirname, '../../templates/pages/search.html'), 'utf8');
     const searchStyles = searchTemplate.match(/<style>([\s\S]*?)<\/style>/)[1];
@@ -904,7 +944,6 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
             <div class="live-data-name">Example materials simulation dataset with a long descriptive title</div>
             <div class="live-data-meta">Uploaded by a researcher · 2026-09-16 · JSON simulation data</div>
           </div>
-          <div class="live-data-badge-group"><span class="live-data-badge public">Public</span></div>
         </a>`;
         const html = `<style>${bootstrapStyles}${searchStyles}</style>
           <div class="card search-bar-card search-live-expanded"><div class="card-body">

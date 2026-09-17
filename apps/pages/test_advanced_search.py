@@ -110,6 +110,79 @@ class AdvancedSearchTests(TestCase):
             [self.own.pk, self.shared.pk],
         )
 
+    def test_results_put_public_first_and_keep_newest_first_within_each_access_group(self):
+        """
+        Public matches precede private matches without changing their visibility
+
+        Upload time and object ID retain a stable order within each access group.
+        """
+        newer_public = JSONData.objects.create(
+            owner=self.other, access_type="all",
+            data={"identifier": "new-public", "phase": [{"Grain_Number": 150}]},
+        )
+        newer_private = JSONData.objects.create(
+            owner=self.viewer, access_type="c",
+            data={"identifier": "new-private", "phase": [{"Grain_Number": 150}]},
+        )
+        params = {
+            "condition_field": "grain_count",
+            "condition_operator": "gt",
+            "condition_value": "50",
+        }
+        expected = [newer_public.pk, self.public.pk, newer_private.pk,
+                    self.shared.pk, self.own.pk]
+
+        for equal_timestamps in (False, True):
+            with self.subTest(equal_timestamps=equal_timestamps):
+                if equal_timestamps:
+                    JSONData.objects.update(uploaded_at=self.own.uploaded_at)
+                response = self.client.get(reverse("search"), params)
+                self.assertEqual(
+                    [obj.pk for obj in response.context["data_objects"]], expected
+                )
+                self.assertEqual(response.context.get("result_count"), 5)
+
+    def test_result_count_follows_access_filters_and_matching_conditions(self):
+        """
+        Count only accessible records that satisfy the complete submitted search
+
+        A private record belonging to another user must not affect any count.
+        """
+        for access, expected in [
+            ("", 3), ("public", 1), ("my_private", 1),
+            ("my_data", 1), ("shared_with_me", 1),
+        ]:
+            with self.subTest(access=access):
+                response = self.client.get(reverse("search"), {
+                    "access": access,
+                    "condition_field": "grain_count",
+                    "condition_operator": "gt",
+                    "condition_value": "50",
+                })
+                self.assertEqual(response.context.get("result_count"), expected)
+        response = self.client.get(reverse("search"), {
+            "phase": "copper",
+            "condition_field": "grain_count",
+            "condition_operator": "lt",
+            "condition_value": "200",
+        })
+        self.assertEqual(response.context.get("result_count"), 1)
+        self.assertEqual([obj.pk for obj in response.context["data_objects"]], [self.own.pk])
+
+    def test_result_count_is_zero_for_empty_unsubmitted_and_invalid_searches(self):
+        """
+        Empty and invalid searches cannot report accessible records as matches
+        """
+        for params in [
+            {}, {"keyword": "definitely_absent"},
+            {"condition_field": "grain_count", "condition_operator": "gt",
+             "condition_value": "invalid"},
+        ]:
+            with self.subTest(params=params):
+                response = self.client.get(reverse("search"), params)
+                self.assertEqual(response.context.get("result_count"), 0)
+                self.assertFalse(response.context["data_objects"])
+
     def test_rendered_match_options_follow_selected_field_type(self):
         """
         Render applicable comparisons even when JavaScript is unavailable
@@ -620,6 +693,7 @@ class AdvancedSearchTests(TestCase):
         self.assertEqual(
             [obj.pk for obj in response.context["data_objects"]], [self.own.pk]
         )
+        self.assertEqual(response.context.get("result_count"), 1)
 
     def test_submitted_path_with_extra_spaces_is_restored_as_selected(self):
         """

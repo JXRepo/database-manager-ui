@@ -200,9 +200,15 @@ the older `keywords` parameter keep an editable Keywords input while it is activ
   refresh and bookmarks preserve them. Do not put secrets in search terms.
 
 Results only include records you own, public records, and private records
-explicitly shared with you. **Live Data Objects** is a separate, compact feed of
+explicitly shared with you. Public results appear before private results, with
+the newest uploads first within each group. Each result shows Public or Private
+without expanding it, and the Search Results heading shows the total number of
+matching objects. **Live Data Objects** is a separate, compact feed of
 the latest 20 public uploads; it excludes all private data, including your own
-and data shared with you. It is not filtered by the search form. Longer feeds
+and data shared with you. Its total counts all public objects, including those
+beyond the latest 20, and refreshes with the list every five seconds while the
+page is visible. Individual feed rows omit the repeated Public badge.
+It is not filtered by the search form. Longer feeds
 scroll within the panel rather than stretching each card.
 This pilot searches stored JSON in the application; it is not intended for large
 scale indexed search.

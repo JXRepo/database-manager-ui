@@ -2201,6 +2201,7 @@ def search_view(request):
 
     Preset data fields are available independently of uploaded records. Results
     respect access permissions, and invalid conditions never broaden a search.
+    Public matches appear first, with the newest uploads first in each group.
 
     Parameters
     ----------
@@ -2210,7 +2211,7 @@ def search_view(request):
     Returns
     -------
     HttpResponse
-        Search form, preset field choices, and matching accessible records.
+        Search form, preset field choices, matching accessible records, and count.
     """
     keyword = request.GET.get("keyword", "").strip()
     title = request.GET.get("title", "").strip()
@@ -2262,7 +2263,7 @@ def search_view(request):
         .distinct()
         .select_related("owner")
         .prefetch_related("shared_users")
-        .order_by("-uploaded_at")
+        .order_by("-uploaded_at", "-pk")
     )
     if not search_performed or search_errors:
         data_objects = data_objects.none()
@@ -2317,6 +2318,8 @@ def search_view(request):
 
         filtered_objects.append(_prepare_list_object(obj))
 
+    filtered_objects.sort(key=lambda obj: obj.access_type != "all")
+
     field_options = [get_field_option(value) for value, label in DATA_FIELD_CHOICES]
     option_labels = {option["value"]: option["label"] for option in field_options}
     for row in condition_rows:
@@ -2349,6 +2352,7 @@ def search_view(request):
     context = {
         "segment": "search",
         "data_objects": filtered_objects,
+        "result_count": len(filtered_objects),
         "search_performed": search_performed,
         "keyword": keyword,
         "title": title,
@@ -2384,18 +2388,19 @@ def search_live_data_objects_view(request):
     Returns
     -------
     JsonResponse
-        Compact summaries of the twenty most recent public objects.
+        Summaries of the twenty most recent public objects and total public count.
     """
     data_objects = (
         JSONData.objects
         .filter(access_type="all")
         .select_related("owner")
-        .order_by("-uploaded_at", "-pk")[:20]
+        .order_by("-uploaded_at", "-pk")
     )
+    total_count = data_objects.count()
 
     objects = []
 
-    for obj in data_objects:
+    for obj in data_objects[:20]:
         data = obj.data or {}
         uploaded_at = timezone.localtime(obj.uploaded_at)
         display_name = str(data.get("title") or data.get("identifier") or "Object")
@@ -2414,7 +2419,7 @@ def search_live_data_objects_view(request):
             }
         )
 
-    return JsonResponse({"objects": objects})
+    return JsonResponse({"objects": objects, "total_count": total_count})
 
 
 @login_required
