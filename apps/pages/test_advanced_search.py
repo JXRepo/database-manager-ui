@@ -226,9 +226,9 @@ class AdvancedSearchTests(TestCase):
             self.assertNotIn(field, field_values)
             self.assertNotIn(json.dumps([field]), field_values)
 
-    def test_title_is_the_first_common_filter(self):
+    def test_common_filters_prioritize_identifier_access_and_owner(self):
         """
-        Put the title input first without changing the seven common fields
+        Keep visual and keyboard order focused on identity and access
         """
         response = self.client.get(reverse("search"))
         elements = _html_elements(parse_html(response.content.decode()))
@@ -236,14 +236,13 @@ class AdvancedSearchTests(TestCase):
                       ("aria-labelledby", "commonFiltersTitle") in element.attributes)
         fields = [dict(element.attributes) for element in _html_elements(common)
                   if element.name in ("input", "select")]
-        self.assertEqual(fields[0]["name"], "title")
-        self.assertEqual(fields[0]["id"], "id_title")
-        self.assertCountEqual(
+        self.assertEqual(fields[0]["id"], "id_identifier")
+        self.assertEqual(
             [field["name"] for field in fields],
-            ["title", "identifier", "creator", "software", "phase", "owner", "access"],
+            ["identifier", "access", "owner", "creator", "software", "phase", "title"],
         )
 
-    def test_uploaded_by_label_keeps_the_owner_filter_binding(self):
+    def test_owner_label_keeps_the_uploader_filter_binding(self):
         """
         Describe the uploader while preserving owner links and submitted values
         """
@@ -251,7 +250,7 @@ class AdvancedSearchTests(TestCase):
         elements = list(_html_elements(parse_html(response.content.decode())))
         label = next(element for element in elements if element.name == "label"
                      and ("for", "id_owner") in element.attributes)
-        self.assertEqual(label.children, ["Uploaded by"])
+        self.assertEqual(label.children, ["Owner (uploaded by)"])
         owner = next(element for element in elements if
                      ("id", "id_owner") in element.attributes)
         self.assertEqual(dict(owner.attributes)["name"], "owner")

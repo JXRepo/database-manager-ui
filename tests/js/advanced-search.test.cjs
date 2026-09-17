@@ -595,6 +595,79 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     }
   });
 
+  test('common filters preserve reading order and fit desktop rows or a mobile stack', async t => {
+    const template = readFileSync(join(__dirname, '../../templates/pages/search.html'), 'utf8');
+    const styles = template.match(/<style>([\s\S]*?)<\/style>/)[1];
+    const section = template.match(/<section[^>]*aria-labelledby="commonFiltersTitle"[\s\S]*?<\/section>/)[0]
+      .replace(/\{% if [^%]* %\}selected\{% endif %\}/g, '')
+      .replace(/\{\{[^}]*\}\}/g, '');
+    const bootstrap = readFileSync(join(__dirname, '../../static/assets/css/plugins/bootstrap.min.css'), 'utf8');
+    const names = ['identifier', 'access', 'owner', 'creator', 'software', 'phase', 'title'];
+    const populated = {identifier: 'a'.repeat(64), access: 'shared_with_me',
+      owner: 'researcher.with.a.long.username', creator: 'Materials Research Group',
+      software: 'DAMASK 3.0', phase: 'Ferrite', title: 'A long materials simulation title'};
+    for (const width of [1440, 1024, 390, 320]) {
+      const evaluate = await page(t, '', width);
+      for (const values of [{}, populated]) {
+        const html = `<style>${bootstrap}${styles}</style>
+          <form class="advanced-panel" style="margin:20px;max-width:980px">${section}</form>`;
+        const state = await evaluate(`(() => {
+          document.body.innerHTML = ${JSON.stringify(html)};
+          const form = document.querySelector('form');
+          const values = ${JSON.stringify(values)};
+          const bounds = element => {
+            const rect = element.getBoundingClientRect();
+            return {left: rect.left, right: rect.right, top: rect.top,
+              bottom: rect.bottom, width: rect.width, height: rect.height};
+          };
+          const fields = [...form.querySelectorAll('input, select')].map(control => {
+            control.value = values[control.name] || '';
+            return {name: control.name, id: control.id,
+              label: control.labels[0]?.textContent.trim(), labelCount: control.labels.length,
+              labelBounds: bounds(control.labels[0]), control: bounds(control),
+              column: bounds(control.parentElement)};
+          });
+          return {fields, values: Object.fromEntries(new FormData(form)),
+            row: bounds(form.querySelector('.row')),
+            pageOverflow: document.documentElement.scrollWidth > innerWidth};
+        })()`);
+        const context = `${width}px/${values.identifier ? 'populated' : 'empty'}`;
+        assert.deepEqual(state.fields.map(field => field.name), names, context);
+        assert.deepEqual(state.fields.map(field => field.id), names.map(name => `id_${name}`), context);
+        assert.deepEqual(state.fields.map(field => field.label),
+          ['Identifier', 'Access', 'Owner (uploaded by)', 'Creator', 'Software', 'Phase', 'Title'], context);
+        assert.deepEqual(state.values, Object.fromEntries(names.map(name => [name, values[name] || ''])), context);
+        assert.equal(state.pageOverflow, false, context);
+        for (const [index, field] of state.fields.entries()) {
+          assert.equal(field.labelCount, 1, `${context}/${field.name}: associated label`);
+          assert.ok(field.control.height >= 44, `${context}/${field.name}: usable control height`);
+          assert.ok(field.control.left >= 0 && field.control.right <= width,
+            `${context}/${field.name}: control fits viewport`);
+          assert.ok(field.labelBounds.bottom <= field.control.top,
+            `${context}/${field.name}: label does not overlap control`);
+          assert.ok(field.labelBounds.right <= field.column.right,
+            `${context}/${field.name}: label fits column`);
+          const fraction = width < 768 ? 1 : index === 0 ? 0.5 : 0.25;
+          assert.ok(Math.abs(field.column.width - state.row.width * fraction) < 1,
+            `${context}/${field.name}: column width ${field.column.width}`);
+          const rowStart = width < 768 ? index : index < 3 ? 0 : 3;
+          assert.ok(Math.abs(field.control.top - state.fields[rowStart].control.top) < 1,
+            `${context}/${field.name}: aligned row`);
+          if (index > 0) {
+            const previous = state.fields[index - 1];
+            if (width < 768 || index === 3) {
+              assert.ok(field.labelBounds.top > previous.control.bottom,
+                `${context}/${field.name}: follows previous row`);
+            } else {
+              assert.ok(field.control.left > previous.control.right,
+                `${context}/${field.name}: follows previous column`);
+            }
+          }
+        }
+      }
+    }
+  });
+
   test('long identifier errors wrap inside the upload page on mobile', async t => {
     const template = readFileSync(join(__dirname, '../../templates/pages/upload.html'), 'utf8');
     const styles = [...template.matchAll(/<style>([\s\S]*?)<\/style>/g)].map(match => match[1]).join('\n');

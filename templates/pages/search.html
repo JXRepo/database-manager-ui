@@ -738,48 +738,48 @@
                 <h6 id="commonFiltersTitle" class="advanced-group-title">Common filters</h6>
                 <div class="advanced-group-body">
                   <div class="row g-3">
-                <div class="col-md-6">
-                  <label for="id_title" class="form-label">Title</label>
-                  <input type="text" name="title" id="id_title" class="form-control" value="{{ title }}">
-                </div>
+                    <div class="col-md-6">
+                      <label for="id_identifier" class="form-label">Identifier</label>
+                      <input type="text" name="identifier" id="id_identifier" class="form-control" value="{{ identifier }}">
+                    </div>
 
-                <div class="col-md-3">
-                  <label for="id_creator" class="form-label">Creator</label>
-                  <input type="text" name="creator" id="id_creator" class="form-control" value="{{ creator }}">
-                </div>
+                    <div class="col-md-3">
+                      <label for="id_access" class="form-label">Access</label>
+                      <select name="access" id="id_access" class="form-select">
+                        <option value="" {% if not access %}selected{% endif %}>Any Accessible</option>
+                        <option value="public" {% if access == "public" %}selected{% endif %}>Public</option>
+                        <option value="my_data" {% if access == "my_data" %}selected{% endif %}>My Data</option>
+                        <option value="my_private" {% if access == "my_private" %}selected{% endif %}>My Private</option>
+                        <option value="shared_with_me" {% if access == "shared_with_me" %}selected{% endif %}>Shared with Me</option>
+                      </select>
+                    </div>
 
-                <div class="col-md-3">
-                  <label for="id_software" class="form-label">Software</label>
-                  <input type="text" name="software" id="id_software" class="form-control" value="{{ software }}">
-                </div>
+                    <div class="col-md-3">
+                      <label for="id_owner" class="form-label">Owner (uploaded by)</label>
+                      <input type="text" name="owner" id="id_owner" class="form-control" value="{{ owner_name }}">
+                    </div>
 
-                <div class="col-md-3">
-                  <label for="id_phase" class="form-label">Phase</label>
-                  <input type="text" name="phase" id="id_phase" class="form-control" value="{{ phase }}">
-                </div>
+                    <div class="col-md-3">
+                      <label for="id_creator" class="form-label">Creator</label>
+                      <input type="text" name="creator" id="id_creator" class="form-control" value="{{ creator }}">
+                    </div>
 
-                <div class="col-md-3">
-                  <label for="id_identifier" class="form-label">Identifier</label>
-                  <input type="text" name="identifier" id="id_identifier" class="form-control" value="{{ identifier }}">
-                </div>
+                    <div class="col-md-3">
+                      <label for="id_software" class="form-label">Software</label>
+                      <input type="text" name="software" id="id_software" class="form-control" value="{{ software }}">
+                    </div>
 
-                <div class="col-md-3">
-                  <label for="id_owner" class="form-label">Uploaded by</label>
-                  <input type="text" name="owner" id="id_owner" class="form-control" value="{{ owner_name }}">
-                </div>
+                    <div class="col-md-3">
+                      <label for="id_phase" class="form-label">Phase</label>
+                      <input type="text" name="phase" id="id_phase" class="form-control" value="{{ phase }}">
+                    </div>
 
-                <div class="col-md-3">
-                  <label for="id_access" class="form-label">Access</label>
-                  <select name="access" id="id_access" class="form-select">
-                    <option value="" {% if not access %}selected{% endif %}>Any Accessible</option>
-                    <option value="public" {% if access == "public" %}selected{% endif %}>Public</option>
-                    <option value="my_data" {% if access == "my_data" %}selected{% endif %}>My Data</option>
-                    <option value="my_private" {% if access == "my_private" %}selected{% endif %}>My Private</option>
-                    <option value="shared_with_me" {% if access == "shared_with_me" %}selected{% endif %}>Shared with Me</option>
-                  </select>
+                    <div class="col-md-3">
+                      <label for="id_title" class="form-label">Title</label>
+                      <input type="text" name="title" id="id_title" class="form-control" value="{{ title }}">
+                    </div>
+                  </div>
                 </div>
-                </div>
-              </div>
               </section>
 
               <section class="advanced-filter-group data-field-conditions" aria-labelledby="dataFieldConditionsTitle">
