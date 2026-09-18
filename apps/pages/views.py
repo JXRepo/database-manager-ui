@@ -51,6 +51,7 @@ from .orcid_auth import (
 from .notifications import build_shared_data_notification_message
 from .upload_services import (
     UploadIdentifierConflict,
+    UploadQuotaExceeded,
     PreparedJSONData,
     UploadResourceLimitError,
     canonical_json_size,
@@ -67,6 +68,7 @@ SHARE_USERNAME_KEY = "username"
 UPLOAD_ISSUE_CATEGORIES = (
     ("invalid_file", "Invalid JSON file", "Correct the JSON syntax in this file before uploading it again."),
     ("invalid_structure", "Invalid JSON structure", "Use a JSON object, a list of objects, or an object containing a data list."),
+    ("empty_file", "No data objects", "Add at least one data object to this file."),
     ("missing_required", "Missing required fields", "Add each listed field to this data object."),
     ("empty_values", "Empty values", "Enter a value for each listed field. Null, blank text, and empty lists or objects count as empty."),
     ("invalid_identifier", "Invalid identifier", "Use a text identifier without surrounding spaces, or remove it to have one assigned automatically."),
@@ -76,6 +78,8 @@ UPLOAD_ISSUE_CATEGORIES = (
     ("public_share_username", "Usernames in public data", 'Remove username from shared_with when access_type is "all".'),
     ("unknown_share_user", "Unknown shared users", "Use an existing platform username, not an email address."),
     ("self_share", "Invalid share targets", "Remove your own username from shared_with. You already have access as the owner."),
+    ("storage_limit", "Storage limit", "Delete data you no longer need or reduce this file before uploading it again."),
+    ("save_error", "File could not be saved", "Try uploading this file again."),
 )
 MECHANICAL_BC_VERTICES = (
     "V000",
@@ -701,23 +705,24 @@ def _get_upload_issue_messages(upload_files):
     Returns
     -------
     list of str
-        One rendered report, or an empty list when there are no issues.
+        One rendered report, or an empty list when every file was uploaded.
     """
+    if not any(file_report["status"] == "failed" for file_report in upload_files):
+        return []
+
     files = []
     for file_report in upload_files:
         objects = []
-        for object_report in file_report["objects"]:
+        failed_objects = file_report["objects"] if file_report["status"] == "failed" else []
+        for object_report in failed_objects:
             groups = _upload_issue_groups(object_report["issues"])
             for group in groups:
                 if group["category"] == "invalid_structure":
                     group["guidance"] = "Replace this entry with a JSON object containing the required fields."
             if groups:
                 objects.append({**object_report, "groups": groups})
-        groups = _upload_issue_groups(file_report["issues"])
-        if groups or objects:
-            files.append({**file_report, "groups": groups, "objects": objects})
-    if not files:
-        return []
+        groups = _upload_issue_groups(file_report["issues"]) if file_report["status"] == "failed" else []
+        files.append({**file_report, "groups": groups, "objects": objects})
     return [render_to_string("includes/upload_issue_report.html", {"upload_files": files})]
 
 
@@ -891,7 +896,10 @@ def _create_shared_data_notification(data_object, actor, recipient):
 @login_required
 def upload_json_view(request):
     """
-    Upload JSON files, validate data objects, and save valid objects to the database
+    Save each JSON file completely and stop at the first failed file
+
+    Check request resource limits before saving anything. Each file then uses
+    its own transaction, so earlier successful files survive a later failure.
 
     Parameters
     ----------
@@ -918,11 +926,8 @@ def upload_json_view(request):
 
         if form.is_valid():
             uploaded_files = form.cleaned_data["file"]
-            processed_file_count = 0
             upload_files = []
-            seen_identifiers = set()
-            prepared_object_reports = {}
-            prepared_objects = []
+            prepared_files = []
             raw_object_count = 0
 
             try:
@@ -930,8 +935,15 @@ def upload_json_view(request):
 
                 for uploaded_file in uploaded_files:
                     file_name = uploaded_file.name or "Uploaded file"
-                    file_report = {"name": file_name, "issues": {}, "objects": []}
+                    file_report = {
+                        "name": file_name, "issues": {}, "objects": [],
+                        "status": "skipped", "saved_count": 0,
+                    }
                     upload_files.append(file_report)
+                    seen_identifiers = set()
+                    prepared_object_reports = {}
+                    prepared_objects = []
+                    prepared_files.append((file_report, prepared_objects, prepared_object_reports))
 
                     try:
                         payload = json.load(uploaded_file)
@@ -970,6 +982,13 @@ def upload_json_view(request):
                         raise UploadResourceLimitError(
                             "The upload exceeds the maximum number of JSON data objects."
                         )
+
+                    if not objects:
+                        _add_upload_issue(
+                            file_report["issues"], "empty_file",
+                            "This file contains no data objects.",
+                        )
+                        continue
 
                     valid_objects, errors = validate_json(objects, detailed=True)
                     object_indexes = {}
@@ -1049,56 +1068,75 @@ def upload_json_view(request):
                         if fingerprint:
                             seen_identifiers.add(fingerprint)
 
-                    processed_file_count += 1
-
-                saved_objects = save_prepared_json_data(
-                    request.user,
-                    prepared_objects,
-                )
-            except UploadIdentifierConflict as error:
-                for identifier in error.identifiers:
-                    object_report = prepared_object_reports[identifier]
-                    _add_upload_issue(
-                        object_report["issues"],
-                        "duplicate_identifier",
-                        f'Identifier "{identifier}" or the same data already exists. No objects from this upload were saved.',
-                    )
-
-                messages.error(request, "Upload failed.")
-                for issue in _get_upload_issue_messages(upload_files):
-                    messages.error(request, issue)
-                return render(request, "pages/upload.html", {"form": form})
             except UploadResourceLimitError as error:
                 messages.error(request, "Upload failed.")
                 messages.error(request, str(error))
                 return render(request, "pages/upload.html", {"form": form})
 
-            total_created_count = len(saved_objects)
+            uploaded_file_count = 0
+            total_created_count = 0
+            saved_identifiers = set()
+            for file_report, prepared_objects, prepared_object_reports in prepared_files:
+                file_report["status"] = "failed"
+                for prepared in prepared_objects:
+                    identifier = prepared.data["identifier"]
+                    if not prepared.identifier_fingerprint and identifier in saved_identifiers:
+                        _add_upload_issue(
+                            prepared_object_reports[identifier]["issues"],
+                            "duplicate_identifier",
+                            f'Identifier "{identifier}" is used more than once in this upload.',
+                        )
+                if file_report["issues"] or any(obj["issues"] for obj in file_report["objects"]):
+                    break
+
+                try:
+                    saved_objects = save_prepared_json_data(request.user, prepared_objects)
+                except UploadIdentifierConflict as error:
+                    for identifier in error.identifiers:
+                        object_report = prepared_object_reports[identifier]
+                        _add_upload_issue(
+                            object_report["issues"], "duplicate_identifier",
+                            f'Identifier "{identifier}" or the same data already exists.',
+                        )
+                    break
+                except UploadQuotaExceeded as error:
+                    _add_upload_issue(file_report["issues"], "storage_limit", str(error))
+                    break
+                except UploadResourceLimitError as error:
+                    _add_upload_issue(file_report["issues"], "save_error", str(error))
+                    break
+                except DatabaseError:
+                    _add_upload_issue(file_report["issues"], "save_error", "The service could not save this file.")
+                    break
+
+                file_report["status"] = "uploaded"
+                file_report["saved_count"] = len(saved_objects)
+                uploaded_file_count += 1
+                total_created_count += len(saved_objects)
+                for data_object in saved_objects:
+                    saved_identifiers.add(data_object.data["identifier"])
+                    if data_object.identifier_fingerprint:
+                        saved_identifiers.add(data_object.identifier_fingerprint)
 
             upload_issue_messages = _get_upload_issue_messages(upload_files)
 
-            if total_created_count == 0 and upload_issue_messages:
-                messages.error(request, "Upload failed.")
-                for issue in upload_issue_messages:
-                    messages.error(request, issue)
-
-            elif total_created_count > 0 and upload_issue_messages:
-                messages.warning(
+            if upload_issue_messages:
+                skipped_count = len(upload_files) - uploaded_file_count - 1
+                add_message = messages.warning if uploaded_file_count else messages.error
+                add_message(
                     request,
-                    (
-                        "Upload partially successful: "
-                        f"{total_created_count} object(s) saved from {processed_file_count} file(s)."
-                    ),
+                    f"Upload stopped: {uploaded_file_count} file(s) uploaded, "
+                    f"1 file failed, {skipped_count} file(s) not uploaded.",
                 )
                 for issue in upload_issue_messages:
-                    messages.warning(request, issue)
+                    add_message(request, issue)
 
             elif total_created_count > 0:
                 messages.success(
                     request,
                     (
                         "Upload successful: "
-                        f"{total_created_count} object(s) saved from {processed_file_count} file(s)."
+                        f"{total_created_count} data object(s) saved from {uploaded_file_count} file(s)."
                     ),
                 )
 

@@ -276,25 +276,19 @@ class UploadIdentifierTests(TestCase):
 
     def test_legacy_full_digest_and_generated_content_conflict_in_either_batch_order(self):
         """
-        Apply legacy content deduplication in both directions within a batch
+        Reject the whole file for repeated legacy content in either order
         """
         legacy = dict(self.data, identifier=self.example_fingerprint)
         for legacy_first in (True, False):
             with self.subTest(legacy_first=legacy_first):
                 objects = [legacy, self.data] if legacy_first else [self.data, legacy]
                 response = self._upload(objects)
-                self.assertEqual(JSONData.objects.count(), 1)
-                stored = JSONData.objects.get()
-                if legacy_first:
-                    self.assertEqual(stored.data, legacy)
-                else:
-                    self.assertRegex(stored.data["identifier"], r"^[0-9a-z]{8}$")
+                self.assertEqual(JSONData.objects.count(), 0)
                 message = self._messages(response)
-                self.assertIn("partially successful", message)
+                self.assertNotIn("partially successful", message)
                 self.assertIn("file-1.json", message)
                 self.assertIn("Object 2 in this file", message)
                 self.assertIn("used more than once in this upload", message)
-                JSONData.objects.all().delete()
 
     def test_distinct_supplied_identifiers_allow_identical_required_content(self):
         """
@@ -400,39 +394,74 @@ class UploadIdentifierTests(TestCase):
 
     def test_repeated_generated_content_in_one_file_is_reported(self):
         """
-        Save only the first occurrence and identify the duplicate object
+        Reject every object in the file and identify its repeated content
         """
         response = self._upload([self.data, self.data])
-        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.count(), 0)
         message = self._messages(response)
-        self.assertIn("partially successful", message)
+        self.assertNotIn("partially successful", message)
         self.assertIn("file-1.json", message)
         self.assertIn("Object 2 in this file", message)
         self.assertIn("used more than once in this upload", message)
 
+    def test_explicit_duplicate_identifiers_in_one_file_reject_the_whole_file(self):
+        """
+        Save neither supplied object when their identifiers repeat in one file
+        """
+        first = dict(self.data, identifier="explicit-duplicate", title="First supplied object")
+        second = dict(self.data, identifier="explicit-duplicate", title="Second supplied object")
+
+        response = self._upload([first, second])
+
+        self.assertEqual(JSONData.objects.count(), 0)
+        message = self._messages(response)
+        self.assertNotIn("partially successful", message)
+        self.assertIn("file-1.json", message)
+        self.assertIn("Object 2 in this file", message)
+        self.assertIn("Second supplied object", message)
+        self.assertIn('data-upload-category="duplicate_identifier"', message)
+
     def test_repeated_generated_content_across_files_is_reported(self):
         """
-        Share the duplicate check across every file in a submission
+        Keep the earlier saved file when a later file repeats its content
         """
         response = self._upload(self.data, self.data)
         self.assertEqual(JSONData.objects.count(), 1)
         message = self._messages(response)
         self.assertIn("file-2.json", message)
         self.assertIn("Object 1 in this file", message)
-        self.assertIn("used more than once in this upload", message)
+        self.assertIn('data-upload-category="duplicate_identifier"', message)
+        self.assertEqual(JSONData.objects.get().identifier_fingerprint, self.example_fingerprint)
 
-    def test_explicit_duplicate_identifiers_in_and_across_files_are_reported(self):
+    def test_explicit_duplicates_reject_the_file_and_stop_later_files(self):
         """
-        Reject repeated supplied identifiers without overwriting data
+        Reject a file with repeated identifiers and leave the next file unprocessed
         """
         payload = dict(self.data, identifier="explicit-duplicate")
         response = self._upload([payload, payload], payload)
-        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.count(), 0)
         message = self._messages(response)
         self.assertIn("file-1.json", message)
         self.assertIn("Object 2 in this file", message)
         self.assertIn("file-2.json", message)
-        self.assertIn("Object 1 in this file", message)
+        self.assertIn("Not uploaded", message)
+        self.assertNotIn("Object 1 in this file", message)
+
+    def test_explicit_duplicate_across_files_preserves_the_earlier_upload(self):
+        """
+        Keep the first file unchanged when the next file repeats its identifier
+        """
+        first = dict(self.data, identifier="explicit-duplicate", title="First file object")
+        second = dict(first, title="Conflicting second file object")
+
+        response = self._upload(first, second)
+
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.get().data, first)
+        message = self._messages(response)
+        self.assertIn("file-2.json", message)
+        self.assertIn("Conflicting second file object", message)
+        self.assertIn('data-upload-category="duplicate_identifier"', message)
 
     def test_generated_identifier_checks_other_users_private_data(self):
         """
@@ -454,7 +483,7 @@ class UploadIdentifierTests(TestCase):
 
     def test_generated_and_supplied_identifiers_share_the_same_namespace(self):
         """
-        Prevent an explicit identifier from bypassing generated ID checks
+        Reject the whole file when a supplied identifier repeats a generated one
         """
         self._upload(self.data)
         self.assertEqual(JSONData.objects.count(), 1)
@@ -462,19 +491,19 @@ class UploadIdentifierTests(TestCase):
         JSONData.objects.all().delete()
         explicit = dict(self.data, identifier=identifier, title="Other simulation")
         response = self._upload([self.data, explicit])
-        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.count(), 0)
         message = self._messages(response)
         self.assertIn("file-1.json", message)
         self.assertIn("Object 2 in this file", message)
 
-    def test_other_missing_fields_still_fail_without_blocking_valid_objects(self):
+    def test_other_missing_fields_reject_all_objects_in_the_file(self):
         """
-        Keep mandatory metadata validation when identifier becomes optional
+        Reject valid neighbors when required metadata is missing in the file
         """
         invalid = dict(self.data)
         invalid.pop("phase")
         response = self._upload([invalid, self.data])
-        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.count(), 0)
         message = self._messages(response)
         self.assertIn("Object 1 in this file", message)
         self.assertIn('data-upload-category="missing_required"', message)

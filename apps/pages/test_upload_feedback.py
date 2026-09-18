@@ -168,9 +168,9 @@ class UploadFeedbackTests(TestCase):
         self.assertEqual(len(reports), 1)
         return reports[0]
 
-    def test_mixed_files_preserve_file_and_object_order_with_partial_success(self):
+    def test_mixed_files_preserve_order_and_stop_after_the_failed_file(self):
         """
-        Save valid objects while reporting failed objects in their original order
+        Keep earlier uploads and report failed objects before later unprocessed files
         """
         first = self._data("First invalid object", "first-invalid")
         first.pop("phase")
@@ -178,24 +178,30 @@ class UploadFeedbackTests(TestCase):
         second["software"] = ""
         third = self._data("Third invalid object", "third-invalid")
         third.pop("creator")
+        saved = self._data("Saved from first file", "first-saved")
         response = self._upload(
-            ("z-first.json", [self._data("Saved from first file"), first, second]),
-            ("a-second.json", [third, self._data("Saved from second file", " ")]),
+            ("z-first.json", saved),
+            ("a-second.json", [self._data("Unstored valid neighbor"), first, second]),
+            ("third.json", [third, self._data("Unprocessed valid object", " ")]),
         )
-        self.assertEqual(JSONData.objects.count(), 2)
-        self.assertContains(response, "partially successful")
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.get().data, saved)
+        self.assertNotContains(response, "partially successful")
         files = _marked(self._report(response), "data-upload-file")
-        self.assertEqual(len(files), 2)
+        self.assertEqual(len(files), 3)
         self.assertIn("z-first.json", _text(files[0]))
         self.assertIn("a-second.json", _text(files[1]))
-        first_objects = _marked(files[0], "data-upload-object")
-        second_objects = _marked(files[1], "data-upload-object")
-        self.assertEqual(len(first_objects), 2)
-        self.assertEqual(len(second_objects), 1)
+        self.assertIn("third.json", _text(files[2]))
+        self.assertFalse(_marked(files[0], "data-upload-object"))
+        failed_objects = _marked(files[1], "data-upload-object")
+        self.assertEqual(len(failed_objects), 2)
+        self.assertFalse(_marked(files[2], "data-upload-object"))
+        self.assertFalse(_marked(files[2], "data-upload-category"))
+        self.assertIn("Not uploaded", _text(files[2]))
+        self.assertNotIn("Third invalid object", _text(files[2]))
         for node, title, identifier, position in [
-            (first_objects[0], "First invalid object", "first-invalid", 2),
-            (first_objects[1], "Second invalid object", "second-invalid", 3),
-            (second_objects[0], "Third invalid object", "third-invalid", 1),
+            (failed_objects[0], "First invalid object", "first-invalid", 2),
+            (failed_objects[1], "Second invalid object", "second-invalid", 3),
         ]:
             header = _text(node, header_only=True)
             self.assertLess(header.index(title), header.index(identifier))
@@ -213,24 +219,27 @@ class UploadFeedbackTests(TestCase):
                 content_type="application/json",
             ),
         ]
-        response = self.client.post(reverse("upload_json"), {"file": files}, follow=True)
-        self.assertEqual(response.redirect_chain, [(reverse("upload_json"), 302)])
-        self.assertEqual(JSONData.objects.count(), 1)
-        reports = _marked(self._report(response), "data-upload-file")
-        self.assertEqual(len(reports), 3)
-        for file_report, filename in zip(reports, ["syntax.json", "root.json", "entries.json"]):
-            self.assertIn(filename, _text(file_report))
-        for file_report, category in zip(reports[:2], ["invalid_file", "invalid_structure"]):
-            self.assertFalse(_marked(file_report, "data-upload-object"))
-            groups = _marked(file_report, "data-upload-category")
-            self.assertEqual(len(groups), 1)
-            self.assertEqual(dict(groups[0].attributes)["data-upload-category"], category)
-        objects = _marked(reports[2], "data-upload-object")
-        self.assertEqual(len(objects), 1)
-        self.assertRegex(_text(objects[0], header_only=True).casefold(), r"object\s+2\b")
-        category = _marked(objects[0], "data-upload-category")[0]
-        self.assertEqual(dict(category.attributes)["data-upload-category"], "invalid_structure")
-        guidance = [_text(_marked(report, "data-upload-guidance")[0]) for report in reports]
+        guidance = []
+        for index, uploaded_file in enumerate(files):
+            with self.subTest(filename=uploaded_file.name):
+                response = self.client.post(reverse("upload_json"), {"file": uploaded_file}, follow=True)
+                self.assertEqual(response.redirect_chain, [(reverse("upload_json"), 302)])
+                self.assertEqual(JSONData.objects.count(), 0)
+                reports = _marked(self._report(response), "data-upload-file")
+                self.assertEqual(len(reports), 1)
+                file_report = reports[0]
+                self.assertIn(uploaded_file.name, _text(file_report))
+                objects = _marked(file_report, "data-upload-object")
+                if index < 2:
+                    self.assertFalse(objects)
+                else:
+                    self.assertEqual(len(objects), 1)
+                    self.assertRegex(_text(objects[0], header_only=True).casefold(), r"object\s+2\b")
+                groups = _marked(file_report, "data-upload-category")
+                self.assertEqual(len(groups), 1)
+                expected_category = "invalid_file" if index == 0 else "invalid_structure"
+                self.assertEqual(dict(groups[0].attributes)["data-upload-category"], expected_category)
+                guidance.append(_text(_marked(groups[0], "data-upload-guidance")[0]))
         self.assertIn("syntax", guidance[0].casefold())
         self.assertIn("list", guidance[1].casefold())
         self.assertIn("entry", guidance[2].casefold())
@@ -339,21 +348,23 @@ class UploadFeedbackTests(TestCase):
 
     def test_duplicate_identifiers_keep_original_data_and_report_the_failed_objects(self):
         """
-        Keep database and batch duplicate reports attached to the rejected objects
+        Reject the whole file while identifying duplicates and preserving stored data
         """
         existing = JSONData.objects.create(
             owner=self.other, access_type="c", data=self._data("Private original", "stored-id"),
         )
         response = self._upload(("duplicates.json", [
             self._data("Rejected stored duplicate", "stored-id"),
-            self._data("Accepted batch original", "batch-id"),
+            self._data("Unstored batch original", "batch-id"),
             self._data("Rejected batch duplicate", "batch-id"),
         ]))
-        self.assertEqual(JSONData.objects.count(), 2)
+        self.assertEqual(JSONData.objects.count(), 1)
         existing.refresh_from_db()
         self.assertEqual(existing.data["title"], "Private original")
-        stored = JSONData.objects.get(owner=self.owner)
-        self.assertEqual(stored.data["title"], "Accepted batch original")
+        self.assertEqual(existing.owner, self.other)
+        self.assertEqual(existing.access_type, "c")
+        self.assertFalse(JSONData.objects.filter(owner=self.owner).exists())
+        self.assertFalse(JSONData.objects.filter(data__identifier="batch-id").exists())
         report = self._report(response)
         self.assertNotIn("Private original", _text(report))
         objects = _marked(report, "data-upload-object")

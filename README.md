@@ -106,17 +106,27 @@ write data.
 - Upload one or more JSON files.
 - Unwrap a single object, a list of objects, or a dict with a top-level `data` list.
 - Validate required top-level fields before saving.
-- Save each valid data object as one `JSONData` record.
+- Save every object in a fully valid file as a separate `JSONData` record.
 - Search accessible data by metadata, nested fields, and numeric comparisons.
 - View compact detail pages with plots and mechanical boundary condition summaries.
 - Manage owned data in My Data.
 - Share private data with specific usernames.
 - Export an individual data object or a selected list of accessible objects as JSON.
 
-Each valid data object becomes a separate `JSONData` record. The original
-uploaded file is not retained. An upload with both valid and invalid objects can
-save the valid objects and report errors for the others; a resource limit failure
-rejects the submission.
+Each data object becomes a separate `JSONData` record, but a JSON file is saved
+only when every object in it passes validation. An error in any object rejects
+the whole file, including its other valid objects. The original file is not retained.
+
+Files are saved in the selected order. At the first failed file, uploading stops:
+earlier successful files remain saved and later files are marked as not uploaded.
+The result lists each file's status, with detailed errors for the failed file.
+Fix that file and select it with the remaining files to retry; do not resend files
+that already succeeded. A file's final identifier conflict, quota failure, or
+database save error also rejects that whole file and stops later files.
+
+Request resource checks run before any files are saved. Exceeding the file count,
+file size, combined size, object count, or JSON depth limits rejects the submission;
+unsupported numeric or Unicode values detected during preparation do so as well.
 
 Upload errors follow the selected file order, then the original data object order
 within each file. Each object is identified by its title and supplied identifier
@@ -316,10 +326,10 @@ Within a submission, a supplied identifier that repeats an earlier accepted
 identifier is reported as a duplicate; supplied values are never silently renamed.
 Duplicates are not overwritten; errors identify the filename, object number,
 and identifier, with instructions to remove the duplicate or supply another
-identifier for a distinct object. Other valid objects can still save, except
-that a duplicate identifier or duplicate content found during the final
-transactional recheck rejects the batch. Distinct content with an automatically
-generated short ID is extended instead of rejected.
+identifier for a distinct object. Any duplicate rejects its entire file,
+including duplicates found during the final transactional recheck. Previously
+successful files stay saved, and later files are not uploaded. Distinct content
+with an automatically generated short ID is extended instead of rejected.
 
 Generated identifiers are part of the stored JSON, its quota size, and exported
 JSON. Internal fingerprints are not added to exported JSON. The original file

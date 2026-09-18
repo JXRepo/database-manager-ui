@@ -782,12 +782,12 @@ class UploadResourceViewTests(TestCase):
         )
 
     @patch("apps.pages.views._identifier_exists", return_value=False)
-    def test_transactional_identifier_recheck_rolls_back_the_batch(
+    def test_transactional_identifier_recheck_rolls_back_the_file(
         self,
         _exists_mock,
     ):
         """
-        A conflict missed during preparation prevents every new object saving
+        A conflict missed during preparation prevents saving any object in the file
         """
         other_owner = User.objects.create_user(
             username="other-owner",
@@ -811,7 +811,7 @@ class UploadResourceViewTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(JSONData.objects.count(), 1)
         self.assertFalse(
             JSONData.objects.filter(data__identifier="fresh-object").exists()
@@ -843,7 +843,7 @@ class UploadResourceViewTests(TestCase):
     @override_settings(PILOT_MAX_USER_JSON_BYTES=50 * 1024 * 1024)
     def test_quota_rejection_saves_zero_new_objects(self):
         """
-        Quota rejection leaves all objects from the request unpersisted
+        Quota rejection leaves all objects from the file unpersisted
         """
         JSONData.objects.create(
             owner=self.owner,
@@ -860,6 +860,6 @@ class UploadResourceViewTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(JSONData.objects.count(), 1)
         self.assertTrue(any("quota" in message.casefold() for message in self._messages(response)))

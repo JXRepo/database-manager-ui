@@ -1148,9 +1148,9 @@ class JSONDataSharingTests(TestCase):
         messages = [str(message) for message in get_messages(response.wsgi_request)]
         self.assertTrue(any("already exists" in message for message in messages))
 
-    def test_upload_saves_valid_object_and_reports_schema_invalid_object(self):
+    def test_upload_rejects_the_whole_file_and_reports_schema_invalid_object(self):
         """
-        Schema errors still allow other valid objects in the file to save
+        Schema errors prevent every object in the same file from being saved
         """
         self.client.login(username="owner", password="password")
         valid_object = self._build_valid_upload_object("valid-object")
@@ -1159,12 +1159,12 @@ class JSONDataSharingTests(TestCase):
         response = self._post_upload_object([valid_object, invalid_object])
 
         self.assertRedirects(response, reverse("upload_json"))
-        self.assertEqual(JSONData.objects.count(), 1)
-        self.assertTrue(
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertFalse(
             JSONData.objects.filter(data__identifier="valid-object").exists()
         )
         messages = [str(message) for message in get_messages(response.wsgi_request)]
-        self.assertTrue(any("partially successful" in message for message in messages))
+        self.assertFalse(any("partially successful" in message for message in messages))
         self.assertTrue(any("Object 2 in this file" in message for message in messages))
         self.assertTrue(any('data-upload-category="missing_required"' in message for message in messages))
 
