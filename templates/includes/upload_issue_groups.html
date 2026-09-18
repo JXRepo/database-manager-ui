@@ -1,0 +1,14 @@
+{% for group in groups %}
+  <section class="upload-report-group" data-upload-category="{{ group.category }}">
+    <p class="upload-report-group-label">{{ group.label }}</p>
+    <ol class="upload-report-issues">
+      {% for field in group.fields %}
+        <li><code>{{ field }}</code></li>
+      {% endfor %}
+      {% for issue in group.messages %}
+        <li>{{ issue }}</li>
+      {% endfor %}
+    </ol>
+    <p class="upload-report-guidance" data-upload-guidance>{{ group.guidance }}</p>
+  </section>
+{% endfor %}

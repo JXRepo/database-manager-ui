@@ -17,6 +17,7 @@ from django.db.models import Q
 from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.urls import reverse
 from django.utils import timezone
+from django.template.loader import render_to_string
 
 from .models import *
 from .forms import AccountSettingsForm, ORCIDAccountSetupForm, SignUpForm, JSONUploadForm
@@ -64,15 +65,17 @@ SHORT_NUMERIC_ARRAY_INLINE_LIMIT = 6
 ASSISTANT_MAX_QUESTION_LENGTH = 600
 SHARE_USERNAME_KEY = "username"
 UPLOAD_ISSUE_CATEGORIES = (
-    ("invalid_file", "Invalid files"),
-    ("invalid_structure", "Invalid JSON structure"),
-    ("missing_required", "Missing required fields"),
-    ("empty_values", "Empty values"),
-    ("duplicate_identifier", "Duplicate identifiers"),
-    ("invalid_access", "Invalid access metadata"),
-    ("unknown_share_user", "Unknown shared users"),
-    ("self_share", "Invalid share targets"),
-    ("other_validation", "Other validation issues"),
+    ("invalid_file", "Invalid JSON file", "Correct the JSON syntax in this file before uploading it again."),
+    ("invalid_structure", "Invalid JSON structure", "Use a JSON object, a list of objects, or an object containing a data list."),
+    ("missing_required", "Missing required fields", "Add each listed field to this data object."),
+    ("empty_values", "Empty values", "Enter a value for each listed field. Null, blank text, and empty lists or objects count as empty."),
+    ("invalid_identifier", "Invalid identifier", "Use a text identifier without surrounding spaces, or remove it to have one assigned automatically."),
+    ("duplicate_identifier", "Duplicate identifiers", "Remove this object if it has already been uploaded. If it is a different object, give it a unique identifier."),
+    ("invalid_share_structure", "Invalid sharing entries", "Replace each listed shared_with entry with a JSON object containing access_type and, if needed, username."),
+    ("invalid_access", "Invalid access metadata", 'Use "all" for public data or "c" for private data.'),
+    ("public_share_username", "Usernames in public data", 'Remove username from shared_with when access_type is "all".'),
+    ("unknown_share_user", "Unknown shared users", "Use an existing platform username, not an email address."),
+    ("self_share", "Invalid share targets", "Remove your own username from shared_with. You already have access as the owner."),
 )
 MECHANICAL_BC_VERTICES = (
     "V000",
@@ -638,76 +641,84 @@ def _get_share_username(item):
     return str(item.get(SHARE_USERNAME_KEY, "")).strip()
 
 
-def _add_upload_issue(upload_issues, category, message):
+def _add_upload_issue(upload_issues, category, message="", fields=()):
     """
     Add one upload issue to its display category
 
     Parameters
     ----------
     upload_issues : dict
-        Mapping of issue category keys to message lists.
+        Field names and problem descriptions grouped by category.
     category : str
         Issue category key.
-    message : str
-        User-facing issue detail.
+    message : str, optional
+        One specific problem, without repeated correction instructions.
+    fields : iterable of str, optional
+        Field names to list separately within this category.
     """
-    upload_issues.setdefault(category, []).append(message)
+    group = upload_issues.setdefault(category, {"fields": [], "messages": []})
+    group["fields"].extend(fields)
+    if message:
+        group["messages"].append(message)
 
 
-def _get_upload_issue_messages(upload_issues):
+def _upload_issue_groups(upload_issues):
     """
-    Build numbered upload issue messages grouped by category
+    Give each issue category its own problem list and correction guidance
 
     Parameters
     ----------
     upload_issues : dict
-        Mapping of issue category keys to message lists.
+        Field names and problem descriptions grouped by category.
 
     Returns
     -------
     list
-        Numbered messages for display through Django messages.
+        Template context for the categories that contain problems.
     """
-    numbered_messages = []
-    issue_number = 1
-
-    for category, label in UPLOAD_ISSUE_CATEGORIES:
-        details = upload_issues.get(category, [])
-
-        if not details:
-            continue
-
-        numbered_messages.append(
-            f"{issue_number}. {label}: {'; '.join(details)}"
-        )
-        issue_number += 1
-
-    return numbered_messages
+    groups = []
+    for category, label, guidance in UPLOAD_ISSUE_CATEGORIES:
+        if category in upload_issues:
+            groups.append({
+                "category": category, "label": label, "guidance": guidance,
+                **upload_issues[category],
+            })
+    return groups
 
 
-def _categorize_validation_error(error):
+def _get_upload_issue_messages(upload_files):
     """
-    Return the upload issue category for one schema validation message
+    Render escaped feedback in file order and then data object order
+
+    Django messages carries the rendered report across the upload redirect.
+    The template escapes filenames, titles, identifiers, and problem text.
 
     Parameters
     ----------
-    error : str
-        Validation error returned by validate_json.
+    upload_files : list of dict
+        File reports containing their own issues and ordered object reports.
 
     Returns
     -------
-    str
-        Upload issue category key.
+    list of str
+        One rendered report, or an empty list when there are no issues.
     """
-    error_text = error.casefold()
-
-    if "missing required" in error_text:
-        return "missing_required"
-
-    if "empty " in error_text:
-        return "empty_values"
-
-    return "other_validation"
+    files = []
+    for file_report in upload_files:
+        objects = []
+        for object_report in file_report["objects"]:
+            groups = _upload_issue_groups(object_report["issues"])
+            for group in groups:
+                if group["category"] == "invalid_structure":
+                    group["guidance"] = "Replace this entry with a JSON object containing the required fields."
+            if groups:
+                objects.append({**object_report, "groups": groups})
+        groups = _upload_issue_groups(file_report["issues"])
+        if groups or objects:
+            files.append({**file_report, "groups": groups, "objects": objects})
+    if not files:
+        return []
+    return [render_to_string("includes/upload_issue_report.html", {"upload_files": files})]
 
 
 def _resolve_upload_access_metadata(data, owner):
@@ -735,7 +746,7 @@ def _resolve_upload_access_metadata(data, owner):
         if not isinstance(item, dict):
             issues.append(
                 (
-                    "invalid_access",
+                    "invalid_share_structure",
                     f"shared_with entry {index} must be an object.",
                 )
             )
@@ -760,8 +771,7 @@ def _resolve_upload_access_metadata(data, owner):
                     "invalid_access",
                     (
                         f'shared_with entry {index} has invalid access_type '
-                        f'"{raw_access_type}". Use "all" for public data or '
-                        f'"c" for private or shared data.'
+                        f'"{raw_access_type}".'
                     ),
                 )
             )
@@ -774,11 +784,10 @@ def _resolve_upload_access_metadata(data, owner):
             if has_username_key:
                 issues.append(
                     (
-                        "invalid_access",
+                        "public_share_username",
                         (
                             f'shared_with entry {index} cannot include username '
-                            'when access_type is "all". Public data is already '
-                            "available through Search."
+                            'when access_type is "all".'
                         ),
                     )
                 )
@@ -818,8 +827,7 @@ def _resolve_upload_access_metadata(data, owner):
                 (
                     "self_share",
                     (
-                        f'username "{username}" is the owner. Remove username '
-                        "to keep this object private."
+                        f'username "{username}" is the owner.'
                     ),
                 )
             )
@@ -911,9 +919,9 @@ def upload_json_view(request):
         if form.is_valid():
             uploaded_files = form.cleaned_data["file"]
             processed_file_count = 0
-            upload_issues = {}
+            upload_files = []
             seen_identifiers = set()
-            prepared_object_labels = {}
+            prepared_object_reports = {}
             prepared_objects = []
             raw_object_count = 0
 
@@ -922,6 +930,8 @@ def upload_json_view(request):
 
                 for uploaded_file in uploaded_files:
                     file_name = uploaded_file.name or "Uploaded file"
+                    file_report = {"name": file_name, "issues": {}, "objects": []}
+                    upload_files.append(file_report)
 
                     try:
                         payload = json.load(uploaded_file)
@@ -931,9 +941,9 @@ def upload_json_view(request):
                         ) from error
                     except ValueError:
                         _add_upload_issue(
-                            upload_issues,
+                            file_report["issues"],
                             "invalid_file",
-                            f"{file_name} is not valid JSON.",
+                            "This file could not be read as JSON.",
                         )
                         continue
 
@@ -948,12 +958,9 @@ def upload_json_view(request):
                             objects = [payload]
                     else:
                         _add_upload_issue(
-                            upload_issues,
+                            file_report["issues"],
                             "invalid_structure",
-                            (
-                                f"{file_name} must be a single object, a list of objects, "
-                                "or a dict with a 'data' list."
-                            ),
+                            "This file does not contain a data object or a list of data objects.",
                         )
                         continue
 
@@ -964,46 +971,51 @@ def upload_json_view(request):
                             "The upload exceeds the maximum number of JSON data objects."
                         )
 
-                    valid_objects, errors = validate_json(objects)
+                    valid_objects, errors = validate_json(objects, detailed=True)
                     object_indexes = {}
 
                     for object_index, obj in enumerate(objects, start=1):
+                        title = obj.get("title") if isinstance(obj, dict) else None
+                        identifier = obj.get("identifier") if isinstance(obj, dict) else None
+                        object_report = {
+                            "position": object_index,
+                            "title": title.strip() if isinstance(title, str) else "",
+                            "identifier": identifier if isinstance(identifier, str) and identifier == identifier.strip() else "",
+                            "issues": {},
+                        }
+                        file_report["objects"].append(object_report)
                         if isinstance(obj, dict):
                             object_indexes[id(obj)] = object_index
 
-                    prepared_count = 0
+                    for error in errors:
+                        object_report = file_report["objects"][error["object_index"] - 1]
+                        _add_upload_issue(
+                            object_report["issues"], error["category"],
+                            error["message"], fields=error["fields"],
+                        )
 
                     for obj in valid_objects:
                         object_index = object_indexes.get(id(obj), 1)
+                        object_report = file_report["objects"][object_index - 1]
                         identifier = obj.get("identifier")
                         fingerprint = ""
                         if identifier is None or not identifier.strip():
                             fingerprint = data_fingerprint(obj)
                             identifier = generate_data_identifier(obj, prepared_objects)
                             obj["identifier"] = identifier
-                        object_label = f"{file_name} data object {object_index}"
-
                         if identifier in seen_identifiers:
                             _add_upload_issue(
-                                upload_issues,
+                                object_report["issues"],
                                 "duplicate_identifier",
-                                (
-                                    f'{object_label}: identifier "{identifier}" is duplicated '
-                                    "in this upload. Please remove the duplicate, or provide "
-                                    "a different identifier if this is a distinct data object."
-                                ),
+                                f'Identifier "{identifier}" is used more than once in this upload.',
                             )
                             continue
 
                         if _identifier_exists(identifier):
                             _add_upload_issue(
-                                upload_issues,
+                                object_report["issues"],
                                 "duplicate_identifier",
-                                (
-                                    f'{object_label}: identifier "{identifier}" already exists. '
-                                    "Please remove the duplicate, or provide a different "
-                                    "identifier if this is a distinct data object."
-                                ),
+                                f'Identifier "{identifier}" already exists.',
                             )
                             continue
 
@@ -1017,9 +1029,9 @@ def upload_json_view(request):
                         if access_issues:
                             for category, issue in access_issues:
                                 _add_upload_issue(
-                                    upload_issues,
+                                    object_report["issues"],
                                     category,
-                                    f"{object_label}: {issue}",
+                                    issue,
                                 )
                             continue
 
@@ -1032,28 +1044,12 @@ def upload_json_view(request):
                                 identifier_fingerprint=fingerprint,
                             )
                         )
-                        prepared_object_labels[identifier] = object_label
+                        prepared_object_reports[identifier] = object_report
                         seen_identifiers.add(identifier)
                         if fingerprint:
                             seen_identifiers.add(fingerprint)
-                        prepared_count += 1
 
                     processed_file_count += 1
-
-                    for error in errors:
-                        category = _categorize_validation_error(error)
-                        _add_upload_issue(
-                            upload_issues,
-                            category,
-                            f"{file_name}: {error}",
-                        )
-
-                    if prepared_count == 0 and errors:
-                        _add_upload_issue(
-                            upload_issues,
-                            "other_validation",
-                            f"{file_name}: No valid data objects were saved.",
-                        )
 
                 saved_objects = save_prepared_json_data(
                     request.user,
@@ -1061,23 +1057,15 @@ def upload_json_view(request):
                 )
             except UploadIdentifierConflict as error:
                 for identifier in error.identifiers:
-                    object_label = prepared_object_labels.get(
-                        identifier,
-                        "Uploaded data object",
-                    )
+                    object_report = prepared_object_reports[identifier]
                     _add_upload_issue(
-                        upload_issues,
+                        object_report["issues"],
                         "duplicate_identifier",
-                        (
-                            f'{object_label}: identifier "{identifier}" or its generated '
-                            "content already exists. "
-                            "Please remove the duplicate, or provide a different "
-                            "identifier if this is a distinct data object."
-                        ),
+                        f'Identifier "{identifier}" or the same data already exists. No objects from this upload were saved.',
                     )
 
                 messages.error(request, "Upload failed.")
-                for issue in _get_upload_issue_messages(upload_issues):
+                for issue in _get_upload_issue_messages(upload_files):
                     messages.error(request, issue)
                 return render(request, "pages/upload.html", {"form": form})
             except UploadResourceLimitError as error:
@@ -1087,7 +1075,7 @@ def upload_json_view(request):
 
             total_created_count = len(saved_objects)
 
-            upload_issue_messages = _get_upload_issue_messages(upload_issues)
+            upload_issue_messages = _get_upload_issue_messages(upload_files)
 
             if total_created_count == 0 and upload_issue_messages:
                 messages.error(request, "Upload failed.")

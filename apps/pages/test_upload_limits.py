@@ -728,9 +728,10 @@ class UploadResourceViewTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertEqual(JSONData.objects.count(), 0)
-        self.assertTrue(
-            any("not valid JSON" in message for message in self._messages(response))
-        )
+        report = " ".join(self._messages(response))
+        self.assertIn("large-integer.json", report)
+        self.assertIn('data-upload-category="invalid_file"', report)
+        self.assertIn("This file could not be read as JSON.", report)
 
     def test_lone_surrogate_value_rejects_the_complete_request(self):
         """

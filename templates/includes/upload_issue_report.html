@@ -1,0 +1,30 @@
+<div class="upload-issue-report" data-upload-report>
+  {% for file in upload_files %}
+    <section class="upload-report-file" data-upload-file>
+      <h6 class="upload-report-file-title">{{ file.name }}</h6>
+      {% include "includes/upload_issue_groups.html" with groups=file.groups only %}
+      {% for object in file.objects %}
+        <section class="upload-report-object" data-upload-object>
+          <p class="upload-report-object-title">
+            {% if object.title %}
+              {{ object.title }}
+            {% elif object.identifier %}
+              Identifier: <code>{{ object.identifier }}</code>
+            {% else %}
+              Data object {{ object.position }}
+            {% endif %}
+          </p>
+          {% if object.title or object.identifier %}
+            <p class="upload-report-object-meta">
+              {% if object.title and object.identifier %}
+                <span>Identifier: <code>{{ object.identifier }}</code></span>
+              {% endif %}
+              <span>Object {{ object.position }} in this file</span>
+            </p>
+          {% endif %}
+          {% include "includes/upload_issue_groups.html" with groups=object.groups only %}
+        </section>
+      {% endfor %}
+    </section>
+  {% endfor %}
+</div>

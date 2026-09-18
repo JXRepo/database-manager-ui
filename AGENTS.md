@@ -51,6 +51,8 @@ Current priority:
 - Extra fields are allowed
 - Missing required fields must produce clear user-facing error messages
 - Empty required fields must produce clear user-facing error messages
+- Group upload feedback by JSON file, then data object in original order, then issue category; list each affected field separately and give guidance specific to that category
+- Identify an object by its title and valid supplied identifier when available, with its file position as a reference or fallback; escape all uploaded text in feedback
 - Only valid data objects should be saved
 - Current required top-level fields include `phase`, not `material`, unless code is explicitly changed
 - `identifier` is not a required upload field: missing, null, or blank values receive an 8 character lowercase base36 identifier derived from the 24 required fields; collisions with different content extend it one character at a time

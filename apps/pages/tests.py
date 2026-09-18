@@ -1165,8 +1165,8 @@ class JSONDataSharingTests(TestCase):
         )
         messages = [str(message) for message in get_messages(response.wsgi_request)]
         self.assertTrue(any("partially successful" in message for message in messages))
-        self.assertTrue(any("Data object 2" in message for message in messages))
-        self.assertTrue(any("missing required fields" in message for message in messages))
+        self.assertTrue(any("Object 2 in this file" in message for message in messages))
+        self.assertTrue(any('data-upload-category="missing_required"' in message for message in messages))
 
     def test_search_filters_by_phase(self):
         """

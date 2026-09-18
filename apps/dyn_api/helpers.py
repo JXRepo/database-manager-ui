@@ -116,7 +116,7 @@ def _is_empty_required_value(value):
 
 
 
-def validate_json(data):
+def validate_json(data, *, detailed=False):
     """
     Validate JSON objects using required top-level fields only
 
@@ -124,21 +124,32 @@ def validate_json(data):
     ----------
     data : list of dict
         Parsed JSON data objects
+    detailed : bool, optional
+        Return issues grouped by object position and category instead of
+        the existing error strings. Required fields and identifiers are
+        checked together in this mode.
 
     Returns
     -------
     valid_data : list of dict
         Valid objects that contain all required top-level fields
 
-    errors : list of str
-        Validation error messages
+    errors : list of str or list of dict
+        Existing error messages, or issues containing object_index, category,
+        fields, and message when detailed is True
     """
     valid_data = []
     errors = []
 
     for index, obj in enumerate(data, start=1):
         if not isinstance(obj, dict):
-            errors.append(f"Data object {index}: not a valid JSON object")
+            if detailed:
+                errors.append({
+                    "object_index": index, "category": "invalid_structure", "fields": [],
+                    "message": "This data object must be a JSON object.",
+                })
+            else:
+                errors.append(f"Data object {index}: not a valid JSON object")
             continue
 
         missing_fields = []
@@ -150,7 +161,13 @@ def validate_json(data):
             elif _is_empty_required_value(obj.get(field)):
                 empty_fields.append(field)
 
-        if missing_fields or empty_fields:
+        if detailed:
+            for category, fields in (("missing_required", missing_fields), ("empty_values", empty_fields)):
+                if fields:
+                    errors.append({
+                        "object_index": index, "category": category, "fields": fields, "message": "",
+                    })
+        elif missing_fields or empty_fields:
             missing_label = "field" if len(missing_fields) == 1 else "fields"
             empty_label = "field" if len(empty_fields) == 1 else "fields"
 
@@ -183,18 +200,31 @@ def validate_json(data):
         identifier = obj.get("identifier")
         if identifier is not None:
             if not isinstance(identifier, str):
-                errors.append(
-                    f"Data object {index}: identifier must be a text value. "
-                    "Please use a JSON string, or omit identifier to generate one automatically."
-                )
+                if detailed:
+                    errors.append({
+                        "object_index": index, "category": "invalid_identifier", "fields": [],
+                        "message": "Identifier must be a text value.",
+                    })
+                else:
+                    errors.append(
+                        f"Data object {index}: identifier must be a text value. "
+                        "Please use a JSON string, or omit identifier to generate one automatically."
+                    )
                 continue
             if identifier.strip() and identifier != identifier.strip():
-                errors.append(
-                    f"Data object {index}: identifier has leading or trailing whitespace. "
-                    "Please remove the surrounding whitespace and upload the JSON file again."
-                )
+                if detailed:
+                    errors.append({
+                        "object_index": index, "category": "invalid_identifier", "fields": [],
+                        "message": "Identifier has leading or trailing whitespace.",
+                    })
+                else:
+                    errors.append(
+                        f"Data object {index}: identifier has leading or trailing whitespace. "
+                        "Please remove the surrounding whitespace and upload the JSON file again."
+                    )
                 continue
 
-        valid_data.append(obj)
+        if not missing_fields and not empty_fields:
+            valid_data.append(obj)
 
     return valid_data, errors

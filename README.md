@@ -118,6 +118,13 @@ uploaded file is not retained. An upload with both valid and invalid objects can
 save the valid objects and report errors for the others; a resource limit failure
 rejects the submission.
 
+Upload errors follow the selected file order, then the original data object order
+within each file. Each object is identified by its title and supplied identifier
+when available, with its position in the file for reference. Missing fields,
+empty values, identifier problems, and sharing problems appear in separate lists,
+each followed by instructions for that issue. Missing or blank identifiers are
+assigned automatically and are not reported as errors.
+
 ## Search
 
 The main search box and common Advanced Search fields require every whole word
