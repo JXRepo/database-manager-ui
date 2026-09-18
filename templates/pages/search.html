@@ -856,7 +856,7 @@
                         </div>
                       </div>
                       <button type="button" class="btn btn-outline-secondary btn-sm condition-remove" data-remove-condition aria-label="Remove condition {{ forloop.counter }}" hidden>Remove</button>
-                      <span class="condition-hint text-muted small" data-condition-hint {% if not row.array_numeric and not row.unit and not row.simple_text %}hidden{% endif %}>{% if row.simple_text %}All words must appear as whole words, in any order. Case is ignored.{% elif row.unit %}Enter temperature in K (kelvin).{% else %}Matches one number in the array.{% endif %}</span>
+                      <span class="condition-hint text-muted small" data-condition-hint {% if not row.array_numeric and not row.unit %}hidden{% endif %}>{% if row.unit %}Enter temperature in K (kelvin).{% else %}Matches one number in the array.{% endif %}</span>
                       <p class="condition-error text-danger small mb-0" data-condition-error id="condition-{{ forloop.counter }}-error" {% if not row.error %}hidden{% endif %}>{{ row.error }}</p>
                     </fieldset>
                   {% endfor %}

@@ -216,7 +216,7 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     for (const state of states) {
       assert.deepEqual(state, {field: state.field, operator: 'words', options: ['words'],
         hidden: true, disabled: false, compact: true,
-        hint: 'All words must appear as whole words, in any order. Case is ignored.',
+        hint: '',
         submitted: [state.field, 'words', 'orientation-123', '']});
     }
   });

@@ -128,10 +128,8 @@
 
     const hint = row.querySelector('[data-condition-hint]');
     if (hint) {
-      hint.hidden = !simpleText && !metadata.unit && (metadata.fieldType !== 'array' || !numeric);
-      hint.textContent = simpleText
-        ? 'All words must appear as whole words, in any order. Case is ignored.'
-        : metadata.unit ? 'Enter temperature in K (kelvin).' : 'Matches one number in the array.';
+      hint.hidden = !metadata.unit && (metadata.fieldType !== 'array' || !numeric);
+      hint.textContent = metadata.unit ? 'Enter temperature in K (kelvin).' : 'Matches one number in the array.';
       for (const input of [value, upper]) {
         const descriptions = (input.getAttribute('aria-describedby') || '').split(' ')
           .filter(id => id && id !== hint.id);
