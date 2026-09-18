@@ -278,6 +278,9 @@ class MultipleFileField(forms.FileField):
         single_file_clean = super().clean
 
         if isinstance(data, (list, tuple)):
+            if not data:
+                single_file_clean(None, initial)
+                return []
             return [single_file_clean(file_item, initial) for file_item in data]
 
         return [single_file_clean(data, initial)]
@@ -294,6 +297,7 @@ class JSONUploadForm(forms.Form):
     """
 
     file = MultipleFileField(
+        allow_empty_file=True,
         widget=MultipleFileInput(
             attrs={
                 "class": "form-control",

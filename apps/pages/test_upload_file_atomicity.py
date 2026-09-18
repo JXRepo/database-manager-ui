@@ -127,20 +127,20 @@ class UploadFileAtomicityTests(TestCase):
 
     def _assert_file_statuses(self, response, expected):
         """
-        Check ordered file outcomes without assigning errors to unprocessed objects
+        Check every file outcome without assigning errors to successful objects
 
         Parameters
         ----------
         response : HttpResponse
             Upload feedback containing a failed file.
         expected : list of str
-            Expected uploaded, failed, or skipped state for each file.
+            Expected uploaded or failed state for each file.
         """
         files = [node for node in _elements(parse_html(response.content.decode()))
                  if "data-upload-file" in dict(node.attributes)]
         self.assertEqual([dict(node.attributes).get("data-upload-file-status") for node in files], expected)
         for file, status in zip(files, expected):
-            if status in {"uploaded", "skipped"}:
+            if status == "uploaded":
                 self.assertFalse(any("data-upload-object" in dict(node.attributes) for node in _elements(file)))
 
     def test_any_invalid_object_prevents_saving_valid_neighbors(self):
@@ -252,26 +252,27 @@ class UploadFileAtomicityTests(TestCase):
         self.assertFalse(DataNotification.objects.exists())
         self.assertFalse(JSONData.objects.exists())
 
-    def test_processing_stops_at_failed_file_and_preserves_earlier_uploads_and_notifications(self):
+    def test_failed_file_preserves_earlier_uploads_and_notifications_and_allows_later_files(self):
         """
-        Keep a successful file while rejecting the next file and skipping later files
+        Keep successful files on both sides of a rejected file
         """
         first = self._data("Successful first file", "first-file")
         first["shared_with"] = [{"access_type": "c", "username": self.recipient.username}]
         candidate = self._data("Candidate in rejected file", "rejected-candidate")
         invalid = self._data("Invalid object in second file", "invalid-second")
         invalid.pop("phase")
-        later = self._data("Unprocessed later file", "later-file")
+        later = self._data("Successful later file", "later-file")
 
         response = self._upload_files(first, [candidate, invalid], later)
 
-        self.assertEqual(JSONData.objects.count(), 1)
-        stored = JSONData.objects.get()
+        self.assertEqual(JSONData.objects.count(), 2)
+        stored = JSONData.objects.get(data__identifier="first-file")
         self.assertEqual(stored.data, first)
+        self.assertEqual(JSONData.objects.get(data__identifier="later-file").data, later)
         notification = DataNotification.objects.get()
         self.assertEqual(notification.data_object_id, stored.pk)
         self.assertEqual(notification.recipient, self.recipient)
-        self._assert_file_statuses(response, ["uploaded", "failed", "skipped"])
+        self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
 
     def test_duplicate_from_an_earlier_file_rejects_the_whole_current_file(self):
         """
@@ -281,12 +282,14 @@ class UploadFileAtomicityTests(TestCase):
         second = [self._data("Valid neighbor of duplicate", "discarded-neighbor"),
                   self._data("Later conflicting occurrence", "cross-file-id")]
 
-        response = self._upload_files(first, second, self._data("Skipped after duplicate", "skipped-duplicate"))
+        later = self._data("Valid after duplicate", "after-duplicate")
+        response = self._upload_files(first, second, later)
 
-        self.assertEqual(JSONData.objects.count(), 1)
-        self.assertEqual(JSONData.objects.get().data, first)
+        self.assertEqual(JSONData.objects.count(), 2)
+        self.assertEqual(JSONData.objects.get(data__identifier="cross-file-id").data, first)
+        self.assertEqual(JSONData.objects.get(data__identifier="after-duplicate").data, later)
         self.assertContains(response, 'data-upload-category="duplicate_identifier"')
-        self._assert_file_statuses(response, ["uploaded", "failed", "skipped"])
+        self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
 
     def test_generated_and_legacy_digest_duplicates_are_rejected_across_files_in_both_orders(self):
         """
@@ -298,21 +301,21 @@ class UploadFileAtomicityTests(TestCase):
                 fingerprint = data_fingerprint(generated)
                 legacy = dict(generated, identifier=fingerprint)
                 first, second = (generated, legacy) if generated_first else (legacy, generated)
-                later = self._data(f"Skipped after legacy duplicate {generated_first}", f"legacy-skipped-{generated_first}")
+                later = self._data(f"Valid after legacy duplicate {generated_first}", f"legacy-later-{generated_first}")
                 before = JSONData.objects.count()
 
                 response = self._upload_files(first, second, later)
 
-                self.assertEqual(JSONData.objects.count(), before + 1)
+                self.assertEqual(JSONData.objects.count(), before + 2)
                 stored = JSONData.objects.get(data__title=generated["title"])
                 if generated_first:
                     self.assertRegex(stored.data["identifier"], r"^[0-9a-z]{8}$")
                     self.assertEqual(stored.identifier_fingerprint, fingerprint)
                 else:
                     self.assertEqual(stored.data, legacy)
-                self.assertFalse(JSONData.objects.filter(data__identifier=later["identifier"]).exists())
+                self.assertEqual(JSONData.objects.get(data__identifier=later["identifier"]).data, later)
                 self.assertContains(response, 'data-upload-category="duplicate_identifier"')
-                self._assert_file_statuses(response, ["uploaded", "failed", "skipped"])
+                self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
 
     def test_transactional_identifier_conflict_rolls_back_only_the_current_file(self):
         """
@@ -324,27 +327,31 @@ class UploadFileAtomicityTests(TestCase):
         second = [self._data("Candidate before late conflict", "late-candidate"),
                   self._data("Conflict caught during save", "recheck-blocker")]
         with patch("apps.pages.views._identifier_exists", return_value=False):
-            response = self._upload_files(first, second, self._data("Skipped after conflict", "after-recheck"))
+            response = self._upload_files(first, second, self._data("Valid after conflict", "after-recheck"))
 
-        self.assertEqual(JSONData.objects.count(), 2)
-        self.assertEqual(JSONData.objects.get(owner=self.owner).data, first)
+        self.assertEqual(JSONData.objects.count(), 3)
+        self.assertEqual(JSONData.objects.get(data__identifier="before-recheck").data, first)
+        self.assertTrue(JSONData.objects.filter(data__identifier="after-recheck").exists())
+        self.assertFalse(JSONData.objects.filter(data__identifier="late-candidate").exists())
         blocker.refresh_from_db()
         self.assertEqual(blocker.data, original)
         self.assertContains(response, 'data-upload-category="duplicate_identifier"')
-        self._assert_file_statuses(response, ["uploaded", "failed", "skipped"])
+        self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
 
     def test_empty_lists_fail_without_reporting_a_successful_upload(self):
         """
         Reject empty direct and wrapped lists before processing the following file
         """
-        for payload in ([], {"data": []}):
+        for index, payload in enumerate(([], {"data": []})):
             with self.subTest(payload=payload):
-                response = self._upload_files(payload, self._data("Skipped after empty file", "after-empty"))
+                later = self._data(f"Valid after empty file {index}", f"after-empty-{index}")
+                response = self._upload_files(payload, later)
 
-                self.assertFalse(JSONData.objects.exists())
+                self.assertEqual(JSONData.objects.count(), index + 1)
+                self.assertEqual(JSONData.objects.get(data__identifier=later["identifier"]).data, later)
                 self.assertContains(response, 'data-upload-category="empty_file"')
                 self.assertNotContains(response, "Upload successful")
-                self._assert_file_statuses(response, ["failed", "skipped"])
+                self._assert_file_statuses(response, ["failed", "uploaded"])
 
     def test_notification_failure_rolls_back_only_current_file_objects_and_notifications(self):
         """
@@ -386,18 +393,19 @@ class UploadFileAtomicityTests(TestCase):
 
         with patch("apps.pages.upload_services.DataNotification.objects.create", side_effect=create_with_failure) as mocked:
             response = self._upload_files(
-                first, [second_first, second_last], self._data("Skipped after database failure", "notification-third"),
+                first, [second_first, second_last], self._data("Valid after database failure", "notification-third"),
             )
 
         self.assertEqual(mocked.call_count, 3)
-        self.assertEqual(JSONData.objects.count(), 1)
-        stored = JSONData.objects.get()
+        self.assertEqual(JSONData.objects.count(), 2)
+        stored = JSONData.objects.get(data__identifier="notification-first")
         self.assertEqual(stored.data, first)
+        self.assertTrue(JSONData.objects.filter(data__identifier="notification-third").exists())
         notification = DataNotification.objects.get()
         self.assertEqual(notification.data_object_id, stored.pk)
         self.assertEqual(notification.recipient, self.recipient)
         self.assertContains(response, 'data-upload-category="save_error"')
-        self._assert_file_statuses(response, ["uploaded", "failed", "skipped"])
+        self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
 
     def test_storage_quota_rejects_the_current_whole_file_but_keeps_the_previous_file(self):
         """
@@ -405,14 +413,17 @@ class UploadFileAtomicityTests(TestCase):
         """
         first = self._data("First file fits", "quota-first")
         candidate = self._data("First object could fit", "quota-candidate")
+        candidate["description"] = "x" * 1000
         overflow = self._data("Second object exceeds remaining quota", "quota-overflow")
+        later = self._data("Smaller valid file after quota failure", "quota-later")
         quota = canonical_json_size(first) + canonical_json_size(candidate)
         with override_settings(PILOT_MAX_USER_JSON_BYTES=quota):
-            response = self._upload_files(first, [candidate, overflow], self._data("Skipped after quota", "quota-later"))
+            response = self._upload_files(first, [candidate, overflow], later)
 
-        self.assertEqual(JSONData.objects.count(), 1)
-        self.assertEqual(JSONData.objects.get().data, first)
-        self._assert_file_statuses(response, ["uploaded", "failed", "skipped"])
+        self.assertEqual(JSONData.objects.count(), 2)
+        self.assertEqual(JSONData.objects.get(data__identifier="quota-first").data, first)
+        self.assertEqual(JSONData.objects.get(data__identifier="quota-later").data, later)
+        self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
 
     def test_corrected_later_file_can_reuse_its_discarded_identifiers(self):
         """
@@ -423,19 +434,19 @@ class UploadFileAtomicityTests(TestCase):
         expected_identifier = generate_data_identifier(candidate)
         invalid = self._data("Repair later file", "retry-later")
         invalid.pop("software")
-        later = self._data("Unprocessed third file", "retry-skipped")
+        later = self._data("Successful third file", "retry-third")
 
         response = self._upload_files(first, [candidate, invalid], later)
 
-        self.assertEqual(JSONData.objects.count(), 1)
-        self.assertEqual(JSONData.objects.get().data, first)
-        self._assert_file_statuses(response, ["uploaded", "failed", "skipped"])
+        self.assertEqual(JSONData.objects.count(), 2)
+        self.assertEqual(JSONData.objects.get(data__identifier="retry-first").data, first)
+        self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
         invalid["software"] = "Software"
         corrected = self._upload([candidate, invalid])
-        self.assertEqual(JSONData.objects.count(), 3)
+        self.assertEqual(JSONData.objects.count(), 4)
         self.assertEqual(JSONData.objects.get(data__title=candidate["title"]).data["identifier"], expected_identifier)
         self.assertEqual(JSONData.objects.get(data__identifier="retry-later").data, invalid)
-        self.assertFalse(JSONData.objects.filter(data__identifier="retry-skipped").exists())
+        self.assertEqual(JSONData.objects.get(data__identifier="retry-third").data, later)
         self.assertNotContains(corrected, "data-upload-report")
 
     def test_generated_files_with_colliding_previews_extend_identifiers_during_save(self):
@@ -461,3 +472,58 @@ class UploadFileAtomicityTests(TestCase):
             self.assertEqual(stored.identifier_fingerprint, fingerprint)
             self.assertEqual(stored.size_bytes, canonical_json_size(final_data))
         self.assertNotContains(response, "data-upload-report")
+
+    @override_settings(PILOT_RATE_LIMITS={"upload": {"limit": 1000, "window_seconds": 3600}})
+    def test_one_to_five_files_are_all_checked_regardless_of_failure_positions(self):
+        """
+        Process valid files around first, middle, last, and multiple failed files
+        """
+        for count in range(1, 6):
+            failure_sets = {(0,), (count // 2,), (count - 1,), tuple(range(count)), tuple(range(0, count, 2))}
+            for case, failed_indexes in enumerate(sorted(failure_sets)):
+                with self.subTest(count=count, failures=failed_indexes):
+                    payloads = []
+                    expected = []
+                    saved_identifiers = []
+                    for index in range(count):
+                        identifier = f"matrix-{count}-{case}-{index}"
+                        payload = self._data(identifier, identifier)
+                        if index in failed_indexes:
+                            payload.pop("phase")
+                            expected.append("failed")
+                        else:
+                            expected.append("uploaded")
+                            saved_identifiers.append(identifier)
+                        payloads.append(payload)
+                    before = JSONData.objects.count()
+
+                    response = self._upload_files(*payloads)
+
+                    self.assertEqual(JSONData.objects.count(), before + len(saved_identifiers))
+                    self.assertCountEqual(
+                        JSONData.objects.filter(data__identifier__startswith=f"matrix-{count}-{case}-")
+                        .values_list("data__identifier", flat=True), saved_identifiers,
+                    )
+                    self._assert_file_statuses(response, expected)
+                    self.assertNotContains(response, 'data-upload-file-status="skipped"')
+
+    def test_failed_file_identifiers_do_not_block_later_valid_files_in_the_same_request(self):
+        """
+        Reuse supplied and generated candidates from rejected files without false duplicates
+        """
+        for supplied in (True, False):
+            with self.subTest(supplied=supplied):
+                candidate = self._data(f"Reusable candidate {supplied}", "reusable-id" if supplied else None)
+                invalid = self._data(f"Rejected neighbor {supplied}", f"rejected-neighbor-{supplied}")
+                invalid.pop("phase")
+                before = JSONData.objects.count()
+
+                response = self._upload_files([candidate, invalid], candidate)
+
+                self.assertEqual(JSONData.objects.count(), before + 1)
+                stored = JSONData.objects.get(data__title=candidate["title"])
+                if supplied:
+                    self.assertEqual(stored.data, candidate)
+                else:
+                    self.assertRegex(stored.data["identifier"], r"^[0-9a-z]{8}$")
+                self._assert_file_statuses(response, ["failed", "uploaded"])

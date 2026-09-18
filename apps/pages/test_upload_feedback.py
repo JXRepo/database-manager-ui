@@ -168,9 +168,9 @@ class UploadFeedbackTests(TestCase):
         self.assertEqual(len(reports), 1)
         return reports[0]
 
-    def test_mixed_files_preserve_order_and_stop_after_the_failed_file(self):
+    def test_mixed_files_preserve_order_and_report_each_failed_file(self):
         """
-        Keep earlier uploads and report failed objects before later unprocessed files
+        Keep successful uploads and report every failed object in file order
         """
         first = self._data("First invalid object", "first-invalid")
         first.pop("phase")
@@ -182,7 +182,7 @@ class UploadFeedbackTests(TestCase):
         response = self._upload(
             ("z-first.json", saved),
             ("a-second.json", [self._data("Unstored valid neighbor"), first, second]),
-            ("third.json", [third, self._data("Unprocessed valid object", " ")]),
+            ("third.json", [third, self._data("Unstored valid object", " ")]),
         )
         self.assertEqual(JSONData.objects.count(), 1)
         self.assertEqual(JSONData.objects.get().data, saved)
@@ -195,13 +195,14 @@ class UploadFeedbackTests(TestCase):
         self.assertFalse(_marked(files[0], "data-upload-object"))
         failed_objects = _marked(files[1], "data-upload-object")
         self.assertEqual(len(failed_objects), 2)
-        self.assertFalse(_marked(files[2], "data-upload-object"))
-        self.assertFalse(_marked(files[2], "data-upload-category"))
-        self.assertIn("Not uploaded", _text(files[2]))
-        self.assertNotIn("Third invalid object", _text(files[2]))
+        later_objects = _marked(files[2], "data-upload-object")
+        self.assertEqual(len(later_objects), 1)
+        self.assertEqual([dict(file.attributes)["data-upload-file-status"] for file in files],
+                         ["uploaded", "failed", "failed"])
         for node, title, identifier, position in [
             (failed_objects[0], "First invalid object", "first-invalid", 2),
             (failed_objects[1], "Second invalid object", "second-invalid", 3),
+            (later_objects[0], "Third invalid object", "third-invalid", 1),
         ]:
             header = _text(node, header_only=True)
             self.assertLess(header.index(title), header.index(identifier))
@@ -219,15 +220,15 @@ class UploadFeedbackTests(TestCase):
                 content_type="application/json",
             ),
         ]
+        response = self.client.post(reverse("upload_json"), {"file": files}, follow=True)
+        self.assertEqual(response.redirect_chain, [(reverse("upload_json"), 302)])
+        self.assertEqual(JSONData.objects.count(), 0)
+        reports = _marked(self._report(response), "data-upload-file")
+        self.assertEqual(len(reports), 3)
         guidance = []
-        for index, uploaded_file in enumerate(files):
+        for index, (uploaded_file, file_report) in enumerate(zip(files, reports)):
             with self.subTest(filename=uploaded_file.name):
-                response = self.client.post(reverse("upload_json"), {"file": uploaded_file}, follow=True)
-                self.assertEqual(response.redirect_chain, [(reverse("upload_json"), 302)])
-                self.assertEqual(JSONData.objects.count(), 0)
-                reports = _marked(self._report(response), "data-upload-file")
-                self.assertEqual(len(reports), 1)
-                file_report = reports[0]
+                self.assertEqual(dict(file_report.attributes)["data-upload-file-status"], "failed")
                 self.assertIn(uploaded_file.name, _text(file_report))
                 objects = _marked(file_report, "data-upload-object")
                 if index < 2:
@@ -415,3 +416,66 @@ class UploadFeedbackTests(TestCase):
         self.assertEqual(refreshed.status_code, 200)
         self.assertEqual(JSONData.objects.count(), 3)
         self.assertFalse(_marked(parse_html(refreshed.content.decode()), "data-upload-report"))
+
+    def test_every_failed_file_reports_all_object_errors_including_independent_sharing_errors(self):
+        """
+        Collect complete object feedback for multiple failed files in one submission
+        """
+        first = self._data("Missing metadata and invalid identifier", 42)
+        first.pop("phase")
+        first["software"] = ""
+        first["shared_with"] = [{"access_type": "c", "username": "no-such-recipient"}]
+        second = self._data("Another invalid object", "second-invalid")
+        second.pop("creator")
+        third = self._data("Error in later file", "third-invalid")
+        third["rights"] = None
+        fourth = self._data("Another later error", "fourth-invalid")
+        fourth.pop("date")
+
+        response = self._upload(("first-bad.json", [first, second]), ("second-bad.json", [third, fourth]))
+
+        self.assertFalse(JSONData.objects.exists())
+        files = _marked(self._report(response), "data-upload-file")
+        self.assertEqual(len(files), 2)
+        expected = [
+            [(first["title"], {"missing_required", "empty_values", "invalid_identifier", "unknown_share_user"}),
+             (second["title"], {"missing_required"})],
+            [(third["title"], {"empty_values"}), (fourth["title"], {"missing_required"})],
+        ]
+        for file, objects_expected in zip(files, expected):
+            self.assertEqual(dict(file.attributes)["data-upload-file-status"], "failed")
+            objects = _marked(file, "data-upload-object")
+            self.assertEqual(len(objects), 2)
+            for object_report, (title, categories) in zip(objects, objects_expected):
+                self.assertIn(title, _text(object_report, header_only=True))
+                groups = _marked(object_report, "data-upload-category")
+                self.assertEqual({dict(group.attributes)["data-upload-category"] for group in groups}, categories)
+
+    def test_nonfinite_object_does_not_hide_later_object_errors_or_block_later_files(self):
+        """
+        Report later invalid objects after a resource error and save other files
+        """
+        nonfinite = self._data("Nonfinite object", "nonfinite-object")
+        nonfinite["extra"] = float("inf")
+        nonfinite["shared_with"] = [{"access_type": "c", "username": "no-such-recipient"}]
+        missing = self._data("Later missing metadata", "missing-metadata")
+        missing.pop("phase")
+        saved = self._data("Valid later file", "valid-later-file")
+
+        response = self._upload(("bad.json", [nonfinite, missing]), ("good.json", saved))
+
+        self.assertEqual(JSONData.objects.get().data, saved)
+        files = _marked(self._report(response), "data-upload-file")
+        self.assertEqual([dict(file.attributes)["data-upload-file-status"] for file in files],
+                         ["failed", "uploaded"])
+        objects = _marked(files[0], "data-upload-object")
+        self.assertEqual(len(objects), 2)
+        self.assertIn(nonfinite["title"], _text(objects[0], header_only=True))
+        nonfinite_groups = _marked(objects[0], "data-upload-category")
+        self.assertEqual({dict(group.attributes)["data-upload-category"] for group in nonfinite_groups},
+                         {"invalid_number", "unknown_share_user"})
+        self.assertIn(missing["title"], _text(objects[1], header_only=True))
+        groups = _marked(objects[1], "data-upload-category")
+        self.assertEqual([dict(group.attributes)["data-upload-category"] for group in groups],
+                         ["missing_required"])
+        self.assertFalse(_marked(files[1], "data-upload-object"))

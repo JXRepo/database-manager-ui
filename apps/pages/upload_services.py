@@ -24,6 +24,20 @@ class UploadResourceLimitError(Exception):
     Signal that an upload exceeds a request resource limit
     """
 
+    def __init__(self, message: str, *, category: str = "save_error"):
+        """
+        Keep the problem category separate from its user facing message
+
+        Parameters
+        ----------
+        message : str
+            Description of the rejected data or resource limit.
+        category : str, optional
+            Feedback group for errors that affect a single file or object.
+        """
+        self.category = category
+        super().__init__(message)
+
 
 class UploadQuotaExceeded(UploadResourceLimitError):
     """
@@ -187,7 +201,8 @@ def _resolve_generated_identifier(
 
     raise UploadResourceLimitError(
         "Could not allocate a unique identifier. Please provide your own unique "
-        "identifier for this data object and upload it again."
+        "identifier for this data object and upload it again.",
+        category="identifier_allocation",
     )
 
 
@@ -224,15 +239,23 @@ def canonical_json_size(value: object) -> int:
         ).encode("utf-8")
     except UnicodeEncodeError as error:
         raise UploadResourceLimitError(
-            INVALID_UNICODE_UPLOAD_MESSAGE
+            INVALID_UNICODE_UPLOAD_MESSAGE, category="invalid_unicode",
         ) from error
 
     return len(encoded)
 
 
-def validate_upload_files(files: Sequence[UploadedFile]) -> None:
+def validate_upload_files(files: Sequence[UploadedFile], *, check_file_sizes: bool = True) -> None:
     """
     Validate request file count and byte limits before parsing
+
+    Parameters
+    ----------
+    files : sequence of UploadedFile
+        Files included in the submission.
+    check_file_sizes : bool, optional
+        Check individual sizes as well as request limits. The upload view
+        checks individual files separately so one oversized file can be rejected.
     """
     if len(files) > settings.PILOT_MAX_UPLOAD_FILES:
         raise UploadResourceLimitError(
@@ -245,9 +268,10 @@ def validate_upload_files(files: Sequence[UploadedFile]) -> None:
         file_size = uploaded_file.size
         file_name = uploaded_file.name or "Uploaded file"
 
-        if file_size > settings.PILOT_MAX_UPLOAD_FILE_BYTES:
+        if check_file_sizes and file_size > settings.PILOT_MAX_UPLOAD_FILE_BYTES:
             raise UploadResourceLimitError(
-                f"{file_name} exceeds the per file upload size limit."
+                f"{file_name} exceeds the per file upload size limit.",
+                category="file_size",
             )
 
         total_size += file_size
@@ -258,18 +282,26 @@ def validate_upload_files(files: Sequence[UploadedFile]) -> None:
         )
 
 
-def validate_json_depth(value: object) -> None:
+def validate_json_depth(value: object, *, initial_depth: int = 0) -> None:
     """
     Validate JSON container depth and finite numeric values
+
+    Parameters
+    ----------
+    value : object
+        Parsed JSON data to inspect.
+    initial_depth : int, optional
+        Number of surrounding containers when validating an unwrapped object.
     """
-    pending = [(value, 0)]
+    pending = [(value, initial_depth)]
 
     while pending:
         current, parent_depth = pending.pop()
 
         if isinstance(current, float) and not math.isfinite(current):
             raise UploadResourceLimitError(
-                "Uploaded JSON cannot contain nonfinite numeric values."
+                "Uploaded JSON cannot contain nonfinite numeric values.",
+                category="invalid_number",
             )
 
         if not isinstance(current, (dict, list)):
@@ -279,7 +311,8 @@ def validate_json_depth(value: object) -> None:
 
         if current_depth > settings.PILOT_MAX_JSON_DEPTH:
             raise UploadResourceLimitError(
-                "Uploaded JSON exceeds the maximum container depth."
+                "Uploaded JSON exceeds the maximum container depth.",
+                category="json_depth",
             )
 
         if isinstance(current, dict):

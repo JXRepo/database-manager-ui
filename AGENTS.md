@@ -54,8 +54,9 @@ Current priority:
 - Group upload feedback by JSON file, then data object in original order, then issue category; list each affected field separately and give guidance specific to that category
 - Identify an object by its title and valid supplied identifier when available, with its file position as a reference or fallback; escape all uploaded text in feedback
 - Treat each uploaded JSON file as one save unit: any validation, identifier, or sharing error rejects the entire file, with no partial objects or notifications saved
-- Process files in upload order and stop at the first failed file; keep previously successful files and show later files as not uploaded
-- Keep request resource checks before any saves; retain a separate atomic identifier and quota recheck for each file
+- Check every file and every readable data object, collecting independent errors instead of stopping at the first issue; reject invalid files and continue processing the others
+- Show all file results and grouped errors below the upload form after processing finishes; show a busy spinner while submitting and prevent duplicate submissions without disabling the file input
+- Check request file count, total bytes, and total object count before any saves; treat file size and content errors as local to that file, and retain a separate atomic identifier and quota recheck for each file
 - Current required top-level fields include `phase`, not `material`, unless code is explicitly changed
 - `identifier` is not a required upload field: missing, null, or blank values receive an 8 character lowercase base36 identifier derived from the 24 required fields; collisions with different content extend it one character at a time
 - Preserve valid supplied text identifiers; reject malformed values and surrounding whitespace with actionable errors

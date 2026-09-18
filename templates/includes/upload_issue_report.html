@@ -5,10 +5,8 @@
       <p>
         {% if file.status == "uploaded" %}
           Uploaded. {{ file.saved_count }} data object{{ file.saved_count|pluralize }} saved.
-        {% elif file.status == "failed" %}
-          Not uploaded. No data from this file was saved.
         {% else %}
-          Not uploaded. Upload stopped after an earlier file failed.
+          Not uploaded. No data from this file was saved.
         {% endif %}
       </p>
       {% include "includes/upload_issue_groups.html" with groups=file.groups only %}

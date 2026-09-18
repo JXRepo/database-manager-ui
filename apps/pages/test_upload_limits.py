@@ -478,9 +478,9 @@ class UploadResourceViewTests(TestCase):
         self.assertEqual(JSONData.objects.count(), 0)
 
     @override_settings(PILOT_MAX_UPLOAD_FILE_BYTES=2048)
-    def test_file_size_rejection_saves_zero_objects_from_the_request(self):
+    def test_file_size_rejection_preserves_other_valid_files(self):
         """
-        File prechecks prevent an earlier valid file from being persisted
+        Reject an oversized file while saving valid files before and after it
         """
         valid_file = self._json_file(self._valid("first"), "first.json")
         oversized_file = SimpleUploadedFile(
@@ -491,11 +491,19 @@ class UploadResourceViewTests(TestCase):
 
         response = self.client.post(
             reverse("upload_json"),
-            {"file": [valid_file, oversized_file]},
+            {"file": [
+                valid_file,
+                oversized_file,
+                self._json_file(self._valid("last"), "last.json"),
+            ]},
+            follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertCountEqual(
+            JSONData.objects.values_list("data__identifier", flat=True),
+            ["first", "last"],
+        )
         self.assertTrue(any("limit" in message.casefold() for message in self._messages(response)))
 
     @override_settings(
@@ -567,9 +575,10 @@ class UploadResourceViewTests(TestCase):
         response = self.client.post(
             reverse("upload_json"),
             {
-                "file": self._json_file(
-                    [self._valid("valid"), {"identifier": "invalid"}]
-                )
+                "file": [
+                    self._json_file(self._valid("valid"), "first.json"),
+                    self._json_file({"identifier": "invalid"}, "invalid.json"),
+                ]
             },
         )
 
@@ -577,9 +586,9 @@ class UploadResourceViewTests(TestCase):
         self.assertEqual(JSONData.objects.count(), 0)
 
     @override_settings(PILOT_MAX_JSON_DEPTH=3)
-    def test_depth_rejection_rolls_back_other_valid_files(self):
+    def test_depth_rejection_preserves_other_valid_files(self):
         """
-        Excessive depth in a later file rejects every prepared object
+        Excessive depth rejects its file without preventing later uploads
         """
         nested_object = self._valid("too-deep")
         nested_object["extra"] = [[[0]]]
@@ -590,16 +599,23 @@ class UploadResourceViewTests(TestCase):
                 "file": [
                     self._json_file(self._valid("first"), "first.json"),
                     self._json_file(nested_object, "deep.json"),
+                    self._json_file(self._valid("last"), "last.json"),
                 ]
             },
+            follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertCountEqual(
+            JSONData.objects.values_list("data__identifier", flat=True),
+            ["first", "last"],
+        )
+        self.assertContains(response, "deep.json")
+        self.assertContains(response, 'data-upload-file-status="failed"', count=1)
 
-    def test_nonfinite_number_rejects_the_complete_request(self):
+    def test_nonfinite_number_rejects_only_its_complete_file(self):
         """
-        A nonfinite number prevents every object in the batch from saving
+        Reject every object in a nonfinite file and continue other files
         """
         invalid = self._valid("nonfinite")
         invalid["extra"] = float("nan")
@@ -607,14 +623,24 @@ class UploadResourceViewTests(TestCase):
         response = self.client.post(
             reverse("upload_json"),
             {
-                "file": self._json_file(
-                    [self._valid("first"), invalid]
-                )
+                "file": [
+                    self._json_file(self._valid("first"), "first.json"),
+                    self._json_file(
+                        [self._valid("unsaved-neighbor"), invalid],
+                        "nonfinite.json",
+                    ),
+                    self._json_file(self._valid("last"), "last.json"),
+                ]
             },
+            follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertCountEqual(
+            JSONData.objects.values_list("data__identifier", flat=True),
+            ["first", "last"],
+        )
+        self.assertContains(response, 'data-upload-file-status="failed"', count=1)
 
     @patch("apps.pages.views.json.load", side_effect=AssertionError("parsed"))
     @patch("apps.pages.views.consume_rate_limit")
@@ -682,6 +708,46 @@ class UploadResourceViewTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(JSONData.objects.count(), 0)
 
+    def test_empty_file_is_reported_without_blocking_other_valid_files(self):
+        """
+        Reject an empty selected file while uploading the valid files around it
+        """
+        empty_file = SimpleUploadedFile(
+            "empty.json", b"", content_type="application/json",
+        )
+
+        response = self.client.post(
+            reverse("upload_json"),
+            {"file": [
+                self._json_file(self._valid("first"), "first.json"),
+                empty_file,
+                self._json_file(self._valid("last"), "last.json"),
+            ]},
+            follow=True,
+        )
+
+        self.assertCountEqual(
+            JSONData.objects.values_list("data__identifier", flat=True),
+            ["first", "last"],
+        )
+        self.assertEqual(response.redirect_chain, [(reverse("upload_json"), 302)])
+        self.assertContains(response, "empty.json")
+        self.assertContains(response, 'data-upload-report', count=1)
+        self.assertContains(response, 'data-upload-category="invalid_file"', count=1)
+        self.assertContains(response, 'data-upload-file-status="failed"', count=1)
+        self.assertContains(response, 'data-upload-file-status="uploaded"', count=2)
+
+    def test_upload_without_a_selected_file_remains_invalid(self):
+        """
+        Require a file selection even when selected empty files reach validation
+        """
+        response = self.client.post(reverse("upload_json"), {})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["form"].has_error("file", "required"))
+        self.assertFalse(JSONData.objects.exists())
+        self.assertNotContains(response, 'data-upload-report')
+
     def test_invalid_json_is_reported_without_saving(self):
         """
         Invalid JSON input is handled without persisting an object
@@ -733,9 +799,9 @@ class UploadResourceViewTests(TestCase):
         self.assertIn('data-upload-category="invalid_file"', report)
         self.assertIn("This file could not be read as JSON.", report)
 
-    def test_lone_surrogate_value_rejects_the_complete_request(self):
+    def test_lone_surrogate_value_rejects_only_its_complete_file(self):
         """
-        A lone surrogate value leaves earlier prepared objects unsaved
+        A lone surrogate value rejects its neighbors but not other files
         """
         invalid = self._valid("invalid-value")
         invalid["extra"] = "\ud800"
@@ -744,22 +810,29 @@ class UploadResourceViewTests(TestCase):
         response = self.client.post(
             reverse("upload_json"),
             {
-                "file": self._escaped_json_file(
-                    [self._valid("first"), invalid]
-                )
+                "file": [
+                    self._json_file(self._valid("first"), "first.json"),
+                    self._escaped_json_file(
+                        [self._valid("unsaved-neighbor"), invalid],
+                        "surrogate-value.json",
+                    ),
+                    self._json_file(self._valid("last"), "last.json"),
+                ]
             },
+            follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(JSONData.objects.count(), 0)
-        self.assertIn(
-            "Uploaded JSON contains invalid Unicode text.",
-            self._messages(response),
+        self.assertCountEqual(
+            JSONData.objects.values_list("data__identifier", flat=True),
+            ["first", "last"],
         )
+        self.assertContains(response, "invalid Unicode")
+        self.assertContains(response, 'data-upload-file-status="failed"', count=1)
 
-    def test_lone_surrogate_key_rejects_the_complete_request(self):
+    def test_lone_surrogate_key_rejects_only_its_complete_file(self):
         """
-        A lone surrogate key leaves earlier prepared objects unsaved
+        A lone surrogate key rejects its neighbors but not other files
         """
         invalid = self._valid("invalid-key")
         invalid["\ud800"] = "value"
@@ -768,18 +841,25 @@ class UploadResourceViewTests(TestCase):
         response = self.client.post(
             reverse("upload_json"),
             {
-                "file": self._escaped_json_file(
-                    [self._valid("first"), invalid]
-                )
+                "file": [
+                    self._json_file(self._valid("first"), "first.json"),
+                    self._escaped_json_file(
+                        [self._valid("unsaved-neighbor"), invalid],
+                        "surrogate-key.json",
+                    ),
+                    self._json_file(self._valid("last"), "last.json"),
+                ]
             },
+            follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(JSONData.objects.count(), 0)
-        self.assertIn(
-            "Uploaded JSON contains invalid Unicode text.",
-            self._messages(response),
+        self.assertCountEqual(
+            JSONData.objects.values_list("data__identifier", flat=True),
+            ["first", "last"],
         )
+        self.assertContains(response, "invalid Unicode")
+        self.assertContains(response, 'data-upload-file-status="failed"', count=1)
 
     @patch("apps.pages.views._identifier_exists", return_value=False)
     def test_transactional_identifier_recheck_rolls_back_the_file(
@@ -821,11 +901,13 @@ class UploadResourceViewTests(TestCase):
         self.assertTrue(any("late-conflict" in message for message in messages))
 
     @patch("apps.pages.views.json.load")
-    def test_json_recursion_error_rejects_the_complete_request(self, load_mock):
+    def test_json_recursion_error_preserves_other_valid_files(self, load_mock):
         """
-        Parser recursion failure rolls back objects prepared from earlier files
+        Parser recursion failure rejects its file and processing continues
         """
-        load_mock.side_effect = [self._valid("first"), RecursionError]
+        load_mock.side_effect = [
+            self._valid("first"), RecursionError, self._valid("last")
+        ]
 
         response = self.client.post(
             reverse("upload_json"),
@@ -833,12 +915,19 @@ class UploadResourceViewTests(TestCase):
                 "file": [
                     self._json_file(self._valid("first"), "first.json"),
                     self._json_file(self._valid("recursive"), "recursive.json"),
+                    self._json_file(self._valid("last"), "last.json"),
                 ]
             },
+            follow=True,
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertCountEqual(
+            JSONData.objects.values_list("data__identifier", flat=True),
+            ["first", "last"],
+        )
+        self.assertEqual(load_mock.call_count, 3)
+        self.assertContains(response, 'data-upload-file-status="failed"', count=1)
 
     @override_settings(PILOT_MAX_USER_JSON_BYTES=50 * 1024 * 1024)
     def test_quota_rejection_saves_zero_new_objects(self):

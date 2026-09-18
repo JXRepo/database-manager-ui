@@ -433,18 +433,20 @@ class UploadIdentifierTests(TestCase):
         self.assertIn('data-upload-category="duplicate_identifier"', message)
         self.assertEqual(JSONData.objects.get().identifier_fingerprint, self.example_fingerprint)
 
-    def test_explicit_duplicates_reject_the_file_and_stop_later_files(self):
+    def test_explicit_duplicates_reject_the_file_without_reserving_ids_for_later_files(self):
         """
-        Reject a file with repeated identifiers and leave the next file unprocessed
+        Reject a file with repeated identifiers while allowing the next valid file
         """
         payload = dict(self.data, identifier="explicit-duplicate")
         response = self._upload([payload, payload], payload)
-        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.get().data, payload)
         message = self._messages(response)
         self.assertIn("file-1.json", message)
         self.assertIn("Object 2 in this file", message)
         self.assertIn("file-2.json", message)
-        self.assertIn("Not uploaded", message)
+        self.assertIn('data-upload-file-status="uploaded"', message)
+        self.assertNotIn('data-upload-file-status="skipped"', message)
         self.assertNotIn("Object 1 in this file", message)
 
     def test_explicit_duplicate_across_files_preserves_the_earlier_upload(self):

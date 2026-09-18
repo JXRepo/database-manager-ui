@@ -1080,8 +1080,9 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     const bootstrap = readFileSync(join(__dirname, '../../static/assets/css/plugins/bootstrap.min.css'), 'utf8');
     const evaluate = await page(t, '', 390);
     const html = `<style>${bootstrap}${styles}</style><div class="pc-content" style="margin:15px">
+      <div id="upload-results">
       <div class="alert alert-danger">file.json data object 2: identifier "${'a'.repeat(64)}"
-      already exists. Please remove the duplicate.</div></div>`;
+      already exists. Please remove the duplicate.</div></div></div>`;
     const layout = await evaluate(`(() => {
       document.body.innerHTML = ${JSON.stringify(html)};
       const alert = document.querySelector('.alert');

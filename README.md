@@ -117,16 +117,27 @@ Each data object becomes a separate `JSONData` record, but a JSON file is saved
 only when every object in it passes validation. An error in any object rejects
 the whole file, including its other valid objects. The original file is not retained.
 
-Files are saved in the selected order. At the first failed file, uploading stops:
-earlier successful files remain saved and later files are marked as not uploaded.
-The result lists each file's status, with detailed errors for the failed file.
-Fix that file and select it with the remaining files to retry; do not resend files
-that already succeeded. A file's final identifier conflict, quota failure, or
-database save error also rejects that whole file and stops later files.
+Every file is checked in the selected order, including files after a failure.
+Within each readable file, validation examines every data object and collects
+independent field, identifier, and sharing errors. Finding an error prevents that
+file from being saved but does not stop checking its remaining objects.
+
+After processing finishes, results below the upload form show every file's status
+and all detected errors grouped by file and data object. Fix and resubmit only
+failed files; successful files remain saved. A final identifier conflict, quota
+failure, or database save error also rejects that whole file while other files
+continue. Failed files do not reserve identifiers or consume storage quota.
+
+While submitting, the Upload button shows a spinner and the page displays
+"Uploading and checking files…". Duplicate submissions and changes to the selected
+files are blocked until the result loads. Returning with the browser's Back button
+restores the controls.
 
 Request resource checks run before any files are saved. Exceeding the file count,
-file size, combined size, object count, or JSON depth limits rejects the submission;
-unsupported numeric or Unicode values detected during preparation do so as well.
+combined size, or total object count limits rejects the submission. File size,
+JSON syntax, depth, unsupported numeric values, and invalid Unicode errors reject
+the affected file while the remaining files continue. Invalid syntax can prevent
+the objects inside that file from being read and checked.
 
 Upload errors follow the selected file order, then the original data object order
 within each file. Each object is identified by its title and supplied identifier
@@ -328,7 +339,7 @@ Duplicates are not overwritten; errors identify the filename, object number,
 and identifier, with instructions to remove the duplicate or supply another
 identifier for a distinct object. Any duplicate rejects its entire file,
 including duplicates found during the final transactional recheck. Previously
-successful files stay saved, and later files are not uploaded. Distinct content
+successful files stay saved, and later files continue to be checked. Distinct content
 with an automatically generated short ID is extended instead of rejected.
 
 Generated identifiers are part of the stored JSON, its quota size, and exported

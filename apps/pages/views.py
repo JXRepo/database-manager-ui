@@ -69,6 +69,11 @@ UPLOAD_ISSUE_CATEGORIES = (
     ("invalid_file", "Invalid JSON file", "Correct the JSON syntax in this file before uploading it again."),
     ("invalid_structure", "Invalid JSON structure", "Use a JSON object, a list of objects, or an object containing a data list."),
     ("empty_file", "No data objects", "Add at least one data object to this file."),
+    ("file_size", "File size limit", "Reduce the file size or split its data objects into smaller JSON files."),
+    ("json_depth", "Too many nested levels", "Reduce the nesting of JSON objects and lists."),
+    ("invalid_number", "Invalid numeric values", "Replace NaN and Infinity with finite JSON numbers."),
+    ("invalid_unicode", "Invalid text encoding", "Replace invalid text characters and save the file as UTF-8 JSON."),
+    ("identifier_allocation", "Identifier could not be assigned", "Provide a unique text identifier for this data object."),
     ("missing_required", "Missing required fields", "Add each listed field to this data object."),
     ("empty_values", "Empty values", "Enter a value for each listed field. Null, blank text, and empty lists or objects count as empty."),
     ("invalid_identifier", "Invalid identifier", "Use a text identifier without surrounding spaces, or remove it to have one assigned automatically."),
@@ -893,13 +898,143 @@ def _create_shared_data_notification(data_object, actor, recipient):
     )
 
 
+def _upload_label(value):
+    """
+    Return a text label that remains printable when an upload has invalid Unicode
+
+    Parameters
+    ----------
+    value : object
+        Uploaded title, identifier, or filename.
+
+    Returns
+    -------
+    str
+        Printable text, or an empty string for a nontext value.
+    """
+    if not isinstance(value, str):
+        return ""
+    return value.encode("utf-8", errors="replace").decode("utf-8")
+
+
+def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identifiers):
+    """
+    Inspect every object and collect independent issues before saving a file
+
+    Parameters
+    ----------
+    objects : list
+        Unwrapped data objects in their original order.
+    owner : User
+        User uploading the file.
+    file_report : dict
+        File feedback to populate with object errors.
+    object_depth : int
+        Number of surrounding JSON containers removed while unwrapping.
+    saved_identifiers : set of str
+        Identifiers and fingerprints from successfully saved files in this request.
+
+    Returns
+    -------
+    tuple
+        Prepared objects and their reports, indexed by the preview identifier.
+    """
+    valid_objects, errors = validate_json(objects, detailed=True)
+    valid_object_ids = {id(obj) for obj in valid_objects}
+    for position, obj in enumerate(objects, start=1):
+        title = obj.get("title") if isinstance(obj, dict) else None
+        identifier = obj.get("identifier") if isinstance(obj, dict) else None
+        file_report["objects"].append({
+            "position": position,
+            "title": _upload_label(title).strip(),
+            "identifier": _upload_label(identifier) if isinstance(identifier, str) and identifier == identifier.strip() else "",
+            "issues": {},
+        })
+
+    for error in errors:
+        object_report = file_report["objects"][error["object_index"] - 1]
+        _add_upload_issue(object_report["issues"], error["category"], error["message"], fields=error["fields"])
+
+    seen_identifiers = set()
+    pending_objects = []
+    prepared_objects = []
+    prepared_reports = {}
+    for obj, object_report in zip(objects, file_report["objects"]):
+        content_error = False
+        size_bytes = 0
+        try:
+            validate_json_depth(obj, initial_depth=object_depth)
+            size_bytes = canonical_json_size(obj)
+        except UploadResourceLimitError as error:
+            _add_upload_issue(object_report["issues"], error.category, str(error))
+            content_error = True
+        if not isinstance(obj, dict):
+            continue
+
+        access_type, shared_users = "c", []
+        try:
+            if content_error:
+                shared_with = obj.get("shared_with", [])
+                validate_json_depth(shared_with, initial_depth=object_depth + 1)
+                canonical_json_size(shared_with)
+            access_type, shared_users, access_issues = _resolve_upload_access_metadata(obj, owner)
+            for category, issue in access_issues:
+                _add_upload_issue(object_report["issues"], category, issue)
+        except UploadResourceLimitError as error:
+            if error.category not in object_report["issues"]:
+                _add_upload_issue(object_report["issues"], error.category, str(error))
+
+        identifier = obj.get("identifier")
+        supplied = (
+            isinstance(identifier, str) and bool(identifier.strip())
+            and identifier == identifier.strip() and _upload_label(identifier) == identifier
+        )
+        fingerprint = ""
+        if not supplied:
+            if content_error or id(obj) not in valid_object_ids:
+                continue
+            fingerprint = data_fingerprint(obj)
+            try:
+                identifier = generate_data_identifier(obj, pending_objects)
+            except UploadResourceLimitError as error:
+                _add_upload_issue(object_report["issues"], error.category, str(error))
+                continue
+            obj["identifier"] = identifier
+            size_bytes = canonical_json_size(obj)
+
+        if identifier in seen_identifiers or (supplied and identifier in saved_identifiers):
+            _add_upload_issue(
+                object_report["issues"], "duplicate_identifier",
+                f'Identifier "{identifier}" is used more than once in this upload.',
+            )
+        elif _identifier_exists(identifier):
+            _add_upload_issue(
+                object_report["issues"], "duplicate_identifier",
+                f'Identifier "{identifier}" already exists.',
+            )
+
+        seen_identifiers.add(identifier)
+        if fingerprint:
+            seen_identifiers.add(fingerprint)
+        candidate = PreparedJSONData(
+            data=obj, access_type=access_type, shared_users=tuple(shared_users),
+            size_bytes=size_bytes, identifier_fingerprint=fingerprint,
+        )
+        pending_objects.append(candidate)
+        if not object_report["issues"]:
+            prepared_objects.append(candidate)
+            prepared_reports[identifier] = object_report
+
+    return prepared_objects, prepared_reports
+
+
 @login_required
 def upload_json_view(request):
     """
-    Save each JSON file completely and stop at the first failed file
+    Check every uploaded file and save only files whose objects all pass
 
-    Check request resource limits before saving anything. Each file then uses
-    its own transaction, so earlier successful files survive a later failure.
+    Check request resource limits before saving anything. Each file uses its
+    own transaction, and failures do not stop checking the remaining files.
 
     Parameters
     ----------
@@ -927,30 +1062,31 @@ def upload_json_view(request):
         if form.is_valid():
             uploaded_files = form.cleaned_data["file"]
             upload_files = []
-            prepared_files = []
+            parsed_files = []
             raw_object_count = 0
 
             try:
-                validate_upload_files(uploaded_files)
+                validate_upload_files(uploaded_files, check_file_sizes=False)
 
                 for uploaded_file in uploaded_files:
-                    file_name = uploaded_file.name or "Uploaded file"
+                    file_name = _upload_label(uploaded_file.name) or "Uploaded file"
                     file_report = {
                         "name": file_name, "issues": {}, "objects": [],
-                        "status": "skipped", "saved_count": 0,
+                        "status": "failed", "saved_count": 0,
                     }
                     upload_files.append(file_report)
-                    seen_identifiers = set()
-                    prepared_object_reports = {}
-                    prepared_objects = []
-                    prepared_files.append((file_report, prepared_objects, prepared_object_reports))
-
                     try:
+                        validate_upload_files([uploaded_file])
                         payload = json.load(uploaded_file)
-                    except RecursionError as error:
-                        raise UploadResourceLimitError(
-                            "Uploaded JSON exceeds the maximum container depth."
-                        ) from error
+                    except UploadResourceLimitError as error:
+                        _add_upload_issue(file_report["issues"], error.category, str(error))
+                        continue
+                    except RecursionError:
+                        _add_upload_issue(
+                            file_report["issues"], "json_depth",
+                            "Uploaded JSON exceeds the maximum container depth.",
+                        )
+                        continue
                     except ValueError:
                         _add_upload_issue(
                             file_report["issues"],
@@ -959,15 +1095,19 @@ def upload_json_view(request):
                         )
                         continue
 
-                    validate_json_depth(payload)
-
                     if isinstance(payload, list):
                         objects = payload
+                        object_depth = 1
+                        wrapper = []
                     elif isinstance(payload, dict):
                         if isinstance(payload.get("data"), list):
                             objects = payload["data"]
+                            object_depth = 2
+                            wrapper = dict(payload, data=[])
                         else:
                             objects = [payload]
+                            object_depth = 0
+                            wrapper = None
                     else:
                         _add_upload_issue(
                             file_report["issues"],
@@ -975,6 +1115,13 @@ def upload_json_view(request):
                             "This file does not contain a data object or a list of data objects.",
                         )
                         continue
+
+                    if wrapper is not None:
+                        try:
+                            validate_json_depth(wrapper)
+                            canonical_json_size(wrapper)
+                        except UploadResourceLimitError as error:
+                            _add_upload_issue(file_report["issues"], error.category, str(error))
 
                     raw_object_count += len(objects)
 
@@ -990,83 +1137,7 @@ def upload_json_view(request):
                         )
                         continue
 
-                    valid_objects, errors = validate_json(objects, detailed=True)
-                    object_indexes = {}
-
-                    for object_index, obj in enumerate(objects, start=1):
-                        title = obj.get("title") if isinstance(obj, dict) else None
-                        identifier = obj.get("identifier") if isinstance(obj, dict) else None
-                        object_report = {
-                            "position": object_index,
-                            "title": title.strip() if isinstance(title, str) else "",
-                            "identifier": identifier if isinstance(identifier, str) and identifier == identifier.strip() else "",
-                            "issues": {},
-                        }
-                        file_report["objects"].append(object_report)
-                        if isinstance(obj, dict):
-                            object_indexes[id(obj)] = object_index
-
-                    for error in errors:
-                        object_report = file_report["objects"][error["object_index"] - 1]
-                        _add_upload_issue(
-                            object_report["issues"], error["category"],
-                            error["message"], fields=error["fields"],
-                        )
-
-                    for obj in valid_objects:
-                        object_index = object_indexes.get(id(obj), 1)
-                        object_report = file_report["objects"][object_index - 1]
-                        identifier = obj.get("identifier")
-                        fingerprint = ""
-                        if identifier is None or not identifier.strip():
-                            fingerprint = data_fingerprint(obj)
-                            identifier = generate_data_identifier(obj, prepared_objects)
-                            obj["identifier"] = identifier
-                        if identifier in seen_identifiers:
-                            _add_upload_issue(
-                                object_report["issues"],
-                                "duplicate_identifier",
-                                f'Identifier "{identifier}" is used more than once in this upload.',
-                            )
-                            continue
-
-                        if _identifier_exists(identifier):
-                            _add_upload_issue(
-                                object_report["issues"],
-                                "duplicate_identifier",
-                                f'Identifier "{identifier}" already exists.',
-                            )
-                            continue
-
-                        access_type, shared_users, access_issues = (
-                            _resolve_upload_access_metadata(
-                                obj,
-                                request.user,
-                            )
-                        )
-
-                        if access_issues:
-                            for category, issue in access_issues:
-                                _add_upload_issue(
-                                    object_report["issues"],
-                                    category,
-                                    issue,
-                                )
-                            continue
-
-                        prepared_objects.append(
-                            PreparedJSONData(
-                                data=obj,
-                                access_type=access_type,
-                                shared_users=tuple(shared_users),
-                                size_bytes=canonical_json_size(obj),
-                                identifier_fingerprint=fingerprint,
-                            )
-                        )
-                        prepared_object_reports[identifier] = object_report
-                        seen_identifiers.add(identifier)
-                        if fingerprint:
-                            seen_identifiers.add(fingerprint)
+                    parsed_files.append((file_report, objects, object_depth))
 
             except UploadResourceLimitError as error:
                 messages.error(request, "Upload failed.")
@@ -1076,18 +1147,12 @@ def upload_json_view(request):
             uploaded_file_count = 0
             total_created_count = 0
             saved_identifiers = set()
-            for file_report, prepared_objects, prepared_object_reports in prepared_files:
-                file_report["status"] = "failed"
-                for prepared in prepared_objects:
-                    identifier = prepared.data["identifier"]
-                    if not prepared.identifier_fingerprint and identifier in saved_identifiers:
-                        _add_upload_issue(
-                            prepared_object_reports[identifier]["issues"],
-                            "duplicate_identifier",
-                            f'Identifier "{identifier}" is used more than once in this upload.',
-                        )
+            for file_report, objects, object_depth in parsed_files:
+                prepared_objects, prepared_object_reports = _prepare_upload_file(
+                    objects, request.user, file_report, object_depth, saved_identifiers,
+                )
                 if file_report["issues"] or any(obj["issues"] for obj in file_report["objects"]):
-                    break
+                    continue
 
                 try:
                     saved_objects = save_prepared_json_data(request.user, prepared_objects)
@@ -1098,16 +1163,16 @@ def upload_json_view(request):
                             object_report["issues"], "duplicate_identifier",
                             f'Identifier "{identifier}" or the same data already exists.',
                         )
-                    break
+                    continue
                 except UploadQuotaExceeded as error:
                     _add_upload_issue(file_report["issues"], "storage_limit", str(error))
-                    break
+                    continue
                 except UploadResourceLimitError as error:
-                    _add_upload_issue(file_report["issues"], "save_error", str(error))
-                    break
+                    _add_upload_issue(file_report["issues"], error.category, str(error))
+                    continue
                 except DatabaseError:
                     _add_upload_issue(file_report["issues"], "save_error", "The service could not save this file.")
-                    break
+                    continue
 
                 file_report["status"] = "uploaded"
                 file_report["saved_count"] = len(saved_objects)
@@ -1121,12 +1186,12 @@ def upload_json_view(request):
             upload_issue_messages = _get_upload_issue_messages(upload_files)
 
             if upload_issue_messages:
-                skipped_count = len(upload_files) - uploaded_file_count - 1
+                failed_count = len(upload_files) - uploaded_file_count
                 add_message = messages.warning if uploaded_file_count else messages.error
                 add_message(
                     request,
-                    f"Upload stopped: {uploaded_file_count} file(s) uploaded, "
-                    f"1 file failed, {skipped_count} file(s) not uploaded.",
+                    f"Upload finished: {uploaded_file_count} file(s) uploaded, "
+                    f"{failed_count} file(s) failed.",
                 )
                 for issue in upload_issue_messages:
                     add_message(request, issue)
