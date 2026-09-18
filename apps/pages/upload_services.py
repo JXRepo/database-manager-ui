@@ -286,6 +286,9 @@ def validate_json_depth(value: object, *, initial_depth: int = 0) -> None:
     """
     Validate JSON container depth and finite numeric values
 
+    Iterators retain only the current path through nested containers, avoiding
+    a separate work item for every value in a large numerical array.
+
     Parameters
     ----------
     value : object
@@ -293,10 +296,15 @@ def validate_json_depth(value: object, *, initial_depth: int = 0) -> None:
     initial_depth : int, optional
         Number of surrounding containers when validating an unwrapped object.
     """
-    pending = [(value, initial_depth)]
+    pending = [(iter((value,)), initial_depth)]
 
     while pending:
-        current, parent_depth = pending.pop()
+        children, parent_depth = pending[-1]
+        try:
+            current = next(children)
+        except StopIteration:
+            pending.pop()
+            continue
 
         if isinstance(current, float) and not math.isfinite(current):
             raise UploadResourceLimitError(
@@ -320,8 +328,7 @@ def validate_json_depth(value: object, *, initial_depth: int = 0) -> None:
         else:
             children = current
 
-        for child in children:
-            pending.append((child, current_depth))
+        pending.append((iter(children), current_depth))
 
 
 def save_prepared_json_data(

@@ -59,6 +59,8 @@ Current priority:
 - Keep one multipart submission and all batch prechecks, stream real file results in order after each atomic save, and retain ordinary form submission as a fallback; never simulate progress or retry automatically after a connection failure
 - Prevent duplicate submissions without disabling the file input; retain confirmed results after an interrupted response and mark unfinished files as unconfirmed
 - Check request file count, total bytes, and total object count before any saves; treat file size and content errors as local to that file, and retain a separate atomic identifier and quota recheck for each file
+- Upload allowances are 5 files, 100 MiB per file, 250 MiB combined, and 1,000 objects per submission; stored JSON quota is 5 GiB per user, with depth 100 and 20 submissions per hourly window unchanged
+- Release parsed JSON after each file's batch precheck and process one file at a time; application allowances do not guarantee the current hosting plan's capacity
 - Current required top-level fields include `phase`, not `material`, unless code is explicitly changed
 - `identifier` is not a required upload field: missing, null, or blank values receive an 8 character lowercase base36 identifier derived from the 24 required fields; collisions with different content extend it one character at a time
 - Preserve valid supplied text identifiers; reject malformed values and surrounding whitespace with actionable errors

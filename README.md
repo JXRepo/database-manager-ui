@@ -66,28 +66,37 @@ on the hosted website; deploying the code does not copy them to the cloud.
 - Registration and login submissions are rate limited. Repeated attempts can
   temporarily block further submissions.
 
-### Pilot Capacity
+### Upload and Storage Limits
 
 The application currently enforces these limits:
 
 | Item | Limit |
 | --- | --- |
 | JSON files per upload submission | 5 |
-| Size of each file | 10 MiB |
-| Combined file size per submission | 25 MiB |
-| Data objects per submission | 100 |
+| Size of each file | 100 MiB |
+| Combined file size per submission | 250 MiB |
+| Data objects per submission | 1,000 |
 | JSON container depth | 100 |
-| Stored JSON per user | 50 MiB |
+| Stored JSON per user | 5 GiB |
 | Upload attempts per user | 20 per hourly window |
 
-One MiB is 1,048,576 bytes. The per-user storage quota counts compact UTF-8 JSON,
+One MiB is 1,048,576 bytes; one GiB is 1,024 MiB.
+The per-user storage quota counts compact UTF-8 JSON,
 not the size of the original files. It is a limit on currently stored data, not
 a monthly allowance. Deleting your records frees your personal quota. Failed
 upload submissions also count toward the upload rate limit.
 
-The settings above are application limits, defined in
-[`config/settings.py`](config/settings.py). They are separate from the hosting
-providers' free plan limits. As of September 2026:
+These are initial application allowances, defined in
+[`config/settings.py`](config/settings.py), rather than verified capacity for
+the current hosting plan. There is no quota expansion request feature yet.
+Large JSON files expand in memory during parsing; production deployment needs
+enough worker memory, temporary disk space, and database storage for the actual
+data and concurrent users.
+
+### Current Pilot Hosting
+
+The hosted pilot's infrastructure is separate from the application allowances
+above. As of September 2026:
 
 - [Supabase Free](https://supabase.com/pricing) provides a 500 MB database shared
   by the whole website. Accounts, indexes, and other database content use part of
@@ -147,6 +156,10 @@ combined size, or total object count limits rejects the submission. File size,
 JSON syntax, depth, unsupported numeric values, and invalid Unicode errors reject
 the affected file while the remaining files continue. Invalid syntax can prevent
 the objects inside that file from being read and checked.
+
+The server reads each file to count objects before saving, releases that parsed
+data, then reads the current file again for validation and its atomic save.
+It does not retain the parsed JSON for the entire submission at once.
 
 Upload errors follow the selected file order, then the original data object order
 within each file. Each object is identified by its title and supplied identifier
@@ -263,8 +276,9 @@ beyond the latest 20, and refreshes with the list every ten seconds while the
 page is visible. Individual feed rows omit the repeated Public badge.
 It is not filtered by the search form. Longer feeds
 scroll within the panel rather than stretching each card.
-This pilot searches stored JSON in the application; it is not intended for large
-scale indexed search.
+Search scans stored JSON one record at a time and retains display summaries for
+matches rather than every original payload. It still reads the accessible data
+in the application; this is not an indexed search designed for large datasets.
 
 ## Access Rules
 

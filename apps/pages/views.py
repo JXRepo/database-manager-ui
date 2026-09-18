@@ -1028,7 +1028,70 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
     return prepared_objects, prepared_reports
 
 
-def _process_upload_file(owner, file_report, objects, object_depth, saved_identifiers):
+def _inspect_upload_file(uploaded_file, file_report):
+    """
+    Count one file's objects without retaining its parsed data for later files
+
+    Request limits need the total object count before any save. Parsing in
+    this function releases each file's data when its inspection returns.
+
+    Parameters
+    ----------
+    uploaded_file : UploadedFile
+        File to inspect before processing the submission.
+    file_report : dict
+        File report receiving syntax, structure, or resource errors.
+
+    Returns
+    -------
+    tuple or None
+        Object count and original container depth, or None for an unreadable
+        or empty file.
+    """
+    try:
+        validate_upload_files([uploaded_file])
+        payload = json.load(uploaded_file)
+    except UploadResourceLimitError as error:
+        _add_upload_issue(file_report["issues"], error.category, str(error))
+        return None
+    except RecursionError:
+        _add_upload_issue(
+            file_report["issues"], "json_depth",
+            "Uploaded JSON exceeds the maximum container depth.",
+        )
+        return None
+    except ValueError:
+        _add_upload_issue(file_report["issues"], "invalid_file", "This file could not be read as JSON.")
+        return None
+
+    if isinstance(payload, list):
+        objects, object_depth, wrapper = payload, 1, None
+    elif isinstance(payload, dict):
+        if isinstance(payload.get("data"), list):
+            objects, object_depth = payload["data"], 2
+            wrapper = dict(payload, data=[])
+        else:
+            objects, object_depth, wrapper = [payload], 0, None
+    else:
+        _add_upload_issue(
+            file_report["issues"], "invalid_structure",
+            "This file does not contain a data object or a list of data objects.",
+        )
+        return None
+
+    if wrapper is not None:
+        try:
+            validate_json_depth(wrapper)
+            canonical_json_size(wrapper)
+        except UploadResourceLimitError as error:
+            _add_upload_issue(file_report["issues"], error.category, str(error))
+    if not objects:
+        _add_upload_issue(file_report["issues"], "empty_file", "This file contains no data objects.")
+        return None
+    return len(objects), object_depth
+
+
+def _process_upload_file(owner, file_report, uploaded_file, object_depth, saved_identifiers):
     """
     Validate one complete file and record the outcome of its atomic save
 
@@ -1041,13 +1104,21 @@ def _process_upload_file(owner, file_report, objects, object_depth, saved_identi
         Authenticated uploader.
     file_report : dict
         File status and grouped issues to update.
-    objects : list
-        Parsed data objects in file order.
+    uploaded_file : UploadedFile
+        Inspected file to read again for validation and saving.
     object_depth : int
         Surrounding containers removed during unwrapping.
     saved_identifiers : set of str
         Identifiers and fingerprints committed earlier in this submission.
     """
+    uploaded_file.seek(0)
+    payload = json.load(uploaded_file)
+    if object_depth == 0:
+        objects = [payload]
+    elif object_depth == 1:
+        objects = payload
+    else:
+        objects = payload["data"]
     prepared_objects, prepared_object_reports = _prepare_upload_file(
         objects, owner, file_report, object_depth, saved_identifiers,
     )
@@ -1094,7 +1165,7 @@ def _upload_progress(upload_files, parsed_files, owner):
     upload_files : list of dict
         Reports for all selected files, including files that could not be parsed.
     parsed_files : dict
-        File indexes mapped to their objects and original container depth.
+        File indexes mapped to uploaded files and original container depth.
     owner : User
         Authenticated uploader.
 
@@ -1107,8 +1178,8 @@ def _upload_progress(upload_files, parsed_files, owner):
     for index, file_report in enumerate(upload_files):
         yield {"type": "file_start", "index": index}
         if index in parsed_files:
-            objects, object_depth = parsed_files[index]
-            _process_upload_file(owner, file_report, objects, object_depth, saved_identifiers)
+            uploaded_file, object_depth = parsed_files.pop(index)
+            _process_upload_file(owner, file_report, uploaded_file, object_depth, saved_identifiers)
         yield {
             "type": "file_result", "index": index,
             "status": file_report["status"], "saved_count": file_report["saved_count"],
@@ -1196,69 +1267,16 @@ def upload_json_view(request):
                         "status": "failed", "saved_count": 0,
                     }
                     upload_files.append(file_report)
-                    try:
-                        validate_upload_files([uploaded_file])
-                        payload = json.load(uploaded_file)
-                    except UploadResourceLimitError as error:
-                        _add_upload_issue(file_report["issues"], error.category, str(error))
+                    inspection = _inspect_upload_file(uploaded_file, file_report)
+                    if inspection is None:
                         continue
-                    except RecursionError:
-                        _add_upload_issue(
-                            file_report["issues"], "json_depth",
-                            "Uploaded JSON exceeds the maximum container depth.",
-                        )
-                        continue
-                    except ValueError:
-                        _add_upload_issue(
-                            file_report["issues"],
-                            "invalid_file",
-                            "This file could not be read as JSON.",
-                        )
-                        continue
-
-                    if isinstance(payload, list):
-                        objects = payload
-                        object_depth = 1
-                        wrapper = []
-                    elif isinstance(payload, dict):
-                        if isinstance(payload.get("data"), list):
-                            objects = payload["data"]
-                            object_depth = 2
-                            wrapper = dict(payload, data=[])
-                        else:
-                            objects = [payload]
-                            object_depth = 0
-                            wrapper = None
-                    else:
-                        _add_upload_issue(
-                            file_report["issues"],
-                            "invalid_structure",
-                            "This file does not contain a data object or a list of data objects.",
-                        )
-                        continue
-
-                    if wrapper is not None:
-                        try:
-                            validate_json_depth(wrapper)
-                            canonical_json_size(wrapper)
-                        except UploadResourceLimitError as error:
-                            _add_upload_issue(file_report["issues"], error.category, str(error))
-
-                    raw_object_count += len(objects)
-
+                    object_count, object_depth = inspection
+                    raw_object_count += object_count
                     if raw_object_count > settings.PILOT_MAX_UPLOAD_OBJECTS:
                         raise UploadResourceLimitError(
                             "The upload exceeds the maximum number of JSON data objects."
                         )
-
-                    if not objects:
-                        _add_upload_issue(
-                            file_report["issues"], "empty_file",
-                            "This file contains no data objects.",
-                        )
-                        continue
-
-                    parsed_files[index] = (objects, object_depth)
+                    parsed_files[index] = (uploaded_file, object_depth)
 
             except UploadResourceLimitError as error:
                 if stream_requested:
@@ -2441,55 +2459,58 @@ def search_view(request):
     if not search_performed or search_errors:
         data_objects = data_objects.none()
 
-    for obj in data_objects:
+    for obj in data_objects.iterator(chunk_size=1):
         data = obj.data if isinstance(obj.data, dict) else {}
-
-        specifically_shared = (
-            obj.owner_id != request.user.id
-            and obj.access_type != "all"
-            and any(user.pk == request.user.pk for user in obj.shared_users.all())
-        )
-        if access == "public" and obj.access_type != "all":
-            continue
-        if access == "my_data" and obj.owner_id != request.user.id:
-            continue
-        if access == "my_private":
-            if not (obj.owner_id == request.user.id and obj.access_type == "c"):
+        try:
+            specifically_shared = (
+                obj.owner_id != request.user.id
+                and obj.access_type != "all"
+                and any(user.pk == request.user.pk for user in obj.shared_users.all())
+            )
+            if access == "public" and obj.access_type != "all":
                 continue
-        if access == "shared_with_me" and not specifically_shared:
-            continue
-
-        if keyword_terms:
-            if specifically_shared:
-                access_text = "shared with me"
-            elif obj.owner_id == request.user.id and obj.access_type == "c":
-                access_text = "my private"
-            elif obj.access_type == "all":
-                access_text = "public"
-            else:
-                access_text = "shared"
-            full_text = _build_basic_search_text(obj, access_text)
-            if not matches_whole_words((full_text,), keyword_terms):
+            if access == "my_data" and obj.owner_id != request.user.id:
+                continue
+            if access == "my_private":
+                if not (obj.owner_id == request.user.id and obj.access_type == "c"):
+                    continue
+            if access == "shared_with_me" and not specifically_shared:
                 continue
 
-        common_match = True
-        for field, terms in common_terms.items():
-            if not terms:
-                continue
-            if field == "owner":
-                value = obj.owner.username
-            elif field == "creator":
-                value = [data.get("creator"), data.get("creator_affiliation")]
-            else:
-                value = data.get(field)
-            text = _normalize_search_value(value)
-            if not matches_whole_words((text,), terms):
-                common_match = False
-                break
-        if not common_match or not matches_conditions(data, conditions):
-            continue
+            if keyword_terms:
+                if specifically_shared:
+                    access_text = "shared with me"
+                elif obj.owner_id == request.user.id and obj.access_type == "c":
+                    access_text = "my private"
+                elif obj.access_type == "all":
+                    access_text = "public"
+                else:
+                    access_text = "shared"
+                full_text = _build_basic_search_text(obj, access_text)
+                if not matches_whole_words((full_text,), keyword_terms):
+                    continue
 
-        filtered_objects.append(_prepare_list_object(obj))
+            common_match = True
+            for field, terms in common_terms.items():
+                if not terms:
+                    continue
+                if field == "owner":
+                    value = obj.owner.username
+                elif field == "creator":
+                    value = [data.get("creator"), data.get("creator_affiliation")]
+                else:
+                    value = data.get(field)
+                text = _normalize_search_value(value)
+                if not matches_whole_words((text,), terms):
+                    common_match = False
+                    break
+            if not common_match or not matches_conditions(data, conditions):
+                continue
+
+            filtered_objects.append(_prepare_list_object(obj))
+        finally:
+            # prefetch caches can retain skipped objects until garbage collection
+            obj.data = {"identifier": data.get("identifier")}
 
     filtered_objects.sort(key=lambda obj: obj.access_type != "all")
 

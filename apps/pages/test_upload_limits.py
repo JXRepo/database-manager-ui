@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -28,13 +29,75 @@ class UploadServiceBoundaryTests(TestCase):
 
     def _file_with_size(self, name, size):
         """
-        Build a real uploaded file with an exact byte size
+        Supply file metadata without allocating the reported number of bytes
+
+        Parameters
+        ----------
+        name : str
+            Filename used in validation messages.
+        size : int
+            Byte size reported to the resource validator.
+
+        Returns
+        -------
+        SimpleNamespace
+            Metadata consumed by the file resource validator.
         """
-        return SimpleUploadedFile(
-            name,
-            b"x" * size,
-            content_type="application/json",
-        )
+        return SimpleNamespace(name=name, size=size)
+
+    def test_default_file_limit_accepts_five_and_rejects_six(self):
+        """
+        The platform accepts five files and rejects a sixth by default
+        """
+        files = [self._file_with_size(f"{index}.json", 1) for index in range(6)]
+
+        validate_upload_files(files[:5])
+
+        with self.assertRaises(UploadResourceLimitError):
+            validate_upload_files(files)
+
+    def test_default_file_size_accepts_one_hundred_mebibytes(self):
+        """
+        A file at the platform size boundary passes without an override
+        """
+        validate_upload_files([
+            self._file_with_size("exact.json", 100 * 1024 * 1024),
+        ])
+
+    def test_default_file_size_rejects_one_byte_over_one_hundred_mebibytes(self):
+        """
+        A file exceeding the platform boundary reports a file size error
+        """
+        with self.assertRaises(UploadResourceLimitError) as context:
+            validate_upload_files([
+                self._file_with_size("over.json", 100 * 1024 * 1024 + 1),
+            ])
+
+        self.assertEqual(context.exception.category, "file_size")
+
+    def test_default_request_size_accepts_two_hundred_fifty_mebibytes(self):
+        """
+        Five files can together reach the platform submission boundary
+        """
+        files = [
+            self._file_with_size(f"{index}.json", 50 * 1024 * 1024)
+            for index in range(5)
+        ]
+
+        validate_upload_files(files)
+
+    def test_default_request_size_rejects_one_byte_over_boundary(self):
+        """
+        Individually valid files cannot exceed the combined byte boundary
+        """
+        files = [
+            self._file_with_size(f"{index}.json", 50 * 1024 * 1024)
+            for index in range(5)
+        ]
+        files[-1].size += 1
+
+        with self.assertRaisesMessage(UploadResourceLimitError, "combined"):
+            validate_upload_files(files)
 
     def _nested_containers(self, depth):
         """
@@ -229,6 +292,45 @@ class PreparedUploadSaveTests(TestCase):
 
         self.assertEqual(len(saved_objects), 1)
         self.assertEqual(saved_objects[0].size_bytes, 17)
+
+    def test_default_quota_accepts_exactly_five_gibibytes(self):
+        """
+        Stored data and a new object can together reach five gibibytes
+        """
+        limit = 5 * 1024 * 1024 * 1024
+        JSONData.objects.create(
+            owner=self.owner,
+            data={"identifier": "existing"},
+            size_bytes=limit - 17,
+        )
+
+        saved_objects = save_prepared_json_data(
+            self.owner, [self._prepared("quota-boundary", size_bytes=17)],
+        )
+
+        self.assertEqual(len(saved_objects), 1)
+        self.assertEqual(saved_objects[0].size_bytes, 17)
+        self.assertEqual(JSONData.objects.count(), 2)
+
+    def test_default_quota_rejects_one_byte_over_five_gibibytes(self):
+        """
+        Reject the whole file when its total exceeds the stored quota
+        """
+        JSONData.objects.create(
+            owner=self.owner,
+            data={"identifier": "existing"},
+            size_bytes=5 * 1024 * 1024 * 1024 - 1,
+        )
+        objects = [
+            self._prepared("would-fit"),
+            self._prepared("exceeds-quota", shared_users=(self.recipient,)),
+        ]
+
+        with self.assertRaises(UploadQuotaExceeded):
+            save_prepared_json_data(self.owner, objects)
+
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertFalse(DataNotification.objects.exists())
 
     @override_settings(PILOT_MAX_USER_JSON_BYTES=50 * 1024 * 1024)
     def test_quota_accepts_exactly_fifty_mebibytes(self):
@@ -453,6 +555,47 @@ class UploadResourceViewTests(TestCase):
             str(message)
             for message in get_messages(response.wsgi_request)
         ]
+
+    def test_default_object_limit_accepts_one_thousand_across_five_files(self):
+        """
+        Save every object when five valid files reach the default batch limit
+        """
+        files = [
+            self._json_file(
+                [self._valid(f"object-{start + index}") for index in range(200)],
+                f"objects-{start}.json",
+            )
+            for start in range(0, 1000, 200)
+        ]
+
+        response = self.client.post(reverse("upload_json"), {"file": files})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(JSONData.objects.count(), 1000)
+        self.assertTrue(JSONData.objects.filter(data__identifier="object-999").exists())
+
+    def test_default_object_limit_rejects_one_thousand_and_one_before_saving(self):
+        """
+        A final extra object rejects every file before a save is attempted
+        """
+        files = [
+            self._json_file(
+                [self._valid(f"object-{index}") for index in range(1000)],
+                "first-thousand.json",
+            ),
+            self._json_file(self._valid("last-object"), "one-too-many.json"),
+        ]
+
+        with patch("apps.pages.views.save_prepared_json_data") as save_mock:
+            response = self.client.post(reverse("upload_json"), {"file": files})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(any(
+            "maximum number of JSON data objects" in message
+            for message in self._messages(response)
+        ))
+        save_mock.assert_not_called()
+        self.assertFalse(JSONData.objects.exists())
 
     @override_settings(PILOT_MAX_UPLOAD_FILES=5)
     def test_file_count_rejection_saves_zero_objects(self):
@@ -906,7 +1049,8 @@ class UploadResourceViewTests(TestCase):
         Parser recursion failure rejects its file and processing continues
         """
         load_mock.side_effect = [
-            self._valid("first"), RecursionError, self._valid("last")
+            self._valid("first"), RecursionError, self._valid("last"),
+            self._valid("first"), self._valid("last"),
         ]
 
         response = self.client.post(
@@ -926,7 +1070,7 @@ class UploadResourceViewTests(TestCase):
             JSONData.objects.values_list("data__identifier", flat=True),
             ["first", "last"],
         )
-        self.assertEqual(load_mock.call_count, 3)
+        self.assertEqual(load_mock.call_count, 5)
         self.assertContains(response, 'data-upload-file-status="failed"', count=1)
 
     @override_settings(PILOT_MAX_USER_JSON_BYTES=50 * 1024 * 1024)
