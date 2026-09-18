@@ -4,7 +4,9 @@
   align-items: center;
   justify-content: center;
 
-  height: 110px;
+  min-height: 300px;
+  padding: 24px;
+  gap: 12px;
 
   border: 1.5px dashed #cbd5e1;
   border-radius: 12px;
@@ -56,21 +58,24 @@
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center;
-  gap: 8px;
-  max-width: 90%;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 #file-text {
   display: flex;
   flex-direction: column !important;
   align-items: center;
-  gap: 4px;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
   max-width: 100%;
   text-align: left;
 }
 
 .selected-file-name {
-  max-width: 380px;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
