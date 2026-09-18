@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.conf import settings
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.models import User
@@ -1028,6 +1028,126 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
     return prepared_objects, prepared_reports
 
 
+def _process_upload_file(owner, file_report, objects, object_depth, saved_identifiers):
+    """
+    Validate one complete file and record the outcome of its atomic save
+
+    Invalid files retain their grouped issues. Only committed records reserve
+    identifiers for the next file in the submission.
+
+    Parameters
+    ----------
+    owner : User
+        Authenticated uploader.
+    file_report : dict
+        File status and grouped issues to update.
+    objects : list
+        Parsed data objects in file order.
+    object_depth : int
+        Surrounding containers removed during unwrapping.
+    saved_identifiers : set of str
+        Identifiers and fingerprints committed earlier in this submission.
+    """
+    prepared_objects, prepared_object_reports = _prepare_upload_file(
+        objects, owner, file_report, object_depth, saved_identifiers,
+    )
+    if file_report["issues"] or any(obj["issues"] for obj in file_report["objects"]):
+        return
+
+    try:
+        saved_objects = save_prepared_json_data(owner, prepared_objects)
+    except UploadIdentifierConflict as error:
+        for identifier in error.identifiers:
+            object_report = prepared_object_reports[identifier]
+            _add_upload_issue(
+                object_report["issues"], "duplicate_identifier",
+                f'Identifier "{identifier}" or the same data already exists.',
+            )
+        return
+    except UploadQuotaExceeded as error:
+        _add_upload_issue(file_report["issues"], "storage_limit", str(error))
+        return
+    except UploadResourceLimitError as error:
+        _add_upload_issue(file_report["issues"], error.category, str(error))
+        return
+    except DatabaseError:
+        _add_upload_issue(file_report["issues"], "save_error", "The service could not save this file.")
+        return
+
+    file_report["status"] = "uploaded"
+    file_report["saved_count"] = len(saved_objects)
+    for data_object in saved_objects:
+        saved_identifiers.add(data_object.data["identifier"])
+        if data_object.identifier_fingerprint:
+            saved_identifiers.add(data_object.identifier_fingerprint)
+
+
+def _upload_progress(upload_files, parsed_files, owner):
+    """
+    Process files in order and yield progress around each complete save
+
+    Both ordinary form posts and streaming responses consume this iterator.
+    The final event contains escaped feedback without changing the session.
+
+    Parameters
+    ----------
+    upload_files : list of dict
+        Reports for all selected files, including files that could not be parsed.
+    parsed_files : dict
+        File indexes mapped to their objects and original container depth.
+    owner : User
+        Authenticated uploader.
+
+    Yields
+    ------
+    dict
+        A start event, a confirmed result, or the completed submission report.
+    """
+    saved_identifiers = set()
+    for index, file_report in enumerate(upload_files):
+        yield {"type": "file_start", "index": index}
+        if index in parsed_files:
+            objects, object_depth = parsed_files[index]
+            _process_upload_file(owner, file_report, objects, object_depth, saved_identifiers)
+        yield {
+            "type": "file_result", "index": index,
+            "status": file_report["status"], "saved_count": file_report["saved_count"],
+        }
+
+    uploaded_count = sum(file["status"] == "uploaded" for file in upload_files)
+    failed_count = len(upload_files) - uploaded_count
+    if failed_count:
+        summary = f"Upload finished: {uploaded_count} file(s) uploaded, {failed_count} file(s) failed."
+        level = "warning" if uploaded_count else "error"
+    else:
+        saved_count = sum(file["saved_count"] for file in upload_files)
+        summary = f"Upload successful: {saved_count} data object(s) saved from {uploaded_count} file(s)."
+        level = "success"
+    reports = _get_upload_issue_messages(upload_files)
+    yield {
+        "type": "complete", "summary": summary, "level": level,
+        "report_html": reports[0] if reports else "",
+    }
+
+
+def _stream_upload_progress(events):
+    """
+    Encode each real upload event as one newline delimited JSON record
+
+    Parameters
+    ----------
+    events : iterator of dict
+        File processing events followed by the final report.
+
+    Yields
+    ------
+    str
+        One JSON event ready for the streaming response.
+    """
+    for event in events:
+        yield json.dumps(event) + "\n"
+
+
 @login_required
 def upload_json_view(request):
     """
@@ -1043,9 +1163,10 @@ def upload_json_view(request):
 
     Returns
     -------
-    HttpResponse
-        Rendered upload page or redirect after success
+    HttpResponse or StreamingHttpResponse
+        Ordinary form results or live progress for a supporting browser.
     """
+    stream_requested = request.headers.get("Accept") == "application/x-ndjson"
     if request.method == "POST":
         try:
             decision = consume_rate_limit("upload", str(request.user.pk))
@@ -1062,13 +1183,13 @@ def upload_json_view(request):
         if form.is_valid():
             uploaded_files = form.cleaned_data["file"]
             upload_files = []
-            parsed_files = []
+            parsed_files = {}
             raw_object_count = 0
 
             try:
                 validate_upload_files(uploaded_files, check_file_sizes=False)
 
-                for uploaded_file in uploaded_files:
+                for index, uploaded_file in enumerate(uploaded_files):
                     file_name = _upload_label(uploaded_file.name) or "Uploaded file"
                     file_report = {
                         "name": file_name, "issues": {}, "objects": [],
@@ -1137,78 +1258,36 @@ def upload_json_view(request):
                         )
                         continue
 
-                    parsed_files.append((file_report, objects, object_depth))
+                    parsed_files[index] = (objects, object_depth)
 
             except UploadResourceLimitError as error:
+                if stream_requested:
+                    return JsonResponse({"error": str(error)}, status=400)
                 messages.error(request, "Upload failed.")
                 messages.error(request, str(error))
                 return render(request, "pages/upload.html", {"form": form})
 
-            uploaded_file_count = 0
-            total_created_count = 0
-            saved_identifiers = set()
-            for file_report, objects, object_depth in parsed_files:
-                prepared_objects, prepared_object_reports = _prepare_upload_file(
-                    objects, request.user, file_report, object_depth, saved_identifiers,
-                )
-                if file_report["issues"] or any(obj["issues"] for obj in file_report["objects"]):
-                    continue
-
-                try:
-                    saved_objects = save_prepared_json_data(request.user, prepared_objects)
-                except UploadIdentifierConflict as error:
-                    for identifier in error.identifiers:
-                        object_report = prepared_object_reports[identifier]
-                        _add_upload_issue(
-                            object_report["issues"], "duplicate_identifier",
-                            f'Identifier "{identifier}" or the same data already exists.',
-                        )
-                    continue
-                except UploadQuotaExceeded as error:
-                    _add_upload_issue(file_report["issues"], "storage_limit", str(error))
-                    continue
-                except UploadResourceLimitError as error:
-                    _add_upload_issue(file_report["issues"], error.category, str(error))
-                    continue
-                except DatabaseError:
-                    _add_upload_issue(file_report["issues"], "save_error", "The service could not save this file.")
-                    continue
-
-                file_report["status"] = "uploaded"
-                file_report["saved_count"] = len(saved_objects)
-                uploaded_file_count += 1
-                total_created_count += len(saved_objects)
-                for data_object in saved_objects:
-                    saved_identifiers.add(data_object.data["identifier"])
-                    if data_object.identifier_fingerprint:
-                        saved_identifiers.add(data_object.identifier_fingerprint)
-
-            upload_issue_messages = _get_upload_issue_messages(upload_files)
-
-            if upload_issue_messages:
-                failed_count = len(upload_files) - uploaded_file_count
-                add_message = messages.warning if uploaded_file_count else messages.error
-                add_message(
-                    request,
-                    f"Upload finished: {uploaded_file_count} file(s) uploaded, "
-                    f"{failed_count} file(s) failed.",
-                )
-                for issue in upload_issue_messages:
-                    add_message(request, issue)
-
-            elif total_created_count > 0:
-                messages.success(
-                    request,
-                    (
-                        "Upload successful: "
-                        f"{total_created_count} data object(s) saved from {uploaded_file_count} file(s)."
-                    ),
+            events = _upload_progress(upload_files, parsed_files, request.user)
+            if stream_requested:
+                return StreamingHttpResponse(
+                    _stream_upload_progress(events),
+                    content_type="application/x-ndjson",
+                    headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
                 )
 
+            for event in events:
+                if event["type"] == "complete":
+                    add_message = getattr(messages, event["level"])
+                    add_message(request, event["summary"])
+                    if event["report_html"]:
+                        add_message(request, event["report_html"])
             return redirect("upload_json")
 
-
-
+        if stream_requested:
+            errors = []
+            for field_errors in form.errors.values():
+                errors.extend(str(error) for error in field_errors)
+            return JsonResponse({"error": " ".join(errors)}, status=400)
     else:
         form = JSONUploadForm()
 

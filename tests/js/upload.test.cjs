@@ -69,16 +69,39 @@ describe('upload controls in Chromium', {skip: !existsSync(chromiumPath), timeou
     const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
     t.after(() => send('Target.closeTarget', {targetId}));
     const evaluate = async expression => {
-      const response = await send('Runtime.evaluate', {expression, returnByValue: true}, sessionId);
+      const response = await send('Runtime.evaluate', {expression, returnByValue: true, awaitPromise: true}, sessionId);
       if (response.exceptionDetails) throw new Error(response.exceptionDetails.text);
       return response.result.value;
     };
     const template = readFileSync(join(__dirname, '../../templates/pages/upload.html'), 'utf8');
     const form = template.match(/<form id="uploadForm"[\s\S]*?<\/form>/)[0]
       .replace(/{%[\s\S]*?%}|{{[\s\S]*?}}/g, '');
-    await evaluate(`document.body.innerHTML = ${JSON.stringify(form)};
+    await evaluate(`document.body.innerHTML = ${JSON.stringify(form + '<div id="upload-results"></div>')};
       window.alerts = [];
       window.alert = message => window.alerts.push(message);
+      window.requests = [];
+      window.fetch = async (url, options) => {
+        requests.push({url, options});
+        if (window.responseOverride) return window.responseOverride;
+        return new Response(new ReadableStream({start(controller) {
+          window.uploadStream = controller;
+        }}), {headers: {'Content-Type': 'application/x-ndjson'}});
+      };
+      window.flush = () => new Promise(resolve => setTimeout(resolve, 0));
+      window.waitForIdle = async () => {
+        const deadline = Date.now() + 2000;
+        while (document.getElementById('uploadForm').getAttribute('aria-busy') === 'true') {
+          if (Date.now() > deadline) throw new Error('Upload did not finish');
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+      };
+      window.deliver = async (events, close = false) => {
+        uploadStream.enqueue(new TextEncoder().encode(events.map(event => JSON.stringify(event) + '\\n').join('')));
+        if (close) uploadStream.close();
+        await flush();
+      };
+      window.rowStates = () => [...document.querySelectorAll('.selected-file-status')].map(row => row.textContent);
+      window.activeSpinners = () => [...document.querySelectorAll('.selected-file-spinner')].filter(spinner => !spinner.hidden).length;
       window.selectFiles = names => {
         const transfer = new DataTransfer();
         names.forEach(name => transfer.items.add(new File(['{}'], name, {type: 'application/json'})));
@@ -105,30 +128,32 @@ describe('upload controls in Chromium', {skip: !existsSync(chromiumPath), timeou
   test('an empty submit keeps controls usable and gives clear guidance', async t => {
     const evaluate = await page(t);
     const result = await evaluate(`({
-      submitted: submit(), disabled: uploadButton.disabled, spinnerHidden: uploadSpinner.hidden,
+      submitted: submit(), disabled: uploadButton.disabled, requests: requests.length,
       message: uploadStatus.textContent, messageHidden: uploadStatus.hidden,
     })`);
     assert.equal(result.submitted, false);
     assert.equal(result.disabled, false);
-    assert.equal(result.spinnerHidden, true);
+    assert.equal(result.requests, 0);
     assert.equal(result.messageHidden, false);
     assert.equal(result.message, 'Choose at least one JSON file to upload.');
     assert.deepEqual(await evaluate(`selectFiles(['selected.json']);
       ({messageHidden: uploadStatus.hidden, submitted: submit(), disabled: uploadButton.disabled})`),
-    {messageHidden: true, submitted: true, disabled: true});
+    {messageHidden: true, submitted: false, disabled: true});
   });
 
-  test('a valid submit shows progress and keeps every selected file in the multipart data', async t => {
+  test('one multipart request retains every file and waits for real server progress', async t => {
     const evaluate = await page(t);
     const result = await evaluate(`selectFiles(['first.json', 'second.json']);
-      ({submitted: submit(), disabled: uploadButton.disabled, spinnerHidden: uploadSpinner.hidden,
+      ({submitted: submit(), disabled: uploadButton.disabled, spinners: activeSpinners(),
         label: uploadButtonLabel.textContent, status: uploadStatus.textContent,
         busy: uploadForm.getAttribute('aria-busy'), inputDisabled: document.getElementById('file-input').disabled,
-        files: new FormData(uploadForm).getAll('file').map(file => file.name)})`);
+        files: requests[0]?.options.body.getAll('file').map(file => file.name),
+        accept: requests[0]?.options.headers.Accept, rows: rowStates(), requests: requests.length})`);
     assert.deepEqual(result, {
-      submitted: true, disabled: true, spinnerHidden: false, label: 'Uploading…',
-      status: 'Uploading and checking files…', busy: 'true', inputDisabled: false,
-      files: ['first.json', 'second.json'],
+      submitted: false, disabled: true, spinners: 0, label: 'Uploading…',
+      status: 'Sending files…', busy: 'true', inputDisabled: false,
+      files: ['first.json', 'second.json'], accept: 'application/x-ndjson',
+      rows: ['Waiting', 'Waiting'], requests: 1,
     });
   });
 
@@ -153,21 +178,125 @@ describe('upload controls in Chromium', {skip: !existsSync(chromiumPath), timeou
     });
   });
 
-  test('returning through the browser cache resets progress and preserves the file selection', async t => {
+  test('server events advance one file at a time and show the final report below the form', async t => {
+    const evaluate = await page(t);
+    await evaluate(`selectFiles(['first.json', 'bad.json', 'last.json']); submit(); flush()`);
+    assert.deepEqual(await evaluate(`deliver([{type:'file_start',index:0}]).then(() => ({rows:rowStates(),spinners:activeSpinners()}))`), {
+      rows: ['Processing', 'Waiting', 'Waiting'], spinners: 1,
+    });
+    assert.deepEqual(await evaluate(`deliver([{type:'file_result',index:0,status:'uploaded',saved_count:2},{type:'file_start',index:1}]).then(() => ({rows:rowStates(),spinners:activeSpinners()}))`), {
+      rows: ['Uploaded', 'Processing', 'Waiting'], spinners: 1,
+    });
+    assert.deepEqual(await evaluate(`deliver([{type:'file_result',index:1,status:'failed',saved_count:0},{type:'file_start',index:2}]).then(() => ({rows:rowStates(),spinners:activeSpinners(),report:document.getElementById('upload-results').textContent}))`), {
+      rows: ['Uploaded', 'Failed', 'Processing'], spinners: 1, report: '',
+    });
+    const final = await evaluate(`deliver([{type:'file_result',index:2,status:'uploaded',saved_count:1},
+      {type:'complete',summary:'2 uploaded, 1 failed.',level:'warning',report_html:'<p>Missing: phase</p>'}],true)
+      .then(() => ({rows:rowStates(),spinners:activeSpinners(),report:document.getElementById('upload-results').textContent,
+        busy:uploadForm.getAttribute('aria-busy'),disabled:uploadButton.disabled,repeat:submit(),requests:requests.length}))`);
+    assert.deepEqual(final, {rows: ['Uploaded', 'Failed', 'Uploaded'], spinners: 0,
+      report: '2 uploaded, 1 failed.Missing: phase', busy: 'false', disabled: true, repeat: false, requests: 1});
+    assert.deepEqual(await evaluate(`selectFiles(['new.json']); ({disabled:uploadButton.disabled,rows:rowStates()})`), {
+      disabled: false, rows: ['Waiting'],
+    });
+  });
+
+  test('decoding keeps UTF-8 and JSON intact across arbitrary stream chunks', async t => {
+    const evaluate = await page(t);
+    await evaluate(`selectFiles(['unicode.json']); submit(); flush()`);
+    await evaluate(`(async () => {
+      const events = [{type:'file_start',index:0},{type:'file_result',index:0,status:'uploaded',saved_count:1},
+        {type:'complete',summary:'Uploaded 日本語 <img src=x>.',level:'success',report_html:''}];
+      const bytes = new TextEncoder().encode(events.map(event => JSON.stringify(event) + '\\n').join(''));
+      for (const byte of bytes) uploadStream.enqueue(new Uint8Array([byte]));
+      uploadStream.close(); await flush();
+    })()`);
+    assert.deepEqual(await evaluate(`({text:document.getElementById('upload-results').textContent,images:document.querySelectorAll('img').length,rows:rowStates()})`), {
+      text: 'Uploaded 日本語 <img src=x>.', images: 0, rows: ['Uploaded'],
+    });
+  });
+
+  test('a disconnected stream retains confirmed results and never retries automatically', async t => {
+    const evaluate = await page(t);
+    await evaluate(`selectFiles(['saved.json','unknown.json','waiting.json']); submit(); flush()`);
+    await evaluate(`deliver([{type:'file_start',index:0},{type:'file_result',index:0,status:'uploaded',saved_count:1},{type:'file_start',index:1}])`);
+    const result = await evaluate(`uploadStream.error(new Error('offline')); flush().then(() => ({rows:rowStates(),
+      spinners:activeSpinners(),message:uploadStatus.textContent,disabled:uploadButton.disabled,repeat:submit(),requests:requests.length}))`);
+    assert.deepEqual(result.rows, ['Uploaded', 'Unconfirmed', 'Unconfirmed']);
+    assert.equal(result.spinners, 0);
+    assert.match(result.message, /Check My Data before/);
+    assert.equal(result.disabled, true);
+    assert.equal(result.repeat, false);
+    assert.equal(result.requests, 1);
+  });
+
+  for (const scenario of ['early complete', 'out of order', 'truncated', 'duplicate result', 'after complete']) {
+    test(`an invalid stream (${scenario}) cannot display a successful final report`, async t => {
+      const evaluate = await page(t);
+      await evaluate(`selectFiles(['first.json','second.json']); submit(); flush()`);
+      const events = {
+        'early complete': [{type:'complete',summary:'Success',level:'success',report_html:''}],
+        'out of order': [{type:'file_start',index:1}],
+        'truncated': [{type:'file_start',index:0}],
+        'duplicate result': [{type:'file_start',index:0},{type:'file_result',index:0,status:'uploaded',saved_count:1},{type:'file_result',index:0,status:'uploaded',saved_count:1}],
+        'after complete': [{type:'file_start',index:0},{type:'file_result',index:0,status:'uploaded',saved_count:1},
+          {type:'file_start',index:1},{type:'file_result',index:1,status:'uploaded',saved_count:1},
+          {type:'complete',summary:'Success',level:'success',report_html:''},{type:'file_start',index:0}],
+      }[scenario];
+      const result = await evaluate(`deliver(${JSON.stringify(events)},true).then(() => ({message:uploadStatus.textContent,
+        report:document.getElementById('upload-results').textContent,spinners:activeSpinners(),disabled:uploadButton.disabled}))`);
+      assert.match(result.message, /Check My Data before/);
+      assert.equal(result.report, '');
+      assert.equal(result.spinners, 0);
+      assert.equal(result.disabled, true);
+    });
+  }
+
+  for (const [code, message] of [[400, 'Too many data objects.'], [403, 'Reload this page'], [429, 'Too many upload attempts'], [503, 'temporarily unavailable']]) {
+    test(`HTTP ${code} gives clear guidance without displaying an error page`, async t => {
+      const evaluate = await page(t);
+      const result = await evaluate(`responseOverride = new Response(${JSON.stringify(code === 400 ? JSON.stringify({error: message}) : '<script>alert(1)</script>')},
+        {status:${code},headers:{'Content-Type':${JSON.stringify(code === 400 ? 'application/json' : 'text/html')}}});
+        selectFiles(['one.json']); submit(); waitForIdle().then(() => ({message:uploadStatus.textContent,rows:rowStates(),
+          scripts:document.getElementById('upload-results').querySelectorAll('script').length,requests:requests.length}))`);
+      assert.ok(result.message.includes(message), result.message);
+      assert.deepEqual(result.rows, [code === 503 ? 'Unconfirmed' : 'Not uploaded']);
+      if (code === 503) assert.match(result.message, /Check My Data before/);
+      assert.equal(result.scripts, 0);
+      assert.equal(result.requests, 1);
+    });
+  }
+
+  test('an expired session shows sign-in guidance instead of rendering login HTML', async t => {
+    const evaluate = await page(t);
+    const result = await evaluate(`responseOverride = new Response('<h1>Login</h1>',{headers:{'Content-Type':'text/html'}});
+      Object.defineProperty(responseOverride,'redirected',{value:true}); selectFiles(['one.json']); submit();
+      flush().then(() => ({message:uploadStatus.textContent,rows:rowStates(),report:document.getElementById('upload-results').textContent}))`);
+    assert.match(result.message, /Sign in again/);
+    assert.deepEqual(result.rows, ['Not uploaded']);
+    assert.equal(result.report, '');
+  });
+
+  test('unsupported streaming falls back to native submission before any fetch', async t => {
+    const evaluate = await page(t);
+    const result = await evaluate(`window.ReadableStream = undefined; selectFiles(['native.json']);
+      ({submitted:submit(),requests:requests.length,disabled:uploadButton.disabled,inputDisabled:document.getElementById('file-input').disabled})`);
+    assert.deepEqual(result, {submitted:true,requests:0,disabled:true,inputDisabled:false});
+  });
+
+  test('returning through browser history cannot resubmit an unconfirmed upload', async t => {
     const evaluate = await page(t);
     const result = await evaluate(`selectFiles(['returned.json']); submit();
       window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}));
-      ({disabled: uploadButton.disabled, spinnerHidden: uploadSpinner.hidden,
-        label: uploadButtonLabel.textContent, statusHidden: uploadStatus.hidden,
-        busy: uploadForm.getAttribute('aria-busy'), pickerDisabled: document.querySelector('.file-upload-box').getAttribute('aria-disabled'),
-        removeDisplay: document.getElementById('remove-file').style.display,
-        selectedName: document.querySelector('.selected-file-name').textContent,
-        canSubmitAgain: submit()})`);
-    assert.deepEqual(result, {
-      disabled: false, spinnerHidden: true, label: 'Upload', statusHidden: true,
-      busy: 'false', pickerDisabled: 'false', removeDisplay: 'inline-flex',
-      selectedName: 'returned.json', canSubmitAgain: true,
-    });
+      ({disabled:uploadButton.disabled,spinners:activeSpinners(),rows:rowStates(),message:uploadStatus.textContent,
+        busy:uploadForm.getAttribute('aria-busy'),repeat:submit(),requests:requests.length})`);
+    assert.deepEqual(result.rows, ['Unconfirmed']);
+    assert.equal(result.disabled, true);
+    assert.equal(result.spinners, 0);
+    assert.equal(result.busy, 'false');
+    assert.match(result.message, /Check My Data before/);
+    assert.equal(result.repeat, false);
+    assert.equal(result.requests, 1);
   });
 
   test('file selection still enforces five files and renders filenames only as text', async t => {

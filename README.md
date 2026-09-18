@@ -128,10 +128,19 @@ failed files; successful files remain saved. A final identifier conflict, quota
 failure, or database save error also rejects that whole file while other files
 continue. Failed files do not reserve identifiers or consume storage quota.
 
-While submitting, the Upload button shows a spinner and the page displays
-"Uploading and checking files…". Duplicate submissions and changes to the selected
-files are blocked until the result loads. Returning with the browser's Back button
-restores the controls.
+Each selected file has its own status on the right: Waiting, Processing,
+Uploaded, or Failed. Only the file currently being checked and saved shows a
+spinner; the next file starts after its result is confirmed. Detailed errors
+appear together below the form after all files finish.
+
+The browser sends the selected files in one submission so batch limits are
+checked before saving. It then reads progress from the server as each file is
+processed. Duplicate submissions and changes to the selection are blocked while
+processing. After completion, select files again to start another upload. If the
+connection is interrupted, confirmed results stay visible and unfinished files
+are marked Unconfirmed; check My Data before retrying. Uploads are never retried
+automatically. Browsers without streaming support use the ordinary form and
+receive the final results after processing.
 
 Request resource checks run before any files are saved. Exceeding the file count,
 combined size, or total object count limits rejects the submission. File size,

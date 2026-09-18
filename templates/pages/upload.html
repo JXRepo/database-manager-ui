@@ -79,16 +79,6 @@
     cursor: wait;
   }
 
-  .upload-submit .spinner-border {
-    margin-right: 6px;
-    vertical-align: -2px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .upload-submit .spinner-border {
-      animation: none;
-    }
-  }
 </style>
 <div class="pc-container">
   <div class="pc-content">
@@ -128,7 +118,7 @@
                 </span>
 
                 <div id="file-info" class="selected-file-info">
-                  <span id="file-text"></span>
+                  <span id="file-text" aria-live="polite" aria-label="Selected files and upload status"></span>
                   <span id="remove-file">x</span>
                 </div>
 
@@ -148,7 +138,6 @@
 
           <div class="text-center mt-4">
             <button type="submit" class="btn btn-primary upload-submit" id="uploadButton">
-              <span class="spinner-border spinner-border-sm" id="uploadSpinner" aria-hidden="true" hidden></span>
               <span id="uploadButtonLabel">Upload</span>
             </button>
             <p class="small text-muted mt-2 mb-0" id="uploadStatus" role="status" aria-live="polite" hidden></p>
