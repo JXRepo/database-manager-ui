@@ -90,7 +90,7 @@ Current priority:
 - Basic search and Common filters require all entered whole words, in any order, ignoring case, using the same matcher as new text Data field filters; do not return substrings or records matching only some query words
 - Keep the two advanced groups distinct: Common filters for general metadata and Data field filters for preset simulation parameters
 - Common filters starts with Identifier, Access, and Owner (uploaded by), followed by Creator, Software, Phase, and Title; keep the `owner` query parameter for Owner and do not add fields without a request
-- Top and advanced-panel Search buttons submit the same combined GET form; both Clear links reset all conditions, and a keyword is optional
+- Top and advanced-panel Search buttons submit the same combined GET form; both Clear links reset all conditions while preserving the panel's expanded or collapsed state, and a keyword is optional
 - Data field filters uses 12 preset simulation fields grouped by microstructure, discretization and boundaries, material models, and loading and temperature; do not populate it from arbitrary uploaded JSON keys or duplicate common metadata
 - Presets recursively search dicts and arrays by normalized field name, ignoring case, whitespace, underscores, and hyphens; `grain_number` is an explicit count alias, not permission to guess arbitrary synonyms
 - Keep loading type and mode within `mechanical_BC`, excluding `thermal_BC`; counts and text must match values of the appropriate type, not arbitrary parameter containers

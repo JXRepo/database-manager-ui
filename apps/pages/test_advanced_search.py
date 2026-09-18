@@ -645,7 +645,7 @@ class AdvancedSearchTests(TestCase):
 
     def test_both_clear_links_discard_every_filter(self):
         """
-        Clear the complete search from either the top or bottom control
+        Clear every condition from either control while keeping the panel expanded
         """
         response = self.client.get(reverse("search"), {
             "keyword": "copper", "title": "experiment", "owner": "search_viewer",
@@ -662,12 +662,59 @@ class AdvancedSearchTests(TestCase):
         self.assertEqual(len(links), 2)
         for link in links:
             with self.subTest(link=str(link)):
-                self.assertEqual(dict(link.attributes)["href"], reverse("search"))
+                self.assertEqual(dict(link.attributes)["href"], reverse("search") + "?advanced=1")
                 cleared = self.client.get(dict(link.attributes)["href"])
-                self.assertFalse(cleared.wsgi_request.GET)
+                self.assertEqual(cleared.wsgi_request.GET.dict(), {"advanced": "1"})
                 self.assertFalse(cleared.context["search_performed"])
-                self.assertFalse(cleared.context["advanced_open"])
+                self.assertTrue(cleared.context["advanced_open"])
+                self.assertFalse(cleared.context["data_objects"])
+                self.assertEqual(cleared.context["result_count"], 0)
+                self.assertFalse(cleared.context["search_errors"])
                 self.assertNotContains(cleared, 'id="id_legacy_keywords"')
+
+    def test_clear_links_preserve_panel_state_without_starting_a_search(self):
+        """
+        Treat an expanded panel as display state rather than a search condition
+        """
+        for params, expanded in [({}, False), ({"advanced": "1"}, True)]:
+            with self.subTest(params=params):
+                response = self.client.get(reverse("search"), params)
+                self.assertEqual(response.context["advanced_open"], expanded)
+                self.assertFalse(response.context["search_performed"])
+                self.assertFalse(response.context["data_objects"])
+                self.assertEqual(response.context["result_count"], 0)
+                self.assertFalse(response.context["search_errors"])
+                links = [element for element in _html_elements(parse_html(response.content.decode()))
+                         if element.name == "a" and "Clear" in element.children]
+                self.assertEqual(len(links), 2)
+                expected_url = reverse("search") + ("?advanced=1" if expanded else "")
+                self.assertEqual([dict(link.attributes)["href"] for link in links], [expected_url] * 2)
+
+    def test_clearing_invalid_conditions_removes_errors_but_keeps_panel_expanded(self):
+        """
+        Let either Clear control recover from rejected filters without collapsing them
+        """
+        response = self.client.get(reverse("search"), {
+            "keyword": "copper", "access": "my_private", "condition_field": "grain_count",
+            "condition_operator": "gt", "condition_value": "invalid number",
+        })
+        self.assertTrue(response.context["advanced_open"])
+        self.assertTrue(response.context["search_errors"])
+        links = [element for element in _html_elements(parse_html(response.content.decode()))
+                 if element.name == "a" and "Clear" in element.children]
+        self.assertEqual(len(links), 2)
+        for link in links:
+            with self.subTest(link=str(link)):
+                cleared = self.client.get(dict(link.attributes)["href"])
+                self.assertEqual(cleared.wsgi_request.GET.dict(), {"advanced": "1"})
+                self.assertTrue(cleared.context["advanced_open"])
+                self.assertFalse(cleared.context["search_performed"])
+                self.assertFalse(cleared.context["search_errors"])
+                self.assertFalse(cleared.context["data_objects"])
+                self.assertEqual(cleared.context["keyword"], "")
+                self.assertEqual(cleared.context["access"], "")
+                self.assertEqual(cleared.context["condition_rows"][0]["field"], "")
+                self.assertEqual(cleared.context["condition_rows"][0]["value"], "")
 
     def test_legacy_keyword_filter_stays_visible_and_editable(self):
         """

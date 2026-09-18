@@ -141,10 +141,12 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
     };
     const html = `<form id="advancedSearchForm">
       <button type="button" aria-controls="advancedSearchPanel" aria-expanded="false">Advanced Search</button>
+      <a href="https://search.test/search/" data-clear-search>Clear</a>
       <div id="advancedSearchPanel" class="collapse">
         <div id="dataFieldConditions" data-max-conditions="10">${conditionRow()}</div>
         <button type="button" id="addConditionButton" hidden>Add condition</button>
         <p id="conditionStatus" role="status"></p>
+        <a href="https://search.test/search/" data-clear-search>Clear</a>
         <template id="conditionRowTemplate">${conditionRow()}</template>
         <template id="conditionOperatorTemplate">${operatorOptions()}</template>
       </div>
@@ -904,6 +906,66 @@ describe('advanced search controls in Chromium', {skip: !existsSync(chromiumPath
         expanded: document.querySelector('[aria-controls]').getAttribute('aria-expanded')};
     })()`);
     assert.deepEqual(state, {open: true, expanded: 'true'});
+  });
+
+  test('both Clear links keep the current panel state and discard search parameters', async t => {
+    for (const width of [1440, 390]) {
+      const evaluate = await page(t, '', width);
+      const state = await evaluate(`(() => {
+        const panel = document.getElementById('advancedSearchPanel');
+        const toggle = document.querySelector('[aria-controls="advancedSearchPanel"]');
+        const links = [...document.querySelectorAll('[data-clear-search]')];
+        const urls = () => links.map(link => link.href);
+        const initial = urls();
+        toggle.setAttribute('aria-expanded', 'true');
+        panel.classList.add('show');
+        panel.dispatchEvent(new Event('show.bs.collapse'));
+        const opened = urls();
+        links.forEach(link => {
+          link.href = 'https://search.test/search/?keyword=copper&condition_value=50#old';
+          link.addEventListener('click', event => event.preventDefault());
+          link.click();
+        });
+        const clicked = urls();
+        const stillOpen = panel.classList.contains('show');
+        toggle.setAttribute('aria-expanded', 'false');
+        panel.classList.remove('show');
+        panel.dispatchEvent(new Event('hide.bs.collapse'));
+        return {initial, opened, clicked, stillOpen, closed: urls()};
+      })()`);
+      const closed = Array(2).fill('https://search.test/search/');
+      const opened = Array(2).fill('https://search.test/search/?advanced=1');
+      assert.deepEqual(state, {initial: closed, opened, clicked: opened, stillOpen: true, closed});
+    }
+  });
+
+  test('Clear uses restored and transitioning panel states without validating incomplete conditions', async t => {
+    const evaluate = await page(t);
+    const state = await evaluate(`(() => {
+      const panel = document.getElementById('advancedSearchPanel');
+      const toggle = document.querySelector('[aria-controls="advancedSearchPanel"]');
+      const links = [...document.querySelectorAll('[data-clear-search]')];
+      toggle.setAttribute('aria-expanded', 'true');
+      window.dispatchEvent(new Event('pageshow'));
+      const restored = links.map(link => link.href);
+      panel.className = 'collapsing';
+      const value = document.querySelector('[name="condition_value"]');
+      value.value = 'unfinished';
+      value.dispatchEvent(new Event('input'));
+      let validations = 0;
+      document.querySelector('form').addEventListener('invalid', () => validations++, true);
+      links[0].addEventListener('click', event => event.preventDefault());
+      links[0].click();
+      const opening = links[0].href;
+      toggle.setAttribute('aria-expanded', 'false');
+      links[0].click();
+      return {restored, opening, closing: links[0].href, validations};
+    })()`);
+    assert.deepEqual(state, {
+      restored: Array(2).fill('https://search.test/search/?advanced=1'),
+      opening: 'https://search.test/search/?advanced=1',
+      closing: 'https://search.test/search/', validations: 0,
+    });
   });
 
   test('advanced footer actions stay usable inside their form at desktop and mobile widths', async t => {

@@ -2229,7 +2229,7 @@ def search_view(request):
         access = ""
 
     condition_rows, conditions, search_errors = parse_conditions(request.GET)
-    advanced_open = any(
+    has_advanced_conditions = any(
         [
             title,
             identifier,
@@ -2243,7 +2243,8 @@ def search_view(request):
             search_errors,
         ]
     )
-    search_performed = bool(keyword or advanced_open)
+    search_performed = bool(keyword or has_advanced_conditions)
+    advanced_open = has_advanced_conditions or request.GET.get("advanced") == "1"
     keyword_terms = _split_keyword_terms(keyword)
     common_queries = {
         "title": title,

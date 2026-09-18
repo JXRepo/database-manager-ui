@@ -723,7 +723,7 @@
                     <span>Advanced Search</span>
                   </button>
 
-                  <a href="{% url 'search' %}" class="clear-btn text-decoration-none">
+                  <a href="{% url 'search' %}{% if advanced_open %}?advanced=1{% endif %}" class="clear-btn text-decoration-none" data-clear-search>
                     Clear
                   </a>
                 </div>
@@ -869,7 +869,7 @@
               </section>
 
               <div class="advanced-search-actions">
-                <a href="{% url 'search' %}" class="clear-btn text-decoration-none">Clear</a>
+                <a href="{% url 'search' %}{% if advanced_open %}?advanced=1{% endif %}" class="clear-btn text-decoration-none" data-clear-search>Clear</a>
                 <button type="submit" class="btn btn-primary search-main-submit">Search</button>
               </div>
 

@@ -9,6 +9,9 @@
   const status = document.getElementById('conditionStatus');
   if (!form || !container || !template || !operatorTemplate || !addButton) return;
 
+  const panel = document.getElementById('advancedSearchPanel');
+  const toggle = form.querySelector('[aria-controls="advancedSearchPanel"]');
+  const clearLinks = form.querySelectorAll('[data-clear-search]');
   const maxConditions = Number(container.dataset.maxConditions) || 10;
   const operatorOptions = Array.from(operatorTemplate.content.querySelectorAll('option'));
   const numericOperators = ['eq', 'gt', 'gte', 'lt', 'lte', 'between'];
@@ -16,6 +19,15 @@
 
   function rows() {
     return Array.from(container.querySelectorAll('[data-condition-row]'));
+  }
+
+  function updateClearLinks(expanded = toggle.getAttribute('aria-expanded') === 'true') {
+    clearLinks.forEach(link => {
+      const url = new URL(link.href);
+      url.search = expanded ? 'advanced=1' : '';
+      url.hash = '';
+      link.href = url.href;
+    });
   }
 
   function updateOperators(row, preserveInvalid = false, fieldChanged = false) {
@@ -196,10 +208,15 @@
   updateCount();
   addButton.hidden = false;
   addButton.addEventListener('click', addRow);
+  updateClearLinks();
+  clearLinks.forEach(link => link.addEventListener('click', () => updateClearLinks()));
+  panel.addEventListener('show.bs.collapse', () => updateClearLinks(true));
+  panel.addEventListener('hide.bs.collapse', () => updateClearLinks(false));
 
   form.addEventListener('invalid', () => {
-    document.getElementById('advancedSearchPanel').classList.add('show');
-    form.querySelector('[aria-controls="advancedSearchPanel"]').setAttribute('aria-expanded', 'true');
+    panel.classList.add('show');
+    toggle.setAttribute('aria-expanded', 'true');
+    updateClearLinks();
   }, true);
 
   window.addEventListener('pageshow', () => {
@@ -208,5 +225,6 @@
       updateRow(row);
     });
     updateCount();
+    updateClearLinks();
   });
 })();

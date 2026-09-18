@@ -130,7 +130,8 @@ Owner (uploaded by), followed by Creator, Software, Phase, and Title. Owner
 matches the platform uploader's username; Creator matches the creator recorded
 in the JSON metadata.
 The Search buttons above and below the filters submit the same combined search.
-Both Clear links reset all conditions, and the main keyword can be left blank.
+Both Clear links reset all conditions while keeping Advanced Search expanded
+or collapsed as it was. The main keyword can be left blank.
 
 **Data field filters** uses preset simulation parameters, following the preset search approach in
 [Ronak Shoghi's DatabaseManager](https://github.com/Ronakshoghi/DatabaseManager).
@@ -210,7 +211,8 @@ the older `keywords` parameter keep an editable Keywords input while it is activ
   selected when changing field types. Use All words for text presets. An
   incompatible comparison produces an error and must be corrected before searching.
 - Invalid or incomplete conditions show an error and do not run a broader search.
-- **Clear** resets the search. Submitted conditions remain in the URL, so browser
+- **Clear** resets the search, errors, and results while preserving whether the
+  Advanced Search panel is open. Submitted conditions remain in the URL, so browser
   refresh and bookmarks preserve them. Do not put secrets in search terms.
 
 Results only include records you own, public records, and private records
