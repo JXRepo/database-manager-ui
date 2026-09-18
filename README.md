@@ -219,7 +219,7 @@ without expanding it, and the Search Results heading shows the total number of
 matching objects. **Live Data Objects** is a separate, compact feed of
 the latest 20 public uploads; it excludes all private data, including your own
 and data shared with you. Its total counts all public objects, including those
-beyond the latest 20, and refreshes with the list every five seconds while the
+beyond the latest 20, and refreshes with the list every ten seconds while the
 page is visible. Individual feed rows omit the repeated Public badge.
 It is not filtered by the search form. Longer feeds
 scroll within the panel rather than stretching each card.
