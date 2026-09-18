@@ -547,6 +547,37 @@ def _preset_field_values(data, field, depth=0, in_mechanical=False, temperature_
         )
 
 
+def matches_whole_words(values, terms):
+    """
+    Require every complete search term among the supplied text values
+
+    Basic search, common filters, and text presets share these word boundaries.
+    Terms can appear in any order and ignore case; punctuation remains literal.
+
+    Parameters
+    ----------
+    values : iterable of str
+        Text values from one record or the selected field.
+    terms : iterable of str
+        Search terms already separated on whitespace.
+
+    Returns
+    -------
+    bool
+        Whether every term appears as a complete word, or no terms were supplied.
+    """
+    remaining = [re.compile(r"(?<!\w)" + re.escape(term.casefold()) + r"(?!\w)")
+                 for term in set(terms)]
+    if not remaining:
+        return True
+    for value in values:
+        text = value.casefold()
+        remaining = [pattern for pattern in remaining if not pattern.search(text)]
+        if not remaining:
+            return True
+    return False
+
+
 def _matches_condition(data, condition):
     """
     Evaluate one prepared comparison against matching field values
@@ -577,14 +608,7 @@ def _matches_condition(data, condition):
     if operation == "is":
         return any(value is expected for value in values)
     if operation == "words":
-        remaining = [re.compile(r"(?<!\w)" + re.escape(term) + r"(?!\w)")
-                     for term in set(expected.split())]
-        for value in values:
-            text = value.casefold()
-            remaining = [pattern for pattern in remaining if not pattern.search(text)]
-            if not remaining:
-                return True
-        return False
+        return matches_whole_words(values, expected.split())
     if operation == "contains":
         remaining = set(expected.split())
         for value in values:

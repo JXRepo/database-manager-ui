@@ -34,6 +34,7 @@ from .advanced_search import (
     get_field_option,
     get_field_operators,
     matches_conditions,
+    matches_whole_words,
     parse_conditions,
 )
 from .orcid_auth import (
@@ -2201,7 +2202,8 @@ def search_view(request):
 
     Preset data fields are available independently of uploaded records. Results
     respect access permissions, and invalid conditions never broaden a search.
-    Public matches appear first, with the newest uploads first in each group.
+    Text queries require every whole word, ignoring order and case. Public
+    matches appear first, with the newest uploads first in each group.
 
     Parameters
     ----------
@@ -2296,7 +2298,7 @@ def search_view(request):
             else:
                 access_text = "shared"
             full_text = _build_basic_search_text(obj, access_text)
-            if not all(term in full_text for term in keyword_terms):
+            if not matches_whole_words((full_text,), keyword_terms):
                 continue
 
         common_match = True
@@ -2309,8 +2311,8 @@ def search_view(request):
                 value = [data.get("creator"), data.get("creator_affiliation")]
             else:
                 value = data.get(field)
-            text = _normalize_search_value(value).casefold()
-            if not all(term in text for term in terms):
+            text = _normalize_search_value(value)
+            if not matches_whole_words((text,), terms):
                 common_match = False
                 break
         if not common_match or not matches_conditions(data, conditions):

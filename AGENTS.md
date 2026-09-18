@@ -87,7 +87,7 @@ Current priority:
 ## Search rules
 
 - Keep search practical and understandable
-- Basic search requires all entered words, in any order, ignoring case; do not return records matching only some query words
+- Basic search and Common filters require all entered whole words, in any order, ignoring case, using the same matcher as new text Data field filters; do not return substrings or records matching only some query words
 - Keep the two advanced groups distinct: Common filters for general metadata and Data field filters for preset simulation parameters
 - Common filters starts with Identifier, Access, and Owner (uploaded by), followed by Creator, Software, Phase, and Title; keep the `owner` query parameter for Owner and do not add fields without a request
 - Top and advanced-panel Search buttons submit the same combined GET form; both Clear links reset all conditions, and a keyword is optional

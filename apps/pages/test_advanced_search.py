@@ -94,6 +94,100 @@ class AdvancedSearchTests(TestCase):
         """
         self.client.force_login(self.viewer)
 
+    def test_basic_search_requires_all_complete_words_in_any_order(self):
+        """
+        Exclude partial words while retaining case independent keyword searches
+        """
+        for obj, title in [(self.public, "Isotropic Elasticity"),
+                           (self.own, "Anisotropic Elasticity"),
+                           (self.shared, "Isotropically elastic"),
+                           (self.hidden, "Isotropic Elasticity")]:
+            obj.data["title"] = title
+            obj.save(update_fields=["data"])
+        for query, expected in [("isotropic", [self.public.pk]),
+                                ("  ELASTICITY\tisotropic  ", [self.public.pk]),
+                                ("isotropic absent", [])]:
+            with self.subTest(query=query):
+                response = self.client.get(reverse("search"), {"keyword": query})
+                self.assertFalse(response.context["search_errors"])
+                self.assertEqual([obj.pk for obj in response.context["data_objects"]], expected)
+
+    def test_common_metadata_requires_complete_words_and_preserves_full_values(self):
+        """
+        Apply the same word boundaries to each common JSON metadata filter
+        """
+        cases = (
+            ("title", "Isotropic Elasticity", "Anisotropic Elasticity", "ELASTICITY isotropic"),
+            ("creator", "Ronak Shoghi", "Ronak Shoghian", "SHOGHI ronak"),
+            ("software", "DAMASK solver", "DAMASKPlus solver", "SOLVER damask"),
+            ("phase", "Copper phase", "CopperAlloy phase", "PHASE copper"),
+            ("identifier", "orientation-123", "orientation-1234", "ORIENTATION-123"),
+        )
+        for field, matching, partial, query in cases:
+            with self.subTest(field=field):
+                for obj, value in [(self.public, matching), (self.own, partial)]:
+                    if field == "creator":
+                        value = [value]
+                    elif field == "phase":
+                        value = [{"phase_identifier": value}]
+                    obj.data[field] = value
+                    obj.save(update_fields=["data"])
+                for entered, expected in [(query, self.public.pk), (partial, self.own.pk)]:
+                    response = self.client.get(reverse("search"), {field: entered})
+                    self.assertFalse(response.context["search_errors"])
+                    self.assertEqual([obj.pk for obj in response.context["data_objects"]], [expected])
+
+    def test_owner_filter_does_not_match_part_of_another_username(self):
+        """
+        Require the complete username token without breaking exact owner searches
+        """
+        matching_owner = User.objects.create_user(username="researcher")
+        partial_owner = User.objects.create_user(username="researcher_extra")
+        self.public.owner = matching_owner
+        self.public.save(update_fields=["owner"])
+        self.shared.owner = partial_owner
+        self.shared.save(update_fields=["owner"])
+        for query, expected in [("RESEARCHER", self.public.pk),
+                                ("researcher_extra", self.shared.pk)]:
+            with self.subTest(query=query):
+                response = self.client.get(reverse("search"), {"owner": query})
+                self.assertFalse(response.context["search_errors"])
+                self.assertEqual([obj.pk for obj in response.context["data_objects"]], [expected])
+
+    def test_complete_word_search_combines_access_common_and_data_field_conditions(self):
+        """
+        Match every search group on one accessible object after applying word boundaries
+        """
+        for obj in (self.public, self.own, self.shared, self.hidden):
+            obj.data.update({
+                "title": "Isotropic specimen",
+                "software": "DAMASK simulation",
+                "phase": [{"grain_count": 60, "elastic_model_name": "Isotropic Elasticity"}],
+            })
+            obj.save(update_fields=["data"])
+        JSONData.objects.create(owner=self.other, access_type="all", data={
+            "title": "Anisotropic specimen", "software": "DAMASK simulation",
+            "phase": [{"grain_count": 60, "elastic_model_name": "Isotropic Elasticity"}],
+        })
+        JSONData.objects.create(owner=self.other, access_type="all", data={
+            "title": "Isotropic specimen", "software": "DAMASK simulation",
+            "phase": [{"grain_count": 20, "elastic_model_name": "Isotropic Elasticity"}],
+        })
+        params = {
+            "keyword": "SPECIMEN isotropic", "title": "isotropic", "software": "damask",
+            "condition_field": ["elastic_model_name", "grain_count"],
+            "condition_operator": ["words", "gt"],
+            "condition_value": ["ELASTICITY isotropic", "50"],
+        }
+        for access, expected in [("", [self.public.pk, self.own.pk, self.shared.pk]),
+                                 ("public", [self.public.pk]), ("my_private", [self.own.pk]),
+                                 ("shared_with_me", [self.shared.pk])]:
+            with self.subTest(access=access):
+                response = self.client.get(reverse("search"), dict(params, access=access))
+                self.assertFalse(response.context["search_errors"])
+                self.assertCountEqual([obj.pk for obj in response.context["data_objects"]], expected)
+                self.assertEqual(response.context["result_count"], len(expected))
+
     def test_range_conditions_search_nested_numbers_not_substrings(self):
         """
         Compare numeric values while keeping private records out of results

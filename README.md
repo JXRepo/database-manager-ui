@@ -120,9 +120,10 @@ rejects the submission.
 
 ## Search
 
-The main search box and common Advanced Search fields require every word you
-enter to appear in the matching record or selected field. Word order and letter
-case do not matter. These are text matches, not a semantic search.
+The main search box and common Advanced Search fields require every whole word
+you enter to appear in the matching record or selected field. Word order and
+letter case do not matter. For example, `isotropic` does not match `anisotropic`.
+This is the same whole word rule used by new Data field filters.
 
 In **Advanced Search**, **Common filters** starts with Identifier, Access, and
 Owner (uploaded by), followed by Creator, Software, Phase, and Title. Owner
