@@ -280,6 +280,27 @@ Search scans stored JSON one record at a time and retains display summaries for
 matches rather than every original payload. It still reads the accessible data
 in the application; this is not an indexed search designed for large datasets.
 
+## My Data
+
+My Data lists only your own uploads, with the newest first. Use the **Access**,
+**Software**, **Phase**, and **Creator** dropdowns to narrow the list before
+opening an object. Creator refers to the creator recorded in the JSON metadata,
+not the platform uploader. Private includes your private objects shared with
+other users.
+
+Software, phase, and creator options come from your uploaded data. Text values
+ignore case and surrounding whitespace; each selected value must match a complete
+name. Lists contribute individual names, and named metadata objects contribute
+their name rather than their parameter values. Every active filter must match
+the same object.
+
+Each option shows how many objects match it together with the other selected
+filters. The result count shows matching objects out of all your uploads.
+Changing a dropdown updates the list; **Clear** restores all uploads. Filters
+remain in the URL for refresh and bookmarks. Without JavaScript, use **Filter**
+to apply the selections. Bulk selection applies to the objects in the current
+list, and existing download and delete actions remain available.
+
 ## Access Rules
 
 - Owners can always view and delete their own data.

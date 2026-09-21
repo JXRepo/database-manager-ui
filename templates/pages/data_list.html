@@ -145,6 +145,41 @@
     box-shadow: 0 2px 10px rgba(16, 24, 40, 0.04);
   }
 
+  .my-data-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .my-data-filter-grid > div,
+  .my-data-filter-grid .form-select {
+    min-width: 0;
+  }
+
+  .my-data-filter-grid .form-select {
+    text-overflow: ellipsis;
+  }
+
+  .my-data-filter-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 0 18px;
+  }
+
+  @media (max-width: 991px) {
+    .my-data-filter-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 575px) {
+    .my-data-filter-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .selection-left {
     display: inline-flex;
     align-items: center;
@@ -366,6 +401,30 @@
         <h5>{{ card_title|default:"My Uploaded Data Objects" }}</h5>
       </div>
       <div class="card-body">
+        {% if my_data_filters %}
+          <form method="get" action="{% url 'json_data_list' %}" id="myDataFilterForm" aria-label="Filter My Data">
+            <div class="my-data-filter-grid">
+              {% for field in my_data_filters %}
+                <div>
+                  <label class="form-label" for="myDataFilter-{{ field.name }}">{{ field.label }}</label>
+                  <select class="form-select" name="{{ field.name }}" id="myDataFilter-{{ field.name }}">
+                    <option value="">All ({{ field.total }})</option>
+                    {% for option in field.options %}
+                      <option value="{{ option.value }}"{% if option.value == field.value %} selected{% elif not option.count %} disabled{% endif %}>{{ option.label }} ({{ option.count }})</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="my-data-filter-footer">
+              <p class="text-muted small mb-0" id="myDataResultCount" role="status">{{ result_count }} of {{ total_count }} data object{{ total_count|pluralize }}</p>
+              <div class="d-flex align-items-center gap-2">
+                <noscript><button type="submit" class="btn btn-primary btn-sm">Filter</button></noscript>
+                <a href="{% url 'json_data_list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+              </div>
+            </div>
+          </form>
+        {% endif %}
         {% if data_objects %}
           {% if show_bulk_export %}
             <form method="post" action="{% url 'export_selected_my_data_objects' %}" id="myDataBulkActionForm">
@@ -549,6 +608,15 @@
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
+    const myDataFilterForm = document.getElementById("myDataFilterForm");
+    if (myDataFilterForm) {
+      myDataFilterForm.addEventListener("change", function (event) {
+        if (event.target.matches("select")) {
+          myDataFilterForm.requestSubmit();
+        }
+      });
+    }
+
     const alerts = document.querySelectorAll(".auto-dismiss-alert");
     const myDataCheckboxes = Array.from(document.querySelectorAll(".my-data-checkbox"));
     const selectAllMyData = document.getElementById("selectAllMyData");

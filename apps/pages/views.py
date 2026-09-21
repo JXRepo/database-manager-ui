@@ -27,6 +27,7 @@ from numbers import Number
 
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
+from .my_data_filters import filter_my_data_objects
 from .advanced_search import (
     DATA_FIELD_CHOICES,
     DATA_FIELD_TYPES,
@@ -2180,24 +2181,42 @@ def _find_share_user(identifier):
 @login_required
 def json_data_list_view(request):
     """
-    Display uploaded JSON data objects for the current user
+    Display and filter uploaded JSON data objects for the current user
+
+    Dropdown choices and counts are derived only from the owner's uploads.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated request with optional metadata filter values.
+
+    Returns
+    -------
+    HttpResponse
+        Owned records matching every selected dropdown.
     """
     data_objects = (
         JSONData.objects
         .filter(owner=request.user)
+        .select_related("owner")
         .prefetch_related("shared_users")
         .order_by("-uploaded_at")
     )
-    prepared_objects = [_prepare_list_object(obj) for obj in data_objects]
+    filtered = filter_my_data_objects(data_objects, request.GET)
+    prepared_objects = [_prepare_list_object(obj) for obj in filtered.pop("data_objects")]
 
     context = {
+        **filtered,
         "segment": "data_list",
         "page_title": "My Data",
         "page_heading": "My Data",
         "breadcrumb_label": "My Data",
         "card_title": "My Uploaded Data Objects",
         "data_objects": prepared_objects,
-        "empty_message": "No uploaded data found",
+        "empty_message": (
+            "No data objects match these filters. Clear filters to see all your uploads."
+            if filtered["has_active_filters"] else "No uploaded data found"
+        ),
         "show_delete": True,
         "show_bulk_export": True,
     }

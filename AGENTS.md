@@ -85,6 +85,9 @@ Current priority:
 - Keep the UI compact, clean, and readable
 - Search pages are for searching and browsing
 - My Data pages are for managing the user's own uploaded data
+- My Data uses Access, Software, Phase, and Creator dropdowns sourced only from the current user's uploads; Creator refers to JSON metadata, not the uploader
+- My Data combines selected filters on the same object, matches complete names ignoring case and surrounding whitespace, and counts each object once per option under the other selected filters
+- Keep My Data filters and Clear available for empty results, preserve selected values in GET URLs, and limit bulk selection to the displayed records
 - Detail pages may include management actions for the owner
 - Search result pages should not include delete actions unless explicitly requested
 - Preserve the existing visual style unless a change is requested
