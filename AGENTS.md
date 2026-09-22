@@ -83,6 +83,7 @@ Current priority:
 ## UI and UX rules
 
 - Keep the UI compact, clean, and readable
+- Focus UI design and implementation on desktop use; only address mobile layout when the user explicitly requests it
 - Search pages are for searching and browsing
 - My Data pages are for managing the user's own uploaded data
 - My Data uses Access, Software, Phase, and Creator dropdowns sourced only from the current user's uploads; Creator refers to JSON metadata, not the uploader
@@ -167,4 +168,4 @@ When explaining changes:
 - Do not commit `.env`, credentials, local databases, uploaded private data, or virtual environments
 - Run relevant Django tests for backend changes; run `node --test tests/js/*.test.cjs` for search or login JavaScript changes
 - Browser tests require Chromium (set `CHROMIUM_BIN` if needed) and a Node runtime with global `WebSocket`; skipped browser tests do not count as verified
-- Test layout changes at desktop and mobile widths, including long content and empty lists
+- Test layout changes at desktop widths, including long content and empty lists; do not run dedicated mobile checks unless the user explicitly requests them
