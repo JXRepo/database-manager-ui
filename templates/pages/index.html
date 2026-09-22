@@ -1,4 +1,5 @@
 {% extends "layouts/base-public.html" %}
+{% load static %}
 
 {% block title %}Materials Data Platform{% endblock title %}
 
@@ -333,114 +334,34 @@
 
   .atlas-specimen {
     animation: atlas-specimen-enter 820ms 120ms ease both;
-    min-height: 560px;
+    margin: 0;
+    min-width: 0;
     position: relative;
   }
 
-  .specimen-coordinate {
-    color: rgba(63, 77, 103, 0.58);
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-    position: absolute;
-    right: 8px;
-    text-transform: uppercase;
-    top: 34px;
+  .specimen-stage {
+    height: 380px;
+    margin-bottom: 24px;
+    position: relative;
   }
 
   .microstructure-map {
-    animation: atlas-microstructure-drift 8s ease-in-out infinite;
-    filter: drop-shadow(0 28px 32px rgba(63, 77, 103, 0.14));
+    display: block;
+    filter: drop-shadow(0 18px 22px rgba(63, 77, 103, 0.13));
     height: 100%;
     inset: 0;
-    overflow: visible;
+    object-fit: contain;
     position: absolute;
     width: 100%;
   }
 
-  .grain-field {
-    fill: #eef8fd;
-  }
-
-  .grain {
-    stroke: rgba(63, 77, 103, 0.58);
-    stroke-width: 2;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .grain-a,
-  .grain-h,
-  .grain-k {
-    fill: #d8effb;
-  }
-
-  .grain-b,
-  .grain-e,
-  .grain-l {
-    fill: #bfe4f7;
-  }
-
-  .grain-c,
-  .grain-f,
-  .grain-i {
-    fill: #eef7fc;
-  }
-
-  .grain-d,
-  .grain-g,
-  .grain-j,
-  .grain-m {
-    fill: #8ed3f3;
-  }
-
-  .grain-outline {
-    fill: none;
-    stroke: var(--atlas-navy);
-    stroke-width: 4;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .grain-load-path {
-    fill: none;
-    stroke: var(--atlas-blue);
-    stroke-dasharray: 10 9;
-    stroke-width: 4;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .grain-orientation {
-    fill: none;
-    stroke: rgba(63, 77, 103, 0.28);
-    stroke-linecap: square;
-    stroke-width: 2;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .grain-axis {
-    fill: none;
-    stroke: var(--atlas-navy);
-    stroke-width: 2;
-    vector-effect: non-scaling-stroke;
-  }
-
-  .grain-arrow {
-    fill: var(--atlas-navy);
-  }
-
-  .grain-load-arrow {
-    fill: var(--atlas-blue);
-  }
-
   .specimen-label {
-    background: rgba(255, 255, 255, 0.94);
-    border: 1px solid rgba(63, 77, 103, 0.22);
-    bottom: 18px;
-    box-shadow: 0 22px 60px rgba(63, 77, 103, 0.12);
-    max-width: 338px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--atlas-line);
+    border-radius: 6px;
+    box-shadow: 0 12px 36px rgba(63, 77, 103, 0.07);
     padding: 22px 24px 20px;
-    position: absolute;
-    right: 4px;
-    width: 68%;
+    position: relative;
   }
 
   .specimen-label::before {
@@ -454,40 +375,48 @@
   }
 
   .specimen-overline {
-    color: var(--atlas-muted);
-    font-size: 0.62rem;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
+    color: var(--atlas-slate);
+    font-family: inherit;
+    font-size: 0.73rem;
+    line-height: 1.5;
+  }
+
+  .specimen-overline a {
+    color: var(--atlas-blue-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .specimen-phase {
-    align-items: baseline;
+    align-items: center;
     border-bottom: 1px solid var(--atlas-line);
     display: flex;
     gap: 12px;
-    margin-top: 15px;
-    padding-bottom: 16px;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-bottom: 15px;
   }
 
   .specimen-phase strong {
     color: var(--atlas-mineral);
     font-family: Georgia, "Times New Roman", serif;
-    font-size: 2.65rem;
+    font-size: 1.65rem;
     font-weight: 400;
-    letter-spacing: -0.05em;
-    line-height: 1;
+    letter-spacing: -0.035em;
+    line-height: 1.2;
   }
 
   .specimen-phase span {
     color: var(--atlas-blue-ink);
-    font-size: 0.76rem;
+    font-size: 0.7rem;
     font-weight: 600;
+    white-space: nowrap;
   }
 
   .specimen-details {
     display: grid;
-    gap: 13px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 13px 24px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin: 15px 0 0;
   }
 
@@ -496,20 +425,19 @@
   }
 
   .specimen-details dt {
-    color: var(--atlas-muted);
-    font-size: 0.56rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    color: var(--atlas-slate);
+    font-family: inherit;
+    font-size: 0.69rem;
+    line-height: 1.5;
   }
 
   .specimen-details dd {
     color: var(--atlas-mineral);
-    font-size: 0.69rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    margin: 5px 0 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.5;
+    margin: 3px 0 0;
+    overflow-wrap: anywhere;
   }
 
   .atlas-section {
@@ -1050,15 +978,6 @@
     }
   }
 
-  @keyframes atlas-microstructure-drift {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-8px);
-    }
-  }
-
   @media (max-width: 1080px) {
     .atlas-nav {
       grid-template-columns: 1fr auto;
@@ -1109,8 +1028,7 @@
 
     .atlas-specimen {
       margin: 38px auto 0;
-      max-width: 620px;
-      min-height: 500px;
+      max-width: 540px;
     }
 
     .atlas-section {
@@ -1228,30 +1146,26 @@
       line-height: 1.5;
     }
 
-    .atlas-specimen {
-      min-height: 390px;
-    }
-
-    .microstructure-map {
-      left: -8%;
-      width: 116%;
-    }
-
-    .specimen-coordinate {
-      right: 0;
-      top: 18px;
+    .specimen-stage {
+      aspect-ratio: 1.12;
+      height: auto;
+      margin-bottom: 20px;
     }
 
     .specimen-label {
-      bottom: 0;
-      max-width: none;
       padding: 18px;
-      right: 0;
-      width: 82%;
     }
 
     .specimen-phase strong {
-      font-size: 2.15rem;
+      font-size: 1.4rem;
+    }
+
+    .specimen-details {
+      column-gap: 12px;
+    }
+
+    .specimen-details dd {
+      font-size: 0.8rem;
     }
 
     .atlas-section {
@@ -1438,60 +1352,39 @@
         </div>
       </div>
 
-      <div class="atlas-specimen" aria-hidden="true">
-        <div class="specimen-coordinate">RVE slice 03 · 128 grains</div>
-        <svg class="microstructure-map" viewBox="0 0 620 560">
-          <defs>
-            <clipPath id="grain-field-clip">
-              <path d="M82 88 532 58 574 405 505 474 126 496 60 165Z"/>
-            </clipPath>
-          </defs>
-          <g clip-path="url(#grain-field-clip)">
-            <path class="grain-field" d="M40 30H600V525H40Z"/>
-            <polygon class="grain grain-a" points="50,100 180,40 220,155 132,236 45,210"/>
-            <polygon class="grain grain-b" points="180,40 330,34 350,144 220,155"/>
-            <polygon class="grain grain-c" points="330,34 510,30 570,125 468,190 350,144"/>
-            <polygon class="grain grain-d" points="510,30 610,80 600,250 468,190 570,125"/>
-            <polygon class="grain grain-e" points="45,210 132,236 150,360 55,410"/>
-            <polygon class="grain grain-f" points="132,236 220,155 310,245 260,360 150,360"/>
-            <polygon class="grain grain-g" points="220,155 350,144 395,250 310,245"/>
-            <polygon class="grain grain-h" points="350,144 468,190 455,320 395,250"/>
-            <polygon class="grain grain-i" points="468,190 600,250 580,390 455,320"/>
-            <polygon class="grain grain-j" points="55,410 150,360 230,480 80,520"/>
-            <polygon class="grain grain-k" points="150,360 260,360 360,480 230,480"/>
-            <polygon class="grain grain-l" points="260,360 395,250 455,320 430,450 360,480"/>
-            <polygon class="grain grain-m" points="455,320 580,390 520,520 430,450"/>
-            <path class="grain-orientation" d="M103 151 149 180M251 84 288 112M393 92 435 121M488 239 531 267M174 292 215 260M303 321 345 288M183 420 218 391M392 407 430 374"/>
-            <path class="grain-load-path" d="M116 421 478 112"/>
-            <path class="grain-load-arrow" d="M478 112 456 119 471 135Z"/>
-          </g>
-          <path class="grain-outline" d="M82 88 532 58 574 405 505 474 126 496 60 165Z"/>
-          <path class="grain-axis" d="M74 514H242M74 514V346"/>
-          <path class="grain-arrow" d="M242 514 226 505V523ZM74 346 65 362H83Z"/>
-        </svg>
-
-        <div class="specimen-label">
-          <div class="specimen-overline">Polycrystal map</div>
+      <figure class="atlas-specimen" aria-labelledby="microstructure-title">
+        <div class="specimen-stage">
+          <img class="microstructure-map"
+               src="{% static 'assets/images/landing/kanapy-rve-cutaway.png' %}"
+               width="1448" height="1594" fetchpriority="high" decoding="async"
+               alt="Kanapy synthetic microstructure with a corner cut away to reveal the internal grains. Colors distinguish individual grains.">
+        </div>
+        <figcaption class="specimen-label">
+          <div class="specimen-overline">Generated with <a href="https://github.com/ICAMS/Kanapy" target="_blank" rel="noopener noreferrer">Kanapy</a></div>
           <div class="specimen-phase">
-            <strong>Cu · FCC</strong>
-            <span>Validated</span>
+            <strong id="microstructure-title">Voxelized microstructure</strong>
+            <span>3D RVE</span>
           </div>
           <dl class="specimen-details">
             <div>
-              <dt>Record</dt>
-              <dd>RVE-0249</dd>
+              <dt>RVE size</dt>
+              <dd>40 × 40 × 40 µm</dd>
             </div>
             <div>
-              <dt>Solver</dt>
-              <dd>DAMASK</dd>
+              <dt>Voxel grid</dt>
+              <dd>30 × 30 × 30</dd>
             </div>
             <div>
-              <dt>Mode</dt>
-              <dd>Tension</dd>
+              <dt>Total voxels</dt>
+              <dd>27,000</dd>
+            </div>
+            <div>
+              <dt>Periodicity</dt>
+              <dd>Periodic</dd>
             </div>
           </dl>
-        </div>
-      </div>
+        </figcaption>
+      </figure>
     </div>
   </section>
 
