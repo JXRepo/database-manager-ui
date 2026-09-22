@@ -1677,7 +1677,7 @@ class JSONDataSharingTests(TestCase):
         self.assertNotContains(response, "demo")
         self.assertContains(response, "The material record behind every simulation")
         self.assertContains(response, 'class="microstructure-map"')
-        self.assertContains(response, "Voxelized microstructure")
+        self.assertContains(response, "Polycrystalline microstructure")
         self.assertContains(response, "--atlas-canvas: #f4f7fa;")
         self.assertContains(response, "--atlas-navy: #3f4d67;")
         self.assertContains(response, "--atlas-blue: #04a9f5;")

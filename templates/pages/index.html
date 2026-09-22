@@ -339,13 +339,8 @@
   }
 
   .specimen-stage {
-    aspect-ratio: 1;
-    background: var(--atlas-paper);
-    border: 1px solid var(--atlas-line);
-    border-radius: 6px;
+    height: 420px;
     margin: 0 auto 24px;
-    max-width: 440px;
-    overflow: hidden;
     position: relative;
     width: 100%;
   }
@@ -1137,6 +1132,8 @@
     }
 
     .specimen-stage {
+      aspect-ratio: 1.08;
+      height: auto;
       margin-bottom: 20px;
     }
 
@@ -1343,31 +1340,23 @@
       <figure class="atlas-specimen" aria-labelledby="microstructure-title">
         <div class="specimen-stage">
           <img class="microstructure-map"
-               src="{% static 'assets/images/landing/rve-figure-2.png' %}"
-               width="600" height="600" fetchpriority="high" decoding="async"
-               alt="Synthetic microstructure with a corner cut away to reveal the internal grains. Colors distinguish individual grains.">
+               src="{% static 'assets/images/landing/polycrystalline-microstructure.png' %}"
+               width="1305" height="1205" fetchpriority="high" decoding="async"
+               alt="Schematic illustration of a polycrystalline cube with colorful, translucent polyhedral grains and visible internal boundaries.">
         </div>
         <figcaption class="specimen-label">
           <div class="specimen-phase">
-            <strong id="microstructure-title">Voxelized microstructure</strong>
-            <span>3D RVE</span>
+            <strong id="microstructure-title">Polycrystalline microstructure</strong>
+            <span>3D schematic</span>
           </div>
           <dl class="specimen-details">
             <div>
-              <dt>RVE size</dt>
-              <dd>40 × 40 × 40 µm</dd>
+              <dt>Grain geometry</dt>
+              <dd>Polyhedral</dd>
             </div>
             <div>
-              <dt>Voxel grid</dt>
-              <dd>30 × 30 × 30</dd>
-            </div>
-            <div>
-              <dt>Total voxels</dt>
-              <dd>27,000</dd>
-            </div>
-            <div>
-              <dt>Periodicity</dt>
-              <dd>Periodic</dd>
+              <dt>Colors</dt>
+              <dd>Distinguish grains</dd>
             </div>
           </dl>
         </figcaption>
