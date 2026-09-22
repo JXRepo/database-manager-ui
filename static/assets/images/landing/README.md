@@ -6,9 +6,17 @@ microstructure image served as a visual reference for the subject, grain
 colors, and translucency.
 
 The image is a conceptual illustration, not a render of the user's simulation
-data. Its caption identifies it as a 3D schematic and describes visible grain
-geometry. Do not attach numerical RVE dimensions, grain counts, voxel counts,
-material names, or boundary conditions to this illustration.
+data. The caption uses copper (Cu) as an illustrative material and identifies
+the figure as a 3D schematic. Copper is a chosen example, not a composition
+inferred from the generated image or imported from a dataset.
+
+The caption describes copper's face-centered cubic (FCC) crystal structure,
+polyhedral grain morphology, and colors distinguishing grain regions.
+The colors are illustrative, not an orientation map, phase map, or stress
+field. Copper's FCC structure is documented by
+[Purdue University Chemistry](https://www.chem.purdue.edu/gchelp/crystals/Cu_cell.html).
+Do not attach numerical RVE dimensions, grain counts, voxel counts, or
+boundary conditions without actual model data.
 
 - Asset: 1305 × 1205 PNG with an alpha channel
 - Subject: a complete cube of colorful, translucent polyhedral grains
