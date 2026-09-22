@@ -6,7 +6,17 @@
 <main class="pc-container">
   <div class="pc-content">
     <section class="quick-start-page" aria-labelledby="quick-start-page-title">
-      {% include "includes/getting_started_content.html" with heading_id="quick-start-page-title" guide_title="Quick start" is_dialog=False %}
+      <div class="quick-start-form">
+        <h1 id="quick-start-page-title">Quick start</h1>
+        <p class="quick-start-intro">Four tools for finding, uploading and sharing materials simulation data.</p>
+        <a href="{% url 'getting_started' %}" class="btn btn-primary" data-open-quick-start hidden data-guide-launch>Start tour</a>
+        {% include "includes/getting_started_content.html" %}
+        <form method="post" action="{% url 'getting_started' %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'search' %}">
+          <button type="submit" class="btn btn-outline-secondary">Back to Search</button>
+        </form>
+      </div>
     </section>
   </div>
 </main>

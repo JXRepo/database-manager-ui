@@ -1,5 +1,33 @@
 {% if request.user.is_authenticated %}
-<dialog id="quick-start-dialog" class="quick-start-dialog" aria-labelledby="quick-start-title" data-auto-show="{{ show_getting_started|yesno:'true,false' }}" data-dismissed="{{ getting_started_dismissed|yesno:'true,false' }}">
-  {% include "includes/getting_started_content.html" with heading_id="quick-start-title" guide_title="Welcome to the data platform" is_dialog=True %}
+<dialog id="quick-start-dialog" class="quick-start-dialog" aria-labelledby="quick-start-title" aria-describedby="quick-start-description" data-auto-show="{{ show_getting_started|yesno:'true,false' }}" data-dismissed="{{ getting_started_dismissed|yesno:'true,false' }}">
+  <div class="quick-start-shade" aria-hidden="true"></div>
+  <div class="quick-start-spotlight" aria-hidden="true" hidden></div>
+  <div class="quick-start-card" data-placement="center">
+    <span class="quick-start-pointer" aria-hidden="true" hidden></span>
+    <form method="post" action="{% url 'getting_started' %}" class="quick-start-form">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="quick-start-close" data-guide-dismiss aria-label="Close quick start">
+        <i data-feather="x" aria-hidden="true"></i>
+      </button>
+      <div class="quick-start-copy" aria-live="polite" aria-atomic="true">
+        <p class="quick-start-progress" hidden></p>
+        <h2 id="quick-start-title" tabindex="-1">Welcome to the data platform</h2>
+        <p id="quick-start-description" class="quick-start-intro">Take a quick tour of the four main tools for your materials simulation data.</p>
+      </div>
+      <p class="quick-start-note">You can revisit this tour using the help icon at the top.</p>
+      <div class="quick-start-error" role="alert" hidden>
+        <p>We couldn't save your choice. Try again, or close this guide for now.</p>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-guide-close-unsaved>Close for now</button>
+      </div>
+      <div class="quick-start-footer">
+        <button type="submit" class="btn btn-link" data-guide-dismiss>Skip tour</button>
+        <button type="button" class="btn btn-outline-secondary" data-guide-back hidden>Back</button>
+        <button type="button" class="btn btn-primary" data-guide-next>Next</button>
+        <button type="submit" class="btn btn-primary" data-guide-finish hidden>Finish</button>
+      </div>
+    </form>
+  </div>
+  <template data-guide-steps>{% include "includes/getting_started_content.html" %}</template>
 </dialog>
 {% endif %}

@@ -21,13 +21,16 @@ future enhancements.
 3. Search accessible records, manage your uploads in My Data, and try sharing
    and JSON export.
 
-The first time you enter the platform, a short welcome guide introduces Search,
-Upload Data, and My Data. Choose an action, select Start exploring, or skip the
-guide. Your account remembers that choice across browsers and future logins.
+The first time you enter the platform, a welcome dialog starts a short tour.
+Next introduces Search, Upload Data, My Data, and Share in that order, with an
+arrow pointing to each sidebar button. Back revisits the previous step; Finish
+or Skip tour closes the guide without leaving the current page. Your account
+remembers completion or skipping across browsers and future logins.
 Existing accounts also receive the guide once when it becomes available. ORCID
 accounts finish their required username and password setup before seeing it.
-Reopen it from Quick start in the sidebar or the help icon in the top bar.
-The Quick start page also works without JavaScript.
+Reopen it using the help icon in the top bar. On small screens, the tour opens
+the sidebar temporarily and restores it when closed. The Quick start page
+provides the same four descriptions without JavaScript.
 
 Use test data and keep your original files. The pilot is not a permanent archive.
 Accounts and data created on a local development server are separate from those

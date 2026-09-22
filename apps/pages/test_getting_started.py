@@ -103,8 +103,8 @@ class GettingStartedTests(TestCase):
                 response = self.client.get("/getting-started/")
                 self.assertEqual(response.status_code, 200)
                 self.assertIs(response.context.get("show_getting_started"), False)
-                self.assertContains(response, 'value="/upload/"')
-                self.assertContains(response, 'value="/data-list/"')
+                self.assertContains(response, 'data-guide-launch')
+                self.assertContains(response, 'data-tour-target="share"')
                 profile.refresh_from_db()
                 self.assertEqual(profile.getting_started_dismissed_at, dismissed_at)
 
