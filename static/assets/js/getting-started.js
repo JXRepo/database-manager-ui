@@ -81,7 +81,7 @@
 
     if (!target) {
       card.dataset.placement = 'center';
-      card.style.width = `${Math.min(440, viewportWidth - margin * 2)}px`;
+      card.style.width = `${Math.min(480, viewportWidth - margin * 2)}px`;
       card.style.left = '50%';
       card.style.top = '50%';
       return;
@@ -92,7 +92,7 @@
     spotlight.style.top = `${rect.top + 2}px`;
     spotlight.style.width = `${rect.width - 4}px`;
     spotlight.style.height = `${rect.height - 4}px`;
-    const width = Math.min(360, viewportWidth - margin * 2);
+    const width = Math.min(420, viewportWidth - margin * 2);
     card.style.width = `${width}px`;
     let left;
     let top;

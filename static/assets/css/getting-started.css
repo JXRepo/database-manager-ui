@@ -63,7 +63,7 @@ body.quick-start-open .pc-menu-overlay {
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: min(440px, calc(100% - 32px));
+  width: min(480px, calc(100% - 32px));
 }
 
 .quick-start-card:not([data-placement="center"]) {
@@ -104,16 +104,16 @@ body.quick-start-open .pc-menu-overlay {
   border-radius: inherit;
   max-height: inherit;
   overflow-y: auto;
-  padding: 26px;
+  padding: 30px;
   position: relative;
 }
 
 .quick-start-form h1,
 .quick-start-form h2 {
-  color: #3f4d67;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 1.8rem;
-  font-weight: 400;
+  color: #243b53;
+  font-family: inherit;
+  font-size: 2rem;
+  font-weight: 600;
   line-height: 1.25;
   margin: 0;
   overflow-wrap: anywhere;
@@ -121,9 +121,7 @@ body.quick-start-open .pc-menu-overlay {
 }
 
 .quick-start-card:not([data-placement="center"]) h2 {
-  font-family: inherit;
-  font-size: 1.4rem;
-  font-weight: 600;
+  font-size: 1.75rem;
 }
 
 .quick-start-close {
@@ -147,20 +145,20 @@ body.quick-start-open .pc-menu-overlay {
 }
 
 .quick-start-intro {
-  color: #596a82;
-  font-size: 0.9rem;
+  color: #405268;
+  font-size: 1.125rem;
   line-height: 1.65;
-  margin: 14px 0 24px;
+  margin: 18px 0 26px;
   overflow-wrap: anywhere;
 }
 
 .quick-start-lead {
-  color: #0078b3;
+  color: #28666b;
   display: block;
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.5;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .quick-start-intro > span {
@@ -168,15 +166,15 @@ body.quick-start-open .pc-menu-overlay {
 }
 
 .quick-start-progress {
-  color: #0078b3;
-  font-size: 0.75rem;
+  color: #52657b;
+  font-size: 0.875rem;
   font-weight: 600;
   margin: 0 32px 12px 0;
 }
 
 .quick-start-note {
-  color: #596a82;
-  font-size: 0.78rem;
+  color: #52657b;
+  font-size: 1rem;
   line-height: 1.6;
   margin: 0 0 24px;
 }
@@ -200,13 +198,25 @@ body.quick-start-open .pc-menu-overlay {
 }
 
 .quick-start-footer .btn {
+  font-size: 1rem;
   margin: 0;
-  min-height: 40px;
-  padding: 9px 14px;
+  min-height: 44px;
+  padding: 10px 16px;
+}
+
+.quick-start-footer .btn-primary {
+  background: #315f7b;
+  border-color: #315f7b;
+}
+
+.quick-start-footer .btn-primary:hover,
+.quick-start-footer .btn-primary:active {
+  background: #254b64;
+  border-color: #254b64;
 }
 
 .quick-start-footer .btn-link {
-  color: #596a82;
+  color: #52657b;
   margin-right: auto;
   padding-left: 0;
   padding-right: 4px;
