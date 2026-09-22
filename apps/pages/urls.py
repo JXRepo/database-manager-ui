@@ -4,6 +4,7 @@ from django.contrib.auth import views as auth_views
 from . import views
 from .auth_views import RateLimitedLoginView
 from .credential_validation import validate_account_credentials
+from .getting_started import getting_started_view
 from .views import account_settings_view, register_view
 from .forms import StyledPasswordChangeForm
 from .views import upload_json_view
@@ -30,6 +31,7 @@ from .views import (
 urlpatterns = [
     path("", views.index, name="index"),
     path("healthz/", views.healthz_view, name="healthz"),
+    path("getting-started/", getting_started_view, name="getting_started"),
     path("accounts/login/", RateLimitedLoginView.as_view()),
     path("accounts/register/", register_view),
     path(

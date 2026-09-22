@@ -75,6 +75,15 @@
           </a>
         </li>
 
+        {% if request.user.is_authenticated %}
+        <li class="pc-item">
+          <a href="{% url 'getting_started' %}" class="pc-link" data-open-quick-start>
+            <span class="pc-micon"><i data-feather="help-circle"></i></span>
+            <span class="pc-mtext">Quick start</span>
+          </a>
+        </li>
+        {% endif %}
+
         <li class="pc-item pc-caption">
           <label>Account</label>
         </li>

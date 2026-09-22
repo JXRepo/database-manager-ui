@@ -1,0 +1,53 @@
+<form method="post" action="{% url 'getting_started' %}" class="quick-start-form">
+  {% csrf_token %}
+  <div class="quick-start-header">
+    <h2 id="{{ heading_id }}" tabindex="-1">{{ guide_title }}</h2>
+    {% if is_dialog %}
+      <button type="submit" name="next" value="{{ request.get_full_path }}" class="quick-start-close" data-guide-dismiss aria-label="Close quick start">
+        <i data-feather="x" aria-hidden="true"></i>
+      </button>
+    {% endif %}
+  </div>
+  <p class="quick-start-intro">Find, share and explore materials simulation data in one place. Here is where to start.</p>
+
+  <div class="quick-start-actions">
+    <button type="submit" name="next" value="{% url 'search' %}" class="quick-start-action">
+      <span class="quick-start-icon"><i data-feather="search" aria-hidden="true"></i></span>
+      <span class="quick-start-copy">
+        <strong>Search</strong>
+        <span>Browse data you can access. Open a record to review its metadata and available plots, or export its JSON.</span>
+      </span>
+      <i class="quick-start-arrow" data-feather="chevron-right" aria-hidden="true"></i>
+    </button>
+    <button type="submit" name="next" value="{% url 'upload_json' %}" class="quick-start-action">
+      <span class="quick-start-icon"><i data-feather="upload" aria-hidden="true"></i></span>
+      <span class="quick-start-copy">
+        <strong>Upload Data</strong>
+        <span>Upload your simulation JSON files. Each data object becomes a separate record after validation.</span>
+      </span>
+      <i class="quick-start-arrow" data-feather="chevron-right" aria-hidden="true"></i>
+    </button>
+    <button type="submit" name="next" value="{% url 'json_data_list' %}" class="quick-start-action">
+      <span class="quick-start-icon"><i data-feather="folder" aria-hidden="true"></i></span>
+      <span class="quick-start-copy">
+        <strong>My Data</strong>
+        <span>Manage your uploads, choose who can access them, and export or delete your own records.</span>
+      </span>
+      <i class="quick-start-arrow" data-feather="chevron-right" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <p class="quick-start-note">You can reopen this guide from <strong>Quick start</strong> in the menu or the help icon at the top.</p>
+  {% if is_dialog %}
+    <div class="quick-start-error" role="alert" hidden>
+      <p>We couldn't save your choice. Try again, or close this guide for now.</p>
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-guide-close-unsaved>Close for now</button>
+    </div>
+  {% endif %}
+  <div class="quick-start-footer">
+    {% if is_dialog %}
+      <button type="submit" name="next" value="{{ request.get_full_path }}" class="btn btn-link" data-guide-dismiss>Skip for now</button>
+    {% endif %}
+    <button type="submit" name="next" value="{% url 'search' %}" class="btn btn-primary">Start exploring</button>
+  </div>
+</form>

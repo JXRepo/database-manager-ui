@@ -1,0 +1,5 @@
+{% if request.user.is_authenticated %}
+<dialog id="quick-start-dialog" class="quick-start-dialog" aria-labelledby="quick-start-title" data-auto-show="{{ show_getting_started|yesno:'true,false' }}" data-dismissed="{{ getting_started_dismissed|yesno:'true,false' }}">
+  {% include "includes/getting_started_content.html" with heading_id="quick-start-title" guide_title="Welcome to the data platform" is_dialog=True %}
+</dialog>
+{% endif %}

@@ -38,6 +38,13 @@
       <!-- [Mobile Media Block end] -->
       <div class="ms-auto">
         <ul class="list-unstyled">
+          {% if request.user.is_authenticated %}
+          <li class="pc-h-item">
+            <a href="{% url 'getting_started' %}" class="pc-head-link" data-open-quick-start aria-label="Quick start" title="Quick start">
+              <i data-feather="help-circle" aria-hidden="true"></i>
+            </a>
+          </li>
+          {% endif %}
           <li class="dropdown pc-h-item">
             <a
               class="pc-head-link dropdown-toggle arrow-none me-0"
@@ -174,3 +181,4 @@
       </div>
     </div>
 </header>
+{% include "includes/getting_started_dialog.html" %}

@@ -137,6 +137,8 @@ class AccountProfile(models.Model):
         Time when the ORCID identity was authenticated.
     orcid_disconnected_at : datetime or None
         Most recent disconnect time used to reject older linking callbacks.
+    getting_started_dismissed_at : datetime or None
+        Time when the user finished or skipped the optional introduction.
     """
 
     user = models.OneToOneField(
@@ -162,6 +164,11 @@ class AccountProfile(models.Model):
         null=True,
         blank=True,
         default=None,
+        editable=False,
+    )
+    getting_started_dismissed_at = models.DateTimeField(
+        null=True,
+        blank=True,
         editable=False,
     )
 

@@ -25,3 +25,6 @@
 
 <!-- Your Custom CSS -->
 <link rel="stylesheet" href="{% static "assets/css/custom.css" %}" >
+{% if request.user.is_authenticated %}
+<link rel="stylesheet" href="{% static 'assets/css/getting-started.css' %}">
+{% endif %}

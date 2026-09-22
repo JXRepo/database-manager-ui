@@ -201,6 +201,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.pages.context_processors.shared_data_notifications",
+                "apps.pages.getting_started.getting_started_context",
             ],
         },
     },

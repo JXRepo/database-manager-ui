@@ -1,0 +1,13 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Quick start{% endblock title %}
+
+{% block content %}
+<main class="pc-container">
+  <div class="pc-content">
+    <section class="quick-start-page" aria-labelledby="quick-start-page-title">
+      {% include "includes/getting_started_content.html" with heading_id="quick-start-page-title" guide_title="Quick start" is_dialog=False %}
+    </section>
+  </div>
+</main>
+{% endblock content %}
