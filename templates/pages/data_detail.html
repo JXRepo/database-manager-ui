@@ -2295,7 +2295,7 @@ function downloadCurrentPlot() {
   return values.map((value, index) => `${index}: ${value}`).join("\n");
 }
 
-function updateRawValues(xVariable, yVariable) {
+function updateRawValues(xVariable, yVariable, pointCount) {
   if (!xVariable || !yVariable) {
     return;
   }
@@ -2308,8 +2308,8 @@ function updateRawValues(xVariable, yVariable) {
   xRawMeta.textContent = "";
   yRawMeta.textContent = "";
 
-  xRawPre.textContent = formatRawValues(xVariable.values);
-  yRawPre.textContent = formatRawValues(yVariable.values);
+  xRawPre.textContent = formatRawValues(xVariable.values.slice(0, pointCount));
+  yRawPre.textContent = formatRawValues(yVariable.values.slice(0, pointCount));
 }
 
 
@@ -2424,15 +2424,9 @@ function updateRawValues(xVariable, yVariable) {
     });
 
 updatePlotTitlePosition(chartInstance);
-updateRawValues(xVariable, yVariable);
+updateRawValues(xVariable, yVariable, pointCount);
 
-if (xVariable.values.length !== yVariable.values.length) {
-  plotStatus.textContent =
-    `${pointCount} shared points plotted. Raw arrays have different lengths.`;
-} else {
-  plotStatus.textContent =
-    `${pointCount} points plotted.`;
-}
+plotStatus.textContent = `${pointCount} points plotted.`;
   }
 
 
