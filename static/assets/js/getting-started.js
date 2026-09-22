@@ -17,12 +17,13 @@
   const finish = dialog.querySelector('[data-guide-finish]');
   const controls = form.querySelectorAll('button');
   const sidebar = document.querySelector('.pc-sidebar');
-  const steps = [{title: title.textContent, description: description.textContent}];
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const steps = [{title: title.textContent, description: description.cloneNode(true)}];
   dialog.querySelector('[data-guide-steps]').content.querySelectorAll('[data-tour-target]').forEach(item => {
     steps.push({
       target: item.dataset.tourTarget,
       title: item.querySelector('h3').textContent,
-      description: item.querySelector('p').textContent,
+      description: item.querySelector('p'),
     });
   });
 
@@ -32,6 +33,28 @@
   let target = null;
   let sidebarScroll = null;
   let positionFrame = null;
+  let textAnimations = [];
+
+  function stopTextAnimations() {
+    textAnimations.forEach(animation => animation.cancel());
+    textAnimations = [];
+  }
+
+  function animateText() {
+    stopTextAnimations();
+    if (reducedMotion.matches) return;
+    [title, ...description.children].forEach((element, index) => {
+      textAnimations.push(element.animate([
+        {opacity: 0, transform: 'translateY(6px)'},
+        {opacity: 1, transform: 'translateY(0)'},
+      ], {
+        duration: 240,
+        delay: index * 45,
+        easing: 'cubic-bezier(0.2, 0.7, 0.3, 1)',
+        fill: 'backwards',
+      }));
+    });
+  }
 
   function restoreSidebar() {
     sidebar?.classList.remove('quick-start-sidebar');
@@ -113,7 +136,8 @@
     const step = steps[stepIndex];
     const last = stepIndex === steps.length - 1;
     title.textContent = step.title;
-    description.textContent = step.description;
+    const content = step.description.cloneNode(true);
+    description.replaceChildren(...content.childNodes);
     progress.textContent = stepIndex ? `${stepIndex} of ${steps.length - 1}` : '';
     progress.hidden = stepIndex === 0;
     note.hidden = stepIndex !== 0;
@@ -139,6 +163,7 @@
     }
     positionCard();
     if (focusedControl.hidden) (last ? finish : next).focus();
+    animateText();
   }
 
   function openGuide() {
@@ -152,6 +177,7 @@
   function closeGuide() {
     if (positionFrame !== null) cancelAnimationFrame(positionFrame);
     positionFrame = null;
+    stopTextAnimations();
     restoreSidebar();
     dialog.close();
     document.body.classList.remove('quick-start-open');
@@ -221,6 +247,9 @@
   });
   dialog.querySelector('[data-guide-close-unsaved]').addEventListener('click', closeGuide);
   window.addEventListener('resize', schedulePosition);
+  reducedMotion.addEventListener('change', () => {
+    if (reducedMotion.matches) stopTextAnimations();
+  });
   document.addEventListener('scroll', schedulePosition, true);
   new ResizeObserver(schedulePosition).observe(card);
   if (dialog.dataset.autoShow === 'true') openGuide();

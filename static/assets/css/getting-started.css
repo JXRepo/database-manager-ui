@@ -122,7 +122,7 @@ body.quick-start-open .pc-menu-overlay {
 
 .quick-start-card:not([data-placement="center"]) h2 {
   font-family: inherit;
-  font-size: 1.25rem;
+  font-size: 1.4rem;
   font-weight: 600;
 }
 
@@ -152,6 +152,19 @@ body.quick-start-open .pc-menu-overlay {
   line-height: 1.65;
   margin: 14px 0 24px;
   overflow-wrap: anywhere;
+}
+
+.quick-start-lead {
+  color: #0078b3;
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.quick-start-intro > span {
+  display: block;
 }
 
 .quick-start-progress {
