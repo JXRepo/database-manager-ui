@@ -180,6 +180,10 @@
               </div>
             </div>
 
+            {% if profile.authenticated_orcid %}
+              <p class="text-muted mt-2 mb-0">ORCID fills empty email and institution fields when public details are available. You can complete or edit them above.</p>
+            {% endif %}
+
             <div class="account-actions mt-4">
               <button type="submit" class="btn btn-primary">
                 <i data-feather="save" class="me-2"></i>

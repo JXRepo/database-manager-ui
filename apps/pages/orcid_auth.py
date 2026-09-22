@@ -17,6 +17,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 
 from .middleware import requires_orcid_account_setup
 from .models import AccountProfile
+from .orcid_profile import fill_missing_orcid_profile
 from .session_policy import apply_login_session_policy
 
 
@@ -211,7 +212,7 @@ def consume_orcid_transaction(request, received_state) -> ORCIDTransaction:
     )
 
 
-def complete_orcid_login(request, orcid, next_url, remember_me=False) -> HttpResponse:
+def complete_orcid_login(request, orcid, next_url, remember_me=False, access_token=None) -> HttpResponse:
     """
     Resolve a verified ORCID identity into one safe local login
 
@@ -227,6 +228,8 @@ def complete_orcid_login(request, orcid, next_url, remember_me=False) -> HttpRes
         Sanitized local redirect from the consumed transaction.
     remember_me : bool
         Validated persistence choice from the consumed transaction.
+    access_token : str or None
+        Provider token for an optional public profile import after login.
 
     Returns
     -------
@@ -247,6 +250,7 @@ def complete_orcid_login(request, orcid, next_url, remember_me=False) -> HttpRes
             and request.user.is_active
             and identity_profile.user.is_active
         ):
+            fill_missing_orcid_profile(request.user.pk, orcid, access_token)
             messages.success(request, "Signed in with ORCID.")
             if requires_orcid_account_setup(request.user):
                 setup_url = reverse("orcid_setup_credentials")
@@ -319,6 +323,7 @@ def complete_orcid_login(request, orcid, next_url, remember_me=False) -> HttpRes
 
         login(request, current_user)
         apply_login_session_policy(request, remember_me=remember_me)
+    fill_missing_orcid_profile(current_user.pk, orcid, access_token)
     messages.success(request, "Signed in with ORCID.")
     if requires_orcid_account_setup(current_user):
         setup_url = reverse("orcid_setup_credentials")
@@ -326,7 +331,7 @@ def complete_orcid_login(request, orcid, next_url, remember_me=False) -> HttpRes
     return redirect(next_url)
 
 
-def complete_orcid_link(request, orcid_transaction, orcid) -> HttpResponse:
+def complete_orcid_link(request, orcid_transaction, orcid, access_token=None) -> HttpResponse:
     """
     Link one verified ORCID identity to its initiating local account
 
@@ -340,6 +345,8 @@ def complete_orcid_link(request, orcid_transaction, orcid) -> HttpResponse:
         Consumed transaction bound to the initiating account and start time.
     orcid : str
         Canonical verified ORCID identity returned by the provider.
+    access_token : str or None
+        Provider token for an optional public profile import after linking.
 
     Returns
     -------
@@ -384,38 +391,36 @@ def complete_orcid_link(request, orcid_transaction, orcid) -> HttpResponse:
                     "ORCID account linking could not be completed. Start a new connection.",
                 )
                 return redirect("account_settings")
-            if current_profile.authenticated_orcid == orcid:
-                messages.success(request, "ORCID iD connected.")
-                return redirect("account_settings")
-            if current_profile.authenticated_orcid is not None:
+            if current_profile.authenticated_orcid not in (None, orcid):
                 messages.error(
                     request,
                     "ORCID account linking could not be completed.",
                 )
                 return redirect("account_settings")
 
-            identity_owner = (
-                AccountProfile.objects.select_for_update()
-                .filter(authenticated_orcid=orcid)
-                .first()
-            )
-            if identity_owner is not None:
-                messages.error(
-                    request,
-                    "This ORCID iD is already connected to another account. "
-                    "Please sign in to that account and disconnect it in Settings "
-                    "before connecting it here.",
+            if current_profile.authenticated_orcid is None:
+                identity_owner = (
+                    AccountProfile.objects.select_for_update()
+                    .filter(authenticated_orcid=orcid)
+                    .first()
                 )
-                return redirect("account_settings")
+                if identity_owner is not None:
+                    messages.error(
+                        request,
+                        "This ORCID iD is already connected to another account. "
+                        "Please sign in to that account and disconnect it in Settings "
+                        "before connecting it here.",
+                    )
+                    return redirect("account_settings")
 
-            current_profile.authenticated_orcid = orcid
-            current_profile.orcid_authenticated_at = timezone.now()
-            current_profile.save(
-                update_fields=[
-                    "authenticated_orcid",
-                    "orcid_authenticated_at",
-                ]
-            )
+                current_profile.authenticated_orcid = orcid
+                current_profile.orcid_authenticated_at = timezone.now()
+                current_profile.save(
+                    update_fields=[
+                        "authenticated_orcid",
+                        "orcid_authenticated_at",
+                    ]
+                )
     except (IntegrityError, User.DoesNotExist):
         messages.error(
             request,
@@ -423,6 +428,7 @@ def complete_orcid_link(request, orcid_transaction, orcid) -> HttpResponse:
         )
         return redirect("account_settings")
 
+    fill_missing_orcid_profile(current_user.pk, orcid, access_token)
     messages.success(request, "ORCID iD connected.")
     return redirect("account_settings")
 

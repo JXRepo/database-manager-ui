@@ -812,7 +812,7 @@ class ORCIDCallbackTestMixin:
 
     def setUp(self):
         """
-        Patch only the external provider exchange
+        Replace external provider calls while retaining real account resolution
         """
         super().setUp()
         exchange_patcher = patch(
@@ -821,6 +821,12 @@ class ORCIDCallbackTestMixin:
         self.exchange = exchange_patcher.start()
         self.addCleanup(exchange_patcher.stop)
         self.exchange.return_value = self._provider_payload()
+        profile_patcher = patch("requests.get")
+        self.profile_request = profile_patcher.start()
+        self.addCleanup(profile_patcher.stop)
+        response = self.profile_request.return_value.__enter__.return_value
+        response.status_code = 200
+        response.iter_content.return_value = [b"{}"]
 
     def _provider_payload(self, **overrides):
         """

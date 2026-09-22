@@ -63,6 +63,14 @@ on the hosted website; deploying the code does not copy them to the cloud.
   and select Connect ORCID in Account Settings. Signing in directly with an
   unlinked ORCID identity creates a separate account; matching names or email
   addresses do not merge accounts.
+- Signing in or connecting with ORCID fills empty email and institution fields
+  from public profile information. It preserves existing values and never uses
+  an email match to select or merge accounts. Email must be public and verified
+  by ORCID; the primary address is preferred when available. Institution comes
+  from one distinct current public employment organization. Missing, private,
+  invalid or ambiguous details remain editable in Account Settings. Optional
+  profile requests have timeouts and size limits; their failure does not prevent
+  sign in. Tokens are used during the callback only and are not stored.
 - One verified ORCID iD can belong to only one platform account. Account Settings
   shows Connected and a Disconnect button. Disconnect removes the link directly
   and retains your username, password, account, and uploaded data.

@@ -570,6 +570,7 @@ def orcid_callback_view(request):
             request,
             orcid_transaction,
             orcid,
+            access_token=access_token,
         )
 
     return complete_orcid_login(
@@ -577,6 +578,7 @@ def orcid_callback_view(request):
         orcid,
         orcid_transaction.next_url,
         remember_me=orcid_transaction.remember_me,
+        access_token=access_token,
     )
 
 
