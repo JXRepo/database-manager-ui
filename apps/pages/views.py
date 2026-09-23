@@ -190,7 +190,17 @@ def register_view(request):
 @login_required
 def account_settings_view(request):
     """
-    Update the signed-in user's basic account settings
+    Update the signed in user's account and optional research details
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated settings request with optional submitted form data.
+
+    Returns
+    -------
+    HttpResponse
+        Settings form or a redirect after saving valid changes.
     """
     profile, _created = AccountProfile.objects.get_or_create(user=request.user)
 
@@ -199,8 +209,9 @@ def account_settings_view(request):
 
         if form.is_valid():
             form.save()
-            profile.institution = form.cleaned_data["institution"]
-            profile.save(update_fields=["institution"])
+            for field_name in form.profile_field_names:
+                setattr(profile, field_name, form.cleaned_data[field_name])
+            profile.save(update_fields=form.profile_field_names)
             messages.success(request, "Account settings updated.")
             return redirect("account_settings")
     else:

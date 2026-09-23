@@ -40,6 +40,8 @@
     font-weight: 600;
     text-align: right;
     word-break: break-word;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .account-actions {
@@ -147,15 +149,17 @@
               {% endfor %}
             {% endif %}
 
-            {% for field in form %}
-              <div class="form-group mb-3">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% for error in field.errors %}
-                  <span class="d-block mt-1 text-danger">{{ error }}</span>
-                {% endfor %}
-              </div>
-            {% endfor %}
+            <div class="row">
+              {% for field in form %}
+                <div class="{% if field.name == 'website' or field.name == 'research_keywords' %}col-12{% else %}col-md-6{% endif %} form-group mb-3">
+                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field }}
+                  {% for error in field.errors %}
+                    <span class="d-block mt-1 text-danger">{{ error }}</span>
+                  {% endfor %}
+                </div>
+              {% endfor %}
+            </div>
 
             <div class="orcid-connect-panel mt-2">
               <div class="orcid-connect-copy">
@@ -181,7 +185,7 @@
             </div>
 
             {% if profile.authenticated_orcid %}
-              <p class="text-muted mt-2 mb-0">ORCID fills empty email and institution fields when public details are available. You can complete or edit them above.</p>
+              <p class="text-muted mt-2 mb-0">ORCID fills empty profile fields when public details are available, including your name, email, institution, department, position, website and research keywords. You can complete or edit them above.</p>
             {% endif %}
 
             <div class="account-actions mt-4">
@@ -211,12 +215,28 @@
               <span class="account-summary-value">{{ request.user.username }}</span>
             </div>
             <div class="account-summary-row">
+              <span class="account-summary-label">Name</span>
+              <span class="account-summary-value">{{ profile.display_name|default:"-" }}</span>
+            </div>
+            <div class="account-summary-row">
               <span class="account-summary-label">Email</span>
               <span class="account-summary-value">{{ request.user.email|default:"-" }}</span>
             </div>
             <div class="account-summary-row">
               <span class="account-summary-label">Institution</span>
               <span class="account-summary-value">{{ profile.institution|default:"-" }}</span>
+            </div>
+            <div class="account-summary-row">
+              <span class="account-summary-label">Department</span>
+              <span class="account-summary-value">{{ profile.department|default:"-" }}</span>
+            </div>
+            <div class="account-summary-row">
+              <span class="account-summary-label">Position</span>
+              <span class="account-summary-value">{{ profile.position|default:"-" }}</span>
+            </div>
+            <div class="account-summary-row">
+              <span class="account-summary-label">Website</span>
+              <span class="account-summary-value">{{ profile.website|default:"-" }}</span>
             </div>
             <div class="account-summary-row">
               <span class="account-summary-label">Verified ORCID iD</span>

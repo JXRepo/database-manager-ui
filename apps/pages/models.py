@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import URLValidator
 
 class Product(models.Model):
     """
@@ -127,8 +128,18 @@ class AccountProfile(models.Model):
     ----------
     user : User
         Account that owns this profile.
+    display_name : str
+        Optional research name, separate from the login username.
     institution : str
         Optional institution name.
+    department : str
+        Optional department within the institution.
+    position : str
+        Optional role at the institution.
+    website : str
+        Optional HTTP or HTTPS homepage.
+    research_keywords : str
+        Optional research interests as editable text.
     orcid : str
         Unverified legacy ORCID text.
     authenticated_orcid : str or None
@@ -146,7 +157,16 @@ class AccountProfile(models.Model):
         on_delete=models.CASCADE,
         related_name="profile",
     )
+    display_name = models.CharField(max_length=255, blank=True)
     institution = models.CharField(max_length=255, blank=True)
+    department = models.CharField(max_length=255, blank=True)
+    position = models.CharField(max_length=255, blank=True)
+    website = models.URLField(
+        max_length=500,
+        blank=True,
+        validators=[URLValidator(schemes=["http", "https"])],
+    )
+    research_keywords = models.CharField(max_length=1000, blank=True)
     orcid = models.CharField(max_length=32, blank=True)
     authenticated_orcid = models.CharField(
         max_length=19,

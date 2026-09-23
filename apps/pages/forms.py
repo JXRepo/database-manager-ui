@@ -3,6 +3,7 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.forms import PasswordChangeForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import password_validators_help_text_html
+from django.core.validators import URLValidator
 
 
 
@@ -97,7 +98,14 @@ class SignInForm(AuthenticationForm):
 
 
 class AccountSettingsForm(forms.ModelForm):
-    """Update basic account profile fields"""
+    """
+    Update account credentials and optional research profile details
+    """
+
+    profile_field_names = (
+        "display_name", "institution", "department", "position", "website",
+        "research_keywords",
+    )
 
     username = forms.CharField(
         widget=forms.TextInput(
@@ -118,6 +126,15 @@ class AccountSettingsForm(forms.ModelForm):
         ),
     )
 
+    display_name = forms.CharField(
+        label="Name",
+        required=False,
+        max_length=255,
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Name (optional)"}
+        ),
+    )
+
     institution = forms.CharField(
         required=False,
         widget=forms.TextInput(
@@ -128,12 +145,60 @@ class AccountSettingsForm(forms.ModelForm):
         ),
     )
 
+    department = forms.CharField(
+        required=False,
+        max_length=255,
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Department (optional)"}
+        ),
+    )
+
+    position = forms.CharField(
+        required=False,
+        max_length=255,
+        widget=forms.TextInput(
+            attrs={"class": "form-control", "placeholder": "Position (optional)"}
+        ),
+    )
+
+    website = forms.URLField(
+        required=False,
+        max_length=500,
+        assume_scheme="https",
+        validators=[URLValidator(schemes=["http", "https"])],
+        widget=forms.URLInput(
+            attrs={"class": "form-control", "placeholder": "https://example.com (optional)"}
+        ),
+    )
+
+    research_keywords = forms.CharField(
+        label="Research keywords",
+        required=False,
+        max_length=1000,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "placeholder": "Research interests (optional)",
+                "rows": 2,
+            }
+        ),
+    )
+
     class Meta:
         model = User
         fields = ("username", "email")
 
     def __init__(self, *args, **kwargs):
-        """Populate optional profile fields from the current user profile"""
+        """
+        Populate optional details from the current user profile
+
+        Parameters
+        ----------
+        *args : tuple
+            Positional form arguments.
+        **kwargs : dict
+            Form data and the existing user instance.
+        """
         super().__init__(*args, **kwargs)
 
         profile = getattr(self.instance, "profile", None)
@@ -141,7 +206,8 @@ class AccountSettingsForm(forms.ModelForm):
         if profile is None:
             return
 
-        self.fields["institution"].initial = profile.institution
+        for field_name in self.profile_field_names:
+            self.fields[field_name].initial = getattr(profile, field_name)
 
     def clean_username(self):
         """Return a unique username for the current account"""

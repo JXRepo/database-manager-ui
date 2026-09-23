@@ -63,14 +63,23 @@ on the hosted website; deploying the code does not copy them to the cloud.
   and select Connect ORCID in Account Settings. Signing in directly with an
   unlinked ORCID identity creates a separate account; matching names or email
   addresses do not merge accounts.
-- Signing in or connecting with ORCID fills empty email and institution fields
-  from public profile information. It preserves existing values and never uses
-  an email match to select or merge accounts. Email must be public and verified
-  by ORCID; the primary address is preferred when available. Institution comes
-  from one distinct current public employment organization. Missing, private,
-  invalid or ambiguous details remain editable in Account Settings. Optional
-  profile requests have timeouts and size limits; their failure does not prevent
-  sign in. Tokens are used during the callback only and are not stored.
+- Signing in or connecting with ORCID fills empty name, email, institution,
+  department, position, website and research keyword fields from public profile
+  information. Name is separate from the login username. Account Settings lets
+  users edit all these optional details; existing values are preserved, and an
+  email or name match never selects or merges accounts. Email must be public and
+  verified by ORCID; the primary address is preferred when available. Name uses
+  the published name when available, otherwise the given and family names.
+  Website uses the first valid public HTTP or HTTPS link in the researcher's
+  preferred order; public keywords are deduplicated in that order.
+- Institution comes from one distinct current public employment organization.
+  An existing institution restricts department and position imports to matching
+  employment records; existing department and position values must also agree.
+  Ambiguous roles are left for manual entry. Missing, private, invalid or
+  oversized details remain editable in Account Settings. Up to two optional
+  requests read the person and employment sections, with timeouts and size
+  limits; their failure does not prevent sign in. Tokens are used during the
+  callback only and are not stored.
 - One verified ORCID iD can belong to only one platform account. Account Settings
   shows Connected and a Disconnect button. Disconnect removes the link directly
   and retains your username, password, account, and uploaded data.

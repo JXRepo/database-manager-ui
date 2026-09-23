@@ -7,7 +7,7 @@ import requests
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.core.validators import validate_email
+from django.core.validators import URLValidator, validate_email
 from django.db import DatabaseError, transaction
 from django.utils import timezone
 
@@ -33,7 +33,7 @@ def _read_section(api_url, orcid, section, access_token):
     orcid : str
         Verified identifier belonging to the signed in account.
     section : str
-        Email or employment endpoint to read.
+        Person or employment endpoint to read.
     access_token : str
         Token returned by this OAuth exchange, used only for this request.
 
@@ -80,6 +80,8 @@ def _public_email(data):
     str
         Valid address that fits the local user field, or an empty string.
     """
+    if not isinstance(data, dict):
+        return ""
     emails = data.get("email")
     if not isinstance(emails, list):
         return ""
@@ -104,6 +106,115 @@ def _public_email(data):
         if not fallback:
             fallback = value
     return fallback
+
+
+def _profile_text(value, field):
+    """
+    Normalize provider text that fits an optional profile field
+
+    Parameters
+    ----------
+    value : object
+        Provider value before type and length checks.
+    field : str
+        Destination field on the account profile.
+
+    Returns
+    -------
+    str
+        Normalized text, or an empty string when unusable.
+    """
+    if not isinstance(value, str):
+        return ""
+    value = " ".join(value.split())
+    if "\x00" in value or len(value) > AccountProfile._meta.get_field(field).max_length:
+        return ""
+    return value
+
+
+def _public_items(data, section, key):
+    """
+    Read public person items in the order chosen by the researcher
+
+    Parameters
+    ----------
+    data : dict
+        ORCID person response.
+    section : str
+        Container for the requested items.
+    key : str
+        List key within that container.
+
+    Returns
+    -------
+    list of dict
+        Public items ordered by descending display index, with stable ties.
+    """
+    container = data.get(section)
+    if not isinstance(container, dict) or not isinstance(container.get(key), list):
+        return []
+    ranked = []
+    for item in container[key]:
+        if not isinstance(item, dict) or item.get("visibility") not in ("public", "PUBLIC"):
+            continue
+        index = item.get("display-index", 0)
+        try:
+            index = int(index) if isinstance(index, (int, str)) else 0
+        except ValueError:
+            index = 0
+        ranked.append((index, item))
+    ranked.sort(key=lambda entry: entry[0], reverse=True)
+    return [item for _index, item in ranked]
+
+
+def _public_person(data):
+    """
+    Extract a public name, preferred website and research keywords
+
+    Parameters
+    ----------
+    data : dict
+        ORCID person response, including per item visibility.
+
+    Returns
+    -------
+    dict
+        Optional account profile values that pass local validation.
+    """
+    values = {}
+    name = data.get("name")
+    if isinstance(name, dict) and name.get("visibility") in ("public", "PUBLIC"):
+        parts = {}
+        for key in ("credit-name", "given-names", "family-name"):
+            part = name.get(key)
+            parts[key] = _profile_text(part.get("value"), "display_name") if isinstance(part, dict) else ""
+        full_name = " ".join(part for part in (parts["given-names"], parts["family-name"]) if part)
+        values["display_name"] = parts["credit-name"] or _profile_text(full_name, "display_name")
+
+    for item in _public_items(data, "researcher-urls", "researcher-url"):
+        url = item.get("url")
+        if not isinstance(url, dict):
+            continue
+        website = _profile_text(url.get("value"), "website")
+        try:
+            URLValidator(schemes=["http", "https"])(website)
+        except ValidationError:
+            continue
+        values["website"] = website
+        break
+
+    keywords = []
+    seen = set()
+    for item in _public_items(data, "keywords", "keyword"):
+        keyword = _profile_text(item.get("content"), "research_keywords")
+        if not keyword or keyword.casefold() in seen:
+            continue
+        keywords.append(keyword)
+        seen.add(keyword.casefold())
+    values["research_keywords"] = _profile_text(
+        ", ".join(keywords), "research_keywords"
+    )
+    return values
 
 
 def _date_bound(value, end=False):
@@ -150,24 +261,27 @@ def _date_bound(value, end=False):
     return date(year, month, parts.get("day", last_day))
 
 
-def _current_institution(data):
+def _current_employment(data, profile):
     """
-    Select one distinct current public employer without guessing between them
+    Select compatible details from one unambiguous current public employment
 
     Parameters
     ----------
     data : dict
         ORCID version 3 employment affiliation groups.
+    profile : AccountProfile
+        Locked current profile whose manual affiliation values must be respected.
 
     Returns
     -------
-    str
-        Unambiguous current institution, or an empty string for manual entry.
+    dict
+        Institution and any unambiguous matching department and position.
     """
     groups = data.get("affiliation-group")
     if not isinstance(groups, list):
-        return ""
+        return {}
     institutions = {}
+    existing_institution = " ".join(profile.institution.split()).casefold()
     today = timezone.localdate()
     for group in groups:
         if not isinstance(group, dict) or not isinstance(group.get("summaries"), list):
@@ -188,19 +302,38 @@ def _current_institution(data):
             organization = item.get("organization")
             if not isinstance(organization, dict):
                 continue
-            name = organization.get("name")
-            if not isinstance(name, str):
+            name = _profile_text(organization.get("name"), "institution")
+            if not name or (existing_institution and name.casefold() != existing_institution):
                 continue
-            name = " ".join(name.split())
-            if not name or "\x00" in name or len(name) > AccountProfile._meta.get_field("institution").max_length:
-                continue
-            institutions.setdefault(name.casefold(), name)
-    return next(iter(institutions.values())) if len(institutions) == 1 else ""
+            values = {
+                "institution": name,
+                "department": _profile_text(item.get("department-name"), "department"),
+                "position": _profile_text(item.get("role-title"), "position"),
+            }
+            institutions.setdefault(name.casefold(), []).append(values)
+    if len(institutions) != 1:
+        return {}
+    employments = next(iter(institutions.values()))
+    compatible = {}
+    for values in employments:
+        if any(
+            getattr(profile, field).strip()
+            and " ".join(getattr(profile, field).split()).casefold() != values[field].casefold()
+            for field in ("department", "position")
+        ):
+            continue
+        pair = (values["department"].casefold(), values["position"].casefold())
+        compatible.setdefault(pair, values)
+    if not compatible:
+        return {}
+    if len(compatible) == 1:
+        return next(iter(compatible.values()))
+    return {"institution": employments[0]["institution"]}
 
 
 def fill_missing_orcid_profile(user_id, orcid, access_token):
     """
-    Fill blank email and institution fields after successful ORCID authentication
+    Fill blank account details after successful ORCID authentication
 
     Perform optional network reads outside database locks, then recheck the
     identity and current field values before writing. Never store the token.
@@ -225,15 +358,21 @@ def fill_missing_orcid_profile(user_id, orcid, access_token):
         ).first()
         if profile is None:
             return
-        email = ""
-        institution = ""
-        if not profile.user.email.strip():
-            email = _public_email(_read_section(api_url, orcid, "email", access_token))
-        if not profile.institution.strip():
-            institution = _current_institution(
-                _read_section(api_url, orcid, "employments", access_token)
-            )
-        if not email and not institution:
+        person = {}
+        employment = {}
+        if not profile.user.email.strip() or any(
+            not getattr(profile, field).strip()
+            for field in ("display_name", "website", "research_keywords")
+        ):
+            person = _read_section(api_url, orcid, "person", access_token)
+        if any(
+            not getattr(profile, field).strip()
+            for field in ("institution", "department", "position")
+        ):
+            employment = _read_section(api_url, orcid, "employments", access_token)
+        email = _public_email(person.get("emails"))
+        values = _public_person(person)
+        if not email and not any(values.values()) and not employment:
             return
 
         with transaction.atomic():
@@ -250,8 +389,13 @@ def fill_missing_orcid_profile(user_id, orcid, access_token):
             if email and not user.email.strip():
                 user.email = email
                 user.save(update_fields=["email"])
-            if institution and not current_profile.institution.strip():
-                current_profile.institution = institution
-                current_profile.save(update_fields=["institution"])
+            values.update(_current_employment(employment, current_profile))
+            changed = []
+            for field, value in values.items():
+                if value and not getattr(current_profile, field).strip():
+                    setattr(current_profile, field, value)
+                    changed.append(field)
+            if changed:
+                current_profile.save(update_fields=changed)
     except DatabaseError:
         logger.warning("Could not save optional ORCID profile details")
