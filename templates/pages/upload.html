@@ -1,9 +1,10 @@
 {% extends "layouts/base.html" %}
-{% load static %}
+{% load static upload_limits %}
 
 {% block title %}Upload Data{% endblock title %}
 
 {% block content %}
+{% upload_limits as limits %}
 <style>
   #upload-results > .alert {
     overflow-wrap: anywhere;
@@ -79,6 +80,15 @@
     cursor: wait;
   }
 
+  .upload-limits {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .upload-limits p {
+    font-size: inherit;
+  }
+
 </style>
 <div class="pc-container">
   <div class="pc-content">
@@ -103,7 +113,7 @@
         <h5>Upload JSON Files</h5>
       </div>
       <div class="card-body">
-        <form id="uploadForm" method="post" enctype="multipart/form-data">
+        <form id="uploadForm" method="post" enctype="multipart/form-data"{% if limits.background_enabled %} data-jobs-url="{% url 'upload_jobs' %}"{% endif %} data-max-files="{{ limits.max_files }}">
           {% csrf_token %}
 
           <div class="mb-4">
@@ -114,7 +124,7 @@
                 <i class="ti ti-upload"></i>
 
                 <span id="placeholder-text">
-                  Click or drag <strong class="upload-limit-emphasis">up to 5</strong> JSON files to upload
+                  Click or drag <strong class="upload-limit-emphasis">up to {{ limits.max_files }}</strong> JSON files to upload
                 </span>
 
                 <div id="file-info" class="selected-file-info">
@@ -144,6 +154,19 @@
           </div>
 
         </form>
+
+        <section class="upload-limits border-top mt-4 pt-3 text-muted" aria-labelledby="upload-limits-heading">
+          <h6 id="upload-limits-heading" class="mb-2">Upload limits</h6>
+          <ul class="list-unstyled mb-2">
+            <li><strong>Per submission:</strong> {{ limits.max_files }} files; {{ limits.file_size }} per file; {{ limits.combined_size }} combined; {{ limits.max_objects }} objects.</li>
+            <li><strong>JSON depth:</strong> {{ limits.max_depth }} container levels.</li>
+            <li><strong>Per user:</strong> {{ limits.stored_size }} of stored JSON; {{ limits.attempts }} upload attempts per {{ limits.window }}, including failed submissions.</li>
+            {% if limits.background_enabled %}<li><strong>Background processing:</strong> 1 active submission per account; {{ limits.processing_window }} processing time per submission.</li>{% endif %}
+          </ul>
+          <p class="mb-1">Storage counts compact UTF-8 JSON, not original file sizes. Deleting your records frees this quota.</p>
+          <p class="mb-1">Each file is saved only when all its objects pass validation. An error rejects the whole file; other valid files can still be saved.</p>
+          <p class="mb-0">These are application allowances. Available memory, temporary disk space and database storage on the hosting plan may be lower.</p>
+        </section>
       </div>
     </div>
 

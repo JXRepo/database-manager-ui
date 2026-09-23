@@ -931,7 +931,7 @@ def _upload_label(value):
     return value.encode("utf-8", errors="replace").decode("utf-8")
 
 
-def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identifiers):
+def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identifiers, progress=None):
     """
     Inspect every object and collect independent issues before saving a file
 
@@ -947,6 +947,8 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         Number of surrounding JSON containers removed while unwrapping.
     saved_identifiers : set of str
         Identifiers and fingerprints from successfully saved files in this request.
+    progress : callable, optional
+        Observer receiving the stage, completed object count and total count.
 
     Returns
     -------
@@ -973,7 +975,9 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
     pending_objects = []
     prepared_objects = []
     prepared_reports = {}
-    for obj, object_report in zip(objects, file_report["objects"]):
+    for completed, (obj, object_report) in enumerate(zip(objects, file_report["objects"])):
+        if progress is not None:
+            progress("validating", completed, len(objects))
         content_error = False
         size_bytes = 0
         try:
@@ -1039,6 +1043,8 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
             prepared_objects.append(candidate)
             prepared_reports[identifier] = object_report
 
+    if progress is not None:
+        progress("validating", len(objects), len(objects))
     return prepared_objects, prepared_reports
 
 
@@ -1105,7 +1111,10 @@ def _inspect_upload_file(uploaded_file, file_report):
     return len(objects), object_depth
 
 
-def _process_upload_file(owner, file_report, uploaded_file, object_depth, saved_identifiers):
+def _process_upload_file(
+    owner, file_report, uploaded_file, object_depth, saved_identifiers,
+    progress=None, on_saved=None,
+):
     """
     Validate one complete file and record the outcome of its atomic save
 
@@ -1124,7 +1133,14 @@ def _process_upload_file(owner, file_report, uploaded_file, object_depth, saved_
         Surrounding containers removed during unwrapping.
     saved_identifiers : set of str
         Identifiers and fingerprints committed earlier in this submission.
+    progress : callable, optional
+        Observer receiving parsing, validation and saving progress.
+    on_saved : callable, optional
+        Persist the successful file report inside the data save transaction.
+        Failure to record this outcome also rolls back the data and notifications.
     """
+    if progress is not None:
+        progress("parsing", 0, None)
     uploaded_file.seek(0)
     payload = json.load(uploaded_file)
     if object_depth == 0:
@@ -1134,13 +1150,18 @@ def _process_upload_file(owner, file_report, uploaded_file, object_depth, saved_
     else:
         objects = payload["data"]
     prepared_objects, prepared_object_reports = _prepare_upload_file(
-        objects, owner, file_report, object_depth, saved_identifiers,
+        objects, owner, file_report, object_depth, saved_identifiers, progress=progress,
     )
     if file_report["issues"] or any(obj["issues"] for obj in file_report["objects"]):
         return
 
     try:
-        saved_objects = save_prepared_json_data(owner, prepared_objects)
+        if progress is not None:
+            progress("saving", len(objects), len(objects))
+        with transaction.atomic():
+            saved_objects = save_prepared_json_data(owner, prepared_objects)
+            if on_saved is not None:
+                on_saved(dict(file_report, status="uploaded", saved_count=len(saved_objects)))
     except UploadIdentifierConflict as error:
         for identifier in error.identifiers:
             object_report = prepared_object_reports[identifier]

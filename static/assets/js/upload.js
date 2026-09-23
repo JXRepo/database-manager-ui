@@ -10,13 +10,23 @@ document.addEventListener('DOMContentLoaded', function() {
   const submitLabel = document.getElementById('uploadButtonLabel');
   const status = document.getElementById('uploadStatus');
   const results = document.getElementById('upload-results');
-  const maxFiles = 5;
+  const maxFiles = Number(form.dataset.maxFiles) || 5;
+  const host = window.FairUploadHost;
+  const usesJobs = !!(form.dataset.jobsUrl && host && typeof XMLHttpRequest === 'function' &&
+    typeof fetch === 'function' && typeof window.crypto?.getRandomValues === 'function');
   let dragHighlightTimer = null;
   let uploading = false;
   let selectionSubmitted = false;
   let requestId = 0;
   let requestController = null;
   let fileRows = [];
+  let displayedJobId = null;
+  let activeSubmissionId = null;
+  let elapsedTimer = null;
+  let startedAt = 0;
+  let lastMessage = '';
+  let transferProgress = null;
+  let ignoreJobUpdates = false;
 
   removeBtn.textContent = 'x';
 
@@ -82,7 +92,7 @@ document.addEventListener('DOMContentLoaded', function() {
         spinner.setAttribute('aria-hidden', 'true');
         const label = document.createElement('span');
         label.className = 'selected-file-status';
-        label.textContent = 'Waiting';
+        label.textContent = usesJobs ? 'Ready' : 'Waiting';
         progress.append(spinner, label);
         row.append(fileName, progress);
         fileText.appendChild(row);
@@ -99,6 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   input.addEventListener('change', function(e) {
     if (uploading) return;
+    ignoreJobUpdates = true;
     updateSelectedFiles(Array.from(e.target.files));
   });
 
@@ -113,6 +124,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function showStatus(message) {
+    lastMessage = message;
     status.textContent = message;
     status.hidden = false;
   }
@@ -122,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
     file.state = state;
     file.row.dataset.state = state;
     file.label.textContent = label;
-    file.spinner.hidden = state !== 'processing';
+    file.spinner.hidden = !['processing', 'parsing', 'validating', 'saving'].includes(state);
   }
 
   function showUnconfirmed() {
@@ -270,6 +282,159 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
+  function startElapsed(createdAt) {
+    if (elapsedTimer) return;
+    startedAt = Date.parse(createdAt) || Date.now();
+    elapsedTimer = window.setInterval(function() {
+      const seconds = Math.floor((Date.now() - startedAt) / 1000);
+      status.textContent = `${lastMessage} · ${seconds}s elapsed`;
+      if (seconds >= 30 && host.getState().transferring) {
+        status.textContent += '. You can browse the sidebar while this upload continues.';
+      }
+    }, 1000);
+  }
+
+  function stopElapsed() {
+    window.clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+
+  function renderJob(job) {
+    if (ignoreJobUpdates) return;
+    if (activeSubmissionId && job.submission_id !== activeSubmissionId) return;
+    if (!uploading && !selectionSubmitted && input.files.length) return;
+    if (displayedJobId !== job.id || fileRows.length !== job.files.length) {
+      if (fileRows.length !== job.files.length || !uploading) updateSelectedFiles(job.files);
+      displayedJobId = job.id;
+    }
+    selectionSubmitted = true;
+    const labels = {
+      waiting: 'Waiting', parsing: 'Reading', validating: 'Validating', saving: 'Saving',
+      uploaded: 'Uploaded', failed: 'Failed', unconfirmed: 'Unconfirmed',
+    };
+    job.files.forEach(function(file, index) {
+      let label = labels[file.status] || 'Unconfirmed';
+      if (file.status === 'validating' && Number.isInteger(file.object_count)) {
+        label = `${file.validated_count} / ${file.object_count} checked`;
+      } else if (file.status === 'uploaded') {
+        label = `Uploaded · ${file.saved_count} objects`;
+      }
+      setFileState(index, file.status, label);
+    });
+    const finished = ['completed', 'interrupted', 'rejected'].includes(job.status);
+    setUploading(!finished);
+    if (finished) {
+      stopElapsed();
+      displayReport({level: job.level === 'info' ? 'warning' : job.level,
+        summary: job.summary || 'Upload finished.', report_html: job.report_html || ''});
+    } else startElapsed(job.created_at);
+  }
+
+  async function recoverSubmission(submissionId, message) {
+    try {
+      const response = await fetch(form.dataset.jobsUrl, {
+        credentials: 'same-origin', cache: 'no-store', headers: {Accept: 'application/json'},
+      });
+      if (response.ok && !response.redirected) {
+        const result = await response.json();
+        if (result.job?.submission_id === submissionId) {
+          host.accept(result.job);
+          return;
+        }
+      }
+    } catch (_) {}
+    if (transferProgress) transferProgress.hidden = true;
+    showUnconfirmed();
+    showStatus(message);
+    stopElapsed();
+    setUploading(false);
+    host.fail(message);
+  }
+
+  function uploadJob() {
+    const request = new XMLHttpRequest();
+    const data = new FormData(form);
+    const randomBytes = crypto.getRandomValues(new Uint8Array(16));
+    randomBytes[6] = (randomBytes[6] & 15) | 64;
+    randomBytes[8] = (randomBytes[8] & 63) | 128;
+    const hex = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    activeSubmissionId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    data.append('submission_id', activeSubmissionId);
+    const submissionId = activeSubmissionId;
+    displayedJobId = null;
+    if (!transferProgress) {
+      transferProgress = document.createElement('progress');
+      transferProgress.setAttribute('aria-label', 'File transfer progress');
+      transferProgress.max = 100;
+      transferProgress.style.cssText = 'display:block;width:240px;max-width:100%;margin:8px auto';
+      status.before(transferProgress);
+    }
+    transferProgress.hidden = false;
+    transferProgress.value = 0;
+    fileRows.forEach(function(file, index) {
+      setFileState(index, 'sending', 'Sending');
+    });
+    startElapsed();
+    request.open('POST', form.dataset.jobsUrl);
+    request.timeout = 60 * 60 * 1000;
+    request.setRequestHeader('Accept', 'application/json');
+    request.upload.addEventListener('progress', function(event) {
+      host.progress(event.loaded, event.lengthComputable ? event.total : 0);
+      if (event.lengthComputable) transferProgress.value = event.loaded / event.total * 100;
+      else transferProgress.removeAttribute('value');
+    });
+    request.upload.addEventListener('load', function() {
+      transferProgress.value = 100;
+      host.received();
+    });
+    request.addEventListener('load', function() {
+      let result;
+      try { result = JSON.parse(request.responseText); } catch (_) {}
+      if (request.status === 202 && result?.job?.submission_id === submissionId) {
+        transferProgress.hidden = true;
+        host.accept(result.job);
+        return;
+      }
+      if ([400, 403, 409, 429].includes(request.status)) {
+        const message = result?.error || (request.status === 429
+          ? 'Too many upload attempts. Please wait before selecting files to try again.'
+          : 'The upload was not accepted. Reload this page and sign in again if needed.');
+        showRejected(message);
+        stopElapsed();
+        setUploading(false);
+        transferProgress.hidden = true;
+        host.fail(message);
+        return;
+      }
+      recoverSubmission(submissionId, 'The upload result could not be confirmed. Check My Data before selecting files to upload again.');
+    });
+    request.addEventListener('error', function() {
+      recoverSubmission(submissionId, 'The connection was interrupted. Check My Data before selecting files to upload again.');
+    });
+    request.addEventListener('abort', function() {
+      recoverSubmission(submissionId, 'The upload result could not be confirmed. Check My Data before selecting files to upload again.');
+    });
+    request.addEventListener('timeout', function() {
+      recoverSubmission(submissionId, 'The upload is taking too long to confirm. Check My Data before selecting files to upload again.');
+    });
+    request.send(data);
+  }
+
+  if (usesJobs) {
+    host.subscribe(function(state) {
+      if (state.authExpired) {
+        stopElapsed();
+        resetFileSelection();
+        results.replaceChildren();
+        setUploading(false);
+        submitButton.disabled = true;
+      }
+      if (ignoreJobUpdates && state.job && !state.authExpired) return;
+      if (state.message) showStatus(state.message);
+      if (state.job) renderJob(state.job);
+    });
+  }
+
   form.addEventListener('submit', function(e) {
     if (uploading || selectionSubmitted) {
       e.preventDefault();
@@ -286,9 +451,20 @@ document.addEventListener('DOMContentLoaded', function() {
       updateSelectedFiles(Array.from(input.files));
       return;
     }
+    ignoreJobUpdates = false;
+    if (usesJobs && !host.start()) {
+      e.preventDefault();
+      showStatus('An upload is already in progress. Wait for its result before selecting more files.');
+      return;
+    }
     selectionSubmitted = true;
     results.replaceChildren();
     setUploading(true);
+    if (usesJobs) {
+      e.preventDefault();
+      uploadJob();
+      return;
+    }
     const supportsStreaming = typeof fetch === 'function' && typeof ReadableStream === 'function' &&
       typeof TextDecoder === 'function' && typeof AbortController === 'function' &&
       typeof Response === 'function' && 'body' in Response.prototype;
@@ -309,6 +485,16 @@ document.addEventListener('DOMContentLoaded', function() {
   }, true);
 
   window.addEventListener('pageshow', function(e) {
+    if (usesJobs && e.persisted) {
+      const state = host.getState();
+      if (state.job) {
+        renderJob(state.job);
+        host.resume();
+      } else if (state.transferring && activeSubmissionId) {
+        recoverSubmission(activeSubmissionId, 'The upload result could not be confirmed. Check My Data before selecting files to upload again.');
+      }
+      return;
+    }
     if (e.persisted && uploading) {
       requestId += 1;
       if (requestController) requestController.abort();
@@ -349,6 +535,7 @@ document.addEventListener('DOMContentLoaded', function() {
     e.stopPropagation();
     box.classList.remove('drag-active');
     if (uploading) return;
+    ignoreJobUpdates = true;
 
     const files = Array.from(e.dataTransfer.files).filter(function(file) {
       return file.name.toLowerCase().endsWith('.json');
@@ -372,6 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
     e.preventDefault();
     e.stopPropagation();
     if (uploading) return;
+    ignoreJobUpdates = true;
     resetFileSelection();
   });
 });

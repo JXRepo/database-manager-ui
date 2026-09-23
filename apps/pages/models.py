@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import URLValidator
@@ -118,6 +120,44 @@ class RateLimitBucket(models.Model):
             f"{self.scope} - {self.identifier_hash[:12]} - "
             f"{self.window_seconds} - {self.window_id}"
         )
+
+
+class UploadWorkerInstance(models.Model):
+    """
+    Identify one running web service and its upload worker
+    """
+
+    id = models.UUIDField(primary_key=True, editable=False)
+    heartbeat_at = models.DateTimeField()
+
+
+class UploadJob(models.Model):
+    """
+    Retain upload progress and confirmed results independently of a browser page
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    submission_id = models.UUIDField()
+    instance_id = models.UUIDField(db_index=True)
+    status = models.CharField(max_length=16, default="queued", db_index=True)
+    ready = models.BooleanField(default=False)
+    claim_token = models.UUIDField(null=True, editable=False)
+    files = models.JSONField(default=list)
+    staged_bytes = models.PositiveBigIntegerField(default=0)
+    summary = models.TextField(blank=True)
+    level = models.CharField(max_length=10, default="info")
+    report_html = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deadline_at = models.DateTimeField(null=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("owner", "submission_id"), name="unique_owner_upload_submission",
+            ),
+        ]
 
 
 class AccountProfile(models.Model):

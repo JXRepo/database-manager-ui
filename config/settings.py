@@ -183,6 +183,7 @@ MIDDLEWARE = [
     "apps.pages.middleware.ORCIDAccountSetupMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.pages.upload_navigation.UploadNavigationMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -288,6 +289,15 @@ PILOT_MAX_UPLOAD_REQUEST_BYTES = 250 * 1024 * 1024
 PILOT_MAX_UPLOAD_OBJECTS = 1000
 PILOT_MAX_JSON_DEPTH = 100
 PILOT_MAX_USER_JSON_BYTES = 5 * 1024 * 1024 * 1024
+
+UPLOAD_INSTANCE_ID = os.getenv("UPLOAD_INSTANCE_ID", "")
+UPLOAD_STAGING_ROOT = Path(os.getenv("UPLOAD_STAGING_ROOT", "/tmp/fair-materials-uploads"))
+UPLOAD_STAGING_MAX_BYTES = 512 * 1024 * 1024
+UPLOAD_STAGING_DISK_RESERVE_BYTES = 64 * 1024 * 1024
+UPLOAD_WORKER_LEASE_SECONDS = 90
+UPLOAD_JOB_MAX_SECONDS = 30 * 60
+UPLOAD_RECEIVING_MAX_SECONDS = 60 * 60
+UPLOAD_RESULT_RETENTION_DAYS = 7
 
 ORCID_BASE_URL = os.environ.get("ORCID_BASE_URL", "https://sandbox.orcid.org").rstrip("/")
 ORCID_CLIENT_ID = os.environ.get("ORCID_CLIENT_ID", "")

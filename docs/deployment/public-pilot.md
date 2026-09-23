@@ -6,6 +6,53 @@ This runbook covers the minimum operator steps for the public pilot deployment o
 
 Uploaded JSON files are parsed into `JSONData` rows. The original uploaded files are not retained after processing.
 
+## Background Uploads
+
+Gunicorn automatically loads `gunicorn.conf.py` with the existing Render start
+command. It uses four web threads and starts one separate
+`python manage.py process_upload_jobs` process. The master assigns both processes
+the same temporary `UPLOAD_INSTANCE_ID`; do not configure a fixed value in Render.
+An unexpected upload worker exit also stops the web service so Render can restart it.
+No paid service, queue provider, storage account, or extra credentials are required.
+
+The browser still submits one multipart request. The worker checks the entire
+submission before saving any data objects, then validates and saves files in
+order. Confirmed file results are committed in the same transaction as their data
+objects and sharing notifications. Status endpoints require the uploading account.
+
+Original files are held in private directories under `/tmp/fair-materials-uploads`
+while processing. `UPLOAD_STAGING_ROOT` may select another private directory; it
+must not be exposed as static or media content. Staging has a separate 512 MiB
+instance budget and keeps 64 MiB of free disk space as a reserve. One account can
+have one active submission. These resource checks do not increase the hosting
+plan's memory, disk, or database capacity, or change the documented upload limits.
+
+Navigating within the app preserves the active transfer and background processing.
+After the server accepts a submission, its task and confirmed file results remain
+in PostgreSQL. Render Free local storage is temporary: restarts, deployment,
+instance shutdown, or lost worker heartbeats can interrupt unfinished files.
+Such files are marked Unconfirmed and are never retried automatically; confirmed
+files remain saved. New deployments cannot claim the previous instance's originals.
+This does not promise continued transfer after closing or reloading the browser.
+
+The worker removes original files after completion or interruption. Abandoned
+receipts expire after one hour; orphan local directories are cleaned after that
+interval when the worker is running. Processing has a 30 minute deadline checked
+between work steps and before committing a file. Task reports expire after seven
+days; deleting a report does not delete its data objects. No cleanup can run while
+a free service is asleep, so raw files on temporary disk are otherwise removed by
+the instance lifecycle.
+
+For a local background upload check, use the configured project interpreter to
+run Gunicorn with `DEBUG=True`, for example:
+
+```bash
+DEBUG=True .venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1:8001 --workers 1
+```
+
+Ordinary `manage.py runserver` does not start this background process. The original
+form submission route remains available without the background JavaScript.
+
 ## Render Environment Variables
 
 Set these non-secret defaults in Render exactly as shown:

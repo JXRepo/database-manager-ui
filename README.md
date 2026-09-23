@@ -114,6 +114,29 @@ not the size of the original files. It is a limit on currently stored data, not
 a monthly allowance. Deleting your records frees your personal quota. Failed
 upload submissions also count toward the upload rate limit.
 
+The upload page shows these allowances directly from the active settings. On the
+hosted service with JavaScript enabled, one multipart submission reports actual transferred bytes,
+then a background task reports parsing, completed object checks and atomic file
+results. A completed transfer does not mean the data has been saved. Each file is
+labelled saved only after its data and task result have committed together.
+
+You can navigate to other platform pages during an upload and return to Upload
+for its results. During transfer, a temporary page frame keeps the sending
+document alive; once the server accepts the files, the task can be queried from
+another page. Reloading, closing the tab or leaving the site before server
+receipt can interrupt transfer. No submission or interrupted task is retried
+automatically. Ordinary form submission remains available without JavaScript.
+Local `runserver` sessions without an upload worker retain the existing NDJSON
+upload flow; use the Gunicorn command in the operator runbook to test background
+uploads locally.
+
+Task status and confirmed outcomes are private to their owner and retained for
+seven days. Original files are temporarily staged outside public static files
+and deleted after processing. On the current Render service this temporary disk
+is ephemeral: a restart or redeploy can interrupt unfinished files. Confirmed
+results remain available, and unfinished files are marked unconfirmed rather
+than silently repeated. Hosting failures are not resumable uploads.
+
 These are initial application allowances, defined in
 [`config/settings.py`](config/settings.py), rather than verified capacity for
 the current hosting plan. There is no quota expansion request feature yet.
@@ -542,6 +565,13 @@ committing locally does not update the website. After a push, wait for Render to
 finish deployment before checking the changes. The build installs dependencies,
 collects static files, and applies database migrations; it does not import local
 accounts or local data.
+
+The existing Gunicorn command automatically reads [`gunicorn.conf.py`](gunicorn.conf.py),
+which runs an independent upload processor and uses four web threads so pages
+and status requests remain available during transfers. No extra paid service is
+created. Each service boot has its own upload queue identity; a new deployment
+cannot claim the previous instance's temporary files. See the operator runbook
+for local worker startup and temporary storage capacity settings.
 
 Deployment does not require a public GitHub repository. Before making this
 repository public, review files and commit history for secrets and personal data,
