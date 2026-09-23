@@ -62,6 +62,7 @@ Current priority:
 - Upload allowances are 5 files, 100 MiB per file, 250 MiB combined, and 1,000 objects per submission; stored JSON quota is 5 GiB per user, with depth 100 and 20 submissions per hourly window unchanged
 - Release parsed JSON after each file's batch precheck and process one file at a time; application allowances do not guarantee the current hosting plan's capacity
 - Current required top-level fields include `phase`, not `material`, unless code is explicitly changed
+- Use the current MiMeDat `phase_name` for phase names in labels, summaries, and search; retain legacy name fallbacks without renaming uploaded JSON or treating phase_id as a name
 - `identifier` is not a required upload field: missing, null, or blank values receive an 8 character lowercase base36 identifier derived from the 24 required fields; collisions with different content extend it one character at a time
 - Preserve valid supplied text identifiers; reject malformed values and surrounding whitespace with actionable errors
 - Check generated and supplied identifiers against all stored records and the whole upload batch; retain the transactional recheck and never overwrite duplicates

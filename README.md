@@ -414,6 +414,12 @@ Use `phase`, not `material`. See the
 [validation implementation](apps/dyn_api/helpers.py) for the current required
 fields.
 
+Use `phase_name` for each phase's name, following the current MiMeDat schema.
+Charts, My Data, and assistant answers prefer it when legacy name fields are
+also present, and Common Phase search recognizes it alongside existing search
+values. Older `phase_identifier` values remain readable for compatibility;
+uploaded field names, stored JSON, and downloads are not renamed.
+
 ### Data object identifiers
 
 Each saved object has its own top-level `identifier`, alongside `title` and

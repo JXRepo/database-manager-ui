@@ -1426,6 +1426,19 @@ def _build_summary_fields(data):
 def _normalize_search_value(value):
     """
     Convert nested JSON values into searchable text
+
+    Include current phase names alongside existing preferred labels while
+    preserving the fallback that searches other stored values.
+
+    Parameters
+    ----------
+    value : object
+        Metadata selected by a common search filter.
+
+    Returns
+    -------
+    str
+        Searchable text from the supplied metadata.
     """
     if value is None or value == "" or value == []:
         return ""
@@ -1458,7 +1471,11 @@ def _normalize_search_value(value):
                 if text:
                     parts.append(text)
 
-        if not parts:
+        if parts:
+            phase_name = _normalize_search_value(value.get("phase_name"))
+            if phase_name:
+                parts.insert(0, phase_name)
+        else:
             parts = [_normalize_search_value(item) for item in value.values()]
 
         return " ".join(part for part in parts if part)
@@ -1569,6 +1586,8 @@ def _assistant_phase_names(data):
     """
     Return phase names from one JSON data object
 
+    Prefer the current schema's phase_name while retaining legacy name fields.
+
     Parameters
     ----------
     data : dict
@@ -1582,11 +1601,18 @@ def _assistant_phase_names(data):
     phases = data.get("phase", [])
     names = []
 
+    if isinstance(phases, dict):
+        phases = [phases]
+
     if isinstance(phases, list):
         for phase in phases:
             if isinstance(phase, dict):
+                phase_name = phase.get("phase_name")
+                if isinstance(phase_name, str):
+                    phase_name = phase_name.strip()
                 name = (
-                    phase.get("phase_identifier")
+                    phase_name
+                    or phase.get("phase_identifier")
                     or phase.get("name")
                     or phase.get("identifier")
                 )

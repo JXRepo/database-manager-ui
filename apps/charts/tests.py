@@ -297,3 +297,43 @@ class ChartsAccessTests(TestCase):
         issue_labels = {row["label"] for row in issue_rows}
         self.assertIn("Software / solver", issue_labels)
         self.assertIn("metadata-gap", [row["example_label"] for row in issue_rows])
+
+    def test_charts_prefer_phase_name_and_keep_legacy_phase_labels(self):
+        """
+        Use canonical phase names consistently across chart and material summaries
+        """
+        cases = (
+            ({"phase_name": "Canonical Copper"}, "Canonical Copper", False),
+            ({
+                "phase_name": "Canonical Nickel",
+                "phase_identifier": "Historical Nickel",
+                "name": "Generic Nickel",
+            }, "Canonical Nickel", False),
+            ({"phase_name": "Canonical Iron", "name": "Generic Iron"}, "Canonical Iron", True),
+            ({"phase_identifier": "Legacy Copper"}, "Legacy Copper", False),
+            ({"name": "Legacy Silver"}, "Legacy Silver", True),
+            ({"phase_name": "", "phase_identifier": "Legacy Tin"}, "Legacy Tin", False),
+            ({"phase_name": "  \t", "phase_identifier": "Legacy Lead"}, "Legacy Lead", False),
+        )
+        objects = []
+        for index, (phase_fields, expected, use_dict) in enumerate(cases):
+            data = self._build_analysis_object_data(f"phase-name-chart-{index}")
+            phase = {**phase_fields, "constitutive_model": data["phase"][0]["constitutive_model"]}
+            data["phase"] = phase if use_dict else [phase]
+            obj = JSONData.objects.create(owner=self.viewer, data=data)
+            objects.append((obj, json.dumps(data)))
+        self.client.force_login(self.viewer)
+
+        response = self.client.get(reverse("charts"))
+
+        self.assertEqual(response.status_code, 200)
+        expected_labels = {expected for _phase, expected, _use_dict in cases}
+        self.assertEqual(set(json.loads(response.context["phase_labels_json"])), expected_labels)
+        self.assertEqual(
+            {row["phase"] for row in response.context["material_model_rows"]},
+            expected_labels,
+        )
+        self.assertEqual(response.context["phase_count"], len(expected_labels))
+        for obj, original in objects:
+            obj.refresh_from_db()
+            self.assertEqual(json.dumps(obj.data), original)

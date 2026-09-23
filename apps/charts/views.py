@@ -27,6 +27,20 @@ QUALITY_CHECK_LABELS = (
 def _normalize_text(value, default="Unknown"):
     """
     Convert a metadata value into a short text label
+
+    Current phase names take precedence over older dictionary labels.
+
+    Parameters
+    ----------
+    value : object
+        Metadata value to summarize.
+    default : str, optional
+        Label used when the value has no readable text.
+
+    Returns
+    -------
+    str
+        Compact label for a chart or analysis table.
     """
     if value is None or value == "" or value == []:
         return default
@@ -51,7 +65,8 @@ def _normalize_text(value, default="Unknown"):
 
     if isinstance(value, dict):
         text = (
-            value.get("name")
+            _normalize_text(value.get("phase_name"), default="")
+            or value.get("name")
             or value.get("creator_name")
             or value.get("author")
             or value.get("identifier")
@@ -89,12 +104,25 @@ def _iter_phase_items(value):
 def _extract_phase_labels(value):
     """
     Extract phase or material labels from top-level phase metadata
+
+    Prefer the current schema's phase_name and retain older name fallbacks.
+
+    Parameters
+    ----------
+    value : object
+        Phase metadata from one data object.
+
+    Returns
+    -------
+    list of str
+        Phase names for chart labels and grouping.
     """
     labels = []
 
     for phase in _iter_phase_items(value):
         label = (
-            phase.get("phase_identifier")
+            _normalize_text(phase.get("phase_name"), default="")
+            or phase.get("phase_identifier")
             or phase.get("material")
             or phase.get("name")
             or phase.get("title")
@@ -479,12 +507,25 @@ def _extract_applied_load_numbers(data, key):
 def _extract_phase_summaries(data):
     """
     Extract phase and constitutive model summaries from one data object
+
+    Current phase names label each model without changing stored metadata.
+
+    Parameters
+    ----------
+    data : dict
+        Stored simulation data object.
+
+    Returns
+    -------
+    list of dict
+        Phase labels with their material model information.
     """
     summaries = []
 
     for phase in _iter_phase_items(data.get("phase")):
         phase_label = _normalize_text(
-            phase.get("phase_identifier")
+            _normalize_text(phase.get("phase_name"), default="")
+            or phase.get("phase_identifier")
             or phase.get("material")
             or phase.get("name")
             or phase.get("title")
