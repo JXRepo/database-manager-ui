@@ -333,6 +333,11 @@ in the application; this is not an indexed search designed for large datasets.
 
 ## Data Object Details
 
+Standard field names follow the
+[MiMeDat schema, version 1.2.0](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json):
+`phase_name`, `processor_specifications`, and the underscore-separated names
+inside `origin`, such as `software_version` and `input_path`.
+
 Detail metadata starts with the fields listed under
 [Required JSON Fields](#required-json-fields), in that order. Top level
 mechanical_BC, stress, and total_strain are omitted from the metadata list because
@@ -360,6 +365,21 @@ Original names, literal punctuation, values, and array item order are preserved.
 Download JSON exports the complete stored object, including the three fields
 omitted from the metadata list and any values not used by the visualizations.
 Upload validation and access rules are unchanged.
+
+Plots read supplied `stress.equivalent_stress`,
+`total_strain.equivalent_strain`, and
+`plastic_strain.equivalent_plastic_strain` arrays. Supplied curves take precedence
+over calculated values. Only absent equivalent fields are supplemented from
+complete tensor components using the existing formulas; an explicitly empty
+equivalent array stays empty.
+
+Mechanical boundary conditions include the supplied load `step`. Whole cube
+stress or strain tensors show every applied load and its components together,
+without treating the tensor as an X, Y, or Z scalar load or drawing a guessed
+directional arrow. Scalar force and displacement loads retain their axis display.
+
+Detail display tests use a synthetic example embedded in the test suite, so they
+do not depend on a local uploaded JSON file or skip when that file is removed.
 
 ## My Data
 

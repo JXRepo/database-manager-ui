@@ -3333,12 +3333,27 @@ def _group_detail_rows(detail_rows):
 
 
 PLOT_FIELD_PREFIXES = ("stress_", "strain_", "plastic_strain_")
+EQUIVALENT_PLOT_FIELDS = frozenset({
+    "equivalent_stress", "equivalent_strain", "equivalent_plastic_strain",
+})
 MECHANICAL_TENSOR_COMPONENTS = ("11", "22", "33", "12", "13", "23")
 
 
 def _get_plot_variable_unit(key, units):
     """
     Return the unit label for a plot variable
+
+    Parameters
+    ----------
+    key : str
+        Mechanical field name from the current schema.
+    units : object
+        Uploaded unit metadata.
+
+    Returns
+    -------
+    str
+        Unit label, or an empty string for dimensionless or unspecified units.
     """
     if not isinstance(units, dict):
         return ""
@@ -3346,7 +3361,7 @@ def _get_plot_variable_unit(key, units):
     if key.startswith("stress_") or key == "equivalent_stress":
         unit = units.get("Stress", "")
     elif key.startswith(("strain_", "plastic_strain_")) or key in {
-        "equivalent_total_strain",
+        "equivalent_strain",
         "equivalent_plastic_strain",
     }:
         unit = units.get("Strain", "")
@@ -3365,6 +3380,16 @@ def _get_plot_variable_unit(key, units):
 def _get_plot_variable_kind(key):
     """
     Return the mechanical variable kind for one plot key
+
+    Parameters
+    ----------
+    key : str
+        Mechanical field name from the current schema.
+
+    Returns
+    -------
+    str
+        Variable kind used to select and pair plot axes.
     """
     if key.startswith("stress_") or key == "equivalent_stress":
         return "stress"
@@ -3372,7 +3397,7 @@ def _get_plot_variable_kind(key):
     if key.startswith("plastic_strain_") or key == "equivalent_plastic_strain":
         return "plastic_strain"
 
-    if key.startswith("strain_") or key == "equivalent_total_strain":
+    if key.startswith("strain_") or key == "equivalent_strain":
         return "strain"
 
     return ""
@@ -3400,13 +3425,23 @@ def _get_plot_component(key):
 def _get_plot_symbol_label(key):
     """
     Return an ASCII notation key for one plot variable
+
+    Parameters
+    ----------
+    key : str
+        Mechanical field name from the current schema.
+
+    Returns
+    -------
+    str
+        Plot symbol corresponding to the field.
     """
     component = _get_plot_component(key)
 
     if key == "equivalent_stress":
         return "sigma_eq"
 
-    if key == "equivalent_total_strain":
+    if key == "equivalent_strain":
         return "epsilon_eq"
 
     if key == "equivalent_plastic_strain":
@@ -3427,11 +3462,21 @@ def _get_plot_symbol_label(key):
 def _get_plot_display_label(key):
     """
     Return display notation for one plot variable
+
+    Parameters
+    ----------
+    key : str
+        Mechanical field name from the current schema.
+
+    Returns
+    -------
+    str
+        Human readable symbol for the axis selector.
     """
     if key == "equivalent_stress":
         return "\u03c3_eq"
 
-    if key == "equivalent_total_strain":
+    if key == "equivalent_strain":
         return "\u03b5_eq"
 
     if key == "equivalent_plastic_strain":
@@ -3546,47 +3591,41 @@ def _calculate_equivalent_strain(arrays):
 
 def _extract_equivalent_plot_variables(data, units):
     """
-    Build calculated equivalent stress and strain plot variables
+    Calculate equivalent curves only when the corresponding field is absent
+
+    Supplied values remain authoritative, including explicitly empty arrays.
+    Missing curves use the existing formulas and current schema field names.
+
+    Parameters
+    ----------
+    data : object
+        Stored data object containing mechanical result groups.
+    units : object
+        Uploaded unit metadata.
+
+    Returns
+    -------
+    list of dict
+        Calculated curves for missing equivalent fields.
     """
     if not isinstance(data, dict):
         return []
 
     variables = []
-    stress_arrays = _get_component_arrays(data.get("stress"), "stress")
-    total_strain_arrays = _get_component_arrays(data.get("total_strain"), "strain")
-    plastic_strain_arrays = _get_component_arrays(
-        data.get("plastic_strain"),
-        "plastic_strain",
+    groups = (
+        ("stress", "stress", "equivalent_stress", _calculate_equivalent_stress),
+        ("total_strain", "strain", "equivalent_strain", _calculate_equivalent_strain),
+        ("plastic_strain", "plastic_strain", "equivalent_plastic_strain", _calculate_equivalent_strain),
     )
-
-    if stress_arrays is not None:
+    for group_name, prefix, key, calculate in groups:
+        group = data.get(group_name)
+        if not isinstance(group, dict) or key in group:
+            continue
+        arrays = _get_component_arrays(group, prefix)
+        if arrays is None:
+            continue
         variables.append(
-            _build_plot_variable(
-                "stress.equivalent_stress",
-                "equivalent_stress",
-                _calculate_equivalent_stress(stress_arrays),
-                units,
-            )
-        )
-
-    if total_strain_arrays is not None:
-        variables.append(
-            _build_plot_variable(
-                "total_strain.equivalent_total_strain",
-                "equivalent_total_strain",
-                _calculate_equivalent_strain(total_strain_arrays),
-                units,
-            )
-        )
-
-    if plastic_strain_arrays is not None:
-        variables.append(
-            _build_plot_variable(
-                "plastic_strain.equivalent_plastic_strain",
-                "equivalent_plastic_strain",
-                _calculate_equivalent_strain(plastic_strain_arrays),
-                units,
-            )
+            _build_plot_variable(f"{group_name}.{key}", key, calculate(arrays), units)
         )
 
     return variables
@@ -3595,6 +3634,23 @@ def _extract_equivalent_plot_variables(data, units):
 def _extract_plot_variables(data, prefix="", units=None):
     """
     Recursively extract plot-ready numeric arrays for mechanical variables
+
+    Supplied equivalent curves follow the current schema names. Calculated
+    curves supplement missing fields without replacing uploaded values.
+
+    Parameters
+    ----------
+    data : object
+        Metadata subtree being inspected.
+    prefix : str, optional
+        Original path of the subtree.
+    units : object, optional
+        Uploaded unit metadata for the plotted values.
+
+    Returns
+    -------
+    list of dict
+        Supplied and calculated mechanical curves for the detail page.
     """
     variables = []
 
@@ -3602,7 +3658,8 @@ def _extract_plot_variables(data, prefix="", units=None):
         for key, value in data.items():
             full_key = f"{prefix}.{key}" if prefix else key
 
-            if isinstance(value, list) and _is_numeric_list(value) and key.startswith(PLOT_FIELD_PREFIXES):
+            is_plot_field = key.startswith(PLOT_FIELD_PREFIXES) or key in EQUIVALENT_PLOT_FIELDS
+            if _is_numeric_list(value) and is_plot_field:
                 variables.append(_build_plot_variable(full_key, key, value, units))
             else:
                 variables.extend(_extract_plot_variables(value, full_key, units))
@@ -3658,21 +3715,43 @@ def _format_compact_value(value):
 def _normalize_applied_load(load):
     """
     Return display-ready details for one applied load entry
+
+    Preserve tensor values while ordering their components for display.
+
+    Parameters
+    ----------
+    load : object
+        One supplied applied load record.
+
+    Returns
+    -------
+    dict or None
+        Load values and readable details, or None for an empty entry.
     """
     if not isinstance(load, dict):
         return None
 
     details = []
 
-    for key in ("magnitude", "frequency", "duration", "R"):
+    for key in ("magnitude", "frequency", "duration", "R", "step"):
         if key not in load:
             continue
+
+        value = load.get(key)
+        display = _format_compact_value(value)
+        if key == "step" and _is_number_value(value):
+            display = str(value)
+        if key == "magnitude" and isinstance(value, dict):
+            components = ("xx", "yy", "zz", "xy", "yz", "xz", "yx", "zx", "zy")
+            ranks = {name: index for index, name in enumerate(components)}
+            ordered = dict(sorted(value.items(), key=lambda item: ranks.get(item[0], len(ranks))))
+            display = json.dumps(ordered, ensure_ascii=False)
 
         details.append(
             {
                 "key": key,
-                "value": load.get(key),
-                "display": _format_compact_value(load.get(key)),
+                "value": value,
+                "display": display,
             }
         )
 
@@ -3684,6 +3763,7 @@ def _normalize_applied_load(load):
         "frequency": load.get("frequency"),
         "duration": load.get("duration"),
         "R": load.get("R"),
+        "step": load.get("step"),
         "details": details,
         "summary": ", ".join(
             f"{detail['key']}: {detail['display']}"
@@ -3746,6 +3826,18 @@ def _get_load_for_axis(applied_loads, load_index, is_group_target):
 def _build_mechanical_bc_items(data):
     """
     Build normalized mechanical boundary condition items for the cube viewer
+
+    Full cube stress and strain tensors remain separate from scalar axis loads.
+
+    Parameters
+    ----------
+    data : dict
+        Stored simulation data containing mechanical boundary conditions.
+
+    Returns
+    -------
+    list of dict
+        Targets with scalar axes or complete tensor load entries.
     """
     mechanical_bc = data.get("mechanical_BC", [])
 
@@ -3779,6 +3871,29 @@ def _build_mechanical_bc_items(data):
 
         if not isinstance(applied_loads, list):
             applied_loads = [applied_loads] if isinstance(applied_loads, dict) else []
+
+        if (
+            condition.get("loading_type") in ("stress", "strain")
+            and len(vertices) == 8
+            and len(set(vertices)) == 8
+            and constraints == ["loaded"]
+        ):
+            tensor_loads = []
+            for load in applied_loads:
+                normalized_load = _normalize_applied_load(load)
+                if normalized_load is not None:
+                    tensor_loads.append(normalized_load)
+            items.append({
+                "vertex": "Whole cube",
+                "vertices": vertices,
+                "target_type": "Whole cube",
+                "axes": [],
+                "is_tensor_load": True,
+                "tensor_loads": tensor_loads,
+                "loading_type": condition.get("loading_type", ""),
+                "loading_mode": condition.get("loading_mode", ""),
+            })
+            continue
 
         load_index = 0
         axes = []
@@ -3835,8 +3950,9 @@ def _build_mechanical_bc_items(data):
         for direction in MECHANICAL_BC_DIRECTIONS
     ]
 
+    has_tensor_load = any(item.get("is_tensor_load") for item in items)
     for vertex in MECHANICAL_BC_VERTICES:
-        if vertex in defined_vertices:
+        if has_tensor_load or vertex in defined_vertices:
             continue
 
         items.append(

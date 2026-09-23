@@ -95,6 +95,8 @@ Current priority:
 - Show other supplied fields directly after required fields at each level, without an Additional metadata group; nested required order follows the locally recorded schema and applicable sharing or thermal conditions
 - Collapse actual nested objects and object lists, even with one child; never merge flat fields by shared prefixes such as creator_affiliation, creator_institute, and creator_group
 - Preserve field names, values, array item order, and complete JSON downloads; keep legacy required top-level placeholders except the three visualized fields, and do not add missing optional or nested fields or introduce deeper upload validation
+- Use current MiMeDat equivalent_stress, equivalent_strain, and equivalent_plastic_strain fields for plots; supplied arrays take precedence and only absent fields may use the existing calculated equivalents
+- Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
 - Search result pages should not include delete actions unless explicitly requested
 - Preserve the existing visual style unless a change is requested
 - Avoid large redesigns unless explicitly requested

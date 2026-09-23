@@ -1635,20 +1635,20 @@ class JSONDataSharingTests(TestCase):
         by_key = {variable["key"]: variable for variable in variables}
 
         self.assertEqual(by_key["stress.equivalent_stress"]["values"], [0, 1])
-        self.assertEqual(by_key["total_strain.equivalent_total_strain"]["values"], [0, 1])
+        self.assertEqual(by_key["total_strain.equivalent_strain"]["values"], [0, 1])
         self.assertEqual(by_key["plastic_strain.equivalent_plastic_strain"]["values"], [0, 1])
         self.assertEqual(by_key["stress.equivalent_stress"]["symbol_label"], "sigma_eq")
         self.assertEqual(by_key["stress.equivalent_stress"]["display_label"], "\u03c3_eq")
-        self.assertEqual(by_key["total_strain.equivalent_total_strain"]["display_label"], "\u03b5_eq")
+        self.assertEqual(by_key["total_strain.equivalent_strain"]["display_label"], "\u03b5_eq")
         self.assertEqual(
             by_key["plastic_strain.equivalent_plastic_strain"]["display_label"],
             "\u03b5_p,eq",
         )
         self.assertNotIn("Equivalent", by_key["stress.equivalent_stress"]["display_label"])
-        self.assertNotIn("Equivalent", by_key["total_strain.equivalent_total_strain"]["display_label"])
-        self.assertEqual(by_key["total_strain.equivalent_total_strain"]["kind"], "strain")
+        self.assertNotIn("Equivalent", by_key["total_strain.equivalent_strain"]["display_label"])
+        self.assertEqual(by_key["total_strain.equivalent_strain"]["kind"], "strain")
         self.assertEqual(by_key["total_strain.strain_11"]["unit"], "")
-        self.assertEqual(by_key["total_strain.equivalent_total_strain"]["unit"], "")
+        self.assertEqual(by_key["total_strain.equivalent_strain"]["unit"], "")
 
     def test_public_home_page_is_available_without_login(self):
         """

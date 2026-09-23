@@ -1,7 +1,6 @@
 import json
 import re
 from copy import deepcopy
-from pathlib import Path
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -488,28 +487,82 @@ class DetailMetadataTests(TestCase):
             with self.subTest(group=name):
                 self.assertEqual([row["label"] for row in fields[name]["children"]], expected)
 
-    def test_local_public_example_has_direct_fields_and_unchanged_download(self):
+    def test_current_schema_example_has_direct_fields_and_unchanged_download(self):
         """
-        Exercise the supplied public example without committing another data copy
+        Exercise current field names with a reproducible synthetic simulation
         """
-        example = Path(__file__).resolve().parents[2] / "example_json_files/a46fde6c1_public.json"
-        if not example.exists():
-            self.skipTest("The local public example is not available")
-        data = json.loads(example.read_text(encoding="utf-8"))
+        data = {
+            "units": {
+                "Stress": "MPa", "Strain": 1, "Length": "mm",
+                "Force": "N", "Angle": "degrees", "Temperature": "K",
+            },
+            "identifier": "synthetic-detail",
+            "title": "Synthetic copper simulation",
+            "creator": ["Example Researcher"],
+            "creator_affiliation": ["Example University"],
+            "creator_institute": ["Example Institute"],
+            "creator_group": ["Example Group"],
+            "date": "2026-01-01",
+            "shared_with": [{"access_type": "all"}],
+            "rights": "CC BY 4.0",
+            "rights_holder": ["Example Researcher"],
+            "software": "Example Solver",
+            "software_version": "1.0",
+            "system": "Linux",
+            "system_version": "1.0",
+            "processor_specifications": "Example processor",
+            "input_path": "inputs",
+            "results_path": "results",
+            "RVE_size": [1, 1, 1],
+            "RVE_continuity": True,
+            "discretization_type": "Structured",
+            "discretization_unit_size": [0.5, 0.5, 0.5],
+            "discretization_count": 8,
+            "origin": {
+                "software": "Example Geometry Generator",
+                "software_version": "1.0",
+                "system": "Linux",
+                "system_version": "1.0",
+                "input_path": "geometry-inputs",
+                "results_path": "geometry-results",
+            },
+            "mechanical_BC": [{
+                "vertex_list": ["V000"],
+                "constraints": ["fixed", "free", "free"],
+            }],
+            "phase": [{
+                "constitutive_model": {"elastic_model_name": "Isotropic Elasticity"},
+                "phase_name": "Copper",
+            }],
+            "stress": {"stress_11": [0, 10]},
+            "total_strain": {"strain_11": [0, 0.01]},
+        }
         obj, response = self._detail(data)
         rows = response.context["detail_rows"]
         fields = {row["label"]: row for row in rows}
 
         self.assertEqual(set(fields), set(data) - {"mechanical_BC", "stress", "total_strain"})
+        self.assertEqual(list(fields)[:4], ["title", "creator", "creator_affiliation", "date"])
+        self.assertEqual(list(fields)[20], "units")
         self.assertEqual(fields["shared_with"]["type"], "group")
         self.assertEqual(fields["shared_with"]["children"][0]["label"], "access_type")
         self.assertEqual(fields["creator_affiliation"]["type"], "string_list")
         self.assertEqual(fields["creator_institute"]["type"], "string_list")
         self.assertEqual(fields["creator_group"]["type"], "string_list")
+        self.assertEqual(
+            [row["label"] for row in fields["phase"]["children"]],
+            ["phase_name", "constitutive_model"],
+        )
+        self.assertEqual(fields["phase"]["children"][1]["type"], "group")
+        self.assertEqual(
+            [row["label"] for row in fields["origin"]["children"]],
+            list(data["origin"]),
+        )
         self.assertTrue(response.context["plot_variables"])
         self.assertTrue(response.context["mechanical_bc_items"])
         exported = self.client.get(reverse("json_data_export", args=[obj.pk]))
         self.assertEqual(exported.json(), data)
+        self.assertEqual(exported.content.decode(), json.dumps(data, indent=2, ensure_ascii=False))
 
     def test_detail_and_download_keep_access_rules_and_original_json(self):
         """

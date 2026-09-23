@@ -86,7 +86,7 @@ function getLoadDirectionSigns(magnitude) {
 
 function getBoundaryConditionMarkerColor(item) {
   const statuses = (item.axes || []).map(axis => String(axis.status || "").toLowerCase());
-  const hasLoaded = statuses.includes("loaded");
+  const hasLoaded = item.is_tensor_load || statuses.includes("loaded");
   const hasFixed = statuses.includes("fixed");
 
   if (hasLoaded && hasFixed) {
@@ -105,6 +105,10 @@ function getBoundaryConditionMarkerColor(item) {
 }
 
 function formatBoundaryConditionHover(item) {
+  if (item.is_tensor_load) {
+    return `${item.vertex || "Whole cube"}\n${item.loading_type} tensor: loaded`;
+  }
+
   const axes = (item.axes || []).map(axis => {
     const status = String(axis.status || "empty").toLowerCase();
     return `${axis.direction}: ${status}`;

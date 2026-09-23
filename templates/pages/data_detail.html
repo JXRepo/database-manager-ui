@@ -1380,6 +1380,24 @@ details[open] > .detail-group-summary {
                         <span class="bc-target-type">{{ item.target_type }}</span>
                       </td>
                       <td>
+                        {% if item.is_tensor_load %}
+                          <span class="bc-status bc-status-loaded">Tensor: loaded</span>
+                          {% for load in item.tensor_loads %}
+                            <details class="bc-load-detail">
+                              <summary>
+                                <span class="bc-status bc-status-loaded">Tensor load {{ forloop.counter }}</span>
+                              </summary>
+                              <ul class="bc-load-list">
+                                {% for detail in load.details %}
+                                  <li>
+                                    <span class="bc-load-key">{{ detail.key }}</span>:
+                                    {{ detail.display }}
+                                  </li>
+                                {% endfor %}
+                              </ul>
+                            </details>
+                          {% endfor %}
+                        {% else %}
                         {% for axis in item.axes %}
                           {% if axis.status == "loaded" and axis.load_details %}
                             <details class="bc-load-detail">
@@ -1403,6 +1421,7 @@ details[open] > .detail-group-summary {
                             </span>
                           {% endif %}
                         {% endfor %}
+                        {% endif %}
                       </td>
                       <td>
                         {{ item.loading_type|default:"-" }}
