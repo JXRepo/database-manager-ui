@@ -19,7 +19,6 @@ from .views import (
     _ensure_required_detail_rows,
     _build_mechanical_bc_items,
     _extract_plot_variables,
-    _filter_visualized_detail_rows,
     _group_detail_rows,
     _prepare_list_object,
 )
@@ -1577,30 +1576,28 @@ class JSONDataSharingTests(TestCase):
         self.assertFalse(by_label["stress_values"].get("is_inline"))
         self.assertEqual(by_label["stress_values"]["count"], 7)
 
-    def test_detail_rows_hide_fields_already_shown_as_visualizations(self):
+    def test_detail_rows_keep_original_fields_used_by_visualizations(self):
         """
-        Detail rows omit mechanical and tensor groups already shown visually
+        Original mechanical data remains available alongside the visualizations
         """
-        rows = _filter_visualized_detail_rows(
-            _build_detail_rows(
-                {
-                    "title": "Visualized object",
-                    "mechanical_BC": [{"vertex_list": ["V000"]}],
-                    "stress": {"stress_11": [0, 1]},
-                    "total_strain": {"strain_11": [0, 0.1]},
-                    "plastic_strain": {"plastic_strain_11": [0, 0.01]},
-                    "phase": [{"phase_identifier": "Copper"}],
-                }
-            )
+        rows = _build_detail_rows(
+            {
+                "title": "Visualized object",
+                "mechanical_BC": [{"vertex_list": ["V000"]}],
+                "stress": {"stress_11": [0, 1]},
+                "total_strain": {"strain_11": [0, 0.1]},
+                "plastic_strain": {"plastic_strain_11": [0, 0.01]},
+                "phase": [{"phase_identifier": "Copper"}],
+            }
         )
         labels = {row["label"] for row in rows}
 
         self.assertIn("title", labels)
         self.assertIn("phase / phase_identifier", labels)
-        self.assertFalse(any(label.startswith("mechanical_BC") for label in labels))
-        self.assertFalse(any(label.startswith("stress") for label in labels))
-        self.assertFalse(any(label.startswith("total_strain") for label in labels))
-        self.assertFalse(any(label.startswith("plastic_strain") for label in labels))
+        self.assertIn("mechanical_BC / vertex_list", labels)
+        self.assertIn("stress / stress_11", labels)
+        self.assertIn("total_strain / strain_11", labels)
+        self.assertIn("plastic_strain / plastic_strain_11", labels)
 
     def test_extract_plot_variables_adds_equivalent_mechanical_values(self):
         """

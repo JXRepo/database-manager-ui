@@ -978,6 +978,7 @@ details[open] > .detail-group-summary {
   font-weight: 700;
   letter-spacing: 0;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .detail-metadata-list .detail-label::before,
@@ -998,6 +999,24 @@ details[open] > .detail-group-summary {
 
 .detail-metadata-list .detail-group {
   grid-column: 1 / -1;
+}
+
+.detail-metadata-list .detail-group,
+.detail-metadata-list .detail-subgroup,
+.detail-metadata-list .detail-group-children,
+.detail-metadata-list .detail-subgroup-children {
+  min-width: 0;
+}
+
+.detail-metadata-list .detail-group-summary-title,
+.detail-metadata-list .detail-subgroup-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-metadata-list .detail-group-count {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .detail-metadata-list .detail-group-summary {
@@ -1238,14 +1257,14 @@ details[open] > .detail-group-summary {
               class="btn btn-outline-secondary btn-sm"
               type="button"
               data-bs-toggle="collapse"
-              data-bs-target="#array-{{ forloop.counter }}"
+              data-bs-target="#{{ row.value_id }}"
               aria-expanded="false"
-              aria-controls="array-{{ forloop.counter }}"
+              aria-controls="{{ row.value_id }}"
             >
               Show values
             </button>
 
-            <div class="collapse" id="array-{{ forloop.counter }}">
+            <div class="collapse" id="{{ row.value_id }}">
               <pre class="array-box">{{ row.json_value }}</pre>
             </div>
           </div>
@@ -1264,14 +1283,14 @@ details[open] > .detail-group-summary {
             class="btn btn-outline-secondary btn-sm"
             type="button"
             data-bs-toggle="collapse"
-            data-bs-target="#json-{{ forloop.counter }}"
+            data-bs-target="#{{ row.value_id }}"
             aria-expanded="false"
-            aria-controls="json-{{ forloop.counter }}"
+            aria-controls="{{ row.value_id }}"
           >
             Show values
           </button>
 
-          <div class="collapse" id="json-{{ forloop.counter }}">
+          <div class="collapse" id="{{ row.value_id }}">
             <pre class="array-box">{{ row.json_value }}</pre>
           </div>
         </div>

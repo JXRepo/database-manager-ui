@@ -71,14 +71,14 @@
               class="btn btn-outline-secondary btn-sm"
               type="button"
               data-bs-toggle="collapse"
-              data-bs-target="#child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+              data-bs-target="#{{ child.value_id }}"
               aria-expanded="false"
-              aria-controls="child-array-{{ child.label|slugify }}-{{ forloop.counter }}"
+              aria-controls="{{ child.value_id }}"
             >
               Show values
             </button>
 
-            <div class="collapse" id="child-array-{{ child.label|slugify }}-{{ forloop.counter }}">
+            <div class="collapse" id="{{ child.value_id }}">
               <pre class="array-box">{{ child.json_value }}</pre>
             </div>
           </div>
@@ -99,14 +99,14 @@
             class="btn btn-outline-secondary btn-sm"
             type="button"
             data-bs-toggle="collapse"
-            data-bs-target="#child-json-{{ child.label|slugify }}-{{ forloop.counter }}"
+            data-bs-target="#{{ child.value_id }}"
             aria-expanded="false"
-            aria-controls="child-json-{{ child.label|slugify }}-{{ forloop.counter }}"
+            aria-controls="{{ child.value_id }}"
           >
             Show values
           </button>
 
-          <div class="collapse" id="child-json-{{ child.label|slugify }}-{{ forloop.counter }}">
+          <div class="collapse" id="{{ child.value_id }}">
             <pre class="array-box">{{ child.json_value }}</pre>
           </div>
         </div>

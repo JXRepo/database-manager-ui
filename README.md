@@ -331,6 +331,29 @@ Search scans stored JSON one record at a time and retains display summaries for
 matches rather than every original payload. It still reads the accessible data
 in the application; this is not an indexed search designed for large datasets.
 
+## Data Object Details
+
+Detail pages follow the field order in the
+[MiMeDat metadata schema](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json):
+identifier, title and authorship first, followed by software, simulation settings,
+phases, results, and units. The display uses a local field order, independent of
+database JSON key order, and does not fetch schemas from uploaded URLs.
+
+Supplied optional fields are shown; absent optional fields are not added.
+Unknown fields remain at the end of their existing nested group. Unknown top
+level fields and the `$schema` reference appear under **Additional metadata**.
+Known older field spellings keep their original names and values while appearing
+beside their corresponding schema fields. Missing required fields in legacy
+records retain an Empty placeholder in the appropriate position.
+
+Nested data and long arrays remain collapsible. Arrays containing multiple
+objects keep separate Item 1, Item 2 groups so their metadata stays associated.
+Literal punctuation in uploaded field names is preserved. Original boundary condition,
+stress, and strain fields are available alongside their visualizations, including
+extra values that the visualizations do not use. Download JSON exports the stored
+object without changing field names, values, or array item order. Display order
+does not introduce deeper schema validation during upload.
+
 ## My Data
 
 My Data lists only your own uploads, with the newest first. Use the **Access**,

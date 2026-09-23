@@ -28,6 +28,7 @@ from numbers import Number
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
+from .detail_metadata import DETAIL_FIELD_ORDERS, detail_field_rank, ordered_metadata_items
 from .advanced_search import (
     DATA_FIELD_CHOICES,
     DATA_FIELD_TYPES,
@@ -2779,9 +2780,40 @@ def _format_detail_label(path):
 
 
 
-def _build_detail_rows(data, prefix=""):
+def _detail_path_labels(path):
     """
-    Recursively build detail rows while preserving the original JSON order
+    Label array items without interpreting punctuation in uploaded field names
+
+    Parameters
+    ----------
+    path : tuple
+        Original dictionary keys and array indices.
+
+    Returns
+    -------
+    list of str
+        Group labels that retain each field name and array item's identity.
+    """
+    return [f"Item {part + 1}" if isinstance(part, int) else part for part in path]
+
+
+def _build_detail_rows(data, prefix=()):
+    """
+    Build detail rows in schema order while retaining every supplied field
+
+    Only dictionary fields are ordered; array items and stored values stay unchanged.
+
+    Parameters
+    ----------
+    data : object
+        JSON value to display.
+    prefix : tuple, optional
+        Original dictionary keys and array indices within the data object.
+
+    Returns
+    -------
+    list of dict
+        Display rows for scalar values, arrays, and nested metadata.
 
     Rules
     -----
@@ -2793,12 +2825,16 @@ def _build_detail_rows(data, prefix=""):
     - Recurse into dict and list[dict]
     """
     rows = []
+    label = " / ".join(_detail_path_labels(prefix))
 
     if isinstance(data, dict):
         if not data:
+            if not prefix:
+                return rows
             rows.append(
                 {
-                    "label": _format_detail_label(prefix),
+                    "label": label,
+                    "path": prefix,
                     "type": "json",
                     "summary": "Empty object",
                     "json_value": json.dumps(data, indent=2, ensure_ascii=False),
@@ -2806,8 +2842,8 @@ def _build_detail_rows(data, prefix=""):
             )
             return rows
 
-        for key, value in data.items():
-            full_key = f"{prefix}.{key}" if prefix else key
+        for key, value in ordered_metadata_items(data, prefix):
+            full_key = prefix + (key,)
             rows.extend(_build_detail_rows(value, full_key))
         return rows
 
@@ -2815,7 +2851,8 @@ def _build_detail_rows(data, prefix=""):
         if len(data) == 0:
             rows.append(
                 {
-                    "label": _format_detail_label(prefix),
+                    "label": label,
+                    "path": prefix,
                     "type": "json",
                     "summary": "Empty list",
                     "json_value": json.dumps(data, indent=2, ensure_ascii=False),
@@ -2826,7 +2863,8 @@ def _build_detail_rows(data, prefix=""):
         if all(isinstance(item, str) and item.strip() for item in data):
             rows.append(
                 {
-                    "label": _format_detail_label(prefix),
+                    "label": label,
+                    "path": prefix,
                     "type": "string_list",
                     "value": data,
                 }
@@ -2836,7 +2874,8 @@ def _build_detail_rows(data, prefix=""):
         if _is_numeric_list(data):
             rows.append(
                 {
-                    "label": _format_detail_label(prefix),
+                    "label": label,
+                    "path": prefix,
                     "type": "numeric_array",
                     "value": data,
                     "count": len(data),
@@ -2849,7 +2888,8 @@ def _build_detail_rows(data, prefix=""):
         if not all(isinstance(item, dict) for item in data):
             rows.append(
                 {
-                    "label": _format_detail_label(prefix),
+                    "label": label,
+                    "path": prefix,
                     "type": "json",
                     "summary": f"Array with {len(data)} item(s)",
                     "json_value": json.dumps(data, indent=2, ensure_ascii=False),
@@ -2858,7 +2898,7 @@ def _build_detail_rows(data, prefix=""):
             return rows
 
         for index, item in enumerate(data):
-            item_prefix = f"{prefix}[{index}]"
+            item_prefix = prefix + (index,) if len(data) > 1 else prefix
             rows.extend(_build_detail_rows(item, item_prefix))
         return rows
 
@@ -2866,7 +2906,8 @@ def _build_detail_rows(data, prefix=""):
         if not data.strip():
             rows.append(
                 {
-                    "label": _format_detail_label(prefix),
+                    "label": label,
+                    "path": prefix,
                     "type": "empty",
                     "value": "",
                 }
@@ -2875,7 +2916,8 @@ def _build_detail_rows(data, prefix=""):
 
         rows.append(
             {
-                "label": _format_detail_label(prefix),
+                "label": label,
+                "path": prefix,
                 "type": "string",
                 "value": data,
             }
@@ -2885,7 +2927,8 @@ def _build_detail_rows(data, prefix=""):
     if isinstance(data, bool):
         rows.append(
             {
-                "label": _format_detail_label(prefix),
+                "label": label,
+                "path": prefix,
                 "type": "boolean",
                 "value": str(data).lower(),
             }
@@ -2895,7 +2938,8 @@ def _build_detail_rows(data, prefix=""):
     if _is_number_value(data):
         rows.append(
             {
-                "label": _format_detail_label(prefix),
+                "label": label,
+                "path": prefix,
                 "type": "number",
                 "value": data,
             }
@@ -2905,7 +2949,8 @@ def _build_detail_rows(data, prefix=""):
     if data is None:
         rows.append(
             {
-                "label": _format_detail_label(prefix),
+                "label": label,
+                "path": prefix,
                 "type": "empty",
                 "value": "",
             }
@@ -2914,7 +2959,8 @@ def _build_detail_rows(data, prefix=""):
 
     rows.append(
         {
-            "label": _format_detail_label(prefix),
+            "label": label,
+            "path": prefix,
             "type": "json",
             "summary": type(data).__name__,
             "json_value": json.dumps(data, indent=2, ensure_ascii=False, default=str),
@@ -2925,7 +2971,21 @@ def _build_detail_rows(data, prefix=""):
 
 def _ensure_required_detail_rows(data, rows):
     """
-    Add empty placeholders for missing required top-level fields
+    Keep missing required fields visible in the correct schema position
+
+    Legacy records may lack required fields; absent optional fields are not added.
+
+    Parameters
+    ----------
+    data : dict
+        Stored JSON data object.
+    rows : list of dict
+        Detail rows for the supplied data.
+
+    Returns
+    -------
+    list of dict
+        Rows and required placeholders ordered by their top level field.
     """
     if not isinstance(data, dict):
         data = {}
@@ -2940,38 +3000,16 @@ def _ensure_required_detail_rows(data, rows):
         complete_rows.append(
             {
                 "label": field,
+                "path": (field,),
                 "type": "empty",
                 "value": "",
             }
         )
 
-    return complete_rows
-
-
-VISUALIZED_DETAIL_FIELD_ROOTS = {
-    "mechanical_BC",
-    "stress",
-    "total_strain",
-    "plastic_strain",
-}
-
-
-def _filter_visualized_detail_rows(rows):
-    """
-    Remove rows that are already represented by detail-page visualizations
-    """
-    filtered_rows = []
-
-    for row in rows:
-        label = str(row.get("label", ""))
-        root_label = label.split(" / ", 1)[0]
-
-        if root_label in VISUALIZED_DETAIL_FIELD_ROOTS:
-            continue
-
-        filtered_rows.append(row)
-
-    return filtered_rows
+    return sorted(
+        complete_rows,
+        key=lambda row: detail_field_rank(row["path"][0]),
+    )
 
 
 def _find_group_child(children, label):
@@ -3229,7 +3267,10 @@ def _group_repeated_flat_roots(rows):
 
 
 def _group_detail_rows(detail_rows):
-    """Group hierarchical detail rows into nested collapsible sections
+    """
+    Group hierarchical detail rows into nested collapsible sections
+
+    Original path parts keep literal punctuation separate from nested fields.
 
     Parameters
     ----------
@@ -3244,10 +3285,9 @@ def _group_detail_rows(detail_rows):
     tree_rows = []
 
     for row in detail_rows:
-        label = row.get("label", "")
-
-        if isinstance(label, str) and " / " in label:
-            _insert_auto_grouped_child(tree_rows, label.split(" / "), row)
+        parts = _detail_path_labels(row["path"])
+        if len(parts) > 1:
+            _insert_auto_grouped_child(tree_rows, parts, row)
             continue
 
         tree_rows.append(row)
@@ -3877,6 +3917,21 @@ def json_data_delete_view(request, pk):
 def json_data_detail_view(request, pk):
     """
     Display a user-friendly detail page for one accessible JSON data object
+
+    Schema fields precede additional metadata, with original values available
+    alongside the plots and boundary condition summaries.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated request for the detail page.
+    pk : int
+        Primary key of the data object.
+
+    Returns
+    -------
+    HttpResponse
+        Detail page for an accessible record.
     """
     obj = get_object_or_404(
         JSONData.objects.select_related("owner").prefetch_related("shared_users"),
@@ -3890,23 +3945,24 @@ def json_data_detail_view(request, pk):
         obj.data or {},
         _build_detail_rows(obj.data or {}),
     )
-    detail_rows = _filter_visualized_detail_rows(detail_rows)
-    display_rows = [
-        row
-        for row in detail_rows
-        if (
-            row["type"] in {
-                "string",
-                "string_list",
-                "number",
-                "numeric_array",
-                "boolean",
-                "empty",
-                "json",
-            }
-        )
-    ]
-    display_rows = _group_detail_rows(display_rows)
+    schema_rows = []
+    additional_rows = []
+    for index, row in enumerate(detail_rows):
+        row["value_id"] = f"detail-value-{index}"
+        root_label = row["path"][0]
+        if detail_field_rank(root_label) < len(DETAIL_FIELD_ORDERS[""]):
+            schema_rows.append(row)
+        else:
+            additional_rows.append(row)
+
+    display_rows = _group_detail_rows(schema_rows)
+    if additional_rows:
+        display_rows.append({
+            "type": "group",
+            "label": "Additional metadata",
+            "children": _group_detail_rows(additional_rows),
+            "count": len(additional_rows),
+        })
     plot_variables = _extract_plot_variables(
         obj.data or {},
         units=(obj.data or {}).get("units", {}),
