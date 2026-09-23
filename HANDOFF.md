@@ -1,8 +1,8 @@
 ---
 status: completed
 branch: main
-timestamp: 2026-09-21T21:57:41+02:00
-code_commit: c8505a108f224e10202ea3030d5f4385707a5e48
+timestamp: 2026-09-23T13:11:41+02:00
+code_commit: 661f4a878fc785b47cc9a0cdcf5623dccf354408
 files_modified:
   - HANDOFF.md
 ---
@@ -11,15 +11,20 @@ files_modified:
 
 ## 当前状态
 
-My Data 下拉筛选已完成，最新功能提交是 `c8505a1`；之前的 Search 和 Upload Data 修改保留。
+最新功能提交是 `661f4a8`：上传限制区改为两列，每项仅保留“限制名称：数值”。
+此前已完成 ORCID 公开资料补全、真实上传进度和跨页面后台处理。
 写本交接前，工作区干净，已用 `git ls-remote origin refs/heads/main` 确认
-GitHub 的 `main` 也是 `c8505a108f224e10202ea3030d5f4385707a5e48`。
+GitHub 的 `main` 也是 `661f4a878fc785b47cc9a0cdcf5623dccf354408`。
 本交接会另行提交并推送，所以拉取后 HEAD 应是包含本文件更新的文档提交。
 
-用户计划 2026-09-22 去学校电脑继续。本次只更新交接文档，不改应用功能。
-没有未完成的已授权代码任务或待合并的代理改动。最近在讨论 My Data 进入详情后的
-stress-strain 曲线、CSV 下载，以及 ε_eq 和 ε_p,eq 的含义；具体结论和边界见下文。
-CSV 下载已暂缓，曲线公式没有修改。下一步等用户明确指示，不要自行实施讨论中的想法。
+用户准备新开聊天，**会继续贴 Ronak 试用后的反馈，下一轮围绕这些反馈逐项推进**。
+本次只更新交接文档，不改应用功能。当前已授权的改动均已完成，没有待合并的代理改动。
+Ronak 的“100 个对象的 JSON 上传两次都没有结果”仍未定位：用户明确要求先略过，
+待向 Ronak 要到原始 JSON 后再查，不能将这次进度和后台处理改动说成已修复该问题。
+更早的曲线 CSV 下载仍暂缓，科学公式未修改，见下文历史讨论。
+
+用户最新 UI 要求：**限制名称、冒号、数值；每项一行，桌面两列；不要在下面恢复大段解释。**
+保持界面英文，中文简短沟通。用户不喜欢为了常规小修改反复确认。
 
 之前给 Ronak 的 Upload Data 说明已整理成英文和中文，包含上传流程及下面的全部额度。
 这里只提供了供用户复制的草稿，**没有代发 Zulip 消息**。
@@ -27,25 +32,26 @@ CSV 下载已暂缓，曲线公式没有修改。下一步等用户明确指示�
 **代码已推送不代表 Render 已部署完成；线上部署及线上功能尚未确认。**
 试用站点：[FAIR Materials Data Platform](https://fair-materials-data-hub.onrender.com/)。
 
-## 学校电脑恢复步骤
+## 新聊天／另一台电脑恢复步骤
 
-1. 在学校电脑自己的仓库目录先运行 `git status --short --branch` 和
+1. 在当前电脑自己的仓库目录先运行 `git status --short --branch` 和
    `git log -10 --oneline`。如果有未提交内容，先检查并保留，不要覆盖、重置或强推。
 2. 工作区干净且位于 `main` 时运行 `git pull --ff-only`。若本地分支与远端分叉，
    先查差异，不要用 `reset --hard` 或强推解决。拉取后重新阅读本文件、
    [AGENTS.md](AGENTS.md) 和 [README.md](README.md) 的 Upload and Storage Limits、
    Current Scope、My Data、Search、Local Setup、Verification。
-3. 不要假定学校电脑保留了聊天记录、这台电脑的路径、登录状态或凭据。
-   若有 PyCharm 环境工具，每次运行 Python 前用它确认学校电脑的项目解释器。
-   README 推荐 Python 3.12；9 月 21 日在 Windows 实际测试用的是 Python 3.13.9，
-   项目目录为 `D:\Projects\database-manager-ui`，解释器在该目录的 `.venv\Scripts\python.exe`。
-   这些路径只是本机记录，不要照搬到学校电脑。
+3. 不要假定新聊天或另一台电脑保留了聊天记录、路径、登录状态或凭据。
+   若有 PyCharm 环境工具，每次运行 Python 前用它确认项目解释器。
+   9 月 23 日工作目录为 `/home/users/xuejungs/Projects/database-manager-ui`，
+   实际测试解释器是本项目 `.venv/bin/python`，Python 3.10.12；Render 配置为 Python 3.12.13。
+   这些只是当前环境记录，换电脑应重新确认，不能直接照搬路径。
 4. 本地开发使用 `DEBUG=True` 和 SQLite。已有 `.env` 不覆盖；若缺少配置，
    按 README 从 `env.sample` 建立本地配置，不借用生产数据库凭据。
    依赖或数据库落后时，按 README 安装 `requirements.txt` 并运行迁移。
-   `c8505a1` 没有新增依赖或迁移，但更早的 identifier 功能有迁移 `0010`。
-   本机原有环境仍是 Django 4.2.9，已按现有 requirements 升级到 Django 5.2.16 后完成最终验证；
-   学校电脑也要检查实际安装版本，不能只看依赖文件。
+   最新功能没有新增依赖；本轮新增迁移 `0012_accountprofile_research_details` 和
+   `0013_upload_jobs`，本地 SQLite 已应用。另一台电脑仍须运行未应用的迁移。
+   本地 `runserver` 默认走原有 NDJSON 上传；测试后台上传要按部署文档启动 Gunicorn，
+   由它启动上传处理进程，不要只启动 `runserver` 就判断后台功能失效。
 5. `.env`、本地数据库、虚拟环境、上传数据和临时测试报告没有通过 Git 同步。
    学校电脑、这台电脑和线上站点的账户、数据各自独立。
 6. 用户偏好中文简短直接沟通，UI、代码注释和 docstring 保持英文。
@@ -58,6 +64,11 @@ CSV 下载已暂缓，曲线公式没有修改。下一步等用户明确指示�
 
 | 提交 | 内容 |
 | --- | --- |
+| `661f4a8` | 上传限制精简为两列“名称：数值”，删除解释段落 |
+| `22a304b` | 真实文件传输和对象校验进度、后台上传任务、站内跨页面继续处理、页面显示限制 |
+| `e3a0716` | ORCID 可选研究资料补全和 Account Settings 编辑字段 |
+| `75e3b82` | 从公开 ORCID 资料补全空的 institution、email |
+| `977d009` / `a3583b7` | 引导文案、强调和动效，以及更易读的字号与配色 |
 | `c8505a1` | My Data 增加 Access、Software、Phase、Creator 下拉筛选及 11 项回归测试 |
 | `463b555` | 上一台电脑的 Upload 和 Search 交接文档 |
 | `9a5228f` | 正式应用额度；上传释放前一文件的解析数据；搜索逐记录扫描并保留摘要 |
@@ -75,7 +86,109 @@ CSV 下载已暂缓，曲线公式没有修改。下一步等用户明确指示�
 
 旧提交 `550ed5f` 的“遇到错误文件就停止后续文件”已经被取代，不能恢复为最终需求。
 
-## My Data 本轮完成内容
+## Ronak 上传反馈：已做与待查
+
+1. **进度不明确：已改。** 原来 100 个对象只显示第 1/1 个文件；现在分别显示实际传输字节、
+   解析／对象校验进度和最终保存结果。只有文件事务提交后才显示已保存，不能把已校验当成已保存。
+2. **上传两次没有结果：原因未确认，用户已暂缓。** 等 Ronak 的原始 JSON；截图文件名为
+   `Data_Base_Cyclic.json`。截图中的 Waiting 只说明文件已选中，不能证明请求已经发出。
+   本地合成的 100 个小对象能够保存，重复提交会报错，但不代表她的实际文件也正常。
+   100 个对象低于每次合计 1,000 的限制；JSON 深度指 dict／list 的嵌套层数，不是对象数量。
+3. **切换页面丢失上传：已实现站内继续处理和状态恢复。** 传输阶段保留发送页面，
+   服务端收齐后由独立进程处理。刷新、关标签页、离站、服务重启有不同边界，见下一节。
+
+以前同步保存路径存在逐对象数据库查询；旧线上日志显示一个 Gunicorn sync worker，
+线上延迟或超时是排查方向，**不是已经证明的根因**。后续应结合实际文件、操作和请求结果定位。
+不要为了继续工作要求用户重复翻找已无法滚动查看的旧日志。
+
+用户已贴的 Render 日志包含许多 GET 200／304、少量 POST 200／302，没有明确 traceback、
+worker timeout 或保存失败原因。当前访问日志格式是 `%(m)s %(s)s %(L)s %(b)s`，
+只有方法、状态、耗时和响应字节数，没有 URL；无法据此识别哪个 POST 是上传。
+HTTP 200 也不证明对象保存成功，响应中可能含校验错误。
+
+已向用户解释：Render 运行 Django 网站并提供访问入口；Supabase PostgreSQL 保存账户、
+对象和权限。当前没有连接可直接读取这两个平台后台的账户工具或凭据，未代查线上数据库。
+
+## 9 月 23 日后台上传实现与边界
+
+- 新增 `UploadJob`、`UploadWorkerInstance` 和迁移 `0013_upload_jobs`。
+  `/upload/jobs/` 接收一次 multipart 并返回任务；`/upload/jobs/<uuid>/` 返回任务进度。
+  接口仅当前所有者可读，保留 CSRF 校验和 `Cache-Control: no-store`。
+- `gunicorn.conf.py` 由现有 Render 启动命令自动加载，使用 `gthread`、4 个线程，
+  启动独立 `process_upload_jobs` 子进程并监督其存活；每次启动使用新的实例 UUID。
+  没有新增收费服务、第三方依赖或独立 Render worker 服务，也没有修改 `render.yaml` 启动命令。
+- 原始文件暂存于非公开的本地目录，服务器生成目录名，目录／文件权限为 0700／0600。
+  后台保留全部批次预检、逐文件解析释放、整文件原子保存及最终 identifier／配额复查。
+  文件成功结果与对象、通知在同一事务提交；确认成功的文件不会因后续中断被误标失败。
+- 客户端以 submission UUID 防重复；任务不自动重试。后台阶段包含 parsing、validating、saving，
+  校验进度来自实际完成的对象；失败或中断保留已确认结果，未确认文件标为 Unconfirmed。
+- 传输中用临时同源 iframe 显示其他站内页面，保留原始发送文档；回 Upload 恢复原页面。
+  收齐后其他页面可查询自己的后台任务。刷新、关标签页或离站发生在收齐之前仍可能中断传输。
+  仅符合条件的已登录 HTML 页面允许同源嵌入，登录和管理等页面保留原有防嵌入限制。
+- 普通表单回退和原有 `/upload/` NDJSON 路径保留；未启用后台 worker 的本地 `runserver`
+  仍可用旧路径。不要移除这条回退，也不要对断线自动重新 POST。
+- 当前后台设置：每账户 1 个活动任务，处理期限 30 分钟；每实例暂存预算 512 MiB，
+  磁盘保留 64 MiB；worker 租约 90 秒、心跳 5 秒；未完成接收过期 1 小时，结果保留 7 天。
+  处理期限在步骤之间和提交前检查，不是对正在运行的 SQL 的硬中断。
+- **当前 Render 临时磁盘不持久，服务休眠／重启／重新部署可能中断未完成任务。**
+  已提交结果保留，未确认文件不自动重传；不能承诺托管故障后断点续传。
+  用户没有授权购买基础设施，这轮沿用现有服务。
+
+关键代码：[upload_jobs.py](apps/pages/upload_jobs.py)、
+[process_upload_jobs.py](apps/pages/management/commands/process_upload_jobs.py)、
+[gunicorn.conf.py](gunicorn.conf.py)、[upload.js](static/assets/js/upload.js)、
+[upload-host.js](static/assets/js/upload-host.js)、
+[upload_navigation.py](apps/pages/upload_navigation.py)、
+[upload_limits.py](apps/pages/templatetags/upload_limits.py)。
+运行说明见 [部署文档](docs/deployment/public-pilot.md)，设计和实施记录见
+[设计](docs/superpowers/specs/2026-09-23-upload-continuity-design.md)及
+[实施计划](docs/superpowers/plans/2026-09-23-upload-continuity.md)。
+
+### 最新上传限制区
+
+`661f4a8` 仅精简 [upload.html](templates/pages/upload.html) 及相应显示测试，不改后台数值。
+两列，每项一行 `Label: value`；没有下面的三段说明文字。数值仍从当前 settings 动态读取。
+后台开启时显示 9 项；关闭时显示基础 7 项，不显示活动任务数和处理期限。
+不要重新加入存储计算、失败计数、主机容量、切页边界等解释段；详细说明保留在 README。
+
+### 本轮验证证据与局限
+
+- `22a304b`：**652 项 Django 测试通过；98 项 JavaScript 测试通过，0 项跳过**。
+  使用 `DEBUG=True`、独立本地 SQLite，Node 24.19.0 和真实 Chromium；迁移漂移检查通过。
+- 实际本地 Gunicorn 验证了处理进程启动、停止和重启；真实 HTTP 上传 100 个合成对象，
+  检查任务阶段、最终保存数、同 token 幂等、新提交重复数据报错和匿名访问拒绝。
+- 真实浏览器在 1280／1440 桌面宽度、限速传输时切换 Search → My Data → Upload，
+  上传继续、双击仅一次 POST、新页面恢复结果，未见 JavaScript 异常。
+- `661f4a8`：4 项限制显示测试通过；8 组桌面布局检查覆盖 1280／1440、后台开／关、
+  空文件列表／5 个长文件名。每项单行，无重叠或横向溢出。
+- 本轮没有用 Ronak 原文件复现，没有真实 PostgreSQL 多连接并发测试，也没有线上容量验证。
+  SQLite 功能／回滚测试和代码锁顺序审查不能替代 PostgreSQL 并发验证。
+- 临时截图、脚本在本机 `/tmp/upload-continuity-*`、`/tmp/upload-limits-compact-qa` 等目录，
+  不随 Git 同步；临时测试服务已停止。**Render 实际部署仍未确认。**
+- 本次 HANDOFF 更新只核对文档和 Git 状态，不重复运行上述应用测试。
+
+## ORCID 可选资料补全
+
+`75e3b82`、`e3a0716` 已完成并推送。Account Settings 可编辑 Name、Email、Institution、
+Department、Position、Website、Research keywords；这些资料可选，Name 与登录 Username 分开。
+新增迁移 `0012_accountprofile_research_details`，桌面保持紧凑两列。
+
+- ORCID 登录／连接时最多额外读取 `/person` 和 `/employments` 两个公开部分，
+  只填本地空字段，不覆盖用户已填内容。不存在、私有、无效、超长或歧义资料留空可手填。
+- Email 必须公开且 ORCID 标记已验证，优先 primary；Name 优先公开 credit name，否则 given／family。
+  Website 仅有效 HTTP(S)，按公开链接顺序优先级选择。
+- **Research keywords 是 ORCID 本人填写并公开的 Keywords**，去重后导入；不是从论文推断。
+- Institution 来自明确的当前公开雇佣机构；已有 institution 时只匹配同机构，
+  Department／Position 不混用无关岗位，歧义时不猜。
+- 网络请求后在事务中重新检查身份和字段是否仍为空。令牌不持久保存；不按邮箱或姓名合并账户。
+  获取可选资料失败不会阻止登录。
+
+关键文件：[orcid_profile.py](apps/pages/orcid_profile.py)、[forms.py](apps/pages/forms.py)、
+[models.py](apps/pages/models.py)、[settings.html](templates/accounts/settings.html)。
+完成时 233 项相关测试通过，迁移检查通过；1280／1440 桌面空资料和长内容布局已检查。
+后续上传的 652 项全量 Django 测试也包含这些回归测试。线上 ORCID 行为尚未验收。
+
+## My Data 已完成内容（9 月 21 日）
 
 用户希望管理自己上传的数据，倾向直观的下拉框，不要搜索框；没有采用 Upload time。
 用户确认了 Access、Software、Phase、Creator 四项后才实施。Search 仍用于搜索和浏览可访问数据。
@@ -193,7 +306,8 @@ Windows 全量 Django 测试中的部署构建测试需要 Bash。本机第一�
 - 文件列表右侧显示 Waiting → Processing（转圈）→ Uploaded / Failed。
   同时只处理一个文件；不人为延迟动画，小文件太快看不到转圈是正常的。
   所有详细结果和错误在全部处理完成后统一显示在表单下方。
-- 浏览器一次发送整个 multipart 请求，保留全批预检。服务端用 NDJSON 依次发送
+- 当前后台路径见上文；以下是仍保留的原有流式回退：一次发送整个 multipart 请求，
+  保留全批预检。服务端用 NDJSON 依次发送
   `file_start`、事务完成后的 `file_result`，最后发送 `complete`。
   不支持流读取的浏览器保留普通表单回退。
 - 处理中防止重复提交，不禁用文件输入导致漏传。断线保留已确认结果，其他文件标为
@@ -225,6 +339,8 @@ Windows 全量 Django 测试中的部署构建测试需要 Bash。本机第一�
 | 每用户已存储 JSON | 5 GiB |
 | JSON 嵌套深度 | 100 层，未改变 |
 | 每用户上传频率 | 每小时窗口 20 次提交，失败也计数，未改变 |
+| 每用户活动后台上传 | 1，仅后台模式 |
+| 每次后台处理期限 | 30 分钟，仅后台模式 |
 
 存储配额按紧凑 UTF-8 JSON 字节计量，不是原始文件大小或每月流量；删除会释放额度。
 这些是用户确认的正式平台初始**应用额度**，并不证明当前试用托管已具备对应容量。
@@ -269,7 +385,8 @@ README 的 Current Pilot Hosting 保留当前试用部署说明。尚无申请�
 ## 历史 Upload 和 Search 验证及容量限制
 
 下面是上一台电脑在 `9a5228f` 提交前完成、由 9 月 19 日交接保留的验证。
-本轮 My Data 的最新 584 项 Django 和 73 项 JavaScript 验证见上文；本轮没有重做大文件容量实测。
+9 月 21 日 My Data 验证为 584 项 Django 和 73 项 JavaScript；9 月 23 日的最新验证见上文。
+本轮没有重做这些大文件容量实测，不应将历史数值当成新后台路径或线上的性能结果。
 
 - 573 项 Django 测试通过；73 项 JavaScript 测试通过，包含真实 Chromium，0 项跳过。
 - `manage.py check` 通过；`manage.py makemigrations --check --dry-run` 无变化。
@@ -314,10 +431,12 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 
 ## 下一步
 
-1. 学校电脑安全拉取最新 main，确认本地环境，先读本交接和 AGENTS，再按用户下一条指示继续。
-2. 最近讨论集中在 My Data 和详情页。筛选已完成；CSV 暂缓；两个等效应变选项已解释并用示例核对，
-   尚无曲线公式、命名或下载功能的进一步修改指令。
-3. 若用户提供会议 TXT，可核对教授对 CSV 的要求和 Ronak 对曲线的原话，再讨论具体修改。
-4. 若用户要验收线上行为，先确认 Render 实际部署的提交，再做线上检查。
-5. 当前没有待完成的已授权功能修改；扩容入口、索引搜索、基础设施升级、AI 和知识图谱
-   都不应未经请求直接展开。
+1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
+2. **用户将在新聊天继续贴 Ronak 试用反馈。** 按新反馈逐项核对当前代码，明确要求修改的直接落实；
+   先讨论或询问含义时先回答，不将每条反馈自动扩大成整体重构。
+3. 等用户拿到 Ronak 的原始 JSON，再复现“上传两次无结果”；记录实际步骤和响应，
+   不用小合成文件成功、HTTP 200 或这次后台改动推定原问题已修复。
+4. 如核对线上问题，先确认 Render 部署提交。Git push 成功不证明部署完成，也不证明迁移或线上行为成功。
+5. 继续保持限制区两列、每项一行“名称：数值”，不要恢复大段解释。
+6. CSV 导出仍暂缓，科学公式未获修改指令；扩容入口、索引搜索、收费基础设施、AI 和知识图谱
+   不应未经请求展开。当前没有其他待完成的已授权代码任务。
