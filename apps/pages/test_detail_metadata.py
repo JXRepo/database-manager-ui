@@ -53,10 +53,11 @@ class DetailMetadataTests(TestCase):
         Interleave required and optional properties in their schema order
         """
         expected = [
+            "$schema", "$id", "version", "type", "description",
             "identifier", "title", "creator", "creator_ORCID", "creator_affiliation",
             "creator_institute", "creator_group", "contributor", "contributor_ORCID",
             "contributor_affiliation", "contributor_institute", "contributor_group",
-            "date", "shared_with", "description", "rights", "rights_holder",
+            "date", "shared_with", "rights", "rights_holder",
             "funder_name", "fund_identifier", "publisher", "relation",
             "user_extra_information", "keywords", "software", "software_version", "system",
             "system_version", "processor_specifications", "input_path", "results_path",
@@ -64,7 +65,7 @@ class DetailMetadataTests(TestCase):
             "discretization_unit_size", "discretization_count", "solid_volume_fraction",
             "origin", "global_temperature", "thermal_BC", "phase", "microstructure", "units",
         ]
-        unknown = ["extra_z", "CPU_specifications", "$schema", "extra_a"]
+        unknown = ["extra_z", "CPU_specifications", "extra_a"]
         hidden = ["mechanical_BC", "stress", "total_strain", "plastic_strain"]
         orders = (
             list(reversed(expected + unknown + hidden)),
@@ -103,7 +104,7 @@ class DetailMetadataTests(TestCase):
         rows = response.context["detail_rows"]
         self.assertEqual(
             [row["label"] for row in rows],
-            ["identifier", "title", uploaded_label, "$schema", "custom_flag"],
+            ["$schema", "identifier", "title", uploaded_label, "custom_flag"],
         )
         self.assertNotIn("Additional metadata", [row["label"] for row in rows])
         self.assertContains(response, "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;")
@@ -130,8 +131,8 @@ class DetailMetadataTests(TestCase):
         self.assertEqual(
             labels,
             [
-                "identifier", "title", "creator_ORCID", "creator_institute",
-                "creator_group", "description", "CPU_specifications",
+                "description", "identifier", "title", "creator_ORCID", "creator_institute",
+                "creator_group", "CPU_specifications",
             ],
         )
         self.assertTrue(all(row["type"] != "group" for row in rows))

@@ -338,8 +338,13 @@ Standard field names follow the
 `phase_name`, `processor_specifications`, and the underscore-separated names
 inside `origin`, such as `software_version` and `input_path`.
 
-At every level, supplied fields defined in the schema follow its `properties`
-order, whether required or optional. For example, `identifier` precedes `title`,
+Supplied top-level `$schema`, `$id`, `version`, `type`, and `description` appear
+first, in that order, matching the schema document's opening fields. These rows
+show uploaded values, not values copied from the schema. `description` appears
+only once, near the beginning of the list.
+
+The remaining fields follow the schema's `properties` order at every level,
+whether required or optional. For example, `identifier` precedes `title`,
 and the creator fields stay together. Nested order also covers the general
 constitutive model and microstructure schemas referenced by the main schema.
 Only supplied fields are shown; missing fields are not added as placeholders.

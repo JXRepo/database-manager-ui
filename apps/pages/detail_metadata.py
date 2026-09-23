@@ -3,6 +3,7 @@ Keep metadata display order independent of database JSON key order
 """
 
 # Fields follow properties declarations in MiMeDat and its referenced schemas
+# Supplied root header fields precede properties in schema document order
 # https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json
 # https://raw.githubusercontent.com/Ronakshoghi/MetadataSchema/main/general_constitutive_model_metadata_schema.json
 # https://raw.githubusercontent.com/YousefRezek/MicrostructureEvolutionDataSchema/main/Microstructure_Module.json
@@ -13,10 +14,11 @@ VISUALIZED_DETAIL_FIELDS = frozenset({
 
 DETAIL_FIELD_ORDERS = {
     "": (
+        "$schema", "$id", "version", "type", "description",
         "identifier", "title", "creator", "creator_ORCID", "creator_affiliation",
         "creator_institute", "creator_group", "contributor", "contributor_ORCID",
         "contributor_affiliation", "contributor_institute", "contributor_group",
-        "date", "shared_with", "description", "rights", "rights_holder",
+        "date", "shared_with", "rights", "rights_holder",
         "funder_name", "fund_identifier", "publisher", "relation",
         "user_extra_information", "keywords", "software", "software_version",
         "system", "system_version", "processor_specifications", "input_path",
