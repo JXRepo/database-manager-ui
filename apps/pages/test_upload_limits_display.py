@@ -43,13 +43,13 @@ class UploadLimitsDisplayTests(SimpleTestCase):
 
         for expected in (
             "up to 7 JSON files",
-            "7 files",
-            "12 MiB per file",
-            "36 MiB combined",
-            "2,345 objects",
-            "48 container levels",
-            "3 GiB of stored JSON",
-            "8 upload attempts per 30 minutes",
+            "Files per submission: 7",
+            "Size per file: 12 MiB",
+            "Total size per submission: 36 MiB",
+            "Objects per submission: 2,345",
+            "JSON nesting depth: 48 levels",
+            "Stored JSON per user: 3 GiB",
+            "Upload attempts per user: 8 / 30 minutes",
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, text)
@@ -64,8 +64,8 @@ class UploadLimitsDisplayTests(SimpleTestCase):
         """
         text = self._page_text()
 
-        self.assertIn("1.5 MiB per file", text)
-        self.assertIn("4 upload attempts per 45 seconds", text)
+        self.assertIn("Size per file: 1.5 MiB", text)
+        self.assertIn("Upload attempts per user: 4 / 45 seconds", text)
 
     @override_settings(UPLOAD_INSTANCE_ID="")
     def test_runserver_keeps_the_ordinary_streaming_upload(self):
@@ -75,7 +75,7 @@ class UploadLimitsDisplayTests(SimpleTestCase):
         html = render_to_string("pages/upload.html", {"form": JSONUploadForm()})
 
         self.assertNotIn("data-jobs-url", html)
-        self.assertNotIn("Background processing:", html)
+        self.assertNotIn("Active uploads per user:", html)
 
     @override_settings(
         UPLOAD_INSTANCE_ID="12345678-1234-5678-1234-567812345678",
@@ -89,5 +89,5 @@ class UploadLimitsDisplayTests(SimpleTestCase):
         text = self._page_text()
 
         self.assertIn('data-jobs-url="/upload/jobs/"', html)
-        self.assertIn("1 active submission per account", text)
-        self.assertIn("45 minutes processing time per submission", text)
+        self.assertIn("Active uploads per user: 1", text)
+        self.assertIn("Processing time per submission: 45 minutes", text)
