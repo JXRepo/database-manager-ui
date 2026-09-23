@@ -374,7 +374,7 @@ details[open] > .detail-group-summary {
 
     .bc-layout {
       display: grid;
-      grid-template-columns: minmax(280px, 1.1fr) minmax(260px, 0.9fr);
+      grid-template-columns: minmax(260px, 1fr) minmax(420px, 1fr);
       gap: 18px;
       align-items: start;
     }
@@ -648,7 +648,7 @@ details[open] > .detail-group-summary {
     }
 
     .bc-table-wrap {
-      overflow: auto;
+      overflow: visible;
       border: 1px solid #e5e7eb;
       border-radius: 16px;
       background: #ffffff;
@@ -656,6 +656,7 @@ details[open] > .detail-group-summary {
 
     .bc-table {
       width: 100%;
+      table-layout: fixed;
       margin: 0;
       font-size: 0.9rem;
     }
@@ -665,6 +666,7 @@ details[open] > .detail-group-summary {
       padding: 9px 10px;
       border-bottom: 1px solid #eef2f7;
       vertical-align: top;
+      overflow-wrap: anywhere;
     }
 
     .bc-table th {
@@ -675,6 +677,36 @@ details[open] > .detail-group-summary {
 
     .bc-table tr:last-child td {
       border-bottom: none;
+    }
+
+    .bc-table th:first-child {
+      width: 66px;
+      border-top-left-radius: 16px;
+    }
+
+    .bc-table th:nth-child(2) {
+      width: 244px;
+    }
+
+    .bc-table th:last-child {
+      border-top-right-radius: 16px;
+    }
+
+    .bc-table td:nth-child(2) {
+      position: relative;
+    }
+
+    .bc-axis-list {
+      display: flex;
+      align-items: flex-start;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .bc-axis-list .bc-status,
+    .bc-axis-list .bc-load-detail {
+      flex: 0 0 auto;
+      margin: 0;
     }
 
     .bc-status {
@@ -710,11 +742,13 @@ details[open] > .detail-group-summary {
 
     .bc-load-detail {
       display: inline-block;
+      vertical-align: top;
       margin-right: 4px;
       margin-bottom: 4px;
     }
 
     .bc-load-detail summary {
+      display: flex;
       cursor: pointer;
       list-style: none;
     }
@@ -724,7 +758,12 @@ details[open] > .detail-group-summary {
     }
 
     .bc-load-list {
-      margin: 6px 0 0;
+      position: absolute;
+      top: calc(100% - 5px);
+      left: 10px;
+      right: 10px;
+      z-index: 20;
+      margin: 0;
       padding: 8px 10px;
       border: 1px solid #fee2e2;
       border-radius: 8px;
@@ -732,6 +771,11 @@ details[open] > .detail-group-summary {
       color: #374151;
       font-size: 0.82rem;
       list-style: none;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      max-height: 320px;
+      overflow-y: auto;
+      box-shadow: 0 6px 18px rgba(16, 24, 40, 0.15);
     }
 
     .bc-load-list li + li {
@@ -1369,7 +1413,7 @@ details[open] > .detail-group-summary {
                   <tr>
                     <th>Target</th>
                     <th>Constraints</th>
-                    <th>Loading type / mode</th>
+                    <th>Loading Type / Mode</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1383,7 +1427,7 @@ details[open] > .detail-group-summary {
                         {% if item.is_tensor_load %}
                           <span class="bc-status bc-status-loaded">Tensor: loaded</span>
                           {% for load in item.tensor_loads %}
-                            <details class="bc-load-detail">
+                            <details class="bc-load-detail" name="bc-load">
                               <summary>
                                 <span class="bc-status bc-status-loaded">Tensor load {{ forloop.counter }}</span>
                               </summary>
@@ -1398,9 +1442,10 @@ details[open] > .detail-group-summary {
                             </details>
                           {% endfor %}
                         {% else %}
+                        <div class="bc-axis-list">
                         {% for axis in item.axes %}
                           {% if axis.status == "loaded" and axis.load_details %}
-                            <details class="bc-load-detail">
+                            <details class="bc-load-detail" name="bc-load">
                               <summary>
                                 <span class="bc-status bc-status-loaded">
                                   {{ axis.direction }}: loaded
@@ -1421,6 +1466,7 @@ details[open] > .detail-group-summary {
                             </span>
                           {% endif %}
                         {% endfor %}
+                        </div>
                         {% endif %}
                       </td>
                       <td>
@@ -1595,6 +1641,22 @@ details[open] > .detail-group-summary {
 <script type="module" src="{% static "assets/js/mechanical-bc-viewer.js" %}"></script>
 
 <script>
+  document.addEventListener("click", event => {
+    const openLoad = document.querySelector(".bc-load-detail[open]");
+    if (openLoad && !openLoad.contains(event.target)) {
+      openLoad.open = false;
+    }
+  });
+
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+    const openLoad = document.querySelector(".bc-load-detail[open]");
+    if (openLoad) {
+      openLoad.open = false;
+      openLoad.querySelector("summary").focus({ preventScroll: true });
+    }
+  });
+
   const plotVariables = JSON.parse(
     document.getElementById("plot-variables-data").textContent
   );

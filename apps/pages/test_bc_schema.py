@@ -151,7 +151,7 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertTrue("Tensor load 1" in response.content.decode(), "Missing tensor load display")
         self.assertContains(response, "Tensor load 2")
         self.assertContains(response, 'class="bc-load-key">step</span>:', count=2)
-        self.assertContains(response, "<th>Loading type / mode</th>", html=True)
+        self.assertContains(response, "<th>Loading Type / Mode</th>", html=True)
         self.assertContains(response, "&quot;xx&quot;: -1.23,")
         self.assertContains(response, "-1.23456789")
         self.assertNotContains(response, "X: loaded")
