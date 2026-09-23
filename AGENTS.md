@@ -90,9 +90,9 @@ Current priority:
 - My Data combines selected filters on the same object, matches complete names ignoring case and surrounding whitespace, and counts each object once per option under the other selected filters
 - Keep My Data filters and Clear available for empty results, preserve selected values in GET URLs, and limit bulk selection to the displayed records
 - Detail pages may include management actions for the owner
-- Detail metadata follows the locally recorded MiMeDat schema field order, starting with identifier, title, and authorship; never rely on database JSON key order
-- Show supplied optional fields and retain unknown nested fields at the end of their group; put unknown top-level fields and the `$schema` reference under Additional metadata
-- Keep existing field names, values, array item order, and download content unchanged; legacy aliases affect display order only, and absent optional fields do not get placeholders
+- Detail metadata has exactly the 24 required top-level fields in the main section, in the mandatory_fields order from title through units; never rely on database JSON key order
+- Put every supplied top-level field outside that exact list under collapsed Additional metadata, including identifier, optional schema fields, `$schema`, custom fields, and CPU_specifications
+- Preserve existing nested ordering and grouping, with unknown nested fields at the end of their group; keep field names, values, array item order, and download content unchanged, and do not add absent optional fields
 - Keep raw mechanical boundary conditions and stress/strain fields available in collapsible metadata alongside their visualizations, including additional fields the visualizations do not use
 - Search result pages should not include delete actions unless explicitly requested
 - Preserve the existing visual style unless a change is requested

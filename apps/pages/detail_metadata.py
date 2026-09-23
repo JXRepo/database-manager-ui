@@ -2,23 +2,18 @@
 Keep metadata display order independent of database JSON key order
 """
 
-# Display order from MiMeDat 511cb98b02270d7f31b55243ff49cfef6c7b240d
+# Main fields follow mandatory_fields in MiMeDat metadata_template.py
+# Nested order is retained from MiMeDat 511cb98b02270d7f31b55243ff49cfef6c7b240d
 # https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json
 # These lists guide presentation only; they do not validate uploaded data
 DETAIL_FIELD_ORDERS = {
     "": (
-        "identifier", "title", "creator", "creator_ORCID", "creator_affiliation",
-        "creator_institute", "creator_group", "contributor", "contributor_ORCID",
-        "contributor_affiliation", "contributor_institute", "contributor_group",
-        "date", "shared_with", "description", "rights", "rights_holder",
-        "funder_name", "fund_identifier", "publisher", "relation",
-        "user_extra_information", "keywords", "software", "software_version",
-        "system", "system_version", "processor_specifications", "input_path",
-        "results_path", "system_extra_information", "RVE_size", "RVE_continuity",
+        "title", "creator", "creator_affiliation", "date", "shared_with",
+        "rights", "rights_holder", "software", "software_version", "system",
+        "system_version", "processor_specifications", "input_path", "results_path",
+        "RVE_size", "RVE_continuity",
         "discretization_type", "discretization_unit_size", "discretization_count",
-        "solid_volume_fraction", "origin", "global_temperature", "mechanical_BC",
-        "thermal_BC", "phase", "microstructure", "stress", "total_strain",
-        "plastic_strain", "units",
+        "mechanical_BC", "phase", "stress", "total_strain", "units",
     ),
     "shared_with": ("access_type", "access_list", "username"),
     "origin": (
@@ -65,9 +60,8 @@ DETAIL_FIELD_ORDERS = {
     "units": ("Stress", "Strain", "Length", "Force", "Angle", "Temperature"),
 }
 
-# Keep documented older spellings in the same position without renaming them
+# Keep documented older nested spellings in position without renaming them
 DETAIL_FIELD_ALIASES = {
-    "": {"CPU_specifications": "processor_specifications"},
     "origin": {
         "software Version": "software_version",
         "system Version": "system_version",

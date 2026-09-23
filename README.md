@@ -333,18 +333,22 @@ in the application; this is not an indexed search designed for large datasets.
 
 ## Data Object Details
 
-Detail pages follow the field order in the
-[MiMeDat metadata schema](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json):
-identifier, title and authorship first, followed by software, simulation settings,
-phases, results, and units. The display uses a local field order, independent of
-database JSON key order, and does not fetch schemas from uploaded URLs.
+The main metadata section contains the 24 fields listed under
+[Required JSON Fields](#required-json-fields), in exactly that order: starting
+with title, creator, and creator_affiliation, and ending with stress, total_strain,
+and units. This display list follows `mandatory_fields` in
+[Ronak Shoghi's MiMeDat template](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/metadata_template.py).
+The order is independent of database JSON key order. Missing required fields in
+legacy records retain an Empty placeholder in the appropriate position.
 
-Supplied optional fields are shown; absent optional fields are not added.
-Unknown fields remain at the end of their existing nested group. Unknown top
-level fields and the `$schema` reference appear under **Additional metadata**.
-Known older field spellings keep their original names and values while appearing
-beside their corresponding schema fields. Missing required fields in legacy
-records retain an Empty placeholder in the appropriate position.
+Every supplied top level field outside that exact list appears under the
+collapsed **Additional metadata** group, including identifier, optional schema
+fields, `$schema`, custom fields, and older names such as CPU_specifications.
+Absent optional fields are not added, and uploaded field names are not renamed.
+
+Nested fields retain their existing locally recorded MiMeDat schema order and
+known older spellings. Unknown nested fields remain at the end of their existing
+group. The display does not fetch schemas from uploaded URLs.
 
 Nested data and long arrays remain collapsible. Arrays containing multiple
 objects keep separate Item 1, Item 2 groups so their metadata stays associated.
