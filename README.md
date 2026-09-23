@@ -333,30 +333,33 @@ in the application; this is not an indexed search designed for large datasets.
 
 ## Data Object Details
 
-The main metadata section contains the 24 fields listed under
-[Required JSON Fields](#required-json-fields), in exactly that order: starting
-with title, creator, and creator_affiliation, and ending with stress, total_strain,
-and units. This display list follows `mandatory_fields` in
-[Ronak Shoghi's MiMeDat template](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/metadata_template.py).
-The order is independent of database JSON key order. Missing required fields in
-legacy records retain an Empty placeholder in the appropriate position.
+Detail metadata starts with the fields listed under
+[Required JSON Fields](#required-json-fields), in that order. Top level
+mechanical_BC, stress, and total_strain are omitted from the metadata list because
+the boundary condition view and plots below use them. The remaining 21 required
+fields appear first; other supplied fields follow directly, without an Additional
+metadata group. Missing required fields in legacy records retain an Empty
+placeholder, except for those three visualized fields.
 
-Every supplied top level field outside that exact list appears under the
-collapsed **Additional metadata** group, including identifier, optional schema
-fields, `$schema`, custom fields, and older names such as CPU_specifications.
-Absent optional fields are not added, and uploaded field names are not renamed.
+Within each object, supplied required children follow the locally recorded
+MiMeDat schema order before optional or custom children. Conditional child order
+uses the object's access_type or thermal constraints. Fields with no required
+children, such as origin and the general constitutive_model, keep their stored
+order. Missing optional fields and missing nested fields are not added. Display
+ordering does not fetch uploaded schema URLs or validate nested data.
 
-Nested fields retain their existing locally recorded MiMeDat schema order and
-known older spellings. Unknown nested fields remain at the end of their existing
-group. The display does not fetch schemas from uploaded URLs.
+Collapsible groups follow actual JSON objects and arrays of objects, including
+objects with only one child. Flat fields such as creator_affiliation,
+creator_institute, and creator_group remain separate; shared name prefixes do
+not create groups. Arrays containing multiple objects keep separate Item 1,
+Item 2 groups. Short scalar lists stay inline, while long numeric and complex
+arrays offer Show values. Strings, numbers, booleans, nulls, empty containers,
+and mixed arrays remain displayable.
 
-Nested data and long arrays remain collapsible. Arrays containing multiple
-objects keep separate Item 1, Item 2 groups so their metadata stays associated.
-Literal punctuation in uploaded field names is preserved. Original boundary condition,
-stress, and strain fields are available alongside their visualizations, including
-extra values that the visualizations do not use. Download JSON exports the stored
-object without changing field names, values, or array item order. Display order
-does not introduce deeper schema validation during upload.
+Original names, literal punctuation, values, and array item order are preserved.
+Download JSON exports the complete stored object, including the three fields
+omitted from the metadata list and any values not used by the visualizations.
+Upload validation and access rules are unchanged.
 
 ## My Data
 

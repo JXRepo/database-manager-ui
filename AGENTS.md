@@ -90,10 +90,10 @@ Current priority:
 - My Data combines selected filters on the same object, matches complete names ignoring case and surrounding whitespace, and counts each object once per option under the other selected filters
 - Keep My Data filters and Clear available for empty results, preserve selected values in GET URLs, and limit bulk selection to the displayed records
 - Detail pages may include management actions for the owner
-- Detail metadata has exactly the 24 required top-level fields in the main section, in the mandatory_fields order from title through units; never rely on database JSON key order
-- Put every supplied top-level field outside that exact list under collapsed Additional metadata, including identifier, optional schema fields, `$schema`, custom fields, and CPU_specifications
-- Preserve existing nested ordering and grouping, with unknown nested fields at the end of their group; keep field names, values, array item order, and download content unchanged, and do not add absent optional fields
-- Keep raw mechanical boundary conditions and stress/strain fields available in collapsible metadata alongside their visualizations, including additional fields the visualizations do not use
+- Detail metadata shows required top-level fields in mandatory_fields order, omitting mechanical_BC, stress, and total_strain from the metadata list while retaining their visualizations
+- Show other supplied fields directly after required fields at each level, without an Additional metadata group; nested required order follows the locally recorded schema and applicable sharing or thermal conditions
+- Collapse actual nested objects and object lists, even with one child; never merge flat fields by shared prefixes such as creator_affiliation, creator_institute, and creator_group
+- Preserve field names, values, array item order, and complete JSON downloads; keep legacy required top-level placeholders except the three visualized fields, and do not add missing optional or nested fields or introduce deeper upload validation
 - Search result pages should not include delete actions unless explicitly requested
 - Preserve the existing visual style unless a change is requested
 - Avoid large redesigns unless explicitly requested

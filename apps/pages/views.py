@@ -28,7 +28,7 @@ from numbers import Number
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
-from .detail_metadata import DETAIL_FIELD_ORDERS, detail_field_rank, ordered_metadata_items
+from .detail_metadata import VISUALIZED_DETAIL_FIELDS, detail_field_rank, ordered_metadata_items
 from .advanced_search import (
     DATA_FIELD_CHOICES,
     DATA_FIELD_TYPES,
@@ -2799,7 +2799,7 @@ def _detail_path_labels(path):
 
 def _build_detail_rows(data, prefix=()):
     """
-    Build detail rows in schema order while retaining every supplied field
+    Build detail rows with required fields first and retain every supplied field
 
     Only dictionary fields are ordered; array items and stored values stay unchanged.
 
@@ -3118,7 +3118,10 @@ def _flatten_group_node(node, prefix=None):
 
 
 def _finalize_group_node(node):
-    """Convert a temporary group tree into a template-ready group
+    """
+    Convert each actual nested object into a collapsible group
+
+    Single child objects keep their structural group instead of being flattened.
 
     Parameters
     ----------
@@ -3137,10 +3140,7 @@ def _finalize_group_node(node):
             children.append(child)
             continue
 
-        if _count_group_leaves(child) >= 2:
-            children.append(_finalize_group_node(child))
-        else:
-            children.extend(_flatten_group_node(child))
+        children.append(_finalize_group_node(child))
 
     return {
         "type": "group",
@@ -3270,7 +3270,8 @@ def _group_detail_rows(detail_rows):
     """
     Group hierarchical detail rows into nested collapsible sections
 
-    Original path parts keep literal punctuation separate from nested fields.
+    Original path parts preserve actual nesting, including objects with one child.
+    Literal punctuation and common prefixes do not create groups.
 
     Parameters
     ----------
@@ -3299,10 +3300,7 @@ def _group_detail_rows(detail_rows):
             grouped_rows.append(row)
             continue
 
-        if _count_group_leaves(row) >= 2:
-            grouped_rows.append(_finalize_group_node(row))
-        else:
-            grouped_rows.extend(_flatten_group_node(row))
+        grouped_rows.append(_finalize_group_node(row))
 
     return grouped_rows
 
@@ -3918,8 +3916,8 @@ def json_data_detail_view(request, pk):
     """
     Display a user-friendly detail page for one accessible JSON data object
 
-    Schema fields precede additional metadata, with original values available
-    alongside the plots and boundary condition summaries.
+    Required fields precede other supplied metadata at each level. The plots and
+    boundary condition summaries display the three omitted result fields.
 
     Parameters
     ----------
@@ -3945,24 +3943,14 @@ def json_data_detail_view(request, pk):
         obj.data or {},
         _build_detail_rows(obj.data or {}),
     )
-    schema_rows = []
-    additional_rows = []
+    detail_rows = [
+        row for row in detail_rows
+        if row["path"][0] not in VISUALIZED_DETAIL_FIELDS
+    ]
     for index, row in enumerate(detail_rows):
         row["value_id"] = f"detail-value-{index}"
-        root_label = row["path"][0]
-        if detail_field_rank(root_label) < len(DETAIL_FIELD_ORDERS[""]):
-            schema_rows.append(row)
-        else:
-            additional_rows.append(row)
 
-    display_rows = _group_detail_rows(schema_rows)
-    if additional_rows:
-        display_rows.append({
-            "type": "group",
-            "label": "Additional metadata",
-            "children": _group_detail_rows(additional_rows),
-            "count": len(additional_rows),
-        })
+    display_rows = _group_detail_rows(detail_rows)
     plot_variables = _extract_plot_variables(
         obj.data or {},
         units=(obj.data or {}).get("units", {}),
