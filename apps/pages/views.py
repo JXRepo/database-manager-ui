@@ -1,5 +1,6 @@
 import json
 import math
+from decimal import Decimal, ROUND_HALF_UP, localcontext
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -3653,6 +3654,19 @@ MECHANICAL_BC_DIRECTIONS = ("X", "Y", "Z")
 def _format_compact_value(value):
     """
     Return a compact display value for one scalar or list
+
+    Load numbers use two decimal places with half-up rounding. Stored values
+    remain unchanged, and short numeric lists use the same display precision.
+
+    Parameters
+    ----------
+    value : object
+        Uploaded value to display in a load detail.
+
+    Returns
+    -------
+    str
+        Compact text with two decimal places for numbers.
     """
     if isinstance(value, list):
         if len(value) <= 6:
@@ -3661,7 +3675,10 @@ def _format_compact_value(value):
         return f"[{len(value)} values]"
 
     if _is_number_value(value):
-        return f"{value:.4g}"
+        with localcontext() as context:
+            context.rounding = ROUND_HALF_UP
+            text = format(Decimal(str(value)), ".2f")
+        return "0.00" if text == "-0.00" else text
 
     if value in (None, ""):
         return ""
@@ -3673,7 +3690,8 @@ def _normalize_applied_load(load):
     """
     Return display-ready details for one applied load entry
 
-    Preserve tensor values while ordering their components for display.
+    Order tensor components and round their displayed numbers to two decimals.
+    Raw values and integer step numbers remain intact.
 
     Parameters
     ----------
@@ -3699,8 +3717,11 @@ def _normalize_applied_load(load):
         if key == "step" and _is_number_value(value):
             display = str(value)
         if key == "magnitude" and isinstance(value, dict):
-            ordered = dict(ordered_metadata_items(value, ("mechanical_BC", "applied_load", "magnitude")))
-            display = json.dumps(ordered, ensure_ascii=False)
+            parts = []
+            for component, amount in ordered_metadata_items(value, ("mechanical_BC", "applied_load", "magnitude")):
+                formatted = _format_compact_value(amount) if _is_number_value(amount) else json.dumps(amount, ensure_ascii=False)
+                parts.append(f"{json.dumps(component, ensure_ascii=False)}: {formatted}")
+            display = "{" + ", ".join(parts) + "}"
 
         details.append(
             {

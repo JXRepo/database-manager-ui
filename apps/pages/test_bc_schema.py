@@ -66,6 +66,30 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertEqual([(detail["key"], detail["value"]) for detail in details], [("magnitude", -4), ("step", 10001)])
         self.assertEqual(details[1]["display"], "10001")
 
+    def test_load_values_round_half_up_without_changing_stored_values(self):
+        """
+        Round load details to two decimals while keeping full values and step numbers
+        """
+        for value, expected in (
+            (-40.9775297345, "-40.98"), (-9.53837730603, "-9.54"),
+            (1.005, "1.01"), (-1.005, "-1.01"), (2.675, "2.68"),
+            (10, "10.00"), (0, "0.00"), (-0.004, "0.00"),
+        ):
+            with self.subTest(value=value):
+                load = {"magnitude": value, "frequency": value, "duration": value, "R": value, "step": 10001}
+                original = deepcopy(load)
+                normalized = _normalize_applied_load(load)
+                fields = {detail["key"]: detail for detail in normalized["details"]}
+                for key in ("magnitude", "frequency", "duration", "R"):
+                    self.assertEqual(fields[key]["display"], expected)
+                    self.assertEqual(fields[key]["value"], value)
+                self.assertEqual(fields["step"]["display"], "10001")
+                self.assertEqual(load, original)
+        self.assertEqual(
+            _normalize_applied_load({"magnitude": [1.005, -9.53837730603]})["details"][0]["display"],
+            "[1.01, -9.54]",
+        )
+
     def test_tensor_loads_preserve_all_steps_without_inventing_axis_constraints(self):
         """
         Represent prescribed tensors as full cube loads without scalar arrows
@@ -95,9 +119,9 @@ class MechanicalBCSchemaTests(TestCase):
                         self.assertEqual(actual["step"], expected["step"])
                     self.assertEqual(data, original)
 
-    def test_tensor_magnitude_uses_schema_component_order_and_exact_values(self):
+    def test_tensor_magnitude_uses_schema_order_and_two_decimal_display(self):
         """
-        Display tensor components in schema order without rounding their values
+        Round displayed tensor components without changing their underlying values
         """
         load = self._tensor_data()["mechanical_BC"][0]["applied_load"][0]
 
@@ -107,7 +131,9 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertTrue(magnitude["display"].startswith('{"xx":'), "Tensor components should start with xx in JSON notation")
         displayed = json.loads(magnitude["display"])
         self.assertEqual(list(displayed), ["xx", "yy", "zz", "xy", "yx", "xz", "zx", "yz", "zy"])
-        self.assertEqual(displayed, load["magnitude"])
+        self.assertEqual(displayed, {**load["magnitude"], "xx": -1.23})
+        self.assertIn('"yy": 2.00', magnitude["display"])
+        self.assertEqual(magnitude["value"], load["magnitude"])
 
     def test_detail_page_shows_all_tensor_steps_and_preserves_download(self):
         """
@@ -125,6 +151,8 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertTrue("Tensor load 1" in response.content.decode(), "Missing tensor load display")
         self.assertContains(response, "Tensor load 2")
         self.assertContains(response, 'class="bc-load-key">step</span>:', count=2)
+        self.assertContains(response, "<th>Loading type / mode</th>", html=True)
+        self.assertContains(response, "&quot;xx&quot;: -1.23,")
         self.assertContains(response, "-1.23456789")
         self.assertNotContains(response, "X: loaded")
         self.assertNotContains(response, "Y: free")

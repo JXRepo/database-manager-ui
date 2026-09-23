@@ -99,6 +99,7 @@ Current priority:
 - Preserve field names, values, array item order, and complete JSON downloads; only display supplied fields, without adding missing-field placeholders or introducing deeper upload validation
 - Use current MiMeDat equivalent_stress, equivalent_strain, and equivalent_plastic_strain fields for plots; supplied arrays take precedence and only absent fields may use the existing calculated equivalents
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
+- Show boundary load numbers with two decimal places and half-up rounding, retaining full integer step values and original stored/exported numbers; label the combined column Loading type / mode
 - Search result pages should not include delete actions unless explicitly requested
 - Preserve the existing visual style unless a change is requested
 - Avoid large redesigns unless explicitly requested

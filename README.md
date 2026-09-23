@@ -385,6 +385,10 @@ Mechanical boundary conditions include the supplied load `step`. Whole cube
 stress or strain tensors show every applied load and its components together,
 without treating the tensor as an X, Y, or Z scalar load or drawing a guessed
 directional arrow. Scalar force and displacement loads retain their axis display.
+The table labels the combined column `Loading type / mode`. Numeric load details,
+including tensor components, display two decimal places with half-up rounding;
+`step` retains its complete integer value. Stored values, arrows, curves, and
+JSON downloads use the original numbers.
 
 Detail display tests use a synthetic example embedded in the test suite, so they
 do not depend on a local uploaded JSON file or skip when that file is removed.
