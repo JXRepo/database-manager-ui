@@ -48,22 +48,27 @@ class DetailMetadataTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return obj, response
 
-    def test_mandatory_order_survives_reversed_and_database_key_order(self):
+    def test_schema_order_survives_reversed_and_database_key_order(self):
         """
-        Show visible mandatory fields before other metadata without a wrapper group
+        Interleave required and optional properties in their schema order
         """
         expected = [
-            "title", "creator", "creator_affiliation", "date", "shared_with",
-            "rights", "rights_holder", "software", "software_version", "system",
+            "identifier", "title", "creator", "creator_ORCID", "creator_affiliation",
+            "creator_institute", "creator_group", "contributor", "contributor_ORCID",
+            "contributor_affiliation", "contributor_institute", "contributor_group",
+            "date", "shared_with", "description", "rights", "rights_holder",
+            "funder_name", "fund_identifier", "publisher", "relation",
+            "user_extra_information", "keywords", "software", "software_version", "system",
             "system_version", "processor_specifications", "input_path", "results_path",
-            "RVE_size", "RVE_continuity", "discretization_type",
-            "discretization_unit_size", "discretization_count", "phase", "units",
+            "system_extra_information", "RVE_size", "RVE_continuity", "discretization_type",
+            "discretization_unit_size", "discretization_count", "solid_volume_fraction",
+            "origin", "global_temperature", "thermal_BC", "phase", "microstructure", "units",
         ]
-        optional = ["identifier", "creator_ORCID", "CPU_specifications", "$schema"]
-        hidden = ["mechanical_BC", "stress", "total_strain"]
+        unknown = ["extra_z", "CPU_specifications", "$schema", "extra_a"]
+        hidden = ["mechanical_BC", "stress", "total_strain", "plastic_strain"]
         orders = (
-            list(reversed(expected + optional + hidden)),
-            sorted(expected + optional + hidden, key=lambda key: (len(key), key)),
+            list(reversed(expected + unknown + hidden)),
+            sorted(expected + unknown + hidden, key=lambda key: (len(key), key)),
             list(reversed(expected)),
         )
 
@@ -73,7 +78,7 @@ class DetailMetadataTests(TestCase):
                 obj, response = self._detail(data)
                 rows = response.context["detail_rows"]
                 displayed = [row["label"] for row in rows]
-                additional = [key for key in keys if key in optional]
+                additional = [key for key in keys if key in unknown]
 
                 self.assertEqual(displayed, expected + additional)
                 html = response.content.decode()
@@ -82,7 +87,7 @@ class DetailMetadataTests(TestCase):
                 obj.refresh_from_db()
                 self.assertEqual(json.dumps(obj.data), json.dumps(data))
 
-    def test_extra_fields_follow_mandatory_fields_and_escape_uploads(self):
+    def test_extra_fields_follow_schema_fields_and_escape_uploads(self):
         """
         Show extra top level fields directly and escape their labels and values
         """
@@ -97,8 +102,8 @@ class DetailMetadataTests(TestCase):
         })
         rows = response.context["detail_rows"]
         self.assertEqual(
-            [row["label"] for row in rows[21:]],
-            [uploaded_label, "$schema", "custom_flag", "identifier"],
+            [row["label"] for row in rows],
+            ["identifier", "title", uploaded_label, "$schema", "custom_flag"],
         )
         self.assertNotIn("Additional metadata", [row["label"] for row in rows])
         self.assertContains(response, "&lt;img src=x onerror=&quot;alert(1)&quot;&gt;")
@@ -122,18 +127,16 @@ class DetailMetadataTests(TestCase):
         })
         rows = response.context["detail_rows"]
         labels = [row["label"] for row in rows]
-        optional_labels = [row["label"] for row in rows[21:]]
-
         self.assertEqual(
-            optional_labels,
+            labels,
             [
-                "creator_ORCID", "identifier", "CPU_specifications", "description",
-                "creator_institute", "creator_group",
+                "identifier", "title", "creator_ORCID", "creator_institute",
+                "creator_group", "description", "CPU_specifications",
             ],
         )
         self.assertTrue(all(row["type"] != "group" for row in rows))
         for key in ("thermal_BC", "user_extra_information", "system_extra_information"):
-            self.assertNotIn(key, labels + optional_labels)
+            self.assertNotIn(key, labels)
         self.assertNotIn("Additional metadata", labels)
         self.assertContains(response, "0000-0002-1451-2715")
         self.assertContains(response, "Legacy CPU description")
@@ -152,11 +155,15 @@ class DetailMetadataTests(TestCase):
                         "euler_angles": [30, 20, 10],
                     },
                     "volume_fraction": 0.7,
+                    "lattice_structure": "FCC",
                     "phase_id": 2,
                     "phase_name": "First phase",
                     "constitutive_model": {
+                        "custom_model_z": "Model extra Z",
                         "plastic_model_name": "Model P",
                         "elastic_model_name": "Model E",
+                        "$schema": "https://example.test/model-schema.json",
+                        "custom_model_a": "Model extra A",
                     },
                 },
                 {
@@ -174,30 +181,36 @@ class DetailMetadataTests(TestCase):
             [row["label"] for row in rows],
             [
                 "phase / Item 1 / phase_name",
-                "phase / Item 1 / constitutive_model / plastic_model_name",
+                "phase / Item 1 / phase_id", "phase / Item 1 / volume_fraction",
+                "phase / Item 1 / lattice_structure",
+                "phase / Item 1 / constitutive_model / $schema",
                 "phase / Item 1 / constitutive_model / elastic_model_name",
-                "phase / Item 1 / custom_note",
+                "phase / Item 1 / constitutive_model / plastic_model_name",
+                "phase / Item 1 / constitutive_model / custom_model_z",
+                "phase / Item 1 / constitutive_model / custom_model_a",
                 "phase / Item 1 / orientation / euler_angles",
                 "phase / Item 1 / orientation / grain_count",
                 "phase / Item 1 / orientation / custom_orientation",
-                "phase / Item 1 / volume_fraction", "phase / Item 1 / phase_id",
-                "phase / Item 2 / phase_name", "phase / Item 2 / custom_note",
+                "phase / Item 1 / custom_note",
+                "phase / Item 2 / phase_name", "phase / Item 2 / phase_id",
                 "phase / Item 2 / orientation / euler_angles",
                 "phase / Item 2 / orientation / grain_count",
-                "phase / Item 2 / phase_id",
+                "phase / Item 2 / custom_note",
             ],
         )
         self.assertEqual(
             [row["value"] for row in rows],
             [
-                "First phase", "Model P", "Model E", "First phase note",
-                [30, 20, 10], 8, "Extra orientation data", 0.7, 2,
-                "Second phase", "Second phase note", [60, 50, 40], 13, 1,
+                "First phase", 2, 0.7, "FCC", "https://example.test/model-schema.json",
+                "Model E", "Model P", "Model extra Z", "Model extra A",
+                [30, 20, 10], 8, "Extra orientation data", "First phase note",
+                "Second phase", 1, [60, 50, 40], 13, "Second phase note",
             ],
         )
         self.assertEqual(json.dumps(data), json.dumps(original))
 
         _, response = self._detail(data)
+        self.assertEqual([row["label"] for row in response.context["detail_rows"]], ["phase"])
         phase = next(row for row in response.context["detail_rows"] if row["label"] == "phase")
         self.assertEqual([item["label"] for item in phase["children"]], ["Item 1", "Item 2"])
         for item, name, grain_count in zip(
@@ -224,10 +237,10 @@ class DetailMetadataTests(TestCase):
             "a.b": "A literal nested-looking field",
             "a": {"b": "An actual nested value", "note": "Nested group note"},
         })
-        fields = {row["label"]: row for row in response.context["detail_rows"][21:]}
+        fields = {row["label"]: row for row in response.context["detail_rows"]}
         self.assertEqual(
             list(fields),
-            ["identifier", "phase.note", "title / explanation", "units[custom]", "a.b", "a"],
+            ["identifier", "title", "phase.note", "title / explanation", "units[custom]", "a.b", "a"],
         )
         self.assertEqual(fields["a.b"]["value"], "A literal nested-looking field")
         nested = {row["label"]: row for row in fields["a"]["children"]}
@@ -236,21 +249,19 @@ class DetailMetadataTests(TestCase):
         self.assertContains(response, "title / explanation")
         self.assertContains(response, "units[custom]")
 
-    def test_empty_legacy_object_does_not_invent_additional_metadata(self):
+    def test_empty_object_does_not_invent_missing_fields(self):
         """
-        Keep required placeholders for empty old records without a phantom group
+        Leave absent metadata absent instead of adding schema placeholders
         """
         _, response = self._detail({})
         rows = response.context["detail_rows"]
 
-        self.assertTrue(rows)
-        self.assertEqual(len(rows), 21)
-        self.assertTrue(all(row["type"] == "empty" for row in rows))
-        self.assertNotIn("Additional metadata", [row["label"] for row in rows])
+        self.assertEqual(rows, [])
+        self.assertContains(response, "No displayable detail fields found")
 
     def test_nested_legacy_order_and_top_level_cpu_preserve_original_names(self):
         """
-        Keep optional nested fields and legacy spellings in their supplied order
+        Order current origin fields while preserving legacy fields as unknown keys
         """
         data = {
             "phase": [{
@@ -261,10 +272,14 @@ class DetailMetadataTests(TestCase):
             }],
             "origin": [{
                 "Results Path": "outputs",
+                "results_path": "current-outputs",
                 "Input Path": "inputs",
+                "input_path": "current-inputs",
                 "system Version": "22.04",
+                "system_version": "24.04",
                 "system": "Linux",
                 "software Version": "3.0",
+                "software_version": "4.0",
                 "software": "DAMASK",
             }],
             "input_path": "current-inputs",
@@ -278,25 +293,28 @@ class DetailMetadataTests(TestCase):
         self.assertEqual(
             [label for label in labels if label.startswith("origin / ")],
             [
+                "origin / software", "origin / software_version", "origin / system",
+                "origin / system_version", "origin / input_path", "origin / results_path",
                 "origin / Results Path", "origin / Input Path", "origin / system Version",
-                "origin / system", "origin / software Version", "origin / software",
+                "origin / software Version",
             ],
         )
         self.assertEqual(
             [label for label in labels if label.startswith("phase / ")],
             [
-                "phase / phase_name", "phase / volume_fraction",
-                "phase / phase_identifier", "phase / phase_id",
+                "phase / phase_name", "phase / phase_id", "phase / volume_fraction",
+                "phase / phase_identifier",
             ],
         )
         _, response = self._detail(data)
         displayed = response.context["detail_rows"]
-        main_fields = {row["label"]: row for row in displayed[:21]}
-        optional_fields = {row["label"]: row for row in displayed[21:]}
-        self.assertNotIn("CPU_specifications", main_fields)
-        self.assertEqual(main_fields["processor_specifications"]["value"], "Current CPU")
-        self.assertEqual(optional_fields["CPU_specifications"]["value"], "Legacy CPU")
-        self.assertIn("origin", optional_fields)
+        fields = {row["label"]: row for row in displayed}
+        self.assertEqual(
+            list(fields),
+            ["system_version", "processor_specifications", "input_path", "origin", "phase", "CPU_specifications"],
+        )
+        self.assertEqual(fields["processor_specifications"]["value"], "Current CPU")
+        self.assertEqual(fields["CPU_specifications"]["value"], "Legacy CPU")
 
     def test_visualized_fields_are_hidden_only_in_metadata_and_remain_in_export(self):
         """
@@ -317,21 +335,30 @@ class DetailMetadataTests(TestCase):
             "plastic_strain": {
                 "plastic_note": "Plastic strain note", "plastic_strain_11": [0, 0.01],
             },
+            "custom_results": {
+                "mechanical_BC": "Nested mechanical metadata",
+                "stress": "Nested stress metadata",
+                "total_strain": "Nested total strain metadata",
+                "plastic_strain": "Nested plastic strain metadata",
+            },
             "units": {"Stress": "MPa", "Strain": 1},
         }
         obj, response = self._detail(data)
         by_label = {row["label"]: row for row in response.context["detail_rows"]}
 
-        for key in ("mechanical_BC", "stress", "total_strain"):
+        for key in ("mechanical_BC", "stress", "total_strain", "plastic_strain"):
             with self.subTest(field=key):
                 self.assertNotIn(key, by_label)
-        self.assertEqual(by_label["plastic_strain"]["type"], "group")
+        self.assertEqual(
+            [row["label"] for row in by_label["custom_results"]["children"]],
+            ["mechanical_BC", "stress", "total_strain", "plastic_strain"],
+        )
         for note in (
             "Boundary condition provenance", "Measured stress note",
-            "Total strain note",
+            "Total strain note", "Plastic strain note",
         ):
             self.assertNotContains(response, note)
-        self.assertContains(response, "Plastic strain note")
+        self.assertContains(response, "Nested plastic strain metadata")
         variables = {item["key"]: item for item in response.context["plot_variables"]}
         self.assertEqual(variables["stress.stress_11"]["values"], [0, 10])
         self.assertEqual(variables["total_strain.strain_11"]["values"], [0, 0.1])
@@ -386,9 +413,9 @@ class DetailMetadataTests(TestCase):
             self.assertEqual(fields[name]["type"], "string_list")
         self.assertNotRegex(response.content.decode(), r'<details\b[^>]*\bopen\b')
 
-    def test_conditional_required_fields_lead_shared_and_thermal_groups(self):
+    def test_schema_order_of_shared_and_thermal_fields_is_not_conditional(self):
         """
-        Prioritize conditional requirements only when the supplied condition applies
+        Use property order for supplied fields regardless of conditional requirements
         """
         for access_type in ("all", "c", "u", "g"):
             with self.subTest(access_type=access_type):
@@ -404,9 +431,7 @@ class DetailMetadataTests(TestCase):
                     row for row in response.context["detail_rows"]
                     if row["label"] == "shared_with"
                 )
-                expected = ["access_type", "username", "access_list", "note"]
-                if access_type in {"u", "g"}:
-                    expected = ["access_type", "access_list", "username", "note"]
+                expected = ["access_type", "access_list", "username", "note"]
                 self.assertEqual([row["label"] for row in shared["children"]], expected)
 
         for constraint in ("fixed", "loaded"):
@@ -424,19 +449,22 @@ class DetailMetadataTests(TestCase):
                     row for row in response.context["detail_rows"]
                     if row["label"] == "thermal_BC"
                 )
-                expected = ["vertex_list", "constraints", "note", "applied_load", "loading_mode"]
-                if constraint == "loaded":
-                    expected = ["vertex_list", "constraints", "loading_mode", "applied_load", "note"]
+                expected = ["vertex_list", "constraints", "loading_mode", "applied_load", "note"]
                 self.assertEqual([row["label"] for row in thermal["children"]], expected)
 
-    def test_nested_required_order_does_not_add_missing_optional_fields(self):
+    def test_nested_schema_order_does_not_add_missing_fields(self):
         """
-        Order orientation and Euler requirements without generating absent siblings
+        Order orientation and Euler properties without generating absent siblings
         """
         _, response = self._detail({
             "phase": [{
                 "orientation": {
                     "note": "Orientation note",
+                    "orientation_identifier": "synthetic-orientation",
+                    "software_version": "1.0",
+                    "software": "Example generator",
+                    "rotation_type": "active",
+                    "frame": "lab",
                     "texture_type": "random",
                     "grain_count": 8,
                     "euler_angles": {"note": "Euler note", "Phi2": 30, "Phi": 20, "Phi1": 10},
@@ -449,7 +477,10 @@ class DetailMetadataTests(TestCase):
         orientation = phase["children"][1]
         self.assertEqual(
             [row["label"] for row in orientation["children"]],
-            ["euler_angles", "grain_count", "texture_type", "note"],
+            [
+                "euler_angles", "grain_count", "texture_type", "frame", "rotation_type",
+                "software", "software_version", "orientation_identifier", "note",
+            ],
         )
         angles = orientation["children"][0]
         self.assertEqual(
@@ -457,31 +488,36 @@ class DetailMetadataTests(TestCase):
             [("Phi1", 10), ("Phi", 20), ("Phi2", 30), ("note", "Euler note")],
         )
 
-    def test_microstructure_groups_prioritize_their_required_fields(self):
+    def test_microstructure_groups_follow_referenced_schema_properties(self):
         """
-        Keep microstructure requirements ahead of optional grain and voxel details
+        Interleave referenced schema properties before unknown microstructure fields
         """
         _, response = self._detail({
             "microstructure": [{
                 "note": "Microstructure note",
-                "grains": [{"label": "Grain", "orientation": "Random", "phase_id": 1, "grain_id": 2}],
+                "grains": [{
+                    "label": "Grain", "parent_grain_id": 0, "orientation": "Random",
+                    "grain_volume": 8, "phase_id": 1, "grain_id": 2,
+                }],
                 "voxels": [{
-                    "volume": 1, "orientation": "Random", "voxel_index": [0, 0, 0],
+                    "volume": 1, "voxel_volume": 2, "orientation": "Random",
+                    "grain_id": 2, "voxel_index": [0, 0, 0],
                     "centroid_coordinates": [0.5, 0.5, 0.5], "phase_id": 1, "voxel_id": 4,
                 }],
                 "grid": {"note": "Grid note", "grid_spacing": [1, 1, 1], "grid_size": [2, 2, 2], "status": "active"},
                 "time_point": 0,
+                "microstructure_state_id": "synthetic-state",
             }],
         })
         microstructure = next(
             row for row in response.context["detail_rows"] if row["label"] == "microstructure"
         )
         fields = {row["label"]: row for row in microstructure["children"]}
-        self.assertEqual(list(fields), ["time_point", "grid", "voxels", "note", "grains"])
+        self.assertEqual(list(fields), ["microstructure_state_id", "time_point", "grid", "grains", "voxels", "note"])
         expected_children = {
             "grid": ["status", "grid_size", "grid_spacing", "note"],
-            "grains": ["grain_id", "phase_id", "orientation", "label"],
-            "voxels": ["voxel_id", "phase_id", "centroid_coordinates", "voxel_index", "orientation", "volume"],
+            "grains": ["grain_id", "phase_id", "grain_volume", "orientation", "parent_grain_id", "label"],
+            "voxels": ["voxel_id", "grain_id", "phase_id", "centroid_coordinates", "voxel_index", "voxel_volume", "orientation", "volume"],
         }
         for name, expected in expected_children.items():
             with self.subTest(group=name):
@@ -541,9 +577,9 @@ class DetailMetadataTests(TestCase):
         rows = response.context["detail_rows"]
         fields = {row["label"]: row for row in rows}
 
-        self.assertEqual(set(fields), set(data) - {"mechanical_BC", "stress", "total_strain"})
-        self.assertEqual(list(fields)[:4], ["title", "creator", "creator_affiliation", "date"])
-        self.assertEqual(list(fields)[20], "units")
+        self.assertEqual(set(fields), set(data) - {"mechanical_BC", "stress", "total_strain", "plastic_strain"})
+        self.assertEqual(list(fields)[:4], ["identifier", "title", "creator", "creator_affiliation"])
+        self.assertEqual(list(fields)[-1], "units")
         self.assertEqual(fields["shared_with"]["type"], "group")
         self.assertEqual(fields["shared_with"]["children"][0]["label"], "access_type")
         self.assertEqual(fields["creator_affiliation"]["type"], "string_list")

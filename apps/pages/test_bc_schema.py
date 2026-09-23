@@ -106,7 +106,7 @@ class MechanicalBCSchemaTests(TestCase):
         magnitude = normalized["details"][0]
         self.assertTrue(magnitude["display"].startswith('{"xx":'), "Tensor components should start with xx in JSON notation")
         displayed = json.loads(magnitude["display"])
-        self.assertEqual(list(displayed), ["xx", "yy", "zz", "xy", "yz", "xz", "yx", "zx", "zy"])
+        self.assertEqual(list(displayed), ["xx", "yy", "zz", "xy", "yx", "xz", "zx", "yz", "zy"])
         self.assertEqual(displayed, load["magnitude"])
 
     def test_detail_page_shows_all_tensor_steps_and_preserves_download(self):

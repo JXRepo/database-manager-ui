@@ -91,10 +91,11 @@ Current priority:
 - My Data combines selected filters on the same object, matches complete names ignoring case and surrounding whitespace, and counts each object once per option under the other selected filters
 - Keep My Data filters and Clear available for empty results, preserve selected values in GET URLs, and limit bulk selection to the displayed records
 - Detail pages may include management actions for the owner
-- Detail metadata shows required top-level fields in mandatory_fields order, omitting mechanical_BC, stress, and total_strain from the metadata list while retaining their visualizations
-- Show other supplied fields directly after required fields at each level, without an Additional metadata group; nested required order follows the locally recorded schema and applicable sharing or thermal conditions
+- Detail metadata orders all supplied schema fields by properties declaration order at every level, including fields from the referenced constitutive and microstructure schemas, without prioritizing required fields
+- Omit top-level mechanical_BC, stress, total_strain, and plastic_strain from the metadata list while retaining their visualizations and complete export; same-named nested fields remain visible
+- Keep fields not defined at that schema path at the end of their own parent, in relative stored order, without an Additional metadata group; freeform objects retain stored order
 - Collapse actual nested objects and object lists, even with one child; never merge flat fields by shared prefixes such as creator_affiliation, creator_institute, and creator_group
-- Preserve field names, values, array item order, and complete JSON downloads; keep legacy required top-level placeholders except the three visualized fields, and do not add missing optional or nested fields or introduce deeper upload validation
+- Preserve field names, values, array item order, and complete JSON downloads; only display supplied fields, without adding missing-field placeholders or introducing deeper upload validation
 - Use current MiMeDat equivalent_stress, equivalent_strain, and equivalent_plastic_strain fields for plots; supplied arrays take precedence and only absent fields may use the existing calculated equivalents
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
 - Search result pages should not include delete actions unless explicitly requested

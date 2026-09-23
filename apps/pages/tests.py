@@ -16,7 +16,6 @@ from .models import AccountProfile, DataNotification, JSONData
 from .orcid_auth import ORCID_TRANSACTION_SESSION_KEY
 from .views import (
     _build_detail_rows,
-    _ensure_required_detail_rows,
     _build_mechanical_bc_items,
     _extract_plot_variables,
     _group_detail_rows,
@@ -1543,20 +1542,16 @@ class JSONDataSharingTests(TestCase):
         self.assertEqual(by_label["mixed_array"]["type"], "json")
         self.assertEqual(by_label["empty_array"]["type"], "json")
 
-    def test_detail_rows_add_empty_required_field_placeholders(self):
+    def test_detail_rows_do_not_invent_missing_field_placeholders(self):
         """
-        Detail rows include required top-level fields even when old data misses them
+        Detail rows contain only fields present in the supplied metadata
         """
-        rows = _ensure_required_detail_rows(
-            {"identifier": "minimal-object", "phase": "Copper"},
-            _build_detail_rows({"identifier": "minimal-object", "phase": "Copper"}),
-        )
+        rows = _build_detail_rows({"identifier": "minimal-object", "phase": "Copper"})
         by_label = {row["label"]: row for row in rows}
 
+        self.assertEqual(list(by_label), ["identifier", "phase"])
         self.assertEqual(by_label["identifier"]["value"], "minimal-object")
-        self.assertEqual(by_label["title"]["type"], "empty")
-        self.assertEqual(by_label["creator"]["type"], "empty")
-        self.assertEqual(by_label["RVE_continuity"]["type"], "empty")
+        self.assertEqual(by_label["phase"]["value"], "Copper")
 
     def test_detail_rows_show_short_numeric_arrays_inline(self):
         """

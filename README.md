@@ -338,20 +338,23 @@ Standard field names follow the
 `phase_name`, `processor_specifications`, and the underscore-separated names
 inside `origin`, such as `software_version` and `input_path`.
 
-Detail metadata starts with the fields listed under
-[Required JSON Fields](#required-json-fields), in that order. Top level
-mechanical_BC, stress, and total_strain are omitted from the metadata list because
-the boundary condition view and plots below use them. The remaining 21 required
-fields appear first; other supplied fields follow directly, without an Additional
-metadata group. Missing required fields in legacy records retain an Empty
-placeholder, except for those three visualized fields.
+At every level, supplied fields defined in the schema follow its `properties`
+order, whether required or optional. For example, `identifier` precedes `title`,
+and the creator fields stay together. Nested order also covers the general
+constitutive model and microstructure schemas referenced by the main schema.
+Only supplied fields are shown; missing fields are not added as placeholders.
 
-Within each object, supplied required children follow the locally recorded
-MiMeDat schema order before optional or custom children. Conditional child order
-uses the object's access_type or thermal constraints. Fields with no required
-children, such as origin and the general constitutive_model, keep their stored
-order. Missing optional fields and missing nested fields are not added. Display
-ordering does not fetch uploaded schema URLs or validate nested data.
+Fields not defined at that path follow the schema fields at the end of the same
+object, retaining their relative stored order. They stay inside their original
+parent without an Additional metadata group. Freeform parameter objects retain
+their stored field order. Display ordering uses local field lists and does not
+fetch uploaded schema URLs or validate nested data. Object key order in JSON is
+not a validation requirement; the schema's declaration order is used here as a
+consistent presentation rule.
+
+Top level `mechanical_BC`, `stress`, `total_strain`, and `plastic_strain` are
+omitted from the metadata list because the boundary condition view and plots
+below use them. Fields with those names inside another object remain visible.
 
 Collapsible groups follow actual JSON objects and arrays of objects, including
 objects with only one child. Flat fields such as creator_affiliation,
@@ -362,7 +365,7 @@ arrays offer Show values. Strings, numbers, booleans, nulls, empty containers,
 and mixed arrays remain displayable.
 
 Original names, literal punctuation, values, and array item order are preserved.
-Download JSON exports the complete stored object, including the three fields
+Download JSON exports the complete stored object, including the four fields
 omitted from the metadata list and any values not used by the visualizations.
 Upload validation and access rules are unchanged.
 

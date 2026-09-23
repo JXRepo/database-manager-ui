@@ -22,13 +22,13 @@ from django.template.loader import render_to_string
 from .models import *
 from .forms import AccountSettingsForm, ORCIDAccountSetupForm, SignUpForm, JSONUploadForm
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
-from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS, validate_json
+from apps.dyn_api.helpers import validate_json
 from numbers import Number
 
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
-from .detail_metadata import VISUALIZED_DETAIL_FIELDS, detail_field_rank, ordered_metadata_items
+from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
 from .advanced_search import (
     DATA_FIELD_CHOICES,
     DATA_FIELD_TYPES,
@@ -2825,7 +2825,7 @@ def _detail_path_labels(path):
 
 def _build_detail_rows(data, prefix=()):
     """
-    Build detail rows with required fields first and retain every supplied field
+    Build detail rows in schema order and retain every supplied field
 
     Only dictionary fields are ordered; array items and stored values stay unchanged.
 
@@ -2993,49 +2993,6 @@ def _build_detail_rows(data, prefix=()):
         }
     )
     return rows
-
-
-def _ensure_required_detail_rows(data, rows):
-    """
-    Keep missing required fields visible in the correct schema position
-
-    Legacy records may lack required fields; absent optional fields are not added.
-
-    Parameters
-    ----------
-    data : dict
-        Stored JSON data object.
-    rows : list of dict
-        Detail rows for the supplied data.
-
-    Returns
-    -------
-    list of dict
-        Rows and required placeholders ordered by their top level field.
-    """
-    if not isinstance(data, dict):
-        data = {}
-
-    existing_labels = {row.get("label") for row in rows}
-    complete_rows = list(rows)
-
-    for field in REQUIRED_TOP_LEVEL_FIELDS:
-        if field in data or field in existing_labels:
-            continue
-
-        complete_rows.append(
-            {
-                "label": field,
-                "path": (field,),
-                "type": "empty",
-                "value": "",
-            }
-        )
-
-    return sorted(
-        complete_rows,
-        key=lambda row: detail_field_rank(row["path"][0]),
-    )
 
 
 def _find_group_child(children, label):
@@ -3742,9 +3699,7 @@ def _normalize_applied_load(load):
         if key == "step" and _is_number_value(value):
             display = str(value)
         if key == "magnitude" and isinstance(value, dict):
-            components = ("xx", "yy", "zz", "xy", "yz", "xz", "yx", "zx", "zy")
-            ranks = {name: index for index, name in enumerate(components)}
-            ordered = dict(sorted(value.items(), key=lambda item: ranks.get(item[0], len(ranks))))
+            ordered = dict(ordered_metadata_items(value, ("mechanical_BC", "applied_load", "magnitude")))
             display = json.dumps(ordered, ensure_ascii=False)
 
         details.append(
@@ -4058,8 +4013,8 @@ def json_data_detail_view(request, pk):
     """
     Display a user-friendly detail page for one accessible JSON data object
 
-    Required fields precede other supplied metadata at each level. The plots and
-    boundary condition summaries display the three omitted result fields.
+    Supplied fields follow schema properties order at each level. The plots and
+    boundary condition summaries display the four omitted result fields.
 
     Parameters
     ----------
@@ -4081,10 +4036,7 @@ def json_data_detail_view(request, pk):
     if not _user_can_access_object(obj, request.user):
         raise Http404("Data object not found")
 
-    detail_rows = _ensure_required_detail_rows(
-        obj.data or {},
-        _build_detail_rows(obj.data or {}),
-    )
+    detail_rows = _build_detail_rows(obj.data or {})
     detail_rows = [
         row for row in detail_rows
         if row["path"][0] not in VISUALIZED_DETAIL_FIELDS
