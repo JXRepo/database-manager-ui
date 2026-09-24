@@ -100,7 +100,7 @@ Current priority:
 - Use current MiMeDat equivalent_stress, equivalent_strain, and equivalent_plastic_strain fields for plots; supplied arrays take precedence and only absent fields may use the existing calculated equivalents
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
 - Show boundary load numbers with two decimal places and half-up rounding, retaining full integer step values and original stored/exported numbers; label the combined column Loading Type / Mode
-- Keep X/Y/Z boundary labels on one line; show load details in one dismissible overlay without moving labels or table rows
+- Keep X/Y/Z boundary labels on one line in evenly spaced columns; allow independent load panels to stay open together below their own labels, growing the row without shifting sibling labels or overlapping other rows
 - Search result pages should not include delete actions unless explicitly requested
 - Preserve the existing visual style unless a change is requested
 - Avoid large redesigns unless explicitly requested

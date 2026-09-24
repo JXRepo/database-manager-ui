@@ -374,7 +374,7 @@ details[open] > .detail-group-summary {
 
     .bc-layout {
       display: grid;
-      grid-template-columns: minmax(260px, 1fr) minmax(420px, 1fr);
+      grid-template-columns: minmax(260px, 2fr) minmax(540px, 3fr);
       gap: 18px;
       align-items: start;
     }
@@ -680,33 +680,40 @@ details[open] > .detail-group-summary {
     }
 
     .bc-table th:first-child {
-      width: 66px;
+      width: 14%;
       border-top-left-radius: 16px;
     }
 
     .bc-table th:nth-child(2) {
-      width: 244px;
+      width: 62%;
     }
 
     .bc-table th:last-child {
       border-top-right-radius: 16px;
     }
 
-    .bc-table td:nth-child(2) {
-      position: relative;
-    }
-
     .bc-axis-list {
-      display: flex;
-      align-items: flex-start;
-      gap: 4px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: start;
+      gap: 8px;
       white-space: nowrap;
     }
 
+    .bc-tensor-loads {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: start;
+      gap: 8px;
+    }
+
     .bc-axis-list .bc-status,
-    .bc-axis-list .bc-load-detail {
-      flex: 0 0 auto;
+    .bc-load-detail {
       margin: 0;
+    }
+
+    .bc-axis-list > .bc-status {
+      justify-self: start;
     }
 
     .bc-status {
@@ -741,10 +748,7 @@ details[open] > .detail-group-summary {
     }
 
     .bc-load-detail {
-      display: inline-block;
-      vertical-align: top;
-      margin-right: 4px;
-      margin-bottom: 4px;
+      min-width: 0;
     }
 
     .bc-load-detail summary {
@@ -758,13 +762,8 @@ details[open] > .detail-group-summary {
     }
 
     .bc-load-list {
-      position: absolute;
-      top: calc(100% - 5px);
-      left: 10px;
-      right: 10px;
-      z-index: 20;
-      margin: 0;
-      padding: 8px 10px;
+      margin: 6px 0 0;
+      padding: 8px 6px;
       border: 1px solid #fee2e2;
       border-radius: 8px;
       background: #fff7f7;
@@ -775,7 +774,6 @@ details[open] > .detail-group-summary {
       overflow-wrap: anywhere;
       max-height: 320px;
       overflow-y: auto;
-      box-shadow: 0 6px 18px rgba(16, 24, 40, 0.15);
     }
 
     .bc-load-list li + li {
@@ -1426,8 +1424,9 @@ details[open] > .detail-group-summary {
                       <td>
                         {% if item.is_tensor_load %}
                           <span class="bc-status bc-status-loaded">Tensor: loaded</span>
+                          <div class="bc-tensor-loads">
                           {% for load in item.tensor_loads %}
-                            <details class="bc-load-detail" name="bc-load">
+                            <details class="bc-load-detail">
                               <summary>
                                 <span class="bc-status bc-status-loaded">Tensor load {{ forloop.counter }}</span>
                               </summary>
@@ -1441,11 +1440,12 @@ details[open] > .detail-group-summary {
                               </ul>
                             </details>
                           {% endfor %}
+                          </div>
                         {% else %}
                         <div class="bc-axis-list">
                         {% for axis in item.axes %}
                           {% if axis.status == "loaded" and axis.load_details %}
-                            <details class="bc-load-detail" name="bc-load">
+                            <details class="bc-load-detail">
                               <summary>
                                 <span class="bc-status bc-status-loaded">
                                   {{ axis.direction }}: loaded
@@ -1641,22 +1641,6 @@ details[open] > .detail-group-summary {
 <script type="module" src="{% static "assets/js/mechanical-bc-viewer.js" %}"></script>
 
 <script>
-  document.addEventListener("click", event => {
-    const openLoad = document.querySelector(".bc-load-detail[open]");
-    if (openLoad && !openLoad.contains(event.target)) {
-      openLoad.open = false;
-    }
-  });
-
-  document.addEventListener("keydown", event => {
-    if (event.key !== "Escape") return;
-    const openLoad = document.querySelector(".bc-load-detail[open]");
-    if (openLoad) {
-      openLoad.open = false;
-      openLoad.querySelector("summary").focus({ preventScroll: true });
-    }
-  });
-
   const plotVariables = JSON.parse(
     document.getElementById("plot-variables-data").textContent
   );
