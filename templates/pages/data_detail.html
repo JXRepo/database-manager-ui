@@ -830,6 +830,35 @@ details[open] > .detail-group-summary {
       line-height: 1.6;
     }
 
+    .csv-export-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .csv-column-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px 16px;
+      max-height: 240px;
+      overflow: auto;
+      margin: 12px 0;
+    }
+
+    .csv-column-options label {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      overflow-wrap: anywhere;
+      font-size: 0.85rem;
+    }
+
+    .csv-column-options input {
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
     .plot-canvas-wrap {
       background: transparent;
       border: none;
@@ -1198,6 +1227,9 @@ details[open] > .detail-group-summary {
 
 <div class="pc-container">
   <div class="pc-content">
+    {% for message in messages %}
+      <div class="alert alert-warning" role="alert">{{ message }}</div>
+    {% endfor %}
     <div class="page-header">
       <div class="page-block">
         <div class="row align-items-center">
@@ -1505,12 +1537,40 @@ details[open] > .detail-group-summary {
 
             <div class="plot-field plot-button-field">
               <button id="download-plot-btn" type="button" class="btn btn-primary">
-                Download
+                Download PNG
               </button>
             </div>
 
 
         </div>
+
+        <div class="csv-export-actions">
+          <button type="button" id="download-xy-csv-btn" class="btn btn-outline-primary btn-sm">
+            Download X/Y CSV
+          </button>
+          <a href="{% url 'mechanical_csv_export' data_object.id %}" class="btn btn-outline-primary btn-sm" id="download-all-csv">
+            Download All CSV
+          </a>
+        </div>
+        <details class="raw-values-box" id="csv-column-picker">
+          <summary>Choose CSV columns</summary>
+          <form method="get" action="{% url 'mechanical_csv_export' data_object.id %}" id="csv-column-form">
+            <input type="hidden" name="scope" value="selected">
+            <div class="csv-export-actions">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="csv-select-all">Select all</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="csv-clear-all">Clear</button>
+            </div>
+            <div class="csv-column-options">
+              {% for variable in plot_variables %}
+                <label>
+                  <input type="checkbox" name="fields" value="{{ variable.key }}" class="form-check-input csv-column-checkbox" checked>
+                  <span>{{ variable.key }}{% if variable.unit %} [{{ variable.unit }}]{% endif %}{% if variable.calculated %} (calculated){% endif %}</span>
+                </label>
+              {% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" id="download-selected-csv">Download Selected CSV</button>
+          </form>
+        </details>
 
         <div class="plot-canvas-wrap">
           <div class="plot-custom-legend">
@@ -1655,6 +1715,32 @@ details[open] > .detail-group-summary {
   const xSelect = document.getElementById("plot-x-select");
   const ySelect = document.getElementById("plot-y-select");
   const downloadPlotButton = document.getElementById("download-plot-btn");
+  const downloadXYCSVButton = document.getElementById("download-xy-csv-btn");
+  const csvColumns = Array.from(document.querySelectorAll(".csv-column-checkbox"));
+  const downloadSelectedCSVButton = document.getElementById("download-selected-csv");
+
+  function updateCSVSelection() {
+    if (downloadSelectedCSVButton) {
+      downloadSelectedCSVButton.disabled = !csvColumns.some(column => column.checked);
+    }
+  }
+
+  csvColumns.forEach(column => column.addEventListener("change", updateCSVSelection));
+  [["csv-select-all", true], ["csv-clear-all", false]].forEach(([id, checked]) => {
+    document.getElementById(id)?.addEventListener("click", () => {
+      csvColumns.forEach(column => { column.checked = checked; });
+      updateCSVSelection();
+    });
+  });
+  if (downloadXYCSVButton) {
+    downloadXYCSVButton.addEventListener("click", () => {
+      const url = new URL("{% url 'mechanical_csv_export' data_object.id %}", window.location.origin);
+      url.searchParams.set("scope", "selected");
+      url.searchParams.append("fields", xSelect.value);
+      url.searchParams.append("fields", ySelect.value);
+      window.location.assign(url.href);
+    });
+  }
   const plotStatus = document.getElementById("plot-status");
   const canvas = document.getElementById("mechanical-plot");
   const plotCustomLegendText = document.getElementById("plot-custom-legend-text");

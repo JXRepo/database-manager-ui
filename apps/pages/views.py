@@ -1,12 +1,14 @@
 import json
 import math
+from tempfile import SpooledTemporaryFile
+from zipfile import ZipFile, ZIP_DEFLATED
 from decimal import Decimal, ROUND_HALF_UP, localcontext
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.conf import settings
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.models import User
@@ -30,6 +32,7 @@ from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
 from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
+from .mechanical_csv import write_mechanical_csv
 from .advanced_search import (
     DATA_FIELD_CHOICES,
     DATA_FIELD_TYPES,
@@ -2768,6 +2771,198 @@ def json_data_export_view(request, pk):
 
 
 
+def _mechanical_csv_variables(obj, fields=None):
+    """
+    Select authorized curve columns from one record
+
+    Parameters
+    ----------
+    obj : JSONData
+        Record whose access has already been checked.
+    fields : list of str, optional
+        Requested paths in download order, or None for all available curves.
+
+    Returns
+    -------
+    list of dict
+        Complete curve columns used by the plot viewer.
+
+    Raises
+    ------
+    ValueError
+        No curves exist or requested paths are empty or unavailable.
+    """
+    data = obj.data or {}
+    variables = _extract_plot_variables(data, units=data.get("units", {}))
+    if not variables:
+        raise ValueError(f"Data object {obj.pk} has no numeric stress or strain series to export.")
+    if fields is not None:
+        by_key = {variable["key"]: variable for variable in variables}
+        if not fields or any(field not in by_key for field in fields):
+            raise ValueError("Choose at least one available CSV column. Reload the detail page if the selection is outdated.")
+        variables = [by_key[field] for field in dict.fromkeys(fields)]
+    return variables
+
+
+def _build_mechanical_csv_download(objects, fields=None, as_zip=False):
+    """
+    Prepare complete CSV downloads before sending any bytes
+
+    Larger output spills to a temporary file. Each ZIP entry is written in
+    turn, keeping the full batch of curve arrays out of memory.
+
+    Parameters
+    ----------
+    objects : iterable of JSONData
+        Accessible records in selection order.
+    fields : list of str, optional
+        Specific curve paths for a single record.
+    as_zip : bool, optional
+        Package multiple objects as separate CSV entries.
+
+    Returns
+    -------
+    FileResponse
+        CSV or ZIP attachment that owns and closes the temporary buffer.
+    """
+    buffer = SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b")
+    try:
+        if as_zip:
+            with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+                for obj in objects:
+                    variables = _mechanical_csv_variables(obj)
+                    name = f"{_build_data_object_filename(obj)[:-5]}_{obj.pk}_curves.csv"
+                    with archive.open(name, "w") as entry:
+                        write_mechanical_csv(entry, variables)
+            filename = "stress_strain_csv.zip"
+            content_type = "application/zip"
+        else:
+            obj = next(iter(objects))
+            write_mechanical_csv(buffer, _mechanical_csv_variables(obj, fields))
+            filename = f"{_build_data_object_filename(obj)[:-5]}_{obj.pk}_curves.csv"
+            content_type = "text/csv; charset=utf-8"
+        buffer.seek(0)
+        return FileResponse(buffer, as_attachment=True, filename=filename, content_type=content_type)
+    except Exception:
+        buffer.close()
+        raise
+
+
+@login_required
+@require_GET
+def mechanical_csv_export_view(request, pk):
+    """
+    Download all or selected curves from an accessible data object
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated request with optional selected field paths.
+    pk : int
+        Requested data object identifier.
+
+    Returns
+    -------
+    HttpResponse
+        CSV attachment or detail page redirect with selection feedback.
+    """
+    obj = get_object_or_404(JSONData.objects.select_related("owner"), pk=pk)
+    if not _user_can_access_object(obj, request.user):
+        raise Http404("Data object not found")
+    try:
+        scope = request.GET.get("scope", "all")
+        if scope not in {"all", "selected"}:
+            raise ValueError("Choose all CSV columns or select specific columns.")
+        fields = request.GET.getlist("fields") if scope == "selected" else None
+        return _build_mechanical_csv_download([obj], fields=fields)
+    except ValueError as error:
+        messages.error(request, str(error))
+        return redirect("json_data_detail", pk=pk)
+
+
+def _export_selected_mechanical_csv(request, owned_only=False):
+    """
+    Check the full selection before building individual CSV files
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated POST containing selected object identifiers.
+    owned_only : bool, optional
+        Restrict My Data downloads to records owned by the requester.
+
+    Returns
+    -------
+    HttpResponse
+        Complete attachment or redirect with actionable feedback.
+    """
+    back = "json_data_list" if owned_only else "search"
+    raw_ids = request.POST.getlist("selected_objects")
+    try:
+        if not raw_ids or len(raw_ids) > 1000:
+            raise ValueError("Select between 1 and 1,000 data objects to export as CSV.")
+        try:
+            ids = list(dict.fromkeys(int(value) for value in raw_ids))
+        except (TypeError, ValueError):
+            raise ValueError("Some selected objects are unavailable. Refresh the list and select them again.")
+        if any(value < 1 or value > 2**63 - 1 for value in ids):
+            raise ValueError("Some selected objects are unavailable. Refresh the list and select them again.")
+        objects = JSONData.objects.filter(pk__in=ids)
+        if owned_only:
+            objects = objects.filter(owner=request.user)
+        else:
+            objects = objects.filter(
+                Q(owner=request.user) | Q(access_type="all") | Q(shared_users=request.user)
+            ).distinct()
+        if set(objects.values_list("pk", flat=True)) != set(ids):
+            raise ValueError("Some selected objects are unavailable. Refresh the list and select them again.")
+        return _build_mechanical_csv_download(
+            (objects.get(pk=pk) for pk in ids), as_zip=len(ids) > 1,
+        )
+    except (ValueError, JSONData.DoesNotExist) as error:
+        message = str(error) if isinstance(error, ValueError) else "Some selected objects are unavailable. Refresh the list and select them again."
+        messages.error(request, message)
+        return redirect(back)
+
+
+@login_required
+@require_POST
+def export_selected_my_data_csv_view(request):
+    """
+    Export selected owned objects as CSV files
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated selection submitted from My Data.
+
+    Returns
+    -------
+    HttpResponse
+        CSV, ZIP, or selection feedback redirect.
+    """
+    return _export_selected_mechanical_csv(request, owned_only=True)
+
+
+@login_required
+@require_POST
+def export_selected_search_csv_view(request):
+    """
+    Export selected accessible search results as CSV files
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated selection submitted from search results.
+
+    Returns
+    -------
+    HttpResponse
+        CSV, ZIP, or selection feedback redirect.
+    """
+    return _export_selected_mechanical_csv(request)
+
+
 def _is_number_value(value):
     """
     Return True when value is a numeric type but not bool
@@ -3582,9 +3777,9 @@ def _extract_equivalent_plot_variables(data, units):
         arrays = _get_component_arrays(group, prefix)
         if arrays is None:
             continue
-        variables.append(
-            _build_plot_variable(f"{group_name}.{key}", key, calculate(arrays), units)
-        )
+        variable = _build_plot_variable(f"{group_name}.{key}", key, calculate(arrays), units)
+        variable["calculated"] = True
+        variables.append(variable)
 
     return variables
 

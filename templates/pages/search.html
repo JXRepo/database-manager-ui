@@ -969,9 +969,15 @@
             <span class="selection-count" id="selectedResultCount">0 selected</span>
           </div>
 
-          <button type="submit" class="btn btn-primary btn-sm" id="exportSelectedButton" disabled>
-            Export Selected Data Objects as JSON
-          </button>
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <button type="submit" class="btn btn-primary btn-sm" id="exportSelectedButton" disabled>
+              Export Selected Data Objects as JSON
+            </button>
+            <button type="submit" formaction="{% url 'export_selected_search_csv' %}"
+              class="btn btn-outline-primary btn-sm" id="exportSelectedCSVButton" disabled>
+              Export Curves as CSV
+            </button>
+          </div>
         </div>
 
         <div class="accordion soft-accordion" id="searchResultAccordion">
@@ -1106,6 +1112,7 @@
     const selectAllResults = document.getElementById("selectAllResults");
     const selectedResultCount = document.getElementById("selectedResultCount");
     const exportSelectedButton = document.getElementById("exportSelectedButton");
+    const exportSelectedCSVButton = document.getElementById("exportSelectedCSVButton");
     const liveDataList = document.getElementById("liveDataList");
     const liveDataStatus = document.getElementById("liveDataStatus");
     const liveDataCount = document.getElementById("liveDataCount");
@@ -1125,6 +1132,9 @@
 
       if (exportSelectedButton) {
         exportSelectedButton.disabled = selectedCount === 0;
+      }
+      if (exportSelectedCSVButton) {
+        exportSelectedCSVButton.disabled = selectedCount === 0;
       }
 
       if (selectAllResults) {

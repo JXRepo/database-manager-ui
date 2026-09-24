@@ -381,6 +381,21 @@ over calculated values. Only absent equivalent fields are supplemented from
 complete tensor components using the existing formulas; an explicitly empty
 equivalent array stays empty.
 
+The plot section can download the current X/Y series, all available curves, or
+any checked subset as CSV. CSV columns use full field paths and available units;
+calculated equivalent curves are marked `(calculated)`. Numeric values retain
+their stored precision. The `index` column starts at zero and refers to array
+position, not time. Columns of different lengths keep every sample, with blank
+cells at the end of shorter columns; no interpolation or resampling is applied.
+
+My Data and search results also offer CSV export for selected objects. One
+object downloads as one CSV; multiple objects download as a ZIP containing one
+CSV per object, with identifiers (or titles) and record IDs in the filenames.
+These are UTF-8 CSV files, not Excel workbooks. Every selected object must still
+be accessible and contain an exportable curve; otherwise the full download is
+rejected with a message instead of silently omitting objects. Existing JSON and
+PNG downloads remain available.
+
 Plot titles and axis labels italicize only the scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
 Variable selectors, tooltips, and raw-value summaries use matching mathematical

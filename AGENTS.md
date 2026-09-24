@@ -78,6 +78,8 @@ Current priority:
 - Search results and detail-page access rules must stay consistent
 - Never rely only on template-level hiding for security
 - Always enforce permissions in Django views
+- Curve CSV exports use the plot's available series, preserve precision and full array lengths, and mark calculated equivalents; shorter columns end with blank cells
+- A single selected object downloads as CSV; multiple objects download as one CSV per object in a ZIP, with the entire selection checked for access and exportable curves
 - Live Data Objects is a separate public activity feed: show only `access_type="all"`, never owned or shared private data
 - Do not apply the public feed restriction to ordinary search, My Data, or detail pages
 
