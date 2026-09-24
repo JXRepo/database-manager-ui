@@ -865,6 +865,10 @@ details[open] > .detail-group-summary {
       line-height: 0;
     }
 
+    .plot-custom-legend .plot-symbol {
+      font-style: italic;
+    }
+
     .plot-custom-legend .plot-versus {
       padding: 0 12px;
     }
@@ -1821,7 +1825,17 @@ details[open] > .detail-group-summary {
       ? `<sub>${escapeHtml(notation.subscript)}</sub>`
       : "";
 
-    return `${escapeHtml(notation.main)}${subscriptHtml}`;
+    const mainHtml = escapeHtml(notation.main).replace(
+      /[σε]/g, symbol => `<span class="plot-symbol">${symbol}</span>`
+    );
+    return `${mainHtml}${subscriptHtml}`;
+  }
+
+  function getPlotTextRuns(text, size, weight = 400) {
+    return String(text).split(/([σε])/).filter(Boolean).map(part => ({
+      text: part,
+      font: `${/^[σε]$/.test(part) ? "italic " : ""}${weight} ${size}px sans-serif`,
+    }));
   }
 
   let isSyncingPlotSelects = false;
@@ -2075,8 +2089,10 @@ const cornerAxisPlugin = {
     }
 
     function measureAxisTitle(ctx, title) {
-      ctx.font = "400 15px sans-serif";
-      const mainWidth = ctx.measureText(title.main).width;
+      const mainWidth = getPlotTextRuns(title.main, 15).reduce((width, run) => {
+        ctx.font = run.font;
+        return width + ctx.measureText(run.text).width;
+      }, 0);
 
       ctx.font = "400 10px sans-serif";
       const subscriptWidth = title.subscript
@@ -2108,9 +2124,11 @@ const cornerAxisPlugin = {
 
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
-      ctx.font = "400 15px sans-serif";
-      ctx.fillText(title.main, cursorX, y);
-      cursorX += ctx.measureText(title.main).width;
+      getPlotTextRuns(title.main, 15).forEach(run => {
+        ctx.font = run.font;
+        ctx.fillText(run.text, cursorX, y);
+        cursorX += ctx.measureText(run.text).width;
+      });
 
       if (title.subscript) {
         ctx.font = "400 10px sans-serif";
@@ -2318,8 +2336,6 @@ function downloadCurrentPlot() {
   const titleHeight = 46;
   const exportCanvas = document.createElement("canvas");
   const exportContext = exportCanvas.getContext("2d", { alpha: false });
-  const exportTitle =
-    `${yVariable.display_label || yVariable.short_label} vs ${xVariable.display_label || xVariable.short_label}`;
   const exportPlotOffsetX = 42;
   const pixelRatioX = sourceCanvas.width / chartInstance.width;
   const chartAreaCenterX = chartArea
@@ -2335,14 +2351,30 @@ function downloadCurrentPlot() {
   exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
   exportContext.fillStyle = "#111827";
-  exportContext.font = "700 24px sans-serif";
-  exportContext.textAlign = "center";
+  exportContext.textAlign = "left";
   exportContext.textBaseline = "middle";
-  exportContext.fillText(
-    exportTitle,
-    exportPadding + chartAreaCenterX + exportPlotOffsetX,
-    exportPadding + 12
-  );
+  const titleRuns = [yVariable, xVariable].flatMap((variable, index) => {
+    const notation = parsePlotNotation(variable.display_label || variable.short_label);
+    return [
+      ...(index ? getPlotTextRuns(" vs ", 24, 700) : []),
+      ...getPlotTextRuns(notation.main, 24, 700),
+      ...(notation.subscript ? [{
+        text: notation.subscript,
+        font: "700 15px sans-serif",
+        yOffset: 8,
+      }] : []),
+    ];
+  });
+  const titleWidth = titleRuns.reduce((width, run) => {
+    exportContext.font = run.font;
+    return width + exportContext.measureText(run.text).width;
+  }, 0);
+  let titleX = exportPadding + chartAreaCenterX + exportPlotOffsetX - titleWidth / 2;
+  titleRuns.forEach(run => {
+    exportContext.font = run.font;
+    exportContext.fillText(run.text, titleX, exportPadding + 12 + (run.yOffset || 0));
+    titleX += exportContext.measureText(run.text).width;
+  });
 
   exportContext.drawImage(
     sourceCanvas,

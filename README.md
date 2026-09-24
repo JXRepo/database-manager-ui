@@ -381,6 +381,9 @@ over calculated values. Only absent equivalent fields are supplemented from
 complete tensor components using the existing formulas; an explicitly empty
 equivalent array stays empty.
 
+Plot titles and axis labels italicize only the scalar symbols sigma and epsilon.
+Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
+
 Mechanical boundary conditions include the supplied load `step`. Whole cube
 stress or strain tensors show every applied load and its components together,
 without treating the tensor as an X, Y, or Z scalar load or drawing a guessed
