@@ -383,6 +383,8 @@ equivalent array stays empty.
 
 Plot titles and axis labels italicize only the scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
+Variable selectors, tooltips, and raw-value summaries use matching mathematical
+italic glyphs for these two symbols; field keys and plotted values are unchanged.
 
 Mechanical boundary conditions include the supplied load `step`. Whole cube
 stress or strain tensors show every applied load and its components together,

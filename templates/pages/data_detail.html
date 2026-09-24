@@ -1737,7 +1737,7 @@ details[open] > .detail-group-summary {
     variables.forEach(variable => {
       const option = document.createElement("option");
       option.value = variable.key;
-      option.textContent = variable.display_label || variable.label;
+      option.textContent = formatPlotPlainLabel(variable.display_label || variable.label);
       selectElement.appendChild(option);
     });
 
@@ -1829,6 +1829,11 @@ details[open] > .detail-group-summary {
       /[σε]/g, symbol => `<span class="plot-symbol">${symbol}</span>`
     );
     return `${mainHtml}${subscriptHtml}`;
+  }
+
+  function formatPlotPlainLabel(label) {
+    // Native options and canvas tooltips need italic glyphs in plain text.
+    return String(label || "").replace(/σ/g, "𝜎").replace(/ε/g, "𝜀");
   }
 
   function getPlotTextRuns(text, size, weight = 400) {
@@ -2417,9 +2422,9 @@ function updateRawValues(xVariable, yVariable, pointCount) {
   }
 
   xRawSummary.textContent =
-    `Show X raw values (${xVariable.display_label || xVariable.short_label})`;
+    `Show X raw values (${formatPlotPlainLabel(xVariable.display_label || xVariable.short_label)})`;
   yRawSummary.textContent =
-    `Show Y raw values (${yVariable.display_label || yVariable.short_label})`;
+    `Show Y raw values (${formatPlotPlainLabel(yVariable.display_label || yVariable.short_label)})`;
 
   xRawMeta.textContent = "";
   yRawMeta.textContent = "";
@@ -2463,7 +2468,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
       data: {
         datasets: [
           {
-            label: `${yVariable.display_label || yVariable.short_label} vs ${xVariable.display_label || xVariable.short_label}`,
+            label: `${formatPlotPlainLabel(yVariable.display_label || yVariable.short_label)} vs ${formatPlotPlainLabel(xVariable.display_label || xVariable.short_label)}`,
             data: points,
             borderWidth: 2,
             backgroundColor: "rgba(66, 153, 225, 0.28)",
