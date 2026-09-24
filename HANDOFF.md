@@ -1,8 +1,8 @@
 ---
 status: completed
 branch: main
-timestamp: 2026-09-23T13:11:41+02:00
-code_commit: 661f4a878fc785b47cc9a0cdcf5623dccf354408
+timestamp: 2026-09-24T17:44:24+02:00
+code_commit: 0b2adcf4006ccd14aa929b1e571b5d0f98d47485
 files_modified:
   - HANDOFF.md
 ---
@@ -11,19 +11,20 @@ files_modified:
 
 ## 当前状态
 
-最新功能提交是 `661f4a8`：上传限制区改为两列，每项仅保留“限制名称：数值”。
-此前已完成 ORCID 公开资料补全、真实上传进度和跨页面后台处理。
+最新功能提交是 `0b2adcf`：应力、应变 CSV 下载，多个对象各一份 CSV 打包为 ZIP。
+9 月 23—24 日还完成了详情页字段排序／折叠、Ronak 最新字段适配、边界条件表格布局、
+cube 标签间距和字号、曲线符号斜体、坐标数字放大。更早的上传和 ORCID 功能继续保留。
 写本交接前，工作区干净，已用 `git ls-remote origin refs/heads/main` 确认
-GitHub 的 `main` 也是 `661f4a878fc785b47cc9a0cdcf5623dccf354408`。
+GitHub 的 `main` 也是 `0b2adcf4006ccd14aa929b1e571b5d0f98d47485`。
 本交接会另行提交并推送，所以拉取后 HEAD 应是包含本文件更新的文档提交。
 
-用户准备新开聊天，**会继续贴 Ronak 试用后的反馈，下一轮围绕这些反馈逐项推进**。
+用户准备回家在笔记本继续，**先读本交接，再等用户接着提供 Ronak 的反馈，逐项推进**。
 本次只更新交接文档，不改应用功能。当前已授权的改动均已完成，没有待合并的代理改动。
 Ronak 的“100 个对象的 JSON 上传两次都没有结果”仍未定位：用户明确要求先略过，
 待向 Ronak 要到原始 JSON 后再查，不能将这次进度和后台处理改动说成已修复该问题。
-更早的曲线 CSV 下载仍暂缓，科学公式未修改，见下文历史讨论。
+CSV 已由用户明确说“做吧，csv不是excel”授权并完成；科学计算公式未修改。
 
-用户最新 UI 要求：**限制名称、冒号、数值；每项一行，桌面两列；不要在下面恢复大段解释。**
+此前已确认的上传 UI 要求：**限制名称、冒号、数值；每项一行，桌面两列；不要在下面恢复大段解释。**
 保持界面英文，中文简短沟通。用户不喜欢为了常规小修改反复确认。
 
 之前给 Ronak 的 Upload Data 说明已整理成英文和中文，包含上传流程及下面的全部额度。
@@ -39,21 +40,25 @@ Ronak 的“100 个对象的 JSON 上传两次都没有结果”仍未定位：�
 2. 工作区干净且位于 `main` 时运行 `git pull --ff-only`。若本地分支与远端分叉，
    先查差异，不要用 `reset --hard` 或强推解决。拉取后重新阅读本文件、
    [AGENTS.md](AGENTS.md) 和 [README.md](README.md) 的 Upload and Storage Limits、
-   Current Scope、My Data、Search、Local Setup、Verification。
+   Current Scope、Data Object Details、My Data、Search、Local Setup、Verification。
 3. 不要假定新聊天或另一台电脑保留了聊天记录、路径、登录状态或凭据。
    若有 PyCharm 环境工具，每次运行 Python 前用它确认项目解释器。
-   9 月 23 日工作目录为 `/home/users/xuejungs/Projects/database-manager-ui`，
+   9 月 24 日工作目录为 `/home/users/xuejungs/Projects/database-manager-ui`，
    实际测试解释器是本项目 `.venv/bin/python`，Python 3.10.12；Render 配置为 Python 3.12.13。
    这些只是当前环境记录，换电脑应重新确认，不能直接照搬路径。
 4. 本地开发使用 `DEBUG=True` 和 SQLite。已有 `.env` 不覆盖；若缺少配置，
    按 README 从 `env.sample` 建立本地配置，不借用生产数据库凭据。
    依赖或数据库落后时，按 README 安装 `requirements.txt` 并运行迁移。
-   最新功能没有新增依赖；本轮新增迁移 `0012_accountprofile_research_details` 和
-   `0013_upload_jobs`，本地 SQLite 已应用。另一台电脑仍须运行未应用的迁移。
+   9 月 24 日详情页和 CSV 功能没有新增依赖或迁移；9 月 23 日新增过迁移
+   `0012_accountprofile_research_details` 和 `0013_upload_jobs`。
+   另一台电脑仍须运行未应用的迁移。
    本地 `runserver` 默认走原有 NDJSON 上传；测试后台上传要按部署文档启动 Gunicorn，
    由它启动上传处理进程，不要只启动 `runserver` 就判断后台功能失效。
 5. `.env`、本地数据库、虚拟环境、上传数据和临时测试报告没有通过 Git 同步。
    学校电脑、这台电脑和线上站点的账户、数据各自独立。
+   用户反复提供的 `example_json_files/a46fde6c.json` 及 `a46fde6c1_public.json`
+   属于被 Git 忽略的本地样例；笔记本没有时需另行复制，不能认为拉取仓库就会出现。
+   原样例路径不可读而跳过，表示那次测试没有读取成功，不代表样例已验证。
 6. 用户偏好中文简短直接沟通，UI、代码注释和 docstring 保持英文。
    明确的小修改直接完成、验证、检查 diff，然后 `git add .`、commit、push；
    不反复索要常规确认，不提交凭据或无关修改。不要把推送状态说成部署状态。
@@ -64,6 +69,15 @@ Ronak 的“100 个对象的 JSON 上传两次都没有结果”仍未定位：�
 
 | 提交 | 内容 |
 | --- | --- |
+| `0b2adcf` | 详情页当前 X/Y、全部、自选列 CSV；列表多对象 ZIP；权限及精度测试 |
+| `c9bcf01` | 曲线坐标数字 15px、科学计数指数 11px，匹配测量和留白 |
+| `67809ac` / `3a598a1` | 下拉菜单、提示、图例、坐标标题和 PNG 的 σ／ε 斜体；下标直立 |
+| `93d6570` / `423140f` / `95da7d3` | 顶点标签稍外移、X 字与箭头拉开、放大顶点和参考轴文字 |
+| `0cf08a5` | 多个 loaded 详情可同时展开，三列充分利用表格宽度 |
+| `c89aaf0` | 边界载荷显示四舍五入两位小数；Loading Type / Mode 标题 |
+| `0bbb951` / `2ced93f` | schema 头字段及各层 properties 相对顺序；隐藏已绘图的根字段 |
+| `a7ee54a` / `0da262d` | 采用当前 MiMeDat 的 phase_name、等效量与边界载荷结构 |
+| `82e6e46` | 按真实 JSON 结构折叠，不再显示 Additional 分组 |
 | `661f4a8` | 上传限制精简为两列“名称：数值”，删除解释段落 |
 | `22a304b` | 真实文件传输和对象校验进度、后台上传任务、站内跨页面继续处理、页面显示限制 |
 | `e3a0716` | ORCID 可选研究资料补全和 Account Settings 编辑字段 |
@@ -85,6 +99,110 @@ Ronak 的“100 个对象的 JSON 上传两次都没有结果”仍未定位：�
 | `18849c7` | 搜索结果直接显示访问类型、总数，Public 排在 Private 前 |
 
 旧提交 `550ed5f` 的“遇到错误文件就停止后续文件”已经被取代，不能恢复为最终需求。
+旧提交 `2803c41` 的“只按 mandatory 排序、其余放 Additional”也已被后续需求取代。
+
+## 9 月 24 日详情页最终约定
+
+### 字段顺序与折叠
+
+- Ronak 参考仓库为 [MiMeDat](https://github.com/Ronakshoghi/MiMeDat)；参考文件是
+  `microstructure_sensitive_mechanical_metadata_schema.json` 和 `metadata_template.py`。
+  `Dict_Test` 是包含必要及可选项的示例；schema 是结构规则。展示顺序和上传验证是两件事。
+- **最终展示不再采用“必要字段在前、可选字段放 Additional”。** 用户提供的字段，凡当前
+  schema 对应层级定义了，就按其 `properties` 相对顺序展示，必要、可选都包括。
+  未定义字段放同一父对象最后，保留其自身顺序；不移动到别的父对象，不添加空占位。
+- 顶层用户提供的 `$schema`、`$id`、`version`、`type`、`description` 依次在前，随后
+  `identifier` 等。只展示上传的值，不从 schema 文档复制值；description 不重复显示。
+- 顶层 `stress`、`total_strain`、`plastic_strain`、`mechanical_BC` 不在元数据列表重复展示，
+  由下方图和边界条件表使用。完整 JSON 下载仍保留这些字段。
+- 按真实对象／对象数组结构折叠，包括只有一个子项的对象；不按“子项多于两个”判定。
+  `creator_affiliation`、`creator_institute` 等独立字段不因前缀相同而合并。
+  没有 Additional 分组；长数组仍有 Show values。未知字段也可展示字符串、数值、列表等。
+- 展示使用本地排序表，不联网获取用户上传的 `$schema` 地址，不在详情页重新做嵌套验证。
+  **上传仍只校验必要顶层字段**；没有因为本轮展示讨论启用所有层级的 required 校验。
+- 用户已删除平台此前上传的旧数据，明确要求按 Ronak 当前命名走；不要主动恢复旧显示名称。
+  phase 使用 `phase_name`；总等效应变字段为 `total_strain.equivalent_strain`。
+- 曾反馈 title 的 Stress 变为 tress；当时本地样例自身的首字母问题已处理，不是字段排序应删除字符。
+  若再出现，分别核对源文件、存储内容、DOM，不能推定当前上传逻辑仍在截断标题。
+
+关键文件：[detail_metadata.py](apps/pages/detail_metadata.py)、
+[views.py](apps/pages/views.py)、[data_detail.html](templates/pages/data_detail.html)、
+[test_detail_metadata.py](apps/pages/test_detail_metadata.py)、
+[test_plot_schema.py](apps/pages/test_plot_schema.py)、[test_bc_schema.py](apps/pages/test_bc_schema.py)。
+
+### Mechanical Boundary Condition Cube 和载荷表
+
+- 表头保持 `Target`、`Constraints`、`Loading Type / Mode`。用户提过 Vortex，未采用；
+  target 可能是顶点组合或整个 cube，Vortex 不是顶点的英文。
+- 载荷显示按 ROUND_HALF_UP 四舍五入两位小数，step 保持整数；不改原值或导出精度。
+- X/Y/Z 标签保持同一行。各方向的 loaded 详情可同时展开，正常文档流增加该行高度，
+  其他方向标签仍停在顶部；不要恢复一次只能开一个或浮层互相遮盖的版本。
+- 三列表宽约 14% / 62% / 24%；cube 与表格采用 2:3 比例和最小宽度约束。
+- 顶点标签约 14 CSS px，参考轴字 17px；顶点标签向外偏移从 0.22 调到 0.28。
+  X 标签已额外拉开与箭头的距离，不要把所有标签推得很远。
+- 顶点命名严格按二进制坐标：Vxyz 的每位 0→-0.5、1→+0.5。V000 的三个相邻点是
+  V100、V010、V001，对角点 V111；检查过八个点与边的对应关系。
+- 右下角是固定参考坐标系。用户明确说其不跟随旋转没关系，**不要另做动态坐标轴同步**。
+- cube 在浏览器用 Three.js 渲染，不是 Node.js。当前按需渲染，空闲不持续重绘；仍有抗锯齿、
+  high-performance 提示和最大 1.5 像素比。实测静止 5 秒及拖动停止后无额外 WebGL 渲染，
+  4 倍 CPU 降速下可操作。未测用户笔记本断电状态，不能承诺所有硬件都不卡。
+  这部分性能核查是只读检查，没有擅自重写渲染器。
+
+cube 实现位于 [mechanical-bc-viewer.js](static/assets/js/mechanical-bc-viewer.js)。
+
+### 曲线字体
+
+- Ronak 要求表示标量的 σ 和 ε 斜体；eq、p,eq、数字下标及单位直立。
+  图例、坐标标题、PNG、下拉菜单、tooltip 和原始值摘要均已适配。
+  原生 select／纯文本使用数学斜体 Unicode；Canvas 和 HTML 使用对应字体样式。
+- 坐标数字从 12px 放大到 15px，科学计数指数从 9px 到 11px，并更新测量和留白。
+  CSV 提交同步修正了旧测试中残留的 12px／固定字体字符串断言，没有再改字体功能。
+
+## CSV 导出已完成（0b2adcf）
+
+Ronak 原意是既能选择应力／应变导出，也能一键导出所有可用曲线，并支持选多个 data objects。
+用户已明确授权 CSV，**不是 XLSX 或 Excel 多 sheet**。
+
+- 详情页曲线区：`Download X/Y CSV`、`Download All CSV`；展开 `Choose CSV columns`
+  可勾选任意多列，有 Select all、Clear 和 Download Selected CSV。原图像按钮明确为 Download PNG。
+- My Data：`Download Curves as CSV`；Search 结果：`Export Curves as CSV`。
+  选一个对象直接下载 CSV；选多个则每对象一份 CSV，打包 `stress_strain_csv.zip`。
+  文件名采用清理后的 identifier／title 加数据库记录 ID，避免同名覆盖。
+- 列头是完整字段路径加可用单位；首列 `index` 从 0 开始，是数组索引，不是物理时间。
+  每行对应相同数组位置；长度不同的列末尾补空白，不截断、不插值、不重采样。
+  保存数值精度，不套用载荷表的两位小数。编码 UTF-8 BOM；CSV 自动处理逗号和引号。
+- 复用 `_extract_plot_variables`，与曲线可选的数值序列一致。用户提供的等效量优先，只有缺失
+  且分量完整才沿用现有公式计算；显式空等效数组不补算。计算列标记 `(calculated)`。
+- 后端逐对象检查 owner／public／explicit share；My Data 导出仅本人记录。
+  混入不可访问、已删除或没有数值曲线的对象，整次拒绝并提示，不悄悄跳过。
+  批量 POST 保留 CSRF、最多 1,000 个选择；单对象及选列使用 GET。
+- 所有内容准备成功后才返回下载；使用 8 MiB 阈值的临时缓冲，大结果落临时文件，ZIP 逐对象写入。
+  不把整个批次 JSON 同时留在内存。Python 3.10 的 SpooledTemporaryFile 无 readable 方法，
+  已用 codecs writer 避免 TextIOWrapper 不兼容；不要恢复有问题的包装方式。
+- 没有改上传验证、科学计算公式、存储数据、原有 JSON 导出或访问规则，没有新增依赖／迁移。
+
+代码：[mechanical_csv.py](apps/pages/mechanical_csv.py)、[views.py](apps/pages/views.py)、
+[urls.py](apps/pages/urls.py)、三个页面模板 `data_detail.html`、`data_list.html`、`search.html`。
+回归测试：[test_mechanical_csv.py](apps/pages/test_mechanical_csv.py)，共 11 项新测试。
+
+### 本轮验证与恢复运行
+
+- 85 项相关 Django 测试通过：`apps.pages.test_mechanical_csv`、`apps.pages.test_bc_schema`、
+  `apps.pages.tests`、`apps.pages.test_my_data_filters`。覆盖精度、单位、不等长、自选列、五对象 ZIP、
+  同名文件、访问权限、缺失对象、无曲线、计算标记、Unicode／逗号／公式前缀等。
+- `node --test tests/js/*.test.cjs`：98 项通过，0 跳过，包含真实 Chromium。
+- 本地真实浏览器 1280／1440 桌面共 52 项检查通过：实际点击当前 X/Y、全部、任意三列下载，
+  清空／全选、PNG 保留、My Data 五对象 ZIP 内容、Search 单对象 CSV、长字段名、无曲线页面。
+- 此前独立浏览器验证还覆盖符号 90 项、坐标字号 40 项、顶点间距 24 项。
+  不把这些历史检查或上传的 652 项检查说成本次 CSV 的全量测试。
+- 测试使用隔离 SQLite／合成数据，临时 QA 位于本机 `/tmp/detail-mimedat-qa-YmWzwQ`，
+  不在 Git 中。临时服务 127.0.0.1:8897 已停止；笔记本须重建自己的本地环境。
+  不复制临时 browser.json 中的登录 cookie，不提交用户样例或数据库。
+- 笔记本按 README 配好 DEBUG=True、SQLite 并确认解释器后，可用该解释器执行
+  `manage.py test apps.pages.test_mechanical_csv apps.pages.test_bc_schema apps.pages.tests apps.pages.test_my_data_filters --noinput`
+  及上述 Node 命令。不要照搬本机临时 qa_settings 路径。
+- 本次只更新 HANDOFF，核对文档／Git 状态，不重复执行已完成的应用测试。
+  Render 部署和线上下载尚未确认；用户实际样例在笔记本上仍可继续验收。
 
 ## Ronak 上传反馈：已做与待查
 
@@ -198,7 +316,7 @@ Department、Position、Website、Research keywords；这些资料可选，Name 
   Creator 指 JSON 中的创建者，不是上传者。
 - Software、Phase、Creator 支持文本、列表和带名称的字典；去除首尾空白、忽略大小写，
   按完整名称精确匹配。各条件之间取 AND；同一个 object 只计数一次。
-  Phase 名称优先于编号，例如有 `name: Iron` 和 `phase_identifier: 7` 时显示 Iron。
+  Phase 名称优先于编号；9 月 24 日已适配 Ronak 当前的 `phase_name`，例如 Iron。
 - 下拉选项后的数字按其他已选条件计算；零结果选项禁用，但保留当前选中值。
   失效或未知 URL 条件保留为零结果，不能悄悄扩大范围。刷新和书签保留 GET 条件。
 - 选择后自动筛选，Clear 清空全部条件；没有 JavaScript 时提供 Filter 按钮。
@@ -237,9 +355,9 @@ Windows 全量 Django 测试中的部署构建测试需要 Bash。本机第一�
 临时服务曾使用 `127.0.0.1:8001`，已停止；不要复用临时登录会话。
 本轮未修改本地 `.env` 和日常数据库，未使用生产数据库凭据。
 
-## 详情页曲线讨论进度
+## 早期详情页曲线讨论记录（科学解释保留，展示以 9 月 24 日约定为准）
 
-**本节记录解释和核对结果，没有新增功能，也没有授权修改科学公式。**
+**本节主要记录早期解释和只读核对；其后已更新字段适配和 CSV，科学公式未修改。**
 用户不熟悉材料学，希望用白话解释；用户把 epsilon 口述成“epsel blabla”。
 截图最后两个选项是 ε_eq 和 ε_p,eq，不应仅根据口述误判为两个 elastic strain 字段。
 
@@ -248,7 +366,7 @@ Windows 全量 Django 测试中的部署构建测试需要 Bash。本机第一�
 | ε_11、ε_22、ε_33 | `strain_11` 等，来自 `total_strain` | 各方向的总拉伸或压缩应变 |
 | ε_12、ε_13、ε_23 | `strain_12` 等 | 各平面的剪切变形，可用正方形变成平行四边形解释 |
 | ε_p,11 等 | `plastic_strain_11` 等，来自 `plastic_strain` | 对应方向或平面的塑性应变 |
-| ε_eq | `equivalent_total_strain` | 将多个总应变分量合成为一个等效量 |
+| ε_eq | 当前为 `total_strain.equivalent_strain` | 将多个总应变分量合成为一个等效量 |
 | ε_p,eq | `equivalent_plastic_strain` | 将多个塑性应变分量合成为一个等效量 |
 | σ_11 等、σ_eq | `stress_11` 等、`equivalent_stress` | 方向应力、等效应力；不是应变 |
 
@@ -262,9 +380,10 @@ Windows 全量 Django 测试中的部署构建测试需要 Bash。本机第一�
 塑性应变反映留下的变形；塑性变形占主导时，两者可以接近。**没有会议原文，不能替 Ronak 确认原话，
 也不能保证任意数据、任意加载路径下两条曲线都接近。**
 
-已只读核对 [views.py](apps/pages/views.py) 中 `_get_plot_display_label`、
+早期已只读核对 [views.py](apps/pages/views.py) 中 `_get_plot_display_label`、
 `_calculate_equivalent_strain` 和 `_extract_equivalent_plot_variables`：
-ε_eq 和 ε_p,eq 分别由 `total_strain`、`plastic_strain` 的六个分量计算，没有使用同一份应变数组。
+在缺失对应等效量而需要补算时，ε_eq 和 ε_p,eq 分别由 `total_strain`、`plastic_strain`
+的六个分量计算，没有使用同一份应变数组；现在明确优先采用用户提供的等效曲线。
 公式先去掉三个正应变分量的平均值，再计算偏应变张量的范数。
 [data_detail.html](templates/pages/data_detail.html) 中 X 轴选择应变、Y 轴选择应力；
 等效应变选项对应等效应力 σ_eq，比较这两个选项通常是更换 X 数据。
@@ -281,12 +400,12 @@ Windows 全量 Django 测试中的部署构建测试需要 Bash。本机第一�
 可参考 [Abaqus 输出变量定义](https://docs.software.vt.edu/abaqusv2025/English/SIMACAEOUTRefMap/simaout-c-std-elementintegrationpointvariables.htm)
 以及 [DAMASK mechanics 实现](https://damask-multiphysics.org/_modules/damask/mechanics.html)。
 
-### CSV 下载暂缓
+### CSV 讨论的历史状态
 
 用户记得教授可能要求在 stress-strain 曲线旁增加 CSV 下载，但会议 TXT 不在手边，
 随后明确说“咱先弄别的”。只解释过曲线的数值点可以导出 CSV，供 Excel、Origin 等读取。
-**本轮没有新增 CSV 按钮或导出逻辑，也没有确定导出当前坐标轴、全部分量或其他细节。**
-等用户重新提出或提供会议内容后再推进，不要把这条讨论当成待自动执行的开发任务。
+这是早期的暂缓记录，**已经被 9 月 24 日的明确授权和 `0b2adcf` 实现取代**。
+当前 CSV 功能和使用方法见上方“CSV 导出已完成”，不要继续当作未实施任务。
 
 ## Upload Data 最终规则
 
@@ -438,5 +557,6 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
    不用小合成文件成功、HTTP 200 或这次后台改动推定原问题已修复。
 4. 如核对线上问题，先确认 Render 部署提交。Git push 成功不证明部署完成，也不证明迁移或线上行为成功。
 5. 继续保持限制区两列、每项一行“名称：数值”，不要恢复大段解释。
-6. CSV 导出仍暂缓，科学公式未获修改指令；扩容入口、索引搜索、收费基础设施、AI 和知识图谱
-   不应未经请求展开。当前没有其他待完成的已授权代码任务。
+6. CSV 已完成；笔记本可用实际样例核对下载内容和布局，再根据用户的新反馈修改。
+   科学公式未获修改指令；扩容入口、索引搜索、收费基础设施、AI 和知识图谱不应未经请求展开。
+   当前没有待完成的已授权代码任务，不要自行启动新功能。
