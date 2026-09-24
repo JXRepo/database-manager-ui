@@ -439,6 +439,7 @@ function createTextSprite(text, color = "#334155", fontSize = 42, worldScale = 0
     depthTest: false,
   });
   const sprite = new THREE.Sprite(material);
+  sprite.userData.fontSize = fontSize;
   sprite.scale.set(width / height * worldScale, worldScale, 1);
   return sprite;
 }
@@ -446,8 +447,12 @@ function createTextSprite(text, color = "#334155", fontSize = 42, worldScale = 0
 function addVertexLabels(group) {
   VERTICES.forEach(vertex => {
     const position = vertexCoordinates(vertex);
-    const label = createTextSprite(vertex, "rgba(100, 116, 139, 0.58)", 34, 0.052);
-    const offset = position.clone().normalize().multiplyScalar(0.14);
+    const label = createTextSprite(vertex, "#334155", 48, 0.052);
+    const offset = position.clone().normalize().multiplyScalar(0.22);
+
+    label.material.sizeAttenuation = false;
+    label.userData.textPixelHeight = 14;
+    label.renderOrder = 10;
 
     label.position.copy(position.clone().add(offset));
     group.add(label);
@@ -698,6 +703,17 @@ function createScene(container) {
   scene.add(root);
 
   function renderSceneOnce() {
+    // Keep vertex text readable at the same screen size across zoom and resize.
+    const viewportHeight = Math.max(container.clientHeight, 1);
+    const projectionHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+
+    root.children.forEach(child => {
+      if (!child.userData.textPixelHeight) return;
+      const texture = child.material.map.image;
+      const height = child.userData.textPixelHeight * (texture.height / child.userData.fontSize)
+        * projectionHeight / viewportHeight;
+      child.scale.set(height * texture.width / texture.height, height, 1);
+    });
     renderer.render(scene, camera);
   }
 
