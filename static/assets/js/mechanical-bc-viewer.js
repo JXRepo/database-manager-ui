@@ -448,7 +448,7 @@ function addVertexLabels(group) {
   VERTICES.forEach(vertex => {
     const position = vertexCoordinates(vertex);
     const label = createTextSprite(vertex, "#334155", 48, 0.052);
-    const offset = position.clone().normalize().multiplyScalar(0.22);
+    const offset = position.clone().normalize().multiplyScalar(0.28);
 
     label.material.sizeAttenuation = false;
     label.userData.textPixelHeight = 14;
