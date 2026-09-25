@@ -396,7 +396,8 @@ be accessible and contain an exportable curve; otherwise the full download is
 rejected with a message instead of silently omitting objects. Existing JSON and
 PNG downloads remain available.
 
-Plot titles and axis labels italicize only the scalar symbols sigma and epsilon.
+Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
+scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
 Variable selectors, tooltips, and raw-value summaries use matching mathematical
 italic glyphs for these two symbols; field keys and plotted values are unchanged.

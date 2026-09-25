@@ -875,33 +875,6 @@ details[open] > .detail-group-summary {
       }
     }
 
-    .plot-custom-legend {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin-top: 16px;
-      margin-bottom: 0;
-      color: #111827;
-      font-size: 20px;
-      font-style: normal;
-      font-weight: 400;
-      line-height: 1.2;
-    }
-
-    .plot-custom-legend sub {
-      font-size: 0.62em;
-      vertical-align: sub;
-      line-height: 0;
-    }
-
-    .plot-custom-legend .plot-symbol {
-      font-style: italic;
-    }
-
-    .plot-custom-legend .plot-versus {
-      padding: 0 12px;
-    }
-
     #mechanical-plot {
       width: 100% !important;
       height: 500px !important;
@@ -1573,9 +1546,6 @@ details[open] > .detail-group-summary {
         </details>
 
         <div class="plot-canvas-wrap">
-          <div class="plot-custom-legend">
-            <span id="plot-custom-legend-text"></span>
-          </div>
           <canvas id="mechanical-plot"></canvas>
           <div id="plot-status" class="plot-status"></div>
         </div>
@@ -1743,7 +1713,6 @@ details[open] > .detail-group-summary {
   }
   const plotStatus = document.getElementById("plot-status");
   const canvas = document.getElementById("mechanical-plot");
-  const plotCustomLegendText = document.getElementById("plot-custom-legend-text");
   const xRawSummary = document.getElementById("x-raw-summary");
     const yRawSummary = document.getElementById("y-raw-summary");
     const xRawMeta = document.getElementById("x-raw-meta");
@@ -1873,50 +1842,6 @@ details[open] > .detail-group-summary {
       : prefixedLabel;
   }
 
-  function escapeHtml(text) {
-    return String(text || "").replace(/[&<>"']/g, character => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;",
-    }[character]));
-  }
-
-  function parsePlotNotation(text) {
-    const value = String(text || "").trim();
-    const subscriptStart = value.indexOf("_");
-
-    if (subscriptStart < 0) {
-      return {
-        main: value,
-        subscript: "",
-      };
-    }
-
-    return {
-      main: value.slice(0, subscriptStart),
-      subscript: value.slice(subscriptStart + 1),
-    };
-  }
-
-  function formatPlotLabelHtml(label) {
-    const notation = parsePlotNotation(label);
-
-    if (!notation.main) {
-      return "";
-    }
-
-    const subscriptHtml = notation.subscript
-      ? `<sub>${escapeHtml(notation.subscript)}</sub>`
-      : "";
-
-    const mainHtml = escapeHtml(notation.main).replace(
-      /[σε]/g, symbol => `<span class="plot-symbol">${symbol}</span>`
-    );
-    return `${mainHtml}${subscriptHtml}`;
-  }
-
   function formatPlotPlainLabel(label) {
     // Native options and canvas tooltips need italic glyphs in plain text.
     return String(label || "").replace(/σ/g, "𝜎").replace(/ε/g, "𝜀");
@@ -2038,23 +1963,6 @@ function buildPlotScale(values) {
     labelPrecision: 4,
     ticks: buildDataRangeTicks(minValue, maxValue),
   };
-}
-
-function updatePlotTitlePosition(chart) {
-  const targetChart = chart || chartInstance;
-  const legend = plotCustomLegendText
-    ? plotCustomLegendText.closest(".plot-custom-legend")
-    : null;
-
-  if (!targetChart || !targetChart.chartArea || !legend) {
-    return;
-  }
-
-  const chartAreaCenter = (targetChart.chartArea.left + targetChart.chartArea.right) / 2;
-  const canvasCenter = targetChart.width / 2;
-  const titleOffset = Math.round(chartAreaCenter - canvasCenter);
-
-  legend.style.transform = `translateX(${titleOffset}px)`;
 }
 
 const cornerAxisPlugin = {
@@ -2425,55 +2333,23 @@ function downloadCurrentPlot() {
   const fileName =
     `${sanitizeFileName(yVariable.symbol_label || yVariable.short_label)}_vs_${sanitizeFileName(xVariable.symbol_label || xVariable.short_label)}.png`;
   const sourceCanvas = chartInstance.canvas;
-  const chartArea = chartInstance.chartArea;
   const exportPadding = 48;
-  const titleHeight = 46;
   const exportCanvas = document.createElement("canvas");
   const exportContext = exportCanvas.getContext("2d", { alpha: false });
   const exportPlotOffsetX = 42;
-  const pixelRatioX = sourceCanvas.width / chartInstance.width;
-  const chartAreaCenterX = chartArea
-    ? ((chartArea.left + chartArea.right) / 2) * pixelRatioX
-    : sourceCanvas.width / 2;
 
   exportCanvas.width = sourceCanvas.width + (exportPadding * 2);
-  exportCanvas.height = sourceCanvas.height + (exportPadding * 2) + titleHeight;
+  exportCanvas.height = sourceCanvas.height + (exportPadding * 2);
 
   exportContext.save();
   exportContext.globalCompositeOperation = "source-over";
   exportContext.fillStyle = "#ffffff";
   exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
-  exportContext.fillStyle = "#111827";
-  exportContext.textAlign = "left";
-  exportContext.textBaseline = "middle";
-  const titleRuns = [yVariable, xVariable].flatMap((variable, index) => {
-    const notation = parsePlotNotation(variable.display_label || variable.short_label);
-    return [
-      ...(index ? getPlotTextRuns(" vs ", 24, 700) : []),
-      ...getPlotTextRuns(notation.main, 24, 700),
-      ...(notation.subscript ? [{
-        text: notation.subscript,
-        font: "700 15px sans-serif",
-        yOffset: 8,
-      }] : []),
-    ];
-  });
-  const titleWidth = titleRuns.reduce((width, run) => {
-    exportContext.font = run.font;
-    return width + exportContext.measureText(run.text).width;
-  }, 0);
-  let titleX = exportPadding + chartAreaCenterX + exportPlotOffsetX - titleWidth / 2;
-  titleRuns.forEach(run => {
-    exportContext.font = run.font;
-    exportContext.fillText(run.text, titleX, exportPadding + 12 + (run.yOffset || 0));
-    titleX += exportContext.measureText(run.text).width;
-  });
-
   exportContext.drawImage(
     sourceCanvas,
     exportPadding + exportPlotOffsetX,
-    exportPadding + titleHeight
+    exportPadding
   );
   exportContext.restore();
 
@@ -2492,14 +2368,6 @@ function downloadCurrentPlot() {
       plotStatus.textContent = "Please select both X and Y variables";
       return;
     }
-
-    if (plotCustomLegendText) {
-      plotCustomLegendText.innerHTML =
-        `${formatPlotLabelHtml(yVariable.display_label || yVariable.short_label)}` +
-        `<span class="plot-versus">vs</span>` +
-        `${formatPlotLabelHtml(xVariable.display_label || xVariable.short_label)}`;
-    }
-
 
     function formatRawValues(values) {
   return values.map((value, index) => `${index}: ${value}`).join("\n");
@@ -2576,9 +2444,6 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             display: false,
           },
         },
-        onResize(chart) {
-          window.requestAnimationFrame(() => updatePlotTitlePosition(chart));
-        },
         layout: {
           padding: plotLayoutPadding,
         },
@@ -2633,7 +2498,6 @@ function updateRawValues(xVariable, yVariable, pointCount) {
       plugins: [canvasBackgroundPlugin, cornerAxisPlugin],
     });
 
-updatePlotTitlePosition(chartInstance);
 updateRawValues(xVariable, yVariable, pointCount);
 
 plotStatus.textContent = `${pointCount} points plotted.`;
