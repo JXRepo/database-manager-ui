@@ -1,0 +1,7 @@
+{% if request.resolver_match.url_name == "json_data_detail" %}
+  {% include "includes/fair_assistant.html" with assistant_page="detail" assistant_object_id=data_object.id %}
+{% elif request.resolver_match.url_name == "upload_json" %}
+  {% include "includes/fair_assistant.html" with assistant_page="upload" %}
+{% else %}
+  {% include "includes/fair_assistant.html" with assistant_page="search" %}
+{% endif %}

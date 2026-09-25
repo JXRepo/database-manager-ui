@@ -1,10 +1,15 @@
 <style>
+  .fair-assistant-widget,
+  .fair-assistant-widget * {
+    box-sizing: border-box;
+  }
+
   .fair-assistant-widget {
     position: fixed;
     right: 22px;
     bottom: 22px;
     z-index: 1080;
-    font-family: inherit;
+    font-family: "Open Sans", Arial, sans-serif;
   }
 
   .fair-assistant-toggle {
@@ -20,7 +25,7 @@
     box-shadow: 0 12px 28px rgba(37, 99, 235, 0.28);
   }
 
-  .fair-assistant-toggle i {
+  .fair-assistant-toggle svg {
     width: 22px;
     height: 22px;
   }
@@ -145,6 +150,8 @@
   }
 
   .fair-assistant-send {
+    display: inline-block;
+    text-decoration: none;
     border: none;
     border-radius: 999px;
     background: #2563eb;
@@ -173,24 +180,23 @@
   data-object-id="{{ assistant_object_id|default:'' }}"
   data-endpoint="{% url 'fair_assistant_ask' %}"
 >
-  <button class="fair-assistant-toggle" type="button" aria-label="Open FAIR Data Assistant" title="FAIR Data Assistant">
-    <i data-feather="message-circle"></i>
+  <button class="fair-assistant-toggle" type="button" aria-label="Open FAIR Data Assistant" title="FAIR Data Assistant" aria-expanded="false" aria-controls="fair-assistant-panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
   </button>
 
-  <div class="fair-assistant-panel" role="dialog" aria-label="FAIR Data Assistant">
+  <div class="fair-assistant-panel" id="fair-assistant-panel" role="dialog" aria-label="FAIR Data Assistant">
     <div class="fair-assistant-header">
       <div class="fair-assistant-title">FAIR Data Assistant</div>
       <button class="fair-assistant-close" type="button" aria-label="Close assistant">
-        <i data-feather="x"></i>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m18 6-12 12M6 6l12 12"/></svg>
       </button>
     </div>
 
     <div class="fair-assistant-messages">
-      <div class="fair-assistant-message assistant">
-        Ask about upload rules, search filters, or the current data object.
-      </div>
+      <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Ask about upload rules, search filters, or the current data object.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
     </div>
 
+    {% if request.user.is_authenticated %}
     <div class="fair-assistant-suggestions">
       {% if assistant_page == "detail" %}
         <button class="fair-assistant-suggestion" type="button" data-question="Summarize this data">Summarize</button>
@@ -208,11 +214,19 @@
     </div>
 
     <form class="fair-assistant-form">
+      {% csrf_token %}
       <textarea class="fair-assistant-input" placeholder="Ask a question"></textarea>
       <div class="fair-assistant-actions">
         <button class="fair-assistant-send" type="submit">Send</button>
       </div>
     </form>
+    {% else %}
+    <div class="fair-assistant-form">
+      <div class="fair-assistant-actions">
+        <a class="fair-assistant-send" href="{% url 'login' %}">Sign in</a>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </div>
 
@@ -263,7 +277,7 @@ document.addEventListener("DOMContentLoaded", function () {
   document.querySelectorAll(".fair-assistant-widget").forEach(function (widget) {
     const toggle = widget.querySelector(".fair-assistant-toggle");
     const close = widget.querySelector(".fair-assistant-close");
-    const form = widget.querySelector(".fair-assistant-form");
+    const form = widget.querySelector("form.fair-assistant-form");
     const input = widget.querySelector(".fair-assistant-input");
     const send = widget.querySelector(".fair-assistant-send");
     const messages = widget.querySelector(".fair-assistant-messages");
@@ -272,6 +286,24 @@ document.addEventListener("DOMContentLoaded", function () {
     const page = widget.dataset.page || "search";
     const objectId = widget.dataset.objectId || "";
     let isLoading = false;
+
+    toggle.addEventListener("click", function () {
+      const isOpen = widget.classList.toggle("is-open");
+      toggle.setAttribute("aria-expanded", String(isOpen));
+      if (isOpen) {
+        (input || close).focus();
+      }
+    });
+
+    close.addEventListener("click", function () {
+      widget.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.focus();
+    });
+
+    if (!form) {
+      return;
+    }
 
     function submitQuestion(rawQuestion) {
       const question = String(rawQuestion || input.value || "").trim();
@@ -321,18 +353,6 @@ document.addEventListener("DOMContentLoaded", function () {
           send.disabled = false;
         });
     }
-
-    toggle.addEventListener("click", function () {
-      widget.classList.toggle("is-open");
-
-      if (widget.classList.contains("is-open")) {
-        input.focus();
-      }
-    });
-
-    close.addEventListener("click", function () {
-      widget.classList.remove("is-open");
-    });
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();

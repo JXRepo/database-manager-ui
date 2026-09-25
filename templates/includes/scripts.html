@@ -13,6 +13,7 @@
 <script>layout_rtl_change('false');</script>
 <script>preset_change("preset-1");</script>
 <script>layout_theme_sidebar_change('false');</script>
+{% include "includes/global_assistant.html" %}
 {% if request.user.is_authenticated %}
 <script src="{% static 'assets/js/upload-host.js' %}" data-jobs-url="{% url 'upload_jobs' %}" data-upload-url="{% url 'upload_json' %}" data-user-id="{{ request.user.pk }}"></script>
 <script src="{% static 'assets/js/getting-started.js' %}" defer></script>
