@@ -1710,12 +1710,12 @@ class JSONDataSharingTests(TestCase):
 
     def test_workspace_has_home_navigation(self):
         """
-        Make the home page reachable from the sidebar and logo
+        Make the home page reachable from the sidebar logo
         """
         self.client.force_login(self.owner)
         response = self.client.get(reverse("search"))
         home = reverse("index")
-        self.assertContains(response, f'href="{home}" class="pc-link" aria-label="Home"')
+        self.assertNotContains(response, f'href="{home}" class="pc-link" aria-label="Home"')
         self.assertContains(response, f'href="{home}" class="b-brand text-primary" aria-label="Home"')
 
     def test_login_page_uses_platform_branding(self):
