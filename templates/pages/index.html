@@ -155,13 +155,6 @@
     justify-self: end;
   }
 
-  .atlas-sign-in {
-    color: var(--atlas-mineral);
-    font-size: 0.83rem;
-    font-weight: 600;
-    padding: 10px 6px;
-  }
-
   .atlas-button {
     align-items: center;
     border: 1px solid transparent;
@@ -189,6 +182,27 @@
     background: #303d56;
   }
 
+  .atlas-button-secondary,
+  .atlas-account-icon {
+    border: 1px solid rgba(63, 77, 103, 0.34);
+    color: var(--atlas-mineral);
+  }
+
+  .atlas-button-secondary:hover,
+  .atlas-account-icon:hover {
+    background: rgba(4, 169, 245, 0.07);
+  }
+
+  .atlas-account-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
   .atlas-arrow {
     font-size: 1.05rem;
     line-height: 1;
@@ -196,7 +210,7 @@
   }
 
   .atlas-button:hover .atlas-arrow {
-    transform: translateY(3px);
+    transform: translateX(3px);
   }
 
   .atlas-hero {
@@ -821,6 +835,32 @@
     margin: 14px 0 0;
   }
 
+  .atlas-footer-brand .atlas-account-actions {
+    margin-top: 24px;
+    flex-wrap: wrap;
+    justify-self: start;
+  }
+
+  .atlas-footer .atlas-button-primary {
+    background: #ffffff;
+    color: var(--atlas-mineral) !important;
+  }
+
+  .atlas-footer .atlas-button-primary:hover {
+    background: #e8f2fa;
+  }
+
+  .atlas-footer .atlas-button-secondary,
+  .atlas-footer .atlas-account-icon {
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #ffffff;
+  }
+
+  .atlas-footer .atlas-button-secondary:hover,
+  .atlas-footer .atlas-account-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
   .atlas-footer-links {
     display: grid;
     gap: 28px;
@@ -1220,14 +1260,7 @@
         <a href="#public-preview">Example data</a>
       </div>
 
-      <div class="atlas-account-actions">
-        {% if request.user.is_authenticated %}
-        <a class="atlas-button atlas-button-primary" href="{% url 'search' %}">Enter workspace</a>
-        {% else %}
-        <a class="atlas-sign-in" href="{% url 'login' %}">Sign in</a>
-        <a class="atlas-button atlas-button-primary" href="{% url 'register' %}">Create account</a>
-        {% endif %}
-      </div>
+      {% include "includes/landing_account_actions.html" %}
     </nav>
   </header>
 
@@ -1240,8 +1273,8 @@
           Preserve the context around simulation results, validate structured metadata, and make research objects easier to find, review, and reuse.
         </p>
         <div class="atlas-actions">
-          <a class="atlas-button atlas-button-primary" href="#capabilities">
-            Explore the platform <span class="atlas-arrow" aria-hidden="true">↓</span>
+          <a class="atlas-button atlas-button-primary" href="{% if request.user.is_authenticated %}{% url 'search' %}{% else %}{% url 'register' %}{% endif %}">
+            Get started <span class="atlas-arrow" aria-hidden="true">→</span>
           </a>
         </div>
         <div class="atlas-proofline">
@@ -1447,6 +1480,7 @@
         <div class="atlas-footer-brand">
           <strong>Materials Data Platform</strong>
           <p>A compact FAIR platform for uploading, validating, finding, sharing, and reviewing materials simulation data.</p>
+          {% include "includes/landing_account_actions.html" %}
         </div>
 
         <div class="atlas-footer-links">

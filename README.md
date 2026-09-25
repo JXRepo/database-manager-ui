@@ -165,9 +165,10 @@ write data.
 
 The home page remains available after signing in. Use the sidebar logo or a
 Home breadcrumb to return to it without signing out. Its
-header offers Sign in and Create account to visitors, or a single Enter workspace
-link to signed in users. The main button explores the platform introduction;
-the footer links only to sections of the home page.
+header and footer offer Create account and Sign in buttons to visitors, or an
+account settings icon and Enter platform button to signed in users. Get started
+opens registration for visitors and the workspace for signed in users. Upload,
+search, and data management controls remain inside the workspace.
 
 - Upload one or more JSON files.
 - Unwrap a single object, a list of objects, or a dict with a top-level `data` list.
