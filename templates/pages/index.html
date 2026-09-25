@@ -182,13 +182,25 @@
     background: #303d56;
   }
 
-  .atlas-button-secondary {
+  .atlas-button-secondary,
+  .atlas-account-avatar {
     border: 1px solid rgba(63, 77, 103, 0.34);
     color: var(--atlas-mineral);
   }
 
-  .atlas-button-secondary:hover {
+  .atlas-button-secondary:hover,
+  .atlas-account-avatar:hover {
     background: rgba(4, 169, 245, 0.07);
+  }
+
+  .atlas-account-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    flex-shrink: 0;
   }
 
   .atlas-arrow {
@@ -837,12 +849,14 @@
     background: #e8f2fa;
   }
 
-  .atlas-footer .atlas-button-secondary {
+  .atlas-footer .atlas-button-secondary,
+  .atlas-footer .atlas-account-avatar {
     border-color: rgba(255, 255, 255, 0.5);
     color: #ffffff;
   }
 
-  .atlas-footer .atlas-button-secondary:hover {
+  .atlas-footer .atlas-button-secondary:hover,
+  .atlas-footer .atlas-account-avatar:hover {
     background: rgba(255, 255, 255, 0.1);
   }
 
