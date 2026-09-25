@@ -369,6 +369,11 @@ Item 2 groups. Short scalar lists stay inline, while long numeric and complex
 arrays offer Show values. Strings, numbers, booleans, nulls, empty containers,
 and mixed arrays remain displayable.
 
+Each metadata group shares an aligned field-name and value column. Field names
+use their natural width up to 48% of the group, leaving space for values; long
+names and content wrap within their columns. Compact indentation and subtle
+vertical guides keep expanded nesting readable without wasting page width.
+
 Original names, literal punctuation, values, and array item order are preserved.
 Download JSON exports the complete stored object, including the four fields
 omitted from the metadata list and any values not used by the visualizations.
