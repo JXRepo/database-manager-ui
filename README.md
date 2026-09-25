@@ -368,6 +368,8 @@ not create groups. Arrays containing multiple objects keep separate Item 1,
 Item 2 groups. Short scalar lists stay inline, while long numeric and complex
 arrays offer Show values. Strings, numbers, booleans, nulls, empty containers,
 and mixed arrays remain displayable.
+Expanded numeric arrays flow horizontally and wrap to fit the available width,
+preserving all values and their order.
 
 Each metadata group shares an aligned field-name and value column. Field names
 use their natural width up to 48% of the group, leaving space for values; long

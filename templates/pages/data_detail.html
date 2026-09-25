@@ -283,6 +283,14 @@ details[open] > .detail-group-summary {
   }
 
 
+.array-box-numeric {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
 .detail-actions {
   display: flex;
   justify-content: flex-end;
@@ -1380,7 +1388,7 @@ details[open] > .detail-group-summary {
             </button>
 
             <div class="collapse" id="{{ row.value_id }}">
-              <pre class="array-box">{{ row.json_value }}</pre>
+              <pre class="array-box array-box-numeric">{{ row.json_value }}</pre>
             </div>
           </div>
         </div>
