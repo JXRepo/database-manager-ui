@@ -165,8 +165,8 @@ write data.
 
 The home page remains available after signing in. Use the sidebar logo or a
 Home breadcrumb to return to it without signing out. Its
-header and footer offer Create account and Sign in buttons to visitors, or an
-account settings icon and Enter platform button to signed in users. Get started
+header and footer always show separate Register and Login buttons. Footer
+buttons sit between the platform introduction and section links. Get started
 opens registration for visitors and the workspace for signed in users. Upload,
 search, and data management controls remain inside the workspace.
 

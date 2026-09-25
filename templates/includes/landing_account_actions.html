@@ -1,14 +1,4 @@
 <div class="atlas-account-actions">
-  {% if request.user.is_authenticated %}
-  <a class="atlas-account-icon" href="{% url 'account_settings' %}" aria-label="Account settings" title="Account settings">
-    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="12" cy="8" r="4"/>
-      <path d="M5 21v-2a7 7 0 0 1 14 0v2"/>
-    </svg>
-  </a>
-  <a class="atlas-button atlas-button-primary" href="{% url 'search' %}">Enter platform</a>
-  {% else %}
-  <a class="atlas-button atlas-button-secondary" href="{% url 'register' %}">Create account</a>
-  <a class="atlas-button atlas-button-primary" href="{% url 'login' %}">Sign in</a>
-  {% endif %}
+  <a class="atlas-button atlas-button-secondary" href="{% url 'register' %}">Register</a>
+  <a class="atlas-button atlas-button-primary" href="{% url 'login' %}">Login</a>
 </div>

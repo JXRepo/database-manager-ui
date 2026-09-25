@@ -182,25 +182,13 @@
     background: #303d56;
   }
 
-  .atlas-button-secondary,
-  .atlas-account-icon {
+  .atlas-button-secondary {
     border: 1px solid rgba(63, 77, 103, 0.34);
     color: var(--atlas-mineral);
   }
 
-  .atlas-button-secondary:hover,
-  .atlas-account-icon:hover {
+  .atlas-button-secondary:hover {
     background: rgba(4, 169, 245, 0.07);
-  }
-
-  .atlas-account-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 46px;
-    height: 46px;
-    border-radius: 50%;
-    flex-shrink: 0;
   }
 
   .atlas-arrow {
@@ -811,7 +799,7 @@
   .atlas-footer-main {
     display: grid;
     gap: 50px;
-    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.25fr) minmax(220px, 1fr) minmax(140px, auto);
     padding-bottom: 56px;
     padding-top: 52px;
   }
@@ -835,10 +823,9 @@
     margin: 14px 0 0;
   }
 
-  .atlas-footer-brand .atlas-account-actions {
-    margin-top: 24px;
-    flex-wrap: wrap;
-    justify-self: start;
+  .atlas-footer-main > .atlas-account-actions {
+    align-self: center;
+    justify-self: center;
   }
 
   .atlas-footer .atlas-button-primary {
@@ -850,14 +837,12 @@
     background: #e8f2fa;
   }
 
-  .atlas-footer .atlas-button-secondary,
-  .atlas-footer .atlas-account-icon {
+  .atlas-footer .atlas-button-secondary {
     border-color: rgba(255, 255, 255, 0.5);
     color: #ffffff;
   }
 
-  .atlas-footer .atlas-button-secondary:hover,
-  .atlas-footer .atlas-account-icon:hover {
+  .atlas-footer .atlas-button-secondary:hover {
     background: rgba(255, 255, 255, 0.1);
   }
 
@@ -1480,8 +1465,9 @@
         <div class="atlas-footer-brand">
           <strong>Materials Data Platform</strong>
           <p>A compact FAIR platform for uploading, validating, finding, sharing, and reviewing materials simulation data.</p>
-          {% include "includes/landing_account_actions.html" %}
         </div>
+
+        {% include "includes/landing_account_actions.html" %}
 
         <div class="atlas-footer-links">
           <div>
