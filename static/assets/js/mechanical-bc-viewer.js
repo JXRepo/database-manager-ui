@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import {tensorArrows, TENSOR_COLORS} from './mechanical-bc-tensor.js';
+import {createTensorPanel} from './mechanical-bc-tensor-panel.js';
 
 const VERTICES = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
 const AXIS_DIRECTIONS = {
@@ -444,8 +446,8 @@ function createTextSprite(text, color = "#334155", fontSize = 42, worldScale = 0
   return sprite;
 }
 
-function addVertexLabels(group) {
-  VERTICES.forEach(vertex => {
+function addVertexLabels(group, vertices = VERTICES) {
+  vertices.forEach(vertex => {
     const position = vertexCoordinates(vertex);
     const label = createTextSprite(vertex, "#334155", 48, 0.052);
     const offset = position.clone().normalize().multiplyScalar(0.28);
@@ -603,7 +605,7 @@ function createTooltip(container) {
   return tooltip;
 }
 
-function setupTooltip(container, camera, selectableMeshes, tooltip) {
+function setupTooltip(container, camera, selectableMeshes, tooltip, onHighlight = () => {}) {
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
@@ -618,9 +620,11 @@ function setupTooltip(container, camera, selectableMeshes, tooltip) {
 
     if (!hit) {
       tooltip.style.opacity = "0";
+      onHighlight('');
       return;
     }
 
+    onHighlight(hit.object.userData.component || '');
     tooltip.textContent = hit.object.userData.tooltip;
     tooltip.style.left = `${event.clientX - rect.left}px`;
     tooltip.style.top = `${event.clientY - rect.top}px`;
@@ -629,6 +633,90 @@ function setupTooltip(container, camera, selectableMeshes, tooltip) {
 
   container.addEventListener("pointerleave", () => {
     tooltip.style.opacity = "0";
+    onHighlight('');
+  });
+}
+
+function disposeTensorGroup(group) {
+  const materials = new Set();
+  group.traverse(object => {
+    object.geometry?.dispose();
+    if (object.material) materials.add(object.material);
+  });
+  materials.forEach(material => {
+    material.map?.dispose();
+    material.dispose();
+  });
+  group.clear();
+}
+
+function drawTensorLoading(view, group, selectableMeshes) {
+  const isStrain = view.item.loading_type === 'strain';
+  if (view.shapeMatrix) {
+    const outline = createCubeWireBox(1, new THREE.LineBasicMaterial({color: '#7c3aed'}), 5);
+    const positions = outline.geometry.attributes.position;
+    for (let index = 0; index < positions.count; index += 1) {
+      const point = [positions.getX(index), positions.getY(index), positions.getZ(index)];
+      const moved = point.map((value, row) => value + view.shapeMatrix[row]
+        .reduce((sum, amount, column) => sum + amount * point[column], 0));
+      positions.setXYZ(index, ...moved);
+    }
+    positions.needsUpdate = true;
+    outline.geometry.computeBoundingSphere();
+    group.add(outline);
+    return;
+  }
+
+  const componentMaterials = new Map();
+  for (const arrow of tensorArrows(view.load?.magnitude, view.filter, view.selected)) {
+    if (!componentMaterials.has(arrow.component)) {
+      componentMaterials.set(arrow.component, new THREE.MeshBasicMaterial({
+        color: TENSOR_COLORS[arrow.direction], transparent: true, opacity: 1,
+      }));
+    }
+    const material = componentMaterials.get(arrow.component);
+    const direction = AXIS_DIRECTIONS[arrow.direction.toUpperCase()].clone().multiplyScalar(arrow.sign);
+    const normal = AXIS_DIRECTIONS[arrow.normal.toUpperCase()].clone().multiplyScalar(arrow.faceSign);
+    const origin = normal.clone().multiplyScalar(0.57);
+    const shear = arrow.direction !== arrow.normal;
+    if (shear) {
+      const other = ['x', 'y', 'z'].find(axis => axis !== arrow.direction && axis !== arrow.normal);
+      origin[other] = arrow.direction < other ? -0.18 : 0.18;
+      origin[arrow.direction] = -arrow.sign * 0.16;
+    } else if (arrow.value < 0) {
+      origin.add(normal.clone().multiplyScalar(0.32));
+    }
+    const end = origin.clone().add(direction.clone().multiplyScalar(0.32));
+    const shaftEnd = end.clone().sub(direction.clone().multiplyScalar(0.075));
+    const tooltip = `${isStrain ? 'Strain guide' : 'Stress component'} ${arrow.component}: ${arrow.value}${view.unit ? ` ${view.unit}` : ''}\n${arrow.faceSign > 0 ? '+' : '-'}${arrow.normal.toUpperCase()} face · ${arrow.sign > 0 ? '+' : '-'}${arrow.direction.toUpperCase()} direction`;
+    const shaft = makeCylinderBetween(origin, shaftEnd, 0.009, material, 12);
+    const head = makeConeAt(end, direction, 0.027, 0.075, material);
+    for (const mesh of [shaft, head]) {
+      if (!mesh) continue;
+      mesh.userData.component = arrow.component;
+      addMesh(group, mesh, tooltip, selectableMeshes);
+    }
+    const faceMaterial = new THREE.MeshBasicMaterial({
+      color: TENSOR_COLORS[arrow.direction], transparent: true, opacity: 0.045,
+      side: THREE.DoubleSide, depthWrite: false,
+    });
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), faceMaterial);
+    face.position.copy(normal.clone().multiplyScalar(0.505 + 'xyz'.indexOf(arrow.direction) * 0.002));
+    face.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+    face.userData.component = arrow.component;
+    face.userData.tensorFace = true;
+    // Faces provide a highlight; arrow hit targets choose individual components.
+    group.add(face);
+  }
+}
+
+function highlightTensor(group, component) {
+  group.traverse(mesh => {
+    if (!mesh.userData.component) return;
+    const active = !component || mesh.userData.component === component;
+    mesh.material.opacity = mesh.userData.tensorFace
+      ? (component && active ? 0.26 : 0.045)
+      : (active ? 1 : 0.18);
   });
 }
 
@@ -645,11 +733,16 @@ function frameScene(camera, controls, root, container, cameraDirection) {
   bounds.getCenter(center);
   bounds.getBoundingSphere(sphere);
 
+  if (root.userData.tensorView) {
+    center.set(0, 0, 0);
+    sphere.radius = root.userData.tensorRadius;
+  }
+
   const verticalFov = THREE.MathUtils.degToRad(camera.fov);
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
   const verticalDistance = sphere.radius / Math.tan(verticalFov / 2);
   const horizontalDistance = sphere.radius / Math.tan(horizontalFov / 2);
-  const padding = container.clientWidth < 460 ? 1.42 : 1.16;
+  const padding = root.userData.tensorView ? 1.06 : container.clientWidth < 460 ? 1.42 : 1.16;
   const distance = Math.max(verticalDistance, horizontalDistance) * padding;
 
   controls.target.copy(center);
@@ -708,6 +801,9 @@ function createScene(container) {
     const projectionHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
 
     root.children.forEach(child => {
+      if (child.userData.faceNormal) {
+        child.visible = child.userData.faceNormal.dot(camera.position.clone().sub(child.position)) > 0;
+      }
       if (!child.userData.textPixelHeight) return;
       const texture = child.material.map.image;
       const height = child.userData.textPixelHeight * (texture.height / child.userData.fontSize)
@@ -764,11 +860,78 @@ function renderMechanicalBcViewer() {
   const materials = createMaterials();
   const selectableMeshes = [];
   const tooltip = createTooltip(container);
+  const tensorItems = items.filter(item => item.is_tensor_load);
+  const scalarItems = items.filter(item => !item.is_tensor_load && item.is_defined !== false);
+  const tensorGroup = new THREE.Group();
+  let tensorPanel = null;
+  let highlighted = '';
 
   drawBaseCube(state.root, materials);
-  addVertexLabels(state.root);
-  drawBoundaryConditions(items, state.root, materials, selectableMeshes);
-  setupTooltip(container, state.camera, selectableMeshes, tooltip);
+  if (!tensorItems.length) {
+    addVertexLabels(state.root);
+  } else if (scalarItems.length) {
+    const namedVertices = new Set(scalarItems.flatMap(item => item.vertices || [])
+      .map(vertex => String(vertex).toUpperCase()));
+    addVertexLabels(state.root, VERTICES.filter(vertex => namedVertices.has(vertex)));
+  }
+  drawBoundaryConditions(items.filter(item => !item.is_tensor_load), state.root, materials, selectableMeshes);
+  const staticMeshCount = selectableMeshes.length;
+  function highlight(component) {
+    if (highlighted === component) return;
+    highlighted = component;
+    highlightTensor(tensorGroup, component);
+    tensorPanel?.highlight(component);
+    state.renderSceneOnce();
+  }
+  if (tensorItems.length) {
+    state.root.userData.tensorView = true;
+    state.root.userData.tensorRadius = scalarItems.length ? 1.2 : 1.02;
+    state.root.add(tensorGroup);
+    for (const axis of ['x', 'y', 'z']) {
+      for (const sign of [-1, 1]) {
+        const label = createTextSprite(`${sign > 0 ? '+' : '-'}${axis.toUpperCase()}`, TENSOR_COLORS[axis], 42, 0.13);
+        label.material.sizeAttenuation = false;
+        label.userData.textPixelHeight = 12;
+        label.userData.faceNormal = AXIS_DIRECTIONS[axis.toUpperCase()].clone().multiplyScalar(sign);
+        label.position[axis] = sign * 0.62;
+        for (const other of ['x', 'y', 'z'].filter(other => other !== axis)) {
+          label.position[other] = 0.32;
+        }
+        state.root.add(label);
+      }
+    }
+    const badge = document.createElement('div');
+    badge.className = 'bc-tensor-badge';
+    container.parentElement.appendChild(badge);
+    const legend = container.closest('.bc-layout').querySelector('.bc-legend');
+    const scalarLegend = scalarItems.length ? Array.from(legend.children).slice(0, 2) : [];
+    legend.replaceChildren(...scalarLegend);
+    for (const axis of ['x', 'y', 'z']) {
+      const label = document.createElement('span');
+      label.className = 'bc-legend-item';
+      label.style.color = TENSOR_COLORS[axis];
+      label.textContent = `${axis.toUpperCase()} direction`;
+      legend.appendChild(label);
+    }
+    const caption = document.createElement('div');
+    caption.className = 'bc-tensor-caption';
+    legend.after(caption);
+    const unitsElement = document.getElementById('plot-units-data');
+    const units = unitsElement ? JSON.parse(unitsElement.textContent) : {};
+    tensorPanel = createTensorPanel(document.querySelector('[data-bc-tensor-panel]'), items, units, view => {
+      highlighted = '';
+      disposeTensorGroup(tensorGroup);
+      selectableMeshes.splice(staticMeshCount);
+      tooltip.style.opacity = '0';
+      drawTensorLoading(view, tensorGroup, selectableMeshes);
+      badge.textContent = `Whole RVE · ${view.shapeMatrix ? 'shape illustration' : view.item.loading_type === 'strain' ? 'strain guides' : 'stress schematic'}`;
+      caption.textContent = view.shapeMatrix
+        ? 'Normalized small-strain illustration · not a simulated shape'
+        : 'Direction schematic · arrows not to scale';
+      state.renderSceneOnce();
+    }, highlight);
+  }
+  setupTooltip(container, state.camera, selectableMeshes, tooltip, highlight);
   state.resetCameraView();
 
   const resetButton = container.parentElement

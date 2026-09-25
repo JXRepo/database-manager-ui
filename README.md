@@ -406,10 +406,35 @@ unspecified; stored JSON and CSV exports retain their existing values and format
 Variable selectors, tooltips, and raw-value summaries use matching mathematical
 italic glyphs for these two symbols; field keys and plotted values are unchanged.
 
-Mechanical boundary conditions include the supplied load `step`. Whole cube
-stress or strain tensors show every applied load and its components together,
-without treating the tensor as an X, Y, or Z scalar load or drawing a guessed
-directional arrow. Scalar force and displacement loads retain their axis display.
+Mechanical boundary conditions include the supplied load `step`. Whole RVE
+stress and strain tensors have a component matrix linked to the cube. Choose a
+boundary condition and load entry, or move the slider through entries in their
+supplied order. This selects recorded entries, without interpolating a loading
+history from frequency or duration. Select a component to isolate it; hover over
+a value or arrow to highlight its counterpart. Normal and shear filters help
+separate pull/push directions from sideways loading. All supplied load details
+remain available in the table, including without JavaScript.
+
+The direction schematic explicitly uses `ij` for direction `i` on faces normal
+to `j`, with outward arrows for positive normal values. It shows supplied
+components independently, including unequal `xy` and `yx`, and does not claim
+to reconstruct the actual tractions on the simulation boundary. Arrow lengths
+are fixed; the matrix and exact values in tooltips carry the magnitudes.
+Zero values produce no arrows; missing and invalid components are identified
+without being replaced by zero or mirrored. Stress and strain units come from
+the uploaded units metadata; dimensionless strain `1` appears as `(-)`.
+
+Strain directions are labeled as guides, not forces. An optional shape
+illustration assumes symmetric small strain with tensor shear and no rigid
+rotation. Only in this explicitly selected preview, omitted reciprocal terms
+are mirrored from the six required components. Conflicting reciprocal values
+or incomplete components disable the shape preview. Deformation is normalized
+for readability, not a calculated or to-scale simulation result; stored values
+and exports are unchanged. These distinctions follow the difference between
+[stress components](https://www.comsol.com/multiphysics/stress-and-equations-of-motion)
+and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
+
+Scalar point, edge and face force/displacement loads retain their axis display.
 The table labels the combined column `Loading Type / Mode`. X/Y/Z labels stay on
 one line in evenly spaced columns. Load details expand independently below their
 own labels, so multiple panels can stay open together. The row grows to fit the

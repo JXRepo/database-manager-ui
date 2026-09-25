@@ -708,6 +708,50 @@ details[open] > .detail-group-summary {
       gap: 8px;
     }
 
+    .bc-tensor-panel {
+      border: 1px solid #dbe4f0;
+      border-radius: 12px;
+      background: #f8fafc;
+      padding: 14px;
+      margin-bottom: 14px;
+      min-width: 0;
+    }
+
+    .bc-tensor-panel h6 { margin: 0 0 12px; font-weight: 700; overflow-wrap: anywhere; }
+    .bc-tensor-panel[hidden], .bc-tensor-shape[hidden] { display: none; }
+    [data-bc-show-tensor][hidden] { display: none; }
+    .bc-layout:has(.bc-tensor-panel:not([hidden])) { grid-template-columns: minmax(340px, 1fr) minmax(400px, 1.2fr); }
+    .bc-layout:has(.bc-tensor-panel:not([hidden])) .bc-cube-wrap { width: 100%; }
+    .bc-layout:has(.bc-tensor-panel:not([hidden])) .bc-table th:first-child { width: 20%; white-space: nowrap; }
+    .bc-layout:has(.bc-tensor-panel:not([hidden])) .bc-table th:nth-child(2) { width: 54%; }
+    .bc-tensor-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .bc-tensor-panel label { font-size: 0.8rem; font-weight: 600; }
+    .bc-tensor-panel select { width: 100%; min-width: 0; font-size: 0.82rem; }
+    .bc-tensor-progress { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+    .bc-tensor-progress input { flex: 1; min-width: 0; accent-color: #2563eb; }
+    .bc-tensor-progress output { font-size: 0.78rem; white-space: nowrap; }
+    .bc-tensor-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+    .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
+    .bc-tensor-matrix { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .bc-tensor-cell {
+      display: flex; align-items: center; justify-content: space-between; gap: 6px;
+      min-width: 0; padding: 9px 10px; background: #fff; border: 1px solid #dbe4f0;
+      border-left: 3px solid var(--component-color); border-radius: 6px; color: #334155;
+    }
+    .bc-tensor-cell span { color: var(--component-color); font-weight: 600; }
+    .bc-tensor-cell strong { font-size: 0.85rem; overflow-wrap: anywhere; min-width: 0; }
+    .bc-tensor-cell:disabled { color: #64748b; border-left-color: #cbd5e1; background: #f1f5f9; }
+    .bc-tensor-cell:disabled strong { font-size: 0.7rem; font-weight: 400; }
+    .bc-tensor-cell[aria-pressed="true"], .bc-tensor-cell.is-hovered { outline: 2px solid var(--component-color); outline-offset: -2px; background: #edf4ff; }
+    .bc-tensor-cell.is-filtered { opacity: 0.5; }
+    .bc-tensor-cell:focus-visible { outline: 3px solid #2563eb; outline-offset: 2px; }
+    .bc-tensor-caption, .bc-tensor-help { font-size: 0.77rem; color: #536176; margin-top: 8px; overflow-wrap: anywhere; }
+    .bc-tensor-help p { margin: 6px 0; }
+    .bc-tensor-status { font-size: 0.82rem; margin: 10px 0 6px; overflow-wrap: anywhere; }
+    .bc-tensor-shape { display: block; margin-top: 10px; }
+    .bc-tensor-shape input { margin-right: 5px; }
+    .bc-tensor-badge { position: absolute; top: 14px; left: 14px; z-index: 2; color: #5b21b6; font-size: 0.78rem; font-weight: 700; pointer-events: none; }
+
     .bc-axis-list .bc-status,
     .bc-load-detail {
       margin: 0;
@@ -1416,6 +1460,35 @@ details[open] > .detail-group-summary {
             </div>
 
             <div class="bc-table-wrap">
+              <section class="bc-tensor-panel" data-bc-tensor-panel hidden aria-label="Whole RVE loading">
+                <h6 data-tensor-heading>Whole RVE</h6>
+                <div class="bc-tensor-selects">
+                  <label>Boundary condition<select class="form-select" data-tensor-condition></select></label>
+                  <label>Load entry<select class="form-select" data-tensor-load></select></label>
+                </div>
+                <div class="bc-tensor-progress">
+                  <input type="range" min="0" max="0" value="0" step="1" data-tensor-slider aria-label="Load entry">
+                  <output data-tensor-position></output>
+                </div>
+                <div class="bc-tensor-caption" data-tensor-metadata></div>
+                <div class="bc-tensor-filters" role="group" aria-label="Components to show">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="true">All</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="normal" aria-pressed="false">Normal · pull / push</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="shear" aria-pressed="false">Shear · sideways</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-clear>Clear selection</button>
+                </div>
+                <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components"></div>
+                <div class="bc-tensor-caption">Rows: direction · columns: face normal. Select a value to isolate it; hover to highlight.</div>
+                <div class="bc-tensor-status" data-tensor-status role="status"></div>
+                <label class="bc-tensor-shape" data-tensor-shape-label hidden>
+                  <input type="checkbox" data-tensor-shape>Small-strain shape illustration (assumes symmetry)
+                </label>
+                <div class="bc-tensor-caption" data-tensor-preview-note></div>
+                <details class="bc-tensor-help">
+                  <summary>How to read this schematic</summary>
+                  <p data-tensor-note></p>
+                </details>
+              </section>
               <table class="bc-table">
                 <thead>
                   <tr>
@@ -1440,6 +1513,7 @@ details[open] > .detail-group-summary {
                               <summary>
                                 <span class="bc-status bc-status-loaded">Tensor load {{ forloop.counter }}</span>
                               </summary>
+                              <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bc-show-tensor="{{ forloop.parentloop.counter0 }}" data-bc-load-index="{{ forloop.counter0 }}" hidden>View in cube</button>
                               <ul class="bc-load-list">
                                 {% for detail in load.details %}
                                   <li>

@@ -101,6 +101,9 @@ Current priority:
 - Preserve field names, values, array item order, and complete JSON downloads; only display supplied fields, without adding missing-field placeholders or introducing deeper upload validation
 - Use current MiMeDat equivalent_stress, equivalent_strain, and equivalent_plastic_strain fields for plots; supplied arrays take precedence and only absent fields may use the existing calculated equivalents
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
+- Whole RVE tensor schematics use the explicitly labeled ij direction/face-normal convention, fixed-length component arrows, and linked numeric matrices; preserve distinct xy/yx values and never infer missing components in the direction view
+- Strain shape illustration is opt-in, normalized, and explicitly assumes symmetric small strain with tensor shear; reject incomplete or conflicting reciprocal data for that preview, and never present it as a simulated shape or change stored/exported values
+- Tensor load navigation follows the supplied entry order and exact step values; do not invent intermediate steps, combine separate tensor conditions, or simulate time histories from frequency/duration metadata
 - Show boundary load numbers with two decimal places and half-up rounding, retaining full integer step values and original stored/exported numbers; label the combined column Loading Type / Mode
 - Keep X/Y/Z boundary labels on one line in evenly spaced columns; allow independent load panels to stay open together below their own labels, growing the row without shifting sibling labels or overlapping other rows
 - Search result pages should not include delete actions unless explicitly requested
