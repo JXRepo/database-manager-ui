@@ -1,8 +1,8 @@
 ---
-status: completed
+status: ready_for_continuation
 branch: main
-timestamp: 2026-09-24T17:44:24+02:00
-code_commit: 0b2adcf4006ccd14aa929b1e571b5d0f98d47485
+timestamp: 2026-09-25T17:44:25+02:00
+code_commit: 4afb994bc427e4ee381a0dc7c6be99a627da23bb
 files_modified:
   - HANDOFF.md
 ---
@@ -11,18 +11,20 @@ files_modified:
 
 ## 当前状态
 
-最新功能提交是 `0b2adcf`：应力、应变 CSV 下载，多个对象各一份 CSV 打包为 ZIP。
-9 月 23—24 日还完成了详情页字段排序／折叠、Ronak 最新字段适配、边界条件表格布局、
-cube 标签间距和字号、曲线符号斜体、坐标数字放大。更早的上传和 ORCID 功能继续保留。
+最新功能提交是 `4afb994`：首页登录后的头像菜单，可查看账户、进入平台、直接退出并留在首页。
+9 月 25 日还完成了图表标题／坐标单位调整、整块 RVE 张量载荷展示、详情页排版和横排数值、
+首页登录状态与助手显示范围。9 月 24 日的 CSV／ZIP 导出和更早上传、ORCID 功能继续保留。
 写本交接前，工作区干净，已用 `git ls-remote origin refs/heads/main` 确认
-GitHub 的 `main` 也是 `0b2adcf4006ccd14aa929b1e571b5d0f98d47485`。
+GitHub 的 `main` 也是 `4afb994bc427e4ee381a0dc7c6be99a627da23bb`。
 本交接会另行提交并推送，所以拉取后 HEAD 应是包含本文件更新的文档提交。
 
-用户准备回家在笔记本继续，**先读本交接，再等用户接着提供 Ronak 的反馈，逐项推进**。
-本次只更新交接文档，不改应用功能。当前已授权的改动均已完成，没有待合并的代理改动。
-Ronak 的“100 个对象的 JSON 上传两次都没有结果”仍未定位：用户明确要求先略过，
-待向 Ronak 要到原始 JSON 后再查，不能将这次进度和后台处理改动说成已修复该问题。
-CSV 已由用户明确说“做吧，csv不是excel”授权并完成；科学计算公式未修改。
+用户准备回家在笔记本继续。**当前接续主题是上传校验与 Ronak Schema 的统一，见下方 9 月 25 日排查。**
+Ronak 的原始 `Data_Base_Cyclic.json` 现已拿到并在隔离环境测试：当前平台会拒绝，具体原因已找到；
+但她当时为什么看不到错误、是否有线上请求中断，仍不能从 Waiting 截图证明。
+用户目前只让排查、讨论并写交接，**尚未授权新增完整 Schema 校验、兼容旧字段、放宽空值或修改原始文件**。
+最近关于“详情页是否已经整理过必填字段”的回答已核实：展示清单和顶层必填检查已有，嵌套校验没有。
+不要继续说“还没拿到样例”，也不要把“本地拒绝原因查清”说成“上传问题修好了”。
+本次只更新交接文档，不改应用功能；没有待合并的代理改动。
 
 此前已确认的上传 UI 要求：**限制名称、冒号、数值；每项一行，桌面两列；不要在下面恢复大段解释。**
 保持界面英文，中文简短沟通。用户不喜欢为了常规小修改反复确认。
@@ -43,7 +45,7 @@ CSV 已由用户明确说“做吧，csv不是excel”授权并完成；科学�
    Current Scope、Data Object Details、My Data、Search、Local Setup、Verification。
 3. 不要假定新聊天或另一台电脑保留了聊天记录、路径、登录状态或凭据。
    若有 PyCharm 环境工具，每次运行 Python 前用它确认项目解释器。
-   9 月 24 日工作目录为 `/home/users/xuejungs/Projects/database-manager-ui`，
+   9 月 25 日工作目录为 `/home/users/xuejungs/Projects/database-manager-ui`，
    实际测试解释器是本项目 `.venv/bin/python`，Python 3.10.12；Render 配置为 Python 3.12.13。
    这些只是当前环境记录，换电脑应重新确认，不能直接照搬路径。
 4. 本地开发使用 `DEBUG=True` 和 SQLite。已有 `.env` 不覆盖；若缺少配置，
@@ -56,8 +58,9 @@ CSV 已由用户明确说“做吧，csv不是excel”授权并完成；科学�
    由它启动上传处理进程，不要只启动 `runserver` 就判断后台功能失效。
 5. `.env`、本地数据库、虚拟环境、上传数据和临时测试报告没有通过 Git 同步。
    学校电脑、这台电脑和线上站点的账户、数据各自独立。
-   用户反复提供的 `example_json_files/a46fde6c.json` 及 `a46fde6c1_public.json`
+   用户提供的 `example_json_files/Data_Base_Cyclic.json`、`a46fde6c.json` 及 `a46fde6c1_public.json`
    属于被 Git 忽略的本地样例；笔记本没有时需另行复制，不能认为拉取仓库就会出现。
+   当前最重要的是 `Data_Base_Cyclic.json`，请用户带上这份附件或另行复制；不要为同步而提交私人样例。
    原样例路径不可读而跳过，表示那次测试没有读取成功，不代表样例已验证。
 6. 用户偏好中文简短直接沟通，UI、代码注释和 docstring 保持英文。
    明确的小修改直接完成、验证、检查 diff，然后 `git add .`、commit、push；
@@ -69,6 +72,14 @@ CSV 已由用户明确说“做吧，csv不是excel”授权并完成；科学�
 
 | 提交 | 内容 |
 | --- | --- |
+| `4afb994` | 首页页头／页脚头像菜单：Account details、Enter platform、Log out；POST 退出回首页 |
+| `b947e46` | 助手只出现在登录后的平台内部；首页、登录和注册页不显示 |
+| `18d573b` / `2d9e33e` | 首页登录后显示头像；未登录页头及页脚显示 Register / Login，页脚入口居中 |
+| `18eeff7` / `5fecdec` | 首页专注平台介绍，主按钮 Get started；保留最终登录状态规则，勿恢复中间方案 |
+| `cf906d0` / `27cdf41` | 登录后也能回首页；侧栏 logo 可回首页，不增加 Home 菜单 |
+| `0467007` / `41865f1` | 详情页字段宽度和嵌套间距；展开的数值数组横排并自然换行 |
+| `75b43c5` | 整块 RVE 的 stress/strain 张量载荷，按分量／步骤展示，不猜方向箭头 |
+| `10d2dc6` / `960cb80` | 图表及 PNG 去标题；放大坐标标题，从 units 取单位，无量纲应变显示 (-) |
 | `0b2adcf` | 详情页当前 X/Y、全部、自选列 CSV；列表多对象 ZIP；权限及精度测试 |
 | `c9bcf01` | 曲线坐标数字 15px、科学计数指数 11px，匹配测量和留白 |
 | `67809ac` / `3a598a1` | 下拉菜单、提示、图例、坐标标题和 PNG 的 σ／ε 斜体；下标直立 |
@@ -100,6 +111,140 @@ CSV 已由用户明确说“做吧，csv不是excel”授权并完成；科学�
 
 旧提交 `550ed5f` 的“遇到错误文件就停止后续文件”已经被取代，不能恢复为最终需求。
 旧提交 `2803c41` 的“只按 mandatory 排序、其余放 Additional”也已被后续需求取代。
+
+## 9 月 25 日当前接续：实际文件与 Schema 校验
+
+### 用户最近的问题和已解释的区别
+
+用户先问失败原因，随后问应该自动识别旧格式还是提示用户按模板调整、平台是否用 JSON validator、
+外部 validator 检查什么，最后问之前详情页是不是已整理了所有必填字段和子字段。
+用户明确提供的参考是 MiMeDat `main` 中的这两个文件：
+
+- [metadata_template.py](https://github.com/Ronakshoghi/MiMeDat/blob/main/metadata_template.py)
+- [microstructure_sensitive_mechanical_metadata_schema.json](https://github.com/Ronakshoghi/MiMeDat/blob/main/microstructure_sensitive_mechanical_metadata_schema.json)
+
+已向用户说明：文件能解析、满足 Schema、满足平台权限和重复检查、科学数据正确，是不同的事。
+当前上传使用自写的顶层字段校验，并未调用完整 JSON Schema validator，也没有向外部校验网站发送文件。
+完整校验可以在服务器内部完成，无须用户手工去外部网站，也无须上传私人数据给外部网站。
+本机项目环境检查发现没有 `jsonschema` 包，`requirements.txt` 也未添加它；本轮未安装或接入。
+
+建议过的方向是：明确能拆分的打包形式可支持；字段和实值按统一规则检查，对旧写法给修改建议，
+不要静默改字段、猜单位或编造数据。**这只是建议，用户尚未确认实施范围。**
+用户说“现在不知道该做什么”，后续交流应白话、直接、少给分叉选项，先沿用已有整理核对规则。
+
+### 原文件的可重复结论
+
+原文件目前在本机两个位置，SHA-256 相同：
+
+- `/home/users/xuejungs/Projects/database-manager-ui/example_json_files/Data_Base_Cyclic.json`
+- `/home/users/xuejungs/Desktop/Data_Base_Cyclic.json`
+- SHA-256：`383720d09b0732e81cc352f9464c6d5310e40a0d3cd50b27bbddc4ec5dc86604`
+
+文件共 7,931,670 字节（7.56 MiB），JSON 语法可解析，100 条对象全放在一个顶层字典中，
+形如 `{ "编号": {对象}, ... }`；每个外层编号与其内部 identifier 一致。
+文件没有换行，约 793 万字符在一行；编辑器可能卡顿，本机也未查到 JSON 默认打开程序。
+这解释了双击不便的可能因素，不能说文件因为 100 条就过大或损坏。
+
+当前 `_inspect_upload_file` 只拆列表或 `{"data": [...]}`，普通字典视为单条对象。
+因此原文件会被当成 1 条，报告缺少全部 24 个顶层必填字段，保存 0 条。
+即使在临时测试中只拆成 100 条、不改内部内容，全部对象仍有以下平台校验问题：
+
+| 问题 | 原文件情况 |
+| --- | --- |
+| 7 个顶层必填字段未按当前名称／位置提供 | `date`、`system`、`processor_specifications`、`input_path`、`results_path`、`phase`、`units` |
+| 旧字段写法 | `Date`、`processor_specification`、`input-path`、`results-path`、`Material` |
+| system 的位置 | 在 `origin.system` 中有 Linux，顶层没有；不能未经确认把来源机器等同于当前计算机器 |
+| 单位的位置 | 在 `Material.constituitve_model.units` 中有 Stress/Stiffness MPa，顶层 units 没有；不是完全没单位，但不能据此补齐所有单位 |
+| 空值 | 100 条的 `total_strain` 全是 `{}`；有 `plastic_strain`，不能拿它冒充总应变 |
+| 共享结构 | 100 条都是 `shared_with: ["all"]`，当前平台和所查 Schema 要求列表项为对象 |
+
+当前规则下，整文件原子失败是预期；这些结论不是完整 Schema 校验的全部错误清单。
+源文件的某些载荷值还是字符串／数组，Schema 对应字段要求数字，完整校验会进一步发现此类差异。
+本轮没有转换、补齐或修改这份原文件，也没有把它上传到线上或外部校验网站。
+
+### 9 月 25 日实际验证证据
+
+在 DEBUG=True、隔离 SQLite 测试库和临时上传目录中验证，未使用生产数据库：
+
+- 原文件普通表单与 NDJSON 上传均返回明确失败，保存 0 条，单次约 0.32 秒。
+- 后台任务路径原文件计数为 1，拆包临时版本计数为 100；均返回文件失败及错误报告，约 0.35 秒。
+  任务 `completed` 只表示处理结束，不等于其文件 `uploaded`。
+- 逐条检查确认上述 7 个缺字段、空应变和共享格式错误均涉及全部 100 条。
+- 现有合成数据的 100 对象后台成功保存测试也通过；不能据此声称原文件可以成功上传。
+- 以上 4 个临时诊断测试及 1 个现有控制测试共 5 项通过。
+- 另用真实 Chromium 连接 Django 临时 LiveServer 上传原文件，1 项通过：
+  Waiting / Upload → Uploading… → Failed，页面显示保存 0 条及缺字段报告，无 JS 异常。
+  在 1440×1000 下结果提示位于页面偏下；提示不够醒目，但不能据此证明她旧截图的具体故障。
+- 她的旧截图只有 Waiting，不能证明请求已发出或服务器已收到；当时“没有任何错误”的线上原因仍未确认。
+  不要让用户再次寻找此前已无法翻出的旧日志，也不要直接断言 Render 超时或文件太大。
+
+临时测试、报告和截图在 `/tmp/ronak-upload-diagnosis/`，不会随 Git 同步。
+其中 `ronak_upload_diagnosis.py`、`ronak_upload_browser.py` 是临时测试，不是项目测试模块。
+新电脑可按上述步骤重建诊断，不要直接执行依赖本机 `/tmp` 或 cookie 的路径。
+
+### Schema 与模板本身的差异：需要明确，不应擅自决定
+
+9 月 25 日读取 MiMeDat main 原文，Schema 标注 version 1.2.0；仅下载、解析源码，未执行远程 Python。
+发现：
+
+1. `Dict_Test` 使用 `CPU_specifications`，但同脚本 `mandatory_fields` 和 Schema `required`
+   使用 `processor_specifications`。模板中的这处名称没有统一。
+2. Schema 根级要求存在 `total_strain`，但该对象内部 `required: []`、没有 `minProperties`，
+   所以 `{}` 符合这部分机器规则；文字 description 又称必须含等效应变。`stress` 也有相似矛盾。
+   当前平台拒绝空的必填容器，比这部分 Schema 机器规则更严格。
+   **已向用户纠正：空应变会被当前平台拒绝，不代表一定过不了她的 Schema。**
+3. Schema 的顶层 units 要求 Stress、Strain、Length、Force、Angle、Temperature 六项；
+   default 是文档默认值，不是有权自动补全用户物理单位的依据。
+4. Schema 共享支持 c/u/g/all 与 access_list；当前平台是 all/c 加 username，未实现组共享。
+   接入完整校验时需要单独核对平台权限语义，不能为了“符合 Schema”把私有数据自动变成公开。
+5. 模板清理函数会删除空容器；模板是填写辅助，并不能保证填写／清理后的内容通过 Schema。
+
+本轮只做源码对照，没有实际运行完整 JSON Schema validator。原始下载在
+`/tmp/mimedat-schema-review/`，未加入仓库。继续时若需完整校验，应固定可信 Schema 版本并处理其引用，
+不要自动请求用户 JSON 内任意 `$schema` URL；展示排序清单中的版本是已固定的旧快照。
+
+### 用户最后问：之前详情页是不是已经统计好了
+
+已检查当前代码、Git 历史和交接：
+
+- `apps/pages/detail_metadata.py` 的 `DETAIL_FIELD_ORDERS` 整理了顶层／子字段和展示顺序，
+  包含必填及可选字段，**不是嵌套必填规则表**。文件注释明确仅用于展示、不校验数据。
+- `apps/dyn_api/helpers.py` 的 `REQUIRED_TOP_LEVEL_FIELDS` 是 24 个顶层必填字段，已用于上传；
+  identifier 可由平台生成。它与当前 Schema 根级 required 去掉 identifier 后的字段一致。
+- 历史 `2803c41` 曾按 mandatory_fields 排序；最终已改为 Schema properties 顺序，
+  不应恢复“必填都在前／其他放 Additional”，也不能把展示表所有子字段都判为必填。
+- 未找到已接入上传的“所有层级必填及条件规则表”。必填子项常只在其父对象存在时才适用。
+- 已回复用户：**不用从零整理字段；已有展示与顶层检查，缺的是完整子字段和条件规则的上传校验。**
+
+接下来先接住用户的进一步决定。若授权实施，建议先定上述矛盾的处理、采用的 Schema 版本和共享范围，
+再加入按对象的 Schema 校验、准确报错、需要的明确拆包支持及实文件测试。
+不要把“用户让看两个参考文件／让写交接”当成已授权更改所有上传规则。
+
+## 9 月 25 日界面改动的最终状态
+
+- 首页对登录和未登录用户都可访问，回首页保留登录；侧栏 logo 回首页，无额外 Home 菜单。
+- 未登录时：首页页头及页脚明确显示 Register、Login 两个按钮。
+- 登录时：这两处改成单个头像，点击展开用户名及 Account details、Enter platform、Log out。
+  菜单支持点外面关闭、Esc 关闭并回焦点、键盘进入；页脚向上展开。
+- 首页退出用带 CSRF 的 POST，回首页并显示 Register/Login。`home_logout` 对应 `/logout/`；
+  避开 admin_datta 同名 logout 的反向解析冲突，现有平台内部退出链接未在本轮改造。
+- 页脚账户入口居于品牌介绍和右侧 PLATFORM 栏之间。首页中部 Get started：游客去注册，登录用户去搜索。
+  不恢复独立 Enter platform 顶部按钮，不在介绍首页增加上传等业务操作。
+- 助手只在已登录的平台内部显示，首页（无论是否登录）、登录和注册页均不显示。
+- 详情页字段宽度／嵌套间距已改善；数值数组展开后横排并自然换行。
+- 曲线无图标题（PNG 也无）；轴标题放大，从 units 取单位，Strain 的 1 显示为 (-)。
+- 整块 RVE tensor loads 按步骤和分量展示，保留传统节点载荷；不把张量猜成方向箭头。
+
+首页菜单关键文件：`templates/includes/landing_account_actions.html`、`templates/pages/index.html`、
+`static/assets/js/landing-account-menu.js`、`apps/pages/urls.py`、`apps/pages/tests.py`。
+助手关键文件：`templates/includes/footer.html`、`scripts.html`、`layouts/base-public.html`、
+`apps/pages/test_assistant_widget.py`。
+
+最近菜单改动验证：8 项 Django 测试（含临时页面生成）、113 项现有 Node 测试全部通过且无跳过；
+另有真实 Chromium 在 1280/1440/1920 下 82 项检查，包含页头／页脚、游客状态、长用户名、键盘关闭和无助手。
+退出测试验证 CSRF、GET 405、会话清除、返回首页及退出后数据页要求登录。
+临时界面测试位于 `/tmp/assistant-global-qa-DHmXrj/`，不在仓库；不要把历史检查说成当前新修改的验证。
+本次交接只做文档与 Git 检查，不重跑应用测试。线上部署完成状态未核实。
 
 ## 9 月 24 日详情页最终约定
 
@@ -208,10 +353,10 @@ Ronak 原意是既能选择应力／应变导出，也能一键导出所有可�
 
 1. **进度不明确：已改。** 原来 100 个对象只显示第 1/1 个文件；现在分别显示实际传输字节、
    解析／对象校验进度和最终保存结果。只有文件事务提交后才显示已保存，不能把已校验当成已保存。
-2. **上传两次没有结果：原因未确认，用户已暂缓。** 等 Ronak 的原始 JSON；截图文件名为
-   `Data_Base_Cyclic.json`。截图中的 Waiting 只说明文件已选中，不能证明请求已经发出。
-   本地合成的 100 个小对象能够保存，重复提交会报错，但不代表她的实际文件也正常。
-   100 个对象低于每次合计 1,000 的限制；JSON 深度指 dict／list 的嵌套层数，不是对象数量。
+2. **9 月 25 日已拿到原文件并查清当前平台拒绝原因，尚未修改上传逻辑。**
+   `Data_Base_Cyclic.json` 的编号字典未被拆分，内部还有旧字段、缺字段、空值和共享格式问题，详见上方新排查。
+   当时“没看到错误”的线上原因仍未确认；Waiting 截图不能证明请求已发出。
+   100 个对象低于每次合计 1,000 的限制；JSON 深度是嵌套层数，不是对象数量。
 3. **切换页面丢失上传：已实现站内继续处理和状态恢复。** 传输阶段保留发送页面，
    服务端收齐后由独立进程处理。刷新、关标签页、离站、服务重启有不同边界，见下一节。
 
