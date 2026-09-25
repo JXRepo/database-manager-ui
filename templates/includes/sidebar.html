@@ -4,7 +4,7 @@
   <div class="navbar-wrapper">
     <div class="m-header">
 
-        <a href="{% url 'search' %}" class="b-brand text-primary">
+        <a href="{% url 'index' %}" class="b-brand text-primary" aria-label="Home">
           <img src="{% static 'assets/images/logo-white.svg' %}" class="img-fluid" alt="logo">
         </a>
 
@@ -28,6 +28,15 @@
 
         <li class="pc-item pc-caption">
           <label>Apps</label>
+        </li>
+
+        <li class="pc-item">
+          <a href="{% url 'index' %}" class="pc-link" aria-label="Home">
+            <span class="pc-micon">
+              <i data-feather="home"></i>
+            </span>
+            <span class="pc-mtext">Home</span>
+          </a>
         </li>
 
         <li class="pc-item">

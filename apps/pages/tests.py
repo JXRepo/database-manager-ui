@@ -1689,6 +1689,35 @@ class JSONDataSharingTests(TestCase):
         self.assertContains(response, "Django UI")
         self.assertContains(response, "JSON validation")
 
+    def test_signed_in_user_can_return_home_without_losing_session(self):
+        """
+        Show the landing page with workspace links while keeping the user signed in
+        """
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse("index"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "pages/index.html")
+        self.assertContains(response, "The material record behind every simulation")
+        self.assertContains(response, "My Data")
+        self.assertContains(response, "Search the workspace")
+        self.assertNotContains(response, "Create account")
+        self.assertNotContains(response, "Sign in")
+        self.assertContains(response, 'class="fair-assistant-widget"', count=1)
+        self.assertEqual(self.client.session["_auth_user_id"], str(self.owner.pk))
+        self.assertEqual(self.client.get(reverse("json_data_list")).status_code, 200)
+
+    def test_workspace_has_home_navigation(self):
+        """
+        Make the home page reachable from the sidebar and logo
+        """
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("search"))
+        home = reverse("index")
+        self.assertContains(response, f'href="{home}" class="pc-link" aria-label="Home"')
+        self.assertContains(response, f'href="{home}" class="b-brand text-primary" aria-label="Home"')
+
     def test_login_page_uses_platform_branding(self):
         """
         Login page uses platform branding instead of template branding

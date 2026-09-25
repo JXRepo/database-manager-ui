@@ -106,9 +106,19 @@ ORCID_AUTH_SCOPE = "/authenticate"
 
 
 def index(request):
-    """Show the public landing page or redirect signed-in users to search"""
-    if request.user.is_authenticated:
-        return redirect("search")
+    """
+    Show the landing page while retaining the current login session
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Visitor or signed in user's request for the site home page.
+
+    Returns
+    -------
+    HttpResponse
+        Landing page with navigation appropriate to the login state.
+    """
 
     return render(request, "pages/index.html")
 

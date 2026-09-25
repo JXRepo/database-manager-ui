@@ -1311,8 +1311,13 @@
       </div>
 
       <div class="atlas-account-actions">
+        {% if request.user.is_authenticated %}
+        <a class="atlas-sign-in" href="{% url 'json_data_list' %}">My Data</a>
+        <a class="atlas-button atlas-button-primary" href="{% url 'search' %}">Search data</a>
+        {% else %}
         <a class="atlas-sign-in" href="{% url 'login' %}">Sign in</a>
         <a class="atlas-button atlas-button-primary" href="{% url 'register' %}">Create account</a>
+        {% endif %}
       </div>
     </nav>
   </header>
@@ -1479,7 +1484,11 @@
           <h2>Example materials index</h2>
         </div>
         <p class="atlas-section-intro">
+          {% if request.user.is_authenticated %}
+          Synthetic records show how the index reads. Search the workspace to inspect your available dataset records.
+          {% else %}
           Synthetic records show how the index reads. Sign in to inspect dataset records from the real workspace.
+          {% endif %}
         </p>
       </div>
 
@@ -1524,7 +1533,11 @@
 
       <div class="atlas-index-note">
         <span>No live dataset content is exposed on this public page.</span>
+        {% if request.user.is_authenticated %}
+        <a href="{% url 'search' %}">Search the workspace <span aria-hidden="true">→</span></a>
+        {% else %}
         <a href="{% url 'login' %}">Sign in to search the workspace <span aria-hidden="true">→</span></a>
+        {% endif %}
       </div>
     </div>
   </section>
@@ -1537,8 +1550,13 @@
           <h2>Bring the context around your next simulation into focus.</h2>
         </div>
         <div class="atlas-footer-actions">
+          {% if request.user.is_authenticated %}
+          <a class="atlas-button atlas-button-light" href="{% url 'upload_json' %}">Upload JSON</a>
+          <a class="atlas-button atlas-button-ghost-light" href="{% url 'search' %}">Search data</a>
+          {% else %}
           <a class="atlas-button atlas-button-light" href="{% url 'register' %}">Create account</a>
           <a class="atlas-button atlas-button-ghost-light" href="{% url 'login' %}">Sign in</a>
+          {% endif %}
         </div>
       </div>
 
@@ -1563,8 +1581,13 @@
           </div>
           <div>
             <h3>Account</h3>
+            {% if request.user.is_authenticated %}
+            <a href="{% url 'json_data_list' %}">My Data</a>
+            <a href="{% url 'password_change' %}">Change password</a>
+            {% else %}
             <a href="{% url 'login' %}">Sign in</a>
             <a href="{% url 'register' %}">Create account</a>
+            {% endif %}
             <a href="{% url 'account_settings' %}">Settings</a>
           </div>
         </div>

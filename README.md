@@ -163,6 +163,10 @@ write data.
 
 ## Current Scope
 
+The home page remains available after signing in. Use Home in the sidebar, the
+sidebar logo, or a Home breadcrumb to return to it without signing out. Its
+account links switch to My Data and Search data for signed in users.
+
 - Upload one or more JSON files.
 - Unwrap a single object, a list of objects, or a dict with a top-level `data` list.
 - Validate required top-level fields before saving.
