@@ -12,3 +12,6 @@
       </div>
     </div>
 </footer>
+{% if request.user.is_authenticated %}
+  {% include "includes/global_assistant.html" %}
+{% endif %}

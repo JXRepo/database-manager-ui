@@ -28,7 +28,7 @@ class AssistantWidgetTests(TestCase):
         """
         self.client.force_login(self.owner)
         for name in (
-            "index", "search", "upload_json", "json_data_list", "share",
+            "search", "upload_json", "json_data_list", "share",
             "shared_with_me", "sharing_history", "notification_list",
             "account_settings", "password_change", "password_change_done",
             "getting_started",
@@ -54,15 +54,14 @@ class AssistantWidgetTests(TestCase):
         self.assertContains(response, f'data-object-id="{self.obj.pk}"')
         self.assertContains(response, 'data-question="Summarize this data"')
 
-    def test_guest_pages_offer_sign_in(self):
+    def test_public_pages_do_not_show_assistant(self):
         """
-        Display an entry point without an unusable anonymous question form
+        Keep the assistant out of public introduction and authentication pages
         """
         for name in ("index", "login", "register"):
             with self.subTest(page=name):
                 response = self.client.get(reverse(name))
-                self.assertContains(response, 'class="fair-assistant-widget"', count=1)
-                self.assertContains(response, "Sign in to ask")
+                self.assertNotContains(response, 'class="fair-assistant-widget"')
                 self.assertNotContains(response, '<form class="fair-assistant-form">')
         response = self.client.post(
             reverse("fair_assistant_ask"),
@@ -71,11 +70,16 @@ class AssistantWidgetTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
+        self.client.force_login(self.owner)
+        response = self.client.get(reverse("index"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'class="fair-assistant-widget"')
+
     def test_new_entry_pages_supply_csrf_for_questions(self):
         """
         Allow a first assistant question from pages without other forms
         """
-        for name in ("index", "json_data_list", "notification_list"):
+        for name in ("json_data_list", "notification_list"):
             with self.subTest(page=name):
                 client = Client(enforce_csrf_checks=True)
                 client.force_login(self.owner)

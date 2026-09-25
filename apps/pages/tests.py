@@ -1717,7 +1717,7 @@ class JSONDataSharingTests(TestCase):
             self.assertNotContains(response, f'href="{reverse(name)}"')
         self.assertNotContains(response, "Create account")
         self.assertNotContains(response, "Sign in")
-        self.assertContains(response, 'class="fair-assistant-widget"', count=1)
+        self.assertNotContains(response, 'class="fair-assistant-widget"')
         self.assertEqual(self.client.session["_auth_user_id"], str(self.owner.pk))
         self.assertEqual(self.client.get(reverse("json_data_list")).status_code, 200)
 

@@ -341,10 +341,11 @@ in the application; this is not an indexed search designed for large datasets.
 
 ## Data Object Details
 
-The FAIR Data Assistant button is available throughout the application,
-including the home and account pages. Upload and detail pages retain their
-specific suggestions and data context. Visitors who are not signed in see a
-sign-in link; assistant questions still require authentication and data access.
+The FAIR Data Assistant button is available inside the signed in workspace,
+including search, upload, details, My Data, and account settings. It is absent
+from the home, login, and registration pages. Upload and detail pages retain
+their specific suggestions and data context; questions require authentication
+and data access.
 
 Standard field names follow the
 [MiMeDat schema, version 1.2.0](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json):
