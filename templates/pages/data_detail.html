@@ -5,6 +5,7 @@
 
 {% block content %}
 {{ plot_variables|json_script:"plot-variables-data" }}
+{{ data_object.data.units|json_script:"plot-units-data" }}
 {{ mechanical_bc_items|json_script:"mechanical-bc-data" }}
 <style>
 
@@ -1678,6 +1679,9 @@ details[open] > .detail-group-summary {
   const plotVariables = JSON.parse(
     document.getElementById("plot-variables-data").textContent
   );
+  const plotUnits = JSON.parse(
+    document.getElementById("plot-units-data").textContent
+  );
   const mechanicalBcItems = JSON.parse(
     document.getElementById("mechanical-bc-data").textContent
   );
@@ -1836,9 +1840,18 @@ details[open] > .detail-group-summary {
     const label = variable.display_label || variable.symbol_label || variable.short_label;
     const prefix = getAxisTitlePrefix(variable);
     const prefixedLabel = prefix ? `${prefix}, ${label}` : label;
+    const strainUnit = plotUnits?.Strain;
+    let unit = variable.unit;
 
-    return variable.unit
-      ? `${prefixedLabel} (${variable.unit})`
+    if (prefix === "Strain" && (
+      strainUnit === 1 ||
+      (typeof strainUnit === "string" && strainUnit.trim() === "1")
+    )) {
+      unit = "-";
+    }
+
+    return unit
+      ? `${prefixedLabel} (${unit})`
       : prefixedLabel;
   }
 
@@ -2091,17 +2104,17 @@ const cornerAxisPlugin = {
     }
 
     function measureAxisTitle(ctx, title) {
-      const mainWidth = getPlotTextRuns(title.main, 15).reduce((width, run) => {
+      const mainWidth = getPlotTextRuns(title.main, 18).reduce((width, run) => {
         ctx.font = run.font;
         return width + ctx.measureText(run.text).width;
       }, 0);
 
-      ctx.font = "400 10px sans-serif";
+      ctx.font = "400 13px sans-serif";
       const subscriptWidth = title.subscript
         ? ctx.measureText(title.subscript).width
         : 0;
 
-      ctx.font = "400 14px sans-serif";
+      ctx.font = "400 18px sans-serif";
       const unitWidth = title.unit ? ctx.measureText(title.unit).width : 0;
       const unitGap = title.unit ? 6 : 0;
 
@@ -2126,20 +2139,20 @@ const cornerAxisPlugin = {
 
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
-      getPlotTextRuns(title.main, 15).forEach(run => {
+      getPlotTextRuns(title.main, 18).forEach(run => {
         ctx.font = run.font;
         ctx.fillText(run.text, cursorX, y);
         cursorX += ctx.measureText(run.text).width;
       });
 
       if (title.subscript) {
-        ctx.font = "400 10px sans-serif";
+        ctx.font = "400 13px sans-serif";
         ctx.fillText(title.subscript, cursorX + 1, y + 5);
         cursorX += ctx.measureText(title.subscript).width + 1;
       }
 
       if (title.unit) {
-        ctx.font = "400 14px sans-serif";
+        ctx.font = "400 18px sans-serif";
         ctx.fillText(title.unit, cursorX + 6, y);
       }
     }

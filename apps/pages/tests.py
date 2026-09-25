@@ -1475,7 +1475,7 @@ class JSONDataSharingTests(TestCase):
         self.assertIn("left: isCompactPlot ? 164 : 190,", template)
         self.assertIn("top: 24,", template)
         self.assertIn("ctx.font = `400 ${tickLabelFontSize}px sans-serif`;", template)
-        self.assertIn('ctx.font = "400 10px sans-serif";', template)
+        self.assertIn('ctx.font = "400 13px sans-serif";', template)
         self.assertNotIn("const titleX = axisX - 88;", template)
         self.assertNotIn("const titleY = axisY + 54;", template)
         self.assertNotIn("const axisTitleTickGap = 34;", template)

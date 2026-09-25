@@ -399,6 +399,10 @@ PNG downloads remain available.
 Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
 scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
+Axis labels and units use 18px text with 13px subscripts. Stress units come from
+the uploaded `units.Stress` value. For total and plastic strain, an explicit
+`units.Strain` value of `1` is displayed as `(-)` on the axes. Missing units stay
+unspecified; stored JSON and CSV exports retain their existing values and format.
 Variable selectors, tooltips, and raw-value summaries use matching mathematical
 italic glyphs for these two symbols; field keys and plotted values are unchanged.
 
