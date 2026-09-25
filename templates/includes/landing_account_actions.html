@@ -1,11 +1,23 @@
 <div class="atlas-account-actions">
   {% if request.user.is_authenticated %}
-  <a class="atlas-account-avatar" href="{% url 'account_settings' %}" aria-label="Account settings" title="{{ request.user.username }} — Account settings">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <circle cx="12" cy="8" r="4"/>
-      <path d="M5 21v-2a7 7 0 0 1 14 0v2"/>
-    </svg>
-  </a>
+  <details class="atlas-account-menu">
+    <summary class="atlas-account-avatar" aria-label="Account menu" title="Account menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="8" r="4"/>
+        <path d="M5 21v-2a7 7 0 0 1 14 0v2"/>
+      </svg>
+    </summary>
+    <div class="atlas-account-dropdown">
+      <div class="atlas-account-name">{{ request.user.username }}</div>
+      <a href="{% url 'account_settings' %}">Account details</a>
+      <a href="{% url 'search' %}">Enter platform</a>
+      <form method="post" action="{% url 'home_logout' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'index' %}">
+        <button type="submit">Log out</button>
+      </form>
+    </div>
+  </details>
   {% else %}
   <a class="atlas-button atlas-button-secondary" href="{% url 'register' %}">Register</a>
   <a class="atlas-button atlas-button-primary" href="{% url 'login' %}">Login</a>

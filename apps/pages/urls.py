@@ -46,7 +46,11 @@ urlpatterns = [
         name="login",
     ),
     path("login/orcid/", views.orcid_login_view, name="orcid_login"),
-    path("logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path(
+        "logout/",
+        auth_views.LogoutView.as_view(next_page=reverse_lazy("index")),
+        name="home_logout",
+    ),
     path("register/", register_view, name="register"),
     path("settings/", account_settings_view, name="account_settings"),
     path("settings/orcid/connect/", views.orcid_connect_view, name="orcid_connect"),

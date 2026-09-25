@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from apps.dyn_api.helpers import validate_json
@@ -1705,13 +1705,15 @@ class JSONDataSharingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "pages/index.html")
         self.assertContains(response, "The material record behind every simulation")
-        self.assertNotContains(response, "Enter platform")
+        self.assertContains(response, "Enter platform", count=2)
+        self.assertContains(response, "Account details", count=2)
+        self.assertContains(response, '>Log out</button>', count=2)
         self.assertNotContains(response, 'class="atlas-account-icon"')
         self.assertContains(response, 'class="atlas-account-avatar"', count=2)
         self.assertContains(response, f'href="{reverse("account_settings")}"', count=2)
         self.assertNotContains(response, f'href="{reverse("register")}"')
         self.assertNotContains(response, f'href="{reverse("login")}"')
-        self.assertContains(response, f'href="{reverse("search")}"', count=1)
+        self.assertContains(response, f'href="{reverse("search")}"', count=3)
         self.assertContains(response, "Get started")
         for name in ("upload_json", "json_data_list", "charts", "share", "password_change"):
             self.assertNotContains(response, f'href="{reverse(name)}"')
@@ -1720,6 +1722,33 @@ class JSONDataSharingTests(TestCase):
         self.assertNotContains(response, 'class="fair-assistant-widget"')
         self.assertEqual(self.client.session["_auth_user_id"], str(self.owner.pk))
         self.assertEqual(self.client.get(reverse("json_data_list")).status_code, 200)
+
+    def test_home_account_menu_logout_returns_home_and_ends_session(self):
+        """
+        Require CSRF for logout and return the signed-out home page
+        """
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.owner)
+        home = reverse("index")
+        response = client.get(home)
+        self.assertContains(response, f'method="post" action="{reverse("home_logout")}"', count=2)
+        self.assertContains(response, f'name="next" value="{home}"', count=2)
+
+        self.assertEqual(client.get(reverse("home_logout")).status_code, 405)
+        rejected = client.post(reverse("home_logout"), {"next": home})
+        self.assertEqual(rejected.status_code, 403)
+        self.assertEqual(client.session["_auth_user_id"], str(self.owner.pk))
+
+        response = client.post(reverse("home_logout"), {
+            "next": home,
+            "csrfmiddlewaretoken": client.cookies["csrftoken"].value,
+        }, follow=True)
+        self.assertRedirects(response, home)
+        self.assertNotIn("_auth_user_id", client.session)
+        self.assertNotContains(response, 'class="atlas-account-menu"')
+        self.assertContains(response, ">Register</a>", count=2)
+        self.assertContains(response, ">Login</a>", count=2)
+        self.assertEqual(client.get(reverse("json_data_list")).status_code, 302)
 
     def test_workspace_has_home_navigation(self):
         """

@@ -201,6 +201,80 @@
     height: 46px;
     border-radius: 50%;
     flex-shrink: 0;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .atlas-account-avatar::-webkit-details-marker {
+    display: none;
+  }
+
+  .atlas-account-menu {
+    position: relative;
+    z-index: 30;
+  }
+
+  .atlas-account-avatar:focus-visible,
+  .atlas-account-dropdown button:focus-visible {
+    outline: 3px solid var(--atlas-blue);
+    outline-offset: 3px;
+  }
+
+  .atlas-account-dropdown {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: 230px;
+    padding: 8px;
+    border: 1px solid var(--atlas-line);
+    border-radius: 16px;
+    background: #ffffff;
+    color: var(--atlas-mineral);
+    box-shadow: 0 14px 40px rgba(30, 45, 65, 0.16);
+    font-size: 0.84rem;
+  }
+
+  .atlas-account-name {
+    padding: 10px 12px 12px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--atlas-line);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  .atlas-account-dropdown a,
+  .atlas-account-dropdown button {
+    display: block;
+    width: 100%;
+    padding: 11px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--atlas-mineral);
+    font: inherit;
+    line-height: 1.5;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .atlas-account-dropdown a:hover,
+  .atlas-account-dropdown button:hover {
+    background: var(--atlas-canvas);
+  }
+
+  .atlas-account-dropdown form {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--atlas-line);
+  }
+
+  .atlas-account-dropdown button {
+    color: #b03b3b;
+  }
+
+  .atlas-footer .atlas-account-dropdown {
+    top: auto;
+    bottom: calc(100% + 12px);
   }
 
   .atlas-arrow {
@@ -1504,4 +1578,7 @@
     </div>
   </footer>
 </main>
+{% if request.user.is_authenticated %}
+<script src="{% static 'assets/js/landing-account-menu.js' %}" defer></script>
+{% endif %}
 {% endblock content %}

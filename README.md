@@ -166,7 +166,8 @@ write data.
 The home page remains available after signing in. Use the sidebar logo or a
 Home breadcrumb to return to it without signing out. Its
 header and footer show Register and Login buttons before sign-in, then a single
-account avatar linking to account settings after sign-in. Footer account access
+account avatar after sign-in. Clicking it opens Account details, Enter platform,
+and Log out; logging out returns directly to the home page. Footer account access
 sits between the platform introduction and section links. Get started
 opens registration for visitors and the workspace for signed in users. Upload,
 search, and data management controls remain inside the workspace.
