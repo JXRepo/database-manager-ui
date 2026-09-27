@@ -47,15 +47,19 @@ Current priority:
 
 ## Validation rules
 
-- Validate required top-level fields only unless deeper schema validation is explicitly requested
+- Validate the 24 required top-level fields and applicable nested and conditional required rules from the bundled MiMeDat schema profile; do not claim full JSON Schema compliance or enforce unrelated optional constraints
 - Extra fields are allowed
 - Missing required fields must produce clear user-facing error messages
 - Empty required fields must produce clear user-facing error messages
+- Required fields include active conditional requirements; null, blank text, empty lists and empty objects are empty, but zero and false are not; optional blanks are preserved
+- Resolve schema references only through the bundled trusted snapshots; never fetch a user's uploaded $schema URL
+- Recognize records in lists, identifier dictionaries and nested collections; stop at record boundaries and retain incomplete members for errors instead of dropping them or changing field names
 - Group upload feedback by JSON file, then data object in original order, then issue category; list each affected field separately and give guidance specific to that category
 - Identify an object by its title and valid supplied identifier when available, with its file position as a reference or fallback; escape all uploaded text in feedback
 - Treat each uploaded JSON file as one save unit: any validation, identifier, or sharing error rejects the entire file, with no partial objects or notifications saved
 - Check every file and every readable data object, collecting independent errors instead of stopping at the first issue; reject invalid files and continue processing the others
-- Show a status to the right of each selected file, with a spinner only for the file the server is currently processing; show all file results and grouped errors below the form after completion
+- Show real Checking n / total and provisional Saving n / total counts beside each selected file; show Uploaded only after the entire file commits, and retain the ordinary form and Processing fallback
+- Use no spinner for object checking or saving counts; keep errors immediately below the form, with expandable details for multiple failed objects
 - Keep one multipart submission and all batch prechecks, stream real file results in order after each atomic save, and retain ordinary form submission as a fallback; never simulate progress or retry automatically after a connection failure
 - Prevent duplicate submissions without disabling the file input; retain confirmed results after an interrupted response and mark unfinished files as unconfirmed
 - Check request file count, total bytes, and total object count before any saves; treat file size and content errors as local to that file, and retain a separate atomic identifier and quota recheck for each file
@@ -98,7 +102,7 @@ Current priority:
 - Omit top-level mechanical_BC, stress, total_strain, and plastic_strain from the metadata list while retaining their visualizations and complete export; same-named nested fields remain visible
 - Keep fields not defined at that schema path at the end of their own parent, in relative stored order, without an Additional metadata group; freeform objects retain stored order
 - Collapse actual nested objects and object lists, even with one child; never merge flat fields by shared prefixes such as creator_affiliation, creator_institute, and creator_group
-- Preserve field names, values, array item order, and complete JSON downloads; only display supplied fields, without adding missing-field placeholders or introducing deeper upload validation
+- Preserve field names, values, array item order, and complete JSON downloads; only display supplied fields, without adding missing-field placeholders or deriving upload requirements from the display order
 - Use current MiMeDat equivalent_stress, equivalent_strain, and equivalent_plastic_strain fields for plots; supplied arrays take precedence and only absent fields may use the existing calculated equivalents
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
 - Whole RVE tensor schematics use the explicitly labeled ij direction/face-normal convention, fixed-length component arrows, and linked numeric matrices; preserve distinct xy/yx values and never infer missing components in the direction view

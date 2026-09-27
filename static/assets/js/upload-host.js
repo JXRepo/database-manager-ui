@@ -93,9 +93,10 @@
     if (terminalStates.includes(job.status)) return job.summary || 'Upload finished. Open upload details.';
     const file = job.files.find(item => ['parsing', 'validating', 'saving'].includes(item.status));
     if (file?.status === 'validating') {
-      return `Validating ${file.name}: ${file.validated_count} of ${file.object_count ?? '?'} objects checked`;
+      const issues = file.failed_object_count ? ` · ${file.failed_object_count} objects need changes` : '';
+      return `Checking ${file.validated_count} / ${file.object_count ?? '?'} · ${file.name}${issues}`;
     }
-    if (file?.status === 'saving') return `Saving ${file.name}…`;
+    if (file?.status === 'saving') return `Saving ${file.saving_count || 0} / ${file.object_count ?? '?'} · ${file.name}`;
     if (file) return `Reading ${file.name}…`;
     return 'Files received. Waiting to process…';
   }

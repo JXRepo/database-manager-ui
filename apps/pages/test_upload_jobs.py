@@ -15,10 +15,11 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from .upload_test_data import valid_upload_object
 from .models import DataNotification, JSONData, RateLimitBucket, UploadJob, UploadWorkerInstance
 from .upload_jobs import (
     _update_file, claim_upload_job, cleanup_upload_jobs, expire_upload_jobs,
-    interrupt_job, process_upload_job, staging_directory,
+    interrupt_job, job_snapshot, process_upload_job, staging_directory,
 )
 
 
@@ -44,17 +45,7 @@ class UploadJobTests(TestCase):
         self.settings.enable()
         self.addCleanup(self.settings.disable)
         UploadWorkerInstance.objects.create(id=self.instance_id, heartbeat_at=timezone.now())
-        self.example = {
-            "title": "Title", "creator": "Creator", "creator_affiliation": "Affiliation",
-            "date": "2026-09-18", "shared_with": [{"access_type": "c"}],
-            "rights": "Rights", "rights_holder": "Rights holder", "software": "Software",
-            "software_version": "1", "system": "System", "system_version": "1",
-            "processor_specifications": "Processor", "input_path": "input", "results_path": "results",
-            "RVE_size": "size", "RVE_continuity": True, "discretization_type": "type",
-            "discretization_unit_size": "unit", "discretization_count": 1,
-            "mechanical_BC": "boundary", "phase": "phase", "stress": "stress",
-            "total_strain": "strain", "units": "units",
-        }
+        self.example = valid_upload_object()
 
     def data(self, title):
         """
@@ -117,7 +108,7 @@ class UploadJobTests(TestCase):
         """
         Keep processing independent of the request and retain accurate object counts
         """
-        response = self.submit([self.data(f"Object {index}") for index in range(100)])
+        response = self.submit({f"record-{index}": self.data(f"Object {index}") for index in range(100)})
         self.assertEqual(response.status_code, 202)
         snapshot = response.json()["job"]
         self.assertEqual(snapshot["status"], "queued")
@@ -137,6 +128,43 @@ class UploadJobTests(TestCase):
         self.assertEqual(recovered["submission_id"], snapshot["submission_id"])
         self.assertNotIn("storage_name", recovered["files"][0])
         self.assertFalse(staging_directory(job).exists())
+
+    def test_saving_progress_is_readable_before_commit_without_claiming_saved_rows(self):
+        """
+        Publish completed save work outside the still uncommitted database transaction
+        """
+        from . import upload_jobs
+
+        self.submit([self.data(f"Object {index}") for index in range(3)])
+        snapshots = []
+        original = upload_jobs.write_save_progress
+
+        def capture(job, index, completed, total):
+            """
+            Read the same private progress snapshot that another page requests
+
+            Parameters
+            ----------
+            job : UploadJob
+                Claimed upload job.
+            index : int
+                File index.
+            completed : int
+                Rows processed inside the transaction.
+            total : int
+                Number of rows to process.
+            """
+            original(job, index, completed, total)
+            job.refresh_from_db()
+            snapshots.append(job_snapshot(job)["files"][index])
+
+        with patch("apps.pages.upload_jobs.write_save_progress", side_effect=capture):
+            job = self.process()
+        self.assertTrue(snapshots)
+        self.assertEqual(snapshots[-1]["saving_count"], 3)
+        self.assertTrue(all(item["status"] == "saving" and item["saved_count"] == 0 for item in snapshots))
+        self.assertEqual(job.files[0]["saved_count"], 3)
+        self.assertEqual(job_snapshot(job)["files"][0]["status"], "uploaded")
 
     @override_settings(PILOT_MAX_UPLOAD_OBJECTS=2)
     def test_batch_object_limit_prevents_every_file_save(self):

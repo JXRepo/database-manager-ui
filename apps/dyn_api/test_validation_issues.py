@@ -3,6 +3,7 @@ from copy import deepcopy
 from django.test import SimpleTestCase
 
 from .helpers import validate_json
+from apps.pages.upload_test_data import valid_upload_object
 
 
 class DetailedValidationTests(SimpleTestCase):
@@ -14,32 +15,7 @@ class DetailedValidationTests(SimpleTestCase):
         """
         Create an object with every required top-level field
         """
-        self.valid = {
-            "title": "Copper simulation",
-            "creator": ["Researcher"],
-            "creator_affiliation": ["Institute"],
-            "date": "2026-09-18",
-            "shared_with": [{"access_type": "c"}],
-            "rights": "Reserved",
-            "rights_holder": ["Researcher"],
-            "software": "Solver",
-            "software_version": "1",
-            "system": "Linux",
-            "system_version": "1",
-            "processor_specifications": "CPU",
-            "input_path": "inputs",
-            "results_path": "results",
-            "RVE_size": [1, 1, 1],
-            "RVE_continuity": False,
-            "discretization_type": "structured",
-            "discretization_unit_size": [1, 1, 1],
-            "discretization_count": 0,
-            "mechanical_BC": [{"loading_type": "force"}],
-            "phase": [{"phase_identifier": "Copper"}],
-            "stress": [0],
-            "total_strain": [0],
-            "units": {"Temperature": "K"},
-        }
+        self.valid = valid_upload_object(discretization_count=0)
 
     def test_detailed_issues_preserve_object_order_and_separate_missing_and_empty(self):
         """
@@ -81,11 +57,11 @@ class DetailedValidationTests(SimpleTestCase):
 
     def test_detailed_validation_keeps_zero_false_optional_and_nested_values(self):
         """
-        Accept nonempty required values without introducing deeper schema validation
+        Accept optional blanks while required descendants stay valid
         """
         data = deepcopy(self.valid)
         data.update({"optional_note": "", "optional_list": [], "optional_object": {}})
-        data["phase"] = [{"nested_optional_value": None}]
+        data["phase"][0]["nested_optional_value"] = None
         before = deepcopy(data)
 
         for detailed in (False, True):

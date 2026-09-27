@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
     file.state = state;
     file.row.dataset.state = state;
     file.label.textContent = label;
-    file.spinner.hidden = !['processing', 'parsing', 'validating', 'saving'].includes(state);
+    file.spinner.hidden = !['processing', 'parsing'].includes(state);
   }
 
   function showUnconfirmed() {
@@ -169,7 +169,7 @@ document.addEventListener('DOMContentLoaded', function() {
       alert.appendChild(report);
     }
     results.replaceChildren(alert);
-    showStatus('Finished. Select files again to start another upload.');
+    showStatus(event.summary);
   }
 
   async function readProgress(response, currentRequest) {
@@ -309,15 +309,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     selectionSubmitted = true;
     const labels = {
-      waiting: 'Waiting', parsing: 'Reading', validating: 'Validating', saving: 'Saving',
+      waiting: 'Waiting', parsing: 'Reading', validating: 'Checking', saving: 'Saving',
       uploaded: 'Uploaded', failed: 'Failed', unconfirmed: 'Unconfirmed',
     };
     job.files.forEach(function(file, index) {
       let label = labels[file.status] || 'Unconfirmed';
       if (file.status === 'validating' && Number.isInteger(file.object_count)) {
-        label = `${file.validated_count} / ${file.object_count} checked`;
+        label = `Checking ${file.validated_count} / ${file.object_count}`;
+      } else if (file.status === 'saving' && Number.isInteger(file.object_count)) {
+        label = `Saving ${file.saving_count || 0} / ${file.object_count}`;
       } else if (file.status === 'uploaded') {
         label = `Uploaded · ${file.saved_count} objects`;
+      } else if (file.status === 'failed' && file.failed_object_count) {
+        label = `Not uploaded · ${file.failed_object_count} objects need changes`;
       }
       setFileState(index, file.status, label);
     });
@@ -327,7 +331,11 @@ document.addEventListener('DOMContentLoaded', function() {
       stopElapsed();
       displayReport({level: job.level === 'info' ? 'warning' : job.level,
         summary: job.summary || 'Upload finished.', report_html: job.report_html || ''});
-    } else startElapsed(job.created_at);
+    } else {
+      const saving = job.files.some(file => file.status === 'saving');
+      if (saving) showStatus('Saving in progress. Uploaded is confirmed only after the whole file succeeds.');
+      startElapsed(job.created_at);
+    }
   }
 
   async function recoverSubmission(submissionId, message) {

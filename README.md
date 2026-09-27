@@ -173,8 +173,8 @@ opens registration for visitors and the workspace for signed in users. Upload,
 search, and data management controls remain inside the workspace.
 
 - Upload one or more JSON files.
-- Unwrap a single object, a list of objects, or a dict with a top-level `data` list.
-- Validate required top-level fields before saving.
+- Unwrap individual objects, lists, dictionaries keyed by identifier, and nested collections.
+- Validate required top-level fields and applicable nested requirements before saving.
 - Save every object in a fully valid file as a separate `JSONData` record.
 - Search accessible data by metadata, nested fields, and numeric comparisons.
 - View compact detail pages with plots and mechanical boundary condition summaries.
@@ -197,10 +197,17 @@ failed files; successful files remain saved. A final identifier conflict, quota
 failure, or database save error also rejects that whole file while other files
 continue. Failed files do not reserve identifiers or consume storage quota.
 
-Each selected file has its own status on the right: Waiting, Processing,
-Uploaded, or Failed. Only the file currently being checked and saved shows a
-spinner; the next file starts after its result is confirmed. Detailed errors
-appear together below the form after all files finish.
+The background upload path shows `Checking 37 / 100`, then `Saving 70 / 100`,
+using actual completed work. Fast operations can skip intermediate displayed
+counts. Checking and saving use numbers without a spinner; reading and the
+legacy Processing fallback still indicate activity when no count is available.
+Saving counts remain provisional until the whole file transaction commits.
+Only then is the file labelled Uploaded. A private temporary progress file lets
+other pages observe saving counts without waiting for that transaction; it
+contains no uploaded data and never overrides confirmed database results.
+Errors appear directly beneath the form, before upload limits. Multiple object
+errors have a compact expandable list, retaining every affected field and its
+original object position and source location.
 
 The browser sends the selected files in one submission so batch limits are
 checked before saving. It then reads progress from the server as each file is
@@ -220,6 +227,11 @@ the objects inside that file from being read and checked.
 The server reads each file to count objects before saving, releases that parsed
 data, then reads the current file again for validation and its atomic save.
 It does not retain the parsed JSON for the entire submission at once.
+The precheck retains only record paths. Recognition stops at a simulation record
+instead of treating its nested metadata as more records. Incomplete collection
+members remain available for validation; mixed or unrecognizable entries cause
+errors rather than silently importing only their valid neighbors. Field names
+and values are not converted, and wrapper keys are not substituted for identifiers.
 
 Upload errors follow the selected file order, then the original data object order
 within each file. Each object is identified by its title and supplied identifier
@@ -505,9 +517,31 @@ metadata separately.
 
 ## Required JSON Fields
 
-Schema validation checks required top-level fields; extra fields are allowed.
-Required values cannot be null, blank strings, or empty lists or objects.
-Uploads also undergo resource, identifier, and sharing checks.
+The upload validator checks the 24 top-level fields below, plus nested and
+conditional `required` rules from the bundled MiMeDat 1.2.0 snapshot and its
+constitutive and microstructure references. The `jsonschema` library executes
+a required field profile, including the container structures needed to reach
+those fields. This is not full validation of every numeric, enum or optional
+property constraint in the original schema. Extra fields remain allowed.
+
+Required values cannot be null, blank strings (including whitespace), or empty
+lists or objects. Zero and false are not empty. Conditional requirements activate
+only when their controlling fields are supplied and the condition matches.
+Optional empty fields are preserved and do not block uploads. This includes an
+empty optional parent: its children are checked once it has content. A nonempty
+list of objects does activate the required rules for every list entry.
+For example, mechanical `applied_load` is optional, but each supplied load entry
+requires a nonempty `magnitude`. A loaded thermal condition requires both
+`loading_mode` and `applied_load`. A tensor magnitude requires its six declared
+components. `total_strain: {}` is rejected, without inventing a requirement for
+any particular strain curve that the schema's `required` list does not specify.
+
+See [the required field validator](apps/dyn_api/required_schema.py) and
+[pinned source URLs and checksums](apps/dyn_api/schemas/sources.json).
+Validation runs offline against these trusted files, never against an uploaded
+`$schema` URL or an external validation website. Updates require a reviewed
+snapshot change. Uploads also undergo the existing resource, identifier, and
+sharing checks; this change does not add group sharing or change access rules.
 
 Required fields include:
 

@@ -5,9 +5,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import DatabaseError, connection
 from django.test import TestCase
 
-from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
 from .models import JSONData
 from .views import _process_upload_file
+from .upload_test_data import valid_upload_object
 
 
 class UploadObjectProgressTests(TestCase):
@@ -22,7 +22,7 @@ class UploadObjectProgressTests(TestCase):
         self.owner = User.objects.create_user(username="object-progress-owner")
         self.objects = []
         for index in range(3):
-            data = dict.fromkeys(REQUIRED_TOP_LEVEL_FIELDS, "metadata")
+            data = valid_upload_object()
             data.update(identifier=f"progress-{index}", shared_with=[{"access_type": "c"}])
             self.objects.append(data)
         self.report = {
@@ -67,7 +67,9 @@ class UploadObjectProgressTests(TestCase):
         validations = [item for item in observations if item[0] == "validating"]
         self.assertEqual([item[1] for item in validations], [0, 1, 2, 3])
         self.assertTrue(all(item[2:] == (3, 0) for item in validations))
-        self.assertEqual(observations[-1], ("saving", 3, 3, 0))
+        saves = [item for item in observations if item[0] == "saving"]
+        self.assertEqual([item[1] for item in saves], [0, 1, 2, 3])
+        self.assertEqual([item[3] for item in saves], [0, 1, 2, 3])
         self.assertEqual(self.report["saved_count"], 3)
 
     def test_invalid_objects_are_counted_and_do_not_trigger_save_callback(self):

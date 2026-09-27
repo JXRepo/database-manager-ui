@@ -9,6 +9,7 @@ from django.test import TestCase, override_settings
 from django.test.html import parse_html
 from django.urls import reverse
 
+from .upload_test_data import valid_upload_object
 from .models import DataNotification, JSONData
 from .upload_services import canonical_json_size, data_fingerprint, generate_data_identifier
 
@@ -46,17 +47,7 @@ class UploadFileAtomicityTests(TestCase):
         """
         cls.owner = User.objects.create_user(username="file-atomicity-owner")
         cls.recipient = User.objects.create_user(username="file-atomicity-recipient")
-        cls.example = {
-            "title": "Title", "creator": "Creator", "creator_affiliation": "Affiliation",
-            "date": "2026-09-18", "shared_with": [{"access_type": "c"}],
-            "rights": "Rights", "rights_holder": "Rights holder", "software": "Software",
-            "software_version": "1", "system": "System", "system_version": "1",
-            "processor_specifications": "Processor", "input_path": "input", "results_path": "results",
-            "RVE_size": "size", "RVE_continuity": True, "discretization_type": "type",
-            "discretization_unit_size": "unit", "discretization_count": 1,
-            "mechanical_BC": "boundary", "phase": "phase", "stress": "stress",
-            "total_strain": "strain", "units": "units",
-        }
+        cls.example = valid_upload_object()
 
     def setUp(self):
         """
@@ -231,7 +222,7 @@ class UploadFileAtomicityTests(TestCase):
         self._upload([first, invalid])
 
         self.assertEqual(JSONData.objects.count(), 0)
-        invalid["phase"] = "phase"
+        invalid["phase"] = valid_upload_object()["phase"]
         response = self._upload([first, invalid])
         self.assertEqual(JSONData.objects.count(), 2)
         self.assertEqual(JSONData.objects.get(data__title=first["title"]).data["identifier"], expected_identifier)

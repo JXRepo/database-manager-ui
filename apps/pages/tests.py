@@ -66,7 +66,7 @@ class JSONDataSharingTests(TestCase):
             shared_with = [{"access_type": "c"}]
 
         if phase is None:
-            phase = [{"phase_identifier": "Copper"}]
+            phase = [{"phase_name": "Copper", "constitutive_model": {"elastic_model_name": "Hooke"}}]
 
         return {
             "identifier": identifier,
@@ -108,7 +108,7 @@ class JSONDataSharingTests(TestCase):
             "phase": phase,
             "stress": {"stress_11": [0, 1]},
             "total_strain": {"strain_11": [0, 0.1]},
-            "units": {"Stress": "MPa", "Strain": 1},
+            "units": {"Stress": "MPa", "Strain": 1, "Length": "mm", "Force": "N", "Angle": "Radian", "Temperature": "K"},
         }
 
     def _post_upload_object(self, data):
@@ -1174,7 +1174,7 @@ class JSONDataSharingTests(TestCase):
             owner=self.viewer,
             data=self._build_valid_upload_object(
                 "copper-object",
-                phase=[{"phase_identifier": "Copper"}],
+                phase=[{"phase_name": "Copper", "constitutive_model": {"elastic_model_name": "Hooke"}}],
             ),
             access_type="c",
         )
@@ -1182,7 +1182,7 @@ class JSONDataSharingTests(TestCase):
             owner=self.viewer,
             data=self._build_valid_upload_object(
                 "nickel-object",
-                phase=[{"phase_identifier": "Nickel"}],
+                phase=[{"phase_name": "Nickel", "constitutive_model": {"elastic_model_name": "Hooke"}}],
             ),
             access_type="c",
         )

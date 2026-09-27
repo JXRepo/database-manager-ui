@@ -247,6 +247,24 @@ describe('uploads across ordinary page navigation', {skip: !existsSync(chromium)
     assert.equal(await evaluate('window === window.top && !document.querySelector("iframe")'), true);
   });
 
+  test('checking and provisional saving counts remain distinct from uploaded results', async t => {
+    job = snapshot();
+    const evaluate = await page(t);
+    await waitFor(evaluate, 'document.querySelector(".selected-file-status")?.textContent.includes("37")');
+    assert.equal(await evaluate('document.querySelector(".selected-file-status").textContent'), 'Checking 37 / 100');
+    assert.equal(await evaluate('document.querySelector(".selected-file-spinner").hidden'), true);
+    job.files[0] = {...job.files[0], status: 'saving', validated_count: 100, saving_count: 70};
+    await waitFor(evaluate, 'document.querySelector(".selected-file-status")?.textContent === "Saving 70 / 100"');
+    assert.match(await evaluate('uploadStatus.textContent'), /whole file/);
+    assert.doesNotMatch(await evaluate('document.querySelector(".selected-file-status").textContent'), /Uploaded/);
+    job = {...job, status: 'completed', level: 'error', summary: 'No data from this file was saved.',
+      report_html: '<p>Correct units.Stress and upload the file again.</p>',
+      files: [{...job.files[0], status: 'failed', failed_object_count: 30, saved_count: 0}]};
+    await waitFor(evaluate, 'document.getElementById("upload-results").textContent.includes("units.Stress")');
+    assert.match(await evaluate('uploadStatus.textContent'), /No data/);
+    assert.match(await evaluate('document.querySelector(".selected-file-status").textContent'), /30.*need changes/);
+  });
+
   for (const mode of ['disconnect-saved', 'disconnect-old']) {
     test(`a lost POST response checks the submission identity (${mode})`, async t => {
       job = null; postCount = 0; postMode = mode;

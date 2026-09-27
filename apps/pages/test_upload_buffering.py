@@ -9,7 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
+from .upload_test_data import valid_upload_object
 from .models import JSONData
 from .upload_services import validate_json_depth
 
@@ -34,7 +34,7 @@ class UploadBufferingTests(TestCase):
         self.client.force_login(owner)
         files = []
         for index in range(3):
-            data = dict.fromkeys(REQUIRED_TOP_LEVEL_FIELDS, "metadata")
+            data = valid_upload_object()
             data.update(identifier=f"buffering-{index}", shared_with=[{"access_type": "c"}])
             files.append(SimpleUploadedFile(f"{index}.json", json.dumps(data).encode("utf-8")))
         references = []

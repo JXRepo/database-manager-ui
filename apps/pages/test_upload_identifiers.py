@@ -1,15 +1,14 @@
 import copy
 import json
-from pathlib import Path
 from unittest.mock import patch
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
+from .upload_test_data import valid_upload_object
 from .models import JSONData
 from .upload_services import canonical_json_size, generate_data_identifier
 
@@ -19,17 +18,16 @@ class UploadIdentifierTests(TestCase):
     Exercise identifier generation and conflicts through real uploads
     """
 
-    example_fingerprint = "e52f02f5c6fa72b995669aa804a6b903fc6989bff2f42d25ffb632fc9a43dad0"
+    example_fingerprint = "684a6b9eaf174e77e12ab42a7243ba6509079ee959a3ac7f41562d839ec8e89f"
 
     @classmethod
     def setUpTestData(cls):
         """
-        Load a real example and create two isolated upload owners
+        Create synthetic metadata and two isolated upload owners
         """
         cls.owner = User.objects.create_user(username="identifier-owner", password="password")
         cls.other = User.objects.create_user(username="identifier-other", password="password")
-        path = Path(settings.BASE_DIR) / "example_json_files/a46fde6c1_public.json"
-        cls.example = json.loads(path.read_text(encoding="utf-8"))
+        cls.example = valid_upload_object(identifier="example")
 
     def setUp(self):
         """

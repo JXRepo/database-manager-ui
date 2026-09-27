@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://github.com/Ronakshoghi/MiMeDat/blob/main/general_constitutive_model_metadata_schema.json",
+  "version": "1.0.0",
+  "type": "object",
+  "description": "A flexible general schema for constitutive models, allowing optional elastic, plastic, and damage models, with enforced element names. Units can be freely defined by the user.",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Reference to the schema used for this constitutive model."
+    },
+    "elastic_model_name": {
+      "type": ["string", "null"],
+      "description": "Name of the elastic model (optional)."
+    },
+    "elastic_parameters": {
+      "type": "object",
+      "description": "Elastic properties of the material (optional). If used, the name must be 'elastic_parameters'.",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "plastic_model_name": {
+      "type": ["string", "null"],
+      "description": "Name of the plasticity model (optional)."
+    },
+    "plastic_parameters": {
+      "type": "object",
+      "description": "Plastic properties of the material, including hardening (optional). If used, the name must be 'plastic_parameters'.",
+      "properties": {},
+      "additionalProperties": true
+    },
+    "damage_model_name": {
+      "type": ["string", "null"],
+      "description": "Name of the damage model (optional)."
+    },
+    "damage_parameters": {
+      "type": "object",
+      "description": "Parameters specific to the damage model (optional). If used, the name must be 'damage_parameters'.",
+      "properties": {},
+      "additionalProperties": true
+    }
+  },
+  "units": {
+    "type": "object",
+    "description": "Units for different physical properties, defined by the user (optional).",
+    "properties": {},
+    "additionalProperties": true
+  },
+  "required": [],
+  "additionalProperties": true
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "file": "mechanical.json",
+    "url": "https://raw.githubusercontent.com/Ronakshoghi/MiMeDat/3093b6de3b24fccab6f6b2d2013bcdb170e90a32/microstructure_sensitive_mechanical_metadata_schema.json",
+    "sha256": "1957008fd5283506b274a3b971b162edbdbf41e00b221d1183a11adcfe82c2a1",
+    "upstream_sha256": "1db1b1de37b00fbaaa1543b3a2cc55f0b50260ee22c8d2f837aed1f57a61b92d",
+    "normalization": "LF line endings and no trailing whitespace"
+  },
+  {
+    "file": "constitutive.json",
+    "url": "https://raw.githubusercontent.com/Ronakshoghi/MetadataSchema/51029f3b30d4a25fef1c1dd21089382f8b610e05/general_constitutive_model_metadata_schema.json",
+    "sha256": "bea538ce8bbf5ca69e8991023c244a7b4c6314134a107847182402a788b2df9e",
+    "upstream_sha256": "13220dcc12c70687e0305b1b644b955193e4c83e069ec3174c6fa6463ef5689e",
+    "normalization": "LF line endings and no trailing whitespace"
+  },
+  {
+    "file": "microstructure.json",
+    "url": "https://raw.githubusercontent.com/YousefRezek/MicrostructureEvolutionDataSchema/17392554b7d3411fdf8064a862e17561ffc4edc9/Microstructure_Module.json",
+    "sha256": "d4a5f193f657c3c2c0c6cd0477fb35b9cca68ca36a7f87d4f1b2e97e809ba0e6",
+    "upstream_sha256": "d4a5f193f657c3c2c0c6cd0477fb35b9cca68ca36a7f87d4f1b2e97e809ba0e6",
+    "normalization": "LF line endings and no trailing whitespace"
+  }
+]

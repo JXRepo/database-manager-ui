@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/YousefRezek/MiMeDat-Microstructure-Module/blob/main/Microstructure_Module.json",
+  "version": "1.0.0",
+  "title": "MiMeDat Microstructure Module",
+  "description": "Time-ordered array of microstructure snapshots, each capturing the microstructural state at a single time point, described at the grid, grain and voxel level.",
+  "type": "array",
+  "$comment": "This schema introduces a dedicated microstructure-evolution module within the schema (microstructure_sensitive_mechanical_metadata_schema) that captures time-resolved microstructural states at both the voxel scale and grain scale, and links these states directly to mechanical property outcomes.",
+  "items": {
+    "type": "object",
+    "properties": {
+      "microstructure_state_id": {
+        "description": "Schema-level identifier of a selected simulation-ready state: the prefix 'S_' followed by the leading eight hexadecimal characters of a SHA-256 digest computed from the content of the snapshot (grid together with the grain- and voxel-level fields that define the state) under a fixed serialization convention. Only snapshots whose grid status is 'undeformed' are eligible; it is assigned when the snapshot is selected for reference or transfer across data objects, and a transferred state keeps the same identifier in the data object that reuses it.",
+        "type": "string",
+        "pattern": "^S_[0-9a-f]{8}$"
+      },
+      "time_point": {
+        "description": "Cumulative physical time elapsed from the start of the simulation to the state represented by the snapshot, in the dataset time unit. It increases continuously across all loading steps and cycles and does not reset between them. A recovered (undeformed) snapshot obtained from a deformed one shares the time_point of that deformed state.",
+        "type": "number",
+        "minimum": 0
+      },
+      "grid": {
+        "description": "Grid definition for this microstructure snapshot, including its deformation state, physical size, and voxel-aligned spacing.",
+        "type": "object",
+        "properties": {
+          "status": {
+            "description": "Deformation configuration of the snapshot: 'undeformed' (regular reference grid or a grid recovered by regridding; voxels are regular cubes) or 'deformed' (distorted, potentially non-orthogonal grid).",
+            "type": "string",
+            "enum": [
+              "undeformed",
+              "deformed"
+            ]
+          },
+          "grid_size": {
+            "description": "Physical size of the grid in x, y, z in the dataset length unit. Exact for an undeformed grid; an estimate of the current extent, reconstructed from the volume-averaged deformation gradient, for a deformed grid.",
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "grid_spacing": {
+            "description": "Voxel spacing in x, y, z in the dataset length unit, interpreted in the same way as grid_size according to the snapshot status.",
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "required": [
+          "status",
+          "grid_size",
+          "grid_spacing"
+        ],
+        "additionalProperties": false
+      },
+      "grains": {
+        "description": "Constituent-level description of the snapshot (optional). Included when a grain-level description is retained; voxel entries then reference grains through grain_id.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "grain_id": {
+              "description": "Grain identifier, unique within the snapshot and preserved across snapshots wherever the grain persists.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "phase_id": {
+              "description": "Identifier of the phase to which the grain belongs.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "grain_volume": {
+              "description": "Volume of the grain in the dataset volume unit.",
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "orientation": {
+              "type": "array",
+              "description": "Representative crystal orientation as Bunge-Euler angles [phi1, Phi, phi2] in the dataset angle unit.",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "number"
+              }
+            },
+            "parent_grain_id": {
+              "description": "Identifier(s) of the parent grain(s) in the preceding snapshot: an integer for a single parent, an array when a grain forms from several. Conditional: included when grain evolution (nucleation, merging, subdivision) is tracked across snapshots and omitted otherwise.",
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "grain_id",
+            "phase_id",
+            "orientation"
+          ]
+        }
+      },
+      "voxels": {
+        "description": "Locally resolved description of the snapshot: one entry per voxel, carrying the phase, the crystallographic orientation and the field quantities computed by the solver. The listed fields are representative; the record may be extended with additional state or visualization quantities.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "voxel_id": {
+              "description": "Unique voxel identifier within the snapshot.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "grain_id": {
+              "description": "Identifier of the grain to which the voxel belongs. Conditional: present when a grain-level description is retained (the grains array is included); absent otherwise.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "phase_id": {
+              "description": "Identifier of the phase to which the voxel belongs; a denormalization that links voxels directly to phases.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "centroid_coordinates": {
+              "description": "Voxel centroid position in x, y, z in the dataset length unit.",
+              "minItems": 3,
+              "maxItems": 3,
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "voxel_index": {
+              "description": "Integer voxel indices [i, j, k] on the grid.",
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "voxel_volume": {
+              "description": "Voxel volume in the dataset volume unit.",
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "orientation": {
+              "description": "Crystal orientation as Bunge-Euler angles [phi1, Phi, phi2] in the dataset angle unit.",
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "number"
+              }
+            },
+            "deformation_gradient": {
+              "description": "Deformation gradient F at the voxel (row-major).",
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            "first_piola_kirchhoff_stress": {
+              "description": "First Piola-Kirchhoff stress P at the voxel (row-major), in the dataset stress unit.",
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            "strain": {
+              "description": "Strain tensor as a 3x3 matrix (row-major).",
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "array",
+                "minItems": 3,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              }
+            },
+            "IPFcolor_(1 0 0)": {
+              "description": "IPF color for the (1 0 0) direction as 8-bit RGB [R,G,B].",
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
+            }
+          },
+          "required": [
+            "voxel_id",
+            "phase_id",
+            "centroid_coordinates",
+            "voxel_index",
+            "orientation"
+          ]
+        }
+      }
+    },
+    "required": [
+      "time_point",
+      "grid",
+      "voxels"
+    ]
+  }
+}

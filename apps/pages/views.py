@@ -55,6 +55,8 @@ from .orcid_auth import (
     start_orcid_transaction,
 )
 from .notifications import build_shared_data_notification_message
+from .upload_unwrap import object_paths, objects_at_paths
+from apps.dyn_api.required_schema import field_path
 from .upload_services import (
     UploadIdentifierConflict,
     UploadQuotaExceeded,
@@ -73,7 +75,7 @@ ASSISTANT_MAX_QUESTION_LENGTH = 600
 SHARE_USERNAME_KEY = "username"
 UPLOAD_ISSUE_CATEGORIES = (
     ("invalid_file", "Invalid JSON file", "Correct the JSON syntax in this file before uploading it again."),
-    ("invalid_structure", "Invalid JSON structure", "Use a JSON object, a list of objects, or an object containing a data list."),
+    ("invalid_structure", "Invalid JSON structure", "Keep each data object together in a list or a dictionary of objects. Use the schema's object and list structures for its fields."),
     ("empty_file", "No data objects", "Add at least one data object to this file."),
     ("file_size", "File size limit", "Reduce the file size or split its data objects into smaller JSON files."),
     ("json_depth", "Too many nested levels", "Reduce the nesting of JSON objects and lists."),
@@ -752,7 +754,9 @@ def _get_upload_issue_messages(upload_files):
             groups = _upload_issue_groups(object_report["issues"])
             for group in groups:
                 if group["category"] == "invalid_structure":
-                    group["guidance"] = "Replace this entry with a JSON object containing the required fields."
+                    group["guidance"] = ("Use the expected value type and structure at each listed field."
+                                         if group["fields"] else
+                                         "Replace this entry with a JSON object containing the required fields.")
             if groups:
                 objects.append({**object_report, "groups": groups})
         groups = _upload_issue_groups(file_report["issues"]) if file_report["status"] == "failed" else []
@@ -958,8 +962,8 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         User uploading the file.
     file_report : dict
         File feedback to populate with object errors.
-    object_depth : int
-        Number of surrounding JSON containers removed while unwrapping.
+    object_depth : int or list of tuple
+        Original container depth or exact paths produced by the batch precheck.
     saved_identifiers : set of str
         Identifiers and fingerprints from successfully saved files in this request.
     progress : callable, optional
@@ -970,8 +974,6 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
     tuple
         Prepared objects and their reports, indexed by the preview identifier.
     """
-    valid_objects, errors = validate_json(objects, detailed=True)
-    valid_object_ids = {id(obj) for obj in valid_objects}
     for position, obj in enumerate(objects, start=1):
         title = obj.get("title") if isinstance(obj, dict) else None
         identifier = obj.get("identifier") if isinstance(obj, dict) else None
@@ -979,12 +981,9 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
             "position": position,
             "title": _upload_label(title).strip(),
             "identifier": _upload_label(identifier) if isinstance(identifier, str) and identifier == identifier.strip() else "",
+            "source": _upload_label(field_path(object_depth[position - 1])) if isinstance(object_depth, list) else "",
             "issues": {},
         })
-
-    for error in errors:
-        object_report = file_report["objects"][error["object_index"] - 1]
-        _add_upload_issue(object_report["issues"], error["category"], error["message"], fields=error["fields"])
 
     seen_identifiers = set()
     pending_objects = []
@@ -993,10 +992,14 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
     for completed, (obj, object_report) in enumerate(zip(objects, file_report["objects"])):
         if progress is not None:
             progress("validating", completed, len(objects))
+        valid_objects, errors = validate_json([obj], detailed=True)
+        for error in errors:
+            _add_upload_issue(object_report["issues"], error["category"], error["message"], fields=error["fields"])
+        depth = len(object_depth[completed]) if isinstance(object_depth, list) else object_depth
         content_error = False
         size_bytes = 0
         try:
-            validate_json_depth(obj, initial_depth=object_depth)
+            validate_json_depth(obj, initial_depth=depth)
             size_bytes = canonical_json_size(obj)
         except UploadResourceLimitError as error:
             _add_upload_issue(object_report["issues"], error.category, str(error))
@@ -1008,9 +1011,15 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         try:
             if content_error:
                 shared_with = obj.get("shared_with", [])
-                validate_json_depth(shared_with, initial_depth=object_depth + 1)
+                validate_json_depth(shared_with, initial_depth=depth + 1)
                 canonical_json_size(shared_with)
             access_type, shared_users, access_issues = _resolve_upload_access_metadata(obj, owner)
+            if any(category == "invalid_share_structure" for category, _ in access_issues):
+                structure = object_report["issues"].get("invalid_structure")
+                if structure:
+                    structure["fields"] = [field for field in structure["fields"] if not field.startswith("shared_with[")]
+                    if not structure["fields"]:
+                        object_report["issues"].pop("invalid_structure")
             for category, issue in access_issues:
                 _add_upload_issue(object_report["issues"], category, issue)
         except UploadResourceLimitError as error:
@@ -1024,7 +1033,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         )
         fingerprint = ""
         if not supplied:
-            if content_error or id(obj) not in valid_object_ids:
+            if content_error or not valid_objects:
                 continue
             fingerprint = data_fingerprint(obj)
             try:
@@ -1080,7 +1089,7 @@ def _inspect_upload_file(uploaded_file, file_report):
     Returns
     -------
     tuple or None
-        Object count and original container depth, or None for an unreadable
+        Object count and original record paths, or None for an unreadable
         or empty file.
     """
     try:
@@ -1099,31 +1108,23 @@ def _inspect_upload_file(uploaded_file, file_report):
         _add_upload_issue(file_report["issues"], "invalid_file", "This file could not be read as JSON.")
         return None
 
-    if isinstance(payload, list):
-        objects, object_depth, wrapper = payload, 1, None
-    elif isinstance(payload, dict):
-        if isinstance(payload.get("data"), list):
-            objects, object_depth = payload["data"], 2
-            wrapper = dict(payload, data=[])
-        else:
-            objects, object_depth, wrapper = [payload], 0, None
-    else:
+    if not isinstance(payload, (dict, list)):
         _add_upload_issue(
             file_report["issues"], "invalid_structure",
             "This file does not contain a data object or a list of data objects.",
         )
         return None
 
-    if wrapper is not None:
-        try:
-            validate_json_depth(wrapper)
-            canonical_json_size(wrapper)
-        except UploadResourceLimitError as error:
-            _add_upload_issue(file_report["issues"], error.category, str(error))
-    if not objects:
+    try:
+        validate_json_depth(payload)
+        canonical_json_size(payload)
+    except UploadResourceLimitError as error:
+        _add_upload_issue(file_report["issues"], error.category, str(error))
+    paths = object_paths(payload)
+    if not paths:
         _add_upload_issue(file_report["issues"], "empty_file", "This file contains no data objects.")
         return None
-    return len(objects), object_depth
+    return len(paths), paths
 
 
 def _process_upload_file(
@@ -1144,8 +1145,8 @@ def _process_upload_file(
         File status and grouped issues to update.
     uploaded_file : UploadedFile
         Inspected file to read again for validation and saving.
-    object_depth : int
-        Surrounding containers removed during unwrapping.
+    object_depth : int or list of tuple
+        Original container depth or exact inspected record paths.
     saved_identifiers : set of str
         Identifiers and fingerprints committed earlier in this submission.
     progress : callable, optional
@@ -1158,7 +1159,9 @@ def _process_upload_file(
         progress("parsing", 0, None)
     uploaded_file.seek(0)
     payload = json.load(uploaded_file)
-    if object_depth == 0:
+    if isinstance(object_depth, list):
+        objects = objects_at_paths(payload, object_depth)
+    elif object_depth == 0:
         objects = [payload]
     elif object_depth == 1:
         objects = payload
@@ -1172,9 +1175,9 @@ def _process_upload_file(
 
     try:
         if progress is not None:
-            progress("saving", len(objects), len(objects))
+            progress("saving", 0, len(objects))
         with transaction.atomic():
-            saved_objects = save_prepared_json_data(owner, prepared_objects)
+            saved_objects = save_prepared_json_data(owner, prepared_objects, progress=progress)
             if on_saved is not None:
                 on_saved(dict(file_report, status="uploaded", saved_count=len(saved_objects)))
     except UploadIdentifierConflict as error:
@@ -1215,7 +1218,7 @@ def _upload_progress(upload_files, parsed_files, owner):
     upload_files : list of dict
         Reports for all selected files, including files that could not be parsed.
     parsed_files : dict
-        File indexes mapped to uploaded files and original container depth.
+        File indexes mapped to uploaded files and inspected record paths.
     owner : User
         Authenticated uploader.
 

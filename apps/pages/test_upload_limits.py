@@ -8,6 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from .upload_test_data import valid_upload_object
 from .models import DataNotification, JSONData
 from .rate_limits import RateLimitDecision
 from .upload_services import (
@@ -489,33 +490,7 @@ class UploadResourceViewTests(TestCase):
         """
         Build a minimal object satisfying every required top level field
         """
-        return {
-            "identifier": identifier,
-            "title": "Title",
-            "creator": "Creator",
-            "creator_affiliation": "Affiliation",
-            "date": "2026-08-09",
-            "shared_with": [{"access_type": "c"}],
-            "rights": "Rights",
-            "rights_holder": "Rights holder",
-            "software": "Software",
-            "software_version": "1",
-            "system": "System",
-            "system_version": "1",
-            "processor_specifications": "Processor",
-            "input_path": "input",
-            "results_path": "results",
-            "RVE_size": "size",
-            "RVE_continuity": True,
-            "discretization_type": "type",
-            "discretization_unit_size": "unit",
-            "discretization_count": 1,
-            "mechanical_BC": "boundary",
-            "phase": "phase",
-            "stress": "stress",
-            "total_strain": "strain",
-            "units": "units",
-        }
+        return valid_upload_object(identifier=identifier)
 
     def _json_file(self, value, name="objects.json"):
         """
@@ -728,13 +703,13 @@ class UploadResourceViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(JSONData.objects.count(), 0)
 
-    @override_settings(PILOT_MAX_JSON_DEPTH=3)
+    @override_settings(PILOT_MAX_JSON_DEPTH=4)
     def test_depth_rejection_preserves_other_valid_files(self):
         """
         Excessive depth rejects its file without preventing later uploads
         """
         nested_object = self._valid("too-deep")
-        nested_object["extra"] = [[[0]]]
+        nested_object["extra"] = [[[[0]]]]
 
         response = self.client.post(
             reverse("upload_json"),

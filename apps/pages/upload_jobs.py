@@ -1,4 +1,5 @@
 import logging
+import json
 import os
 import shutil
 import time
@@ -48,13 +49,56 @@ def job_snapshot(job):
     dict
         Public task fields without staging paths or worker tokens.
     """
-    fields = ("name", "status", "validated_count", "object_count", "saved_count")
-    return {
+    fields = ("name", "status", "validated_count", "object_count", "saved_count", "failed_object_count")
+    snapshot = {
         "id": str(job.pk), "submission_id": str(job.submission_id), "status": job.status,
-        "files": [{key: item[key] for key in fields} for item in job.files],
+        "files": [{key: item.get(key, 0) for key in fields} for item in job.files],
         "summary": job.summary, "level": job.level, "report_html": job.report_html,
         "created_at": job.created_at.isoformat(), "updated_at": job.updated_at.isoformat(),
     }
+    if job.status == "processing":
+        try:
+            progress = json.loads((staging_directory(job) / "save-progress.json").read_text())
+            index = progress["index"]
+            if progress["claim_token"] == str(job.claim_token) and 0 <= index < len(snapshot["files"]):
+                file = snapshot["files"][index]
+                completed = progress["completed"]
+                if (file["status"] == "saving" and progress["total"] == file["object_count"]
+                        and isinstance(completed, int) and 0 <= completed <= file["object_count"]):
+                    file["saving_count"] = completed
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    return snapshot
+
+
+def write_save_progress(job, index, completed, total):
+    """
+    Publish provisional work counts without waiting for the data transaction
+
+    The private sidecar contains no uploaded content. Only an owner authorized
+    task snapshot can read it, and terminal database results always take priority.
+
+    Parameters
+    ----------
+    job : UploadJob
+        Claimed job whose private staging directory already exists.
+    index : int
+        Original file position.
+    completed : int
+        Records processed inside the uncommitted transaction.
+    total : int
+        Total records being saved.
+    """
+    directory = staging_directory(job)
+    temporary = directory / "save-progress.tmp"
+    try:
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, "w") as output:
+            json.dump({"claim_token": str(job.claim_token), "index": index,
+                       "completed": completed, "total": total}, output)
+        os.replace(temporary, directory / "save-progress.json")
+    except OSError:
+        logger.warning("Could not publish save progress for upload %s", job.pk)
 
 
 def _response(data, status=200):
@@ -505,14 +549,14 @@ def process_upload_job(job):
 
             def progress(stage, completed, total):
                 """
-                Record completed object checks without predicting saved objects
+                Record real work while keeping provisional saves out of durable results
 
                 Parameters
                 ----------
                 stage : str
                     Current processing phase.
                 completed : int
-                    Objects whose validation has finished.
+                    Objects whose work in this phase has finished.
                 total : int
                     Known object count.
                 """
@@ -520,9 +564,14 @@ def process_upload_job(job):
                 if (stage == last_progress["stage"] and completed not in (0, total)
                         and now - last_progress["time"] < 0.5):
                     return
-                _update_file(job, index, {
-                    "status": stage, "validated_count": completed, "object_count": total,
-                })
+                if stage == "saving" and completed:
+                    write_save_progress(job, index, completed, total)
+                else:
+                    values = {"status": stage, "object_count": total}
+                    if stage == "validating":
+                        values["validated_count"] = completed
+                        values["failed_object_count"] = sum(bool(obj["issues"]) for obj in report["objects"])
+                    _update_file(job, index, values)
                 last_progress.update(time=now, stage=stage)
 
             def on_saved(file_report):
@@ -543,7 +592,10 @@ def process_upload_job(job):
                     progress=progress, on_saved=on_saved,
                 )
             if report["status"] != "uploaded":
-                _update_file(job, index, {**report, "status": "failed", "validated_count": report["object_count"]})
+                _update_file(job, index, {
+                    **report, "status": "failed", "validated_count": report["object_count"],
+                    "failed_object_count": sum(bool(obj["issues"]) for obj in report["objects"]),
+                })
         _finish_job(job)
     except UploadStopped:
         interrupt_job(job.pk, "Upload interrupted. Confirmed results are retained; unfinished files were not retried.")

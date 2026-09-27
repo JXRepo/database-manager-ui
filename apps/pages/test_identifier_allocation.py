@@ -1,20 +1,19 @@
 import copy
 import json
-from pathlib import Path
 from unittest.mock import patch
 
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.db.models.query import QuerySet
 from django.test import TestCase
 from django.urls import reverse
 
 from . import upload_services
+from .upload_test_data import valid_upload_object
 from .models import DataNotification, JSONData
 
 
-EXAMPLE_FINGERPRINT = "e52f02f5c6fa72b995669aa804a6b903fc6989bff2f42d25ffb632fc9a43dad0"
-EXAMPLE_IDENTIFIER_STREAM = "4fvjlgcqe376d07x25ykq2uu7nfq35tpuuzja7it4mzw8bymp5"
+EXAMPLE_FINGERPRINT = "684a6b9eaf174e77e12ab42a7243ba6509079ee959a3ac7f41562d839ec8e89f"
+EXAMPLE_IDENTIFIER_STREAM = "7id5xh701ukx1rf2gym5ka0s2kprk92k4khjkt2udmifzhqkl2"
 
 
 class IdentifierAllocationTests(TestCase):
@@ -25,12 +24,11 @@ class IdentifierAllocationTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         """
-        Load example metadata and create isolated owners
+        Create portable synthetic metadata and isolated owners
         """
         cls.other = User.objects.create_user(username="allocation-other")
         cls.owner = User.objects.create_user(username="allocation-owner")
-        path = Path(settings.BASE_DIR) / "example_json_files/a46fde6c1_public.json"
-        cls.example = json.loads(path.read_text(encoding="utf-8"))
+        cls.example = valid_upload_object(identifier="example")
 
     def setUp(self):
         """
@@ -100,7 +98,7 @@ class IdentifierAllocationTests(TestCase):
         identifier = upload_services.generate_data_identifier(self.data)
 
         self.assertRegex(identifier, r"^[0-9a-z]{8}$")
-        self.assertEqual(identifier, "4fvjlgcq")
+        self.assertEqual(identifier, "7id5xh70")
         self.assertFalse(JSONData.objects.exists())
         self.assertNotIn("identifier", self.data)
 
@@ -108,19 +106,19 @@ class IdentifierAllocationTests(TestCase):
         """
         Preserve occupied identifiers and use the next available prefix
         """
-        first = self._occupy_identifier("4fvjlgcq")
+        first = self._occupy_identifier("7id5xh70")
 
         self.assertEqual(
-            upload_services.generate_data_identifier(self.data), "4fvjlgcqe",
+            upload_services.generate_data_identifier(self.data), "7id5xh701",
         )
-        second = self._occupy_identifier("4fvjlgcqe")
+        second = self._occupy_identifier("7id5xh701")
         self.assertEqual(
-            upload_services.generate_data_identifier(self.data), "4fvjlgcqe3",
+            upload_services.generate_data_identifier(self.data), "7id5xh701u",
         )
         first.refresh_from_db()
         second.refresh_from_db()
-        self.assertEqual(first.data["identifier"], "4fvjlgcq")
-        self.assertEqual(second.data["identifier"], "4fvjlgcqe")
+        self.assertEqual(first.data["identifier"], "7id5xh70")
+        self.assertEqual(second.data["identifier"], "7id5xh701")
         self.assertEqual(JSONData.objects.count(), 2)
 
     def test_late_collision_updates_saved_bytes_and_notification_identifier(self):
@@ -128,19 +126,19 @@ class IdentifierAllocationTests(TestCase):
         Reallocate after preparation before accounting or notifying recipients
         """
         prepared = self._prepare(shared_users=(self.other,))
-        blocker = self._occupy_identifier("4fvjlgcq")
+        blocker = self._occupy_identifier("7id5xh70")
 
         saved = upload_services.save_prepared_json_data(self.owner, [prepared])[0]
 
-        self.assertEqual(saved.data["identifier"], "4fvjlgcqe")
+        self.assertEqual(saved.data["identifier"], "7id5xh701")
         self.assertEqual(saved.size_bytes, prepared.size_bytes + 1)
         self.assertEqual(saved.identifier_fingerprint, EXAMPLE_FINGERPRINT)
         self.assertEqual(saved.shared_users.get(), self.other)
         notification = DataNotification.objects.get()
         self.assertEqual(notification.data_object, saved)
-        self.assertIn("4fvjlgcqe", notification.message)
+        self.assertIn("7id5xh701", notification.message)
         blocker.refresh_from_db()
-        self.assertEqual(blocker.data["identifier"], "4fvjlgcq")
+        self.assertEqual(blocker.data["identifier"], "7id5xh70")
 
     def test_final_allocation_follows_global_then_owner_lock_requests(self):
         """
@@ -202,14 +200,14 @@ class IdentifierAllocationTests(TestCase):
             ("lock", self.owner.pk),
             ("allocate", EXAMPLE_FINGERPRINT),
         ])
-        self.assertEqual(saved[0].data["identifier"], "4fvjlgcq")
+        self.assertEqual(saved[0].data["identifier"], "7id5xh70")
 
     def test_late_extension_over_quota_creates_no_rows_or_notifications(self):
         """
         Reject the extra identifier byte rather than exceeding the live quota
         """
         prepared = self._prepare(shared_users=(self.other,))
-        self._occupy_identifier("4fvjlgcq")
+        self._occupy_identifier("7id5xh70")
 
         with self.settings(PILOT_MAX_USER_JSON_BYTES=prepared.size_bytes):
             with self.assertRaises(upload_services.UploadQuotaExceeded):
@@ -227,7 +225,7 @@ class IdentifierAllocationTests(TestCase):
         earlier = self._prepare(dict(self.data, title="Earlier batch object"))
         existing = JSONData.objects.create(
             owner=self.other,
-            data=dict(self.data, identifier="4fvjlgcqe"),
+            data=dict(self.data, identifier="7id5xh701"),
             identifier_fingerprint=EXAMPLE_FINGERPRINT,
             access_type="c",
             size_bytes=1,
@@ -236,21 +234,21 @@ class IdentifierAllocationTests(TestCase):
         with self.assertRaises(upload_services.UploadIdentifierConflict) as caught:
             upload_services.save_prepared_json_data(self.owner, [earlier, prepared])
 
-        self.assertEqual(caught.exception.identifiers, ("4fvjlgcq",))
+        self.assertEqual(caught.exception.identifiers, ("7id5xh70",))
         self.assertFalse(JSONData.objects.filter(owner=self.owner).exists())
         self.assertEqual(JSONData.objects.count(), 1)
         self.assertFalse(DataNotification.objects.exists())
         existing.refresh_from_db()
-        self.assertEqual(existing.data["identifier"], "4fvjlgcqe")
+        self.assertEqual(existing.data["identifier"], "7id5xh701")
 
     def test_final_extension_reserves_later_supplied_identifiers(self):
         """
         Avoid every supplied batch identifier during final automatic allocation
         """
         automatic = self._prepare()
-        self._occupy_identifier("4fvjlgcq")
+        self._occupy_identifier("7id5xh70")
         supplied = upload_services.PreparedJSONData(
-            data={"identifier": "4fvjlgcqe"},
+            data={"identifier": "7id5xh701"},
             access_type="c",
             shared_users=(),
             size_bytes=17,
@@ -258,9 +256,9 @@ class IdentifierAllocationTests(TestCase):
 
         saved = upload_services.save_prepared_json_data(self.owner, [automatic, supplied])
 
-        self.assertEqual(saved[0].data["identifier"], "4fvjlgcqe3")
+        self.assertEqual(saved[0].data["identifier"], "7id5xh701u")
         self.assertEqual(saved[0].size_bytes, automatic.size_bytes + 2)
-        self.assertEqual(saved[1].data, {"identifier": "4fvjlgcqe"})
+        self.assertEqual(saved[1].data, {"identifier": "7id5xh701"})
         self.assertEqual(saved[1].size_bytes, 17)
         self.assertEqual(saved[1].identifier_fingerprint, "")
 
@@ -276,7 +274,7 @@ class IdentifierAllocationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(saved.identifier_fingerprint, EXAMPLE_FINGERPRINT)
-        self.assertEqual(saved.data, dict(self.data, identifier="4fvjlgcq"))
+        self.assertEqual(saved.data, dict(self.data, identifier="7id5xh70"))
         self.assertEqual(json.loads(response.content), saved.data)
         self.assertNotIn("identifier_fingerprint", saved.data)
 
@@ -286,7 +284,7 @@ class IdentifierAllocationTests(TestCase):
         """
         JSONData.objects.create(
             owner=self.other,
-            data=dict(self.data, identifier="4fvjlgcqe3"),
+            data=dict(self.data, identifier="7id5xh701u"),
             identifier_fingerprint=EXAMPLE_FINGERPRINT,
             size_bytes=1,
         )
@@ -294,7 +292,7 @@ class IdentifierAllocationTests(TestCase):
 
         identifier = upload_services.generate_data_identifier(optional_change)
 
-        self.assertEqual(identifier, "4fvjlgcqe3")
+        self.assertEqual(identifier, "7id5xh701u")
         self.assertEqual(JSONData.objects.count(), 1)
 
     def test_old_full_digest_is_recognized_without_rewriting_the_record(self):

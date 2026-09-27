@@ -10,6 +10,9 @@
         {% endif %}
       </p>
       {% include "includes/upload_issue_groups.html" with groups=file.groups only %}
+      {% if file.objects %}
+      <details class="upload-object-issues"{% if file.objects|length == 1 %} open{% endif %}>
+        <summary>{{ file.objects|length }} data object{{ file.objects|pluralize }} need{{ file.objects|pluralize:"s," }} changes — view field errors</summary>
       {% for object in file.objects %}
         <section class="upload-report-object" data-upload-object>
           <p class="upload-report-object-title">
@@ -29,9 +32,14 @@
               <span>Object {{ object.position }} in this file</span>
             </p>
           {% endif %}
+          {% if object.source %}
+            <p class="upload-report-object-meta">Location: <code>{{ object.source }}</code></p>
+          {% endif %}
           {% include "includes/upload_issue_groups.html" with groups=object.groups only %}
         </section>
       {% endfor %}
+      </details>
+      {% endif %}
     </section>
   {% endfor %}
 </div>

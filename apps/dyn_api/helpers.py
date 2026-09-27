@@ -7,6 +7,7 @@ from django.db import models
 from django.http import HttpResponseRedirect, HttpResponse
 
 from rest_framework import serializers
+from .required_schema import is_empty, nested_required_issues
 
 
 REQUIRED_TOP_LEVEL_FIELDS = [
@@ -91,7 +92,7 @@ def check_permission(function):
 
 def _is_empty_required_value(value):
     """
-    Return True when a required top-level field value is empty
+    Return True when a required field value is empty
 
     Parameters
     ----------
@@ -103,22 +104,13 @@ def _is_empty_required_value(value):
     bool
         True when the value is empty
     """
-    if value is None:
-        return True
-
-    if isinstance(value, str) and not value.strip():
-        return True
-
-    if isinstance(value, (list, dict)) and len(value) == 0:
-        return True
-
-    return False
+    return is_empty(value)
 
 
 
 def validate_json(data, *, detailed=False):
     """
-    Validate JSON objects using required top-level fields only
+    Validate top level and schema derived nested required fields
 
     Parameters
     ----------
@@ -132,7 +124,7 @@ def validate_json(data, *, detailed=False):
     Returns
     -------
     valid_data : list of dict
-        Valid objects that contain all required top-level fields
+        Objects whose required fields and applicable required descendants pass
 
     errors : list of str or list of dict
         Existing error messages, or issues containing object_index, category,
@@ -161,12 +153,22 @@ def validate_json(data, *, detailed=False):
             elif _is_empty_required_value(obj.get(field)):
                 empty_fields.append(field)
 
+        nested = nested_required_issues(obj)
+        missing_fields.extend(nested.get("missing_required", []))
+        empty_fields.extend(nested.get("empty_values", []))
+
         if detailed:
             for category, fields in (("missing_required", missing_fields), ("empty_values", empty_fields)):
                 if fields:
                     errors.append({
                         "object_index": index, "category": category, "fields": fields, "message": "",
                     })
+            if nested.get("invalid_structure"):
+                errors.append({
+                    "object_index": index, "category": "invalid_structure",
+                    "fields": nested["invalid_structure"],
+                    "message": " ".join(nested["structure_messages"]),
+                })
         elif missing_fields or empty_fields:
             missing_label = "field" if len(missing_fields) == 1 else "fields"
             empty_label = "field" if len(empty_fields) == 1 else "fields"
@@ -194,6 +196,10 @@ def validate_json(data, *, detailed=False):
                     f"Please add the missing required fields and fill in the empty required fields, "
                     f"then upload the JSON file again."
                 )
+            continue
+
+        if not detailed and nested.get("invalid_structure"):
+            errors.append(f"Data object {index}: invalid structure at {', '.join(nested['invalid_structure'])}.")
             continue
 
 
@@ -224,7 +230,7 @@ def validate_json(data, *, detailed=False):
                     )
                 continue
 
-        if not missing_fields and not empty_fields:
+        if not missing_fields and not empty_fields and not nested.get("invalid_structure"):
             valid_data.append(obj)
 
     return valid_data, errors

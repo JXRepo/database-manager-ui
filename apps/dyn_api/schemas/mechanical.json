@@ -1,0 +1,852 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "$id": "https://github.com/Ronakshoghi/MiMeDat/blob/main/microstructure_sensitive_mechanical_metadata_schema.json",
+  "version": "1.2.0",
+  "type": "object",
+  "description": "A workflow-centric metadata schema for microstructure-sensitive mechanical data",
+  "properties": {
+    "identifier": {
+      "type": "string",
+      "description": "Name of the data object, serving as the unique identifier."
+    },
+    "title": {
+      "type": "string",
+      "description": "The title of the data object or the project where the data object is part of it."
+    },
+    "creator": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The user responsible for generating the data object, formatted as 'Last name, First name'."
+    },
+    "creator_ORCID": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The ORCID ID of the creator. Multiple ORCID IDs are inserted as a list."
+    },
+    "creator_affiliation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The organizational affiliation of the creator. Multiple affiliations are inserted as a list."
+    },
+    "creator_institute": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The specific institute within the organization to which the creator belongs."
+    },
+    "creator_group": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The group within the organization associated with the creator."
+    },
+    "contributor": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Individuals who have contributed significantly to the data generation process."
+    },
+    "contributor_ORCID": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The ORCID ID of the contributor. Multiple ORCID IDs are separated by commas."
+    },
+    "contributor_affiliation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The organizational affiliation of the contributor. Multiple affiliations are inserted as a list."
+    },
+    "contributor_institute": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The specific institute within the organization to which the contributor belongs."
+    },
+    "contributor_group": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The group within the organization associated with the contributor."
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "The date when the data generation process started in the format YYYY-MM-DD."
+    },
+    "shared_with": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "access_type": {
+            "type": "string",
+            "enum": ["c", "u", "g", "all"],
+            "description": "Defines the type of access: 'c' for creator, 'u' for users, 'g' for groups, 'all' for public access."
+          },
+          "access_list": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of users or groups. Required if 'u' or 'g' is selected for access_type."
+          }
+        },
+        "required": ["access_type"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "access_type": { "const": "u" }
+              }
+            },
+            "then": {
+              "required": ["access_list"],
+              "properties": {
+                "access_list": {
+                  "minItems": 1,
+                  "description": "At least one user must be provided if 'u' is selected."
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "access_type": { "const": "g" }
+              }
+            },
+            "then": {
+              "required": ["access_list"],
+              "properties": {
+                "access_list": {
+                  "minItems": 1,
+                  "description": "At least one group must be provided if 'g' is selected."
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "access_type": { "const": "c" }
+              }
+            },
+            "then": {
+              "not": {
+                "required": ["access_list"]
+              },
+              "properties": {
+                "access_list": {
+                  "maxItems": 0,
+                  "description": "No access list allowed if 'c' (creator) is selected."
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "access_type": { "const": "all" }
+              }
+            },
+            "then": {
+              "not": {
+                "required": ["access_list"]
+              },
+              "properties": {
+                "access_list": {
+                  "maxItems": 0,
+                  "description": "No access list allowed if 'all' (public access) is selected."
+                }
+              }
+            }
+          }
+        ]
+      },
+      "description": "Specifies access details. 'c' for creator, 'u' for users, 'g' for groups, and 'all' for public access. For 'u' and 'g', an access_list is required, but for 'c' and 'all', no access_list is allowed."
+    },
+    "description": {
+      "type": "string",
+      "description": "A free-text description of the data object."
+    },
+    "rights": {
+      "type": "string",
+      "description": "The license under which the dataset is made available."
+    },
+    "rights_holder": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The person or organization managing rights over the resource."
+    },
+    "funder_name": {
+      "type": "string",
+      "description": "The name of the funding provider."
+    },
+    "fund_identifier": {
+      "type": "string",
+      "description": "The project identifier provided by the funding agency or body."
+    },
+    "publisher": {
+      "type": "string",
+      "description": "The entity responsible for making the dataset available."
+    },
+    "relation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Any resource related to or associated with the dataset."
+    },
+    "user_extra_information": {
+      "type": "string",
+      "description": "Additional user details or information relevant to the data object."
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Words that highlight the main topics or concepts of the data object."
+    },
+    "software": {
+      "type": "string",
+      "description": "Names of the software or computational tool used for running the simulation."
+    },
+    "software_version": {
+      "type": "string",
+      "description": "Specifies the version number of the software or computational tool used for running the simulation."
+    },
+    "system": {
+      "type": "string",
+      "description": "The name of the operating system where the data was generated."
+    },
+    "system_version": {
+      "type": "string",
+      "description": "Specifies the version of the operating system."
+    },
+    "processor_specifications": {
+      "type": "string",
+      "description": "The technical characteristics of the processor."
+    },
+    "input_path": {
+      "type": "string",
+      "description": "The relative file path or directory where input data files required to run the simulation or analysis are stored."
+    },
+    "results_path": {
+      "type": "string",
+      "description": "The file path or directory where the results of the simulation or analysis are stored."
+    },
+    "system_extra_information": {
+      "type": "string",
+      "description": "Additional system-related details or information relevant to the data object."
+    },
+    "RVE_size": {
+    "type": "array",
+    "items": {
+      "type": "number"
+    },
+    "minItems": 3,
+    "maxItems": 3,
+    "description": "Tuple of Float representing the dimensions of the RVE: length, width, height.",
+    "property": "Length"
+    },
+    "RVE_continuity": {
+      "type": "boolean",
+      "description": "Describes whether the RVE has periodic or non-periodic boundary conditions."
+    },
+    "discretization_type": {
+      "type": "string",
+      "enum": ["Structured", "Unstructured"],
+      "description": "Indicates that the discretization uses a regular, grid-like pattern ('Structured') or an irregular pattern ('Unstructured')."
+    },
+    "discretization_unit_size": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3,
+      "description": "Tuple of Float representing the average physical size of discrete units for structured models: length, width, height."
+    },
+    "discretization_count": {
+      "type": "integer",
+      "description": "Total number of discrete units in the RVE."
+    },
+    "solid_volume_fraction": {
+      "type": "number",
+      "description": "Specifies the solid volume fraction of the microstructure, represented as a value between 0 and 1 (e.g., 0.5 for 50% solid volume fraction)."
+    },
+    "origin": {
+      "type": "object",
+      "properties": {
+        "software": {
+          "type": "string",
+          "description": "The software used to generate geometry."
+        },
+        "software_version": {
+          "type": "string",
+          "description": "The version of the software used."
+        },
+        "system": {
+          "type": "string",
+          "description": "The system on which the geometry was generated."
+        },
+        "system_version": {
+          "type": "string",
+          "description": "The version of the system."
+        },
+        "input_path": {
+          "type": "string",
+          "description": "The file path where the input data is stored."
+        },
+        "results_path": {
+          "type": "string",
+          "description": "The file path where the results are stored."
+        }
+      },
+      "description": "Information about the tool used to generate geometry."
+    },
+    "global_temperature": {
+      "type": "integer",
+      "description": "The global initial temperature.",
+      "property": "Temperature"
+    },
+    "mechanical_BC": {
+      "type": "array",
+
+      "items": {
+        "type": "object",
+
+        "properties": {
+          "vertex_list": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Vertices describing a point (1), edge (2), face (4) or the full cube (8)."
+          },
+          "constraints": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["free","fixed","loaded"] },
+            "description": "Boundary flags for x,y,z."
+          },
+          "loading_type": {
+            "type": "string",
+            "enum": ["force","displacement","stress","strain","none"],
+            "description": "What is prescribed."
+          },
+          "loading_mode": {
+            "type": "string",
+            "enum": ["static","cyclic","monotonic","intermittent"],
+            "description": "Time‑dependence of the load."
+          },
+
+          "applied_load": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "magnitude": {
+                  "description": "Scalar (force / displacement) **or** full tensor (stress / strain).",
+                  "oneOf": [
+                    { "type": "number" },
+                    {
+                      "type": "object",
+                      "description": "Full (non‑symmetric) 3×3 tensor; six Voigt terms required.",
+                      "properties": {
+                        "xx": { "type": "number" },
+                        "yy": { "type": "number" },
+                        "zz": { "type": "number" },
+                        "xy": { "type": "number" },
+                        "yx": { "type": "number" },
+                        "xz": { "type": "number" },
+                        "zx": { "type": "number" },
+                        "yz": { "type": "number" },
+                        "zy": { "type": "number" }
+                      },
+                      "required": ["xx","yy","zz","xy","yz","xz"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "frequency": { "type": "number", "property": "Frequency" },
+                "duration":  { "type": "number", "property": "Time" },
+                "R":         { "type": "number" },
+                "step":      { "type": "number" }
+              },
+              "required": ["magnitude"],
+              "additionalProperties": false
+            }
+          }
+        },
+
+        "required": ["vertex_list","constraints"],
+
+        "if": { "properties": { "loading_type": { "const": "force" } } },
+        "then": {
+          "properties": {
+            "applied_load": {
+              "items": {
+                "properties": {
+                  "magnitude": {
+                    "type": "number",
+                    "description": "The magnitude of the applied force.",
+                    "property": "Force"
+                  }
+                }
+              }
+            }
+          }
+        },
+
+        "else": {
+          "if": { "properties": { "loading_type": { "const": "displacement" } } },
+          "then": {
+            "properties": {
+              "applied_load": {
+                "items": {
+                  "properties": {
+                    "magnitude": {
+                      "type": "number",
+                      "description": "The magnitude of the applied displacement.",
+                      "property": "Length"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+
+        "allOf": [{
+          "if": {
+            "required": ["loading_type"],
+            "properties": {
+              "loading_type": { "enum": ["stress","strain"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "vertex_list": { "minItems": 8, "maxItems": 8, "uniqueItems": true },
+              "constraints": { "items": { "const": "loaded" },
+                               "minItems": 1, "maxItems": 1 },
+              "applied_load": { "items": {
+                "properties": { "magnitude": { "not": { "type": "number" } } }
+              }}
+            }
+          }
+        }]
+      }
+    },
+    "thermal_BC": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "vertex_list": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A list includes vertex/vertices that describe a point, edge, or face."
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["free", "fixed", "loaded"]
+            },
+            "description": "Defines the constraints for each direction (x, y, z) as either 'free', 'fixed', or 'loaded'."
+          },
+          "loading_mode": {
+            "type": "string",
+            "enum": ["static", "cyclic", "monotonic", "fluctuated"],
+            "description": "Specifies the nature of the thermal loading condition with respect to time."
+          },
+          "applied_load": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "magnitude": {
+                  "type": "number",
+                  "description": "The magnitude of the thermal load.",
+                  "property": "Temperature"
+                },
+                "frequency": {
+                  "type": "number",
+                  "description": "The frequency of the thermal load (optional).",
+                  "property": "Frequency"
+                },
+                "duration": {
+                  "type": "number",
+                  "description": "The duration of the thermal load (optional).",
+                  "property": "Time"
+                }
+              },
+              "required": ["magnitude"],
+              "description": "Contains the values of the applied thermal load."
+            }
+          }
+        },
+        "required": ["vertex_list", "constraints"],
+        "if": {
+          "properties": {
+            "constraints": {
+              "contains": {
+                "const": "loaded"
+              }
+            }
+          }
+        },
+        "then": {
+          "required": ["loading_mode", "applied_load"]
+        }
+      },
+      "description": "Defines thermal boundary conditions including vertex lists, constraints, loading modes, and applied loads."
+    },
+    "phase": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "phase_name": {
+            "type": "string",
+            "description": "Name identifying the phase."
+          },
+          "phase_id": {
+            "type": "integer",
+            "description": "Integer ID assigned to the material phase."
+          },
+          "volume_fraction": {
+            "type": "number",
+            "description": "Volume fraction of the material phase within the RVE."
+          },
+          "lattice_structure": {
+            "type": "string",
+            "description": "Describes the crystal lattice structure of the material phase (e.g., FCC, BCC, HCP)."
+          },
+          "constitutive_model": {
+            "$ref": "https://raw.githubusercontent.com/Ronakshoghi/MetadataSchema/main/general_constitutive_model_metadata_schema.json",
+            "description": "The general structure of the constitutive model, allowing flexible elastic, plastic, and damage models."
+          },
+          "orientation": {
+            "type": "object",
+            "properties": {
+              "euler_angles": {
+                "type": "object",
+                "properties": {
+                  "Phi1": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Phi1 Euler angle.",
+                    "property": "Angle"
+                  },
+                  "Phi": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Phi Euler angle.",
+                    "property": "Angle"
+                  },
+                  "Phi2": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "description": "Phi2 Euler angle.",
+                    "property": "Angle"
+                  }
+                },
+                "required": ["Phi1", "Phi", "Phi2"],
+                "description": "The orientation of each grain given as Euler angles in active rotation from global coordinates."
+              },
+              "grain_count": {
+                "type": "integer",
+                "description": "The total number of material grains equal to the number of orientation angles."
+              },
+              "texture_type": {
+                "type": "string",
+                "description": "Free-text description of texture type."
+              },
+              "frame": {
+                "type": "string",
+                "enum": ["lab", "material"],
+                "description": "The coordinate system used for the orientation data. Can be either 'lab' (fixed relative to laboratory) or 'material' (fixed relative to material)."
+              },
+              "rotation_type": {
+                "type": "string",
+                "enum": ["active", "passive"],
+                "description": "Specifies whether the rotation is described as 'active' (physical rotation of the grain) or 'passive' (rotation of the coordinate system)."
+              },
+              "software": {
+                "type": "string",
+                "description": "Name of software or tools used to generate orientation."
+              },
+              "software_version": {
+                "type": "string",
+                "description": "The version of the software used to generate orientation."
+              },
+              "orientation_identifier": {
+                "type": "string",
+                "description": "Hash or identifier for the orientation."
+              },
+              "texture_extra_information": {
+                "description": "Optional additional texture data. Accepts either a free‑text note or any JSON object (dictionary) with arbitrary key‑value pairs.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "minProperties": 1,
+                    "additionalProperties": true
+                  }
+                ]
+              }
+            },
+            "required": ["euler_angles", "grain_count", "texture_type"],
+            "description": "Describes the material's orientation, including Euler angles, grain count, and texture type."
+          }
+        },
+        "required": ["phase_name", "constitutive_model"],
+        "description": "Material definition including constitutive model and orientation."
+      }
+    },
+    "microstructure": {
+      "$ref": "https://raw.githubusercontent.com/YousefRezek/MicrostructureEvolutionDataSchema/main/Microstructure_Module.json",
+      "description": "The microstructure object is optional and can include any microstructure evolution data defined in the Microstructure Evolution Data Schema"
+    },
+    "stress": {
+      "type": "object",
+      "properties": {
+        "equivalent_stress": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of equivalent stress values throughout the simulation.",
+          "property": "Stress"
+        },
+        "stress_11": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of stress values in direction 11 throughout the simulation.",
+          "property": "Stress"
+        },
+        "stress_22": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of stress values in direction 22 throughout the simulation.",
+          "property": "Stress"
+        },
+        "stress_33": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of stress values in direction 33 throughout the simulation.",
+          "property": "Stress"
+        },
+        "stress_12": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of stress values in direction 12 throughout the simulation.",
+          "property": "Stress"
+        },
+        "stress_13": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of stress values in direction 13 throughout the simulation.",
+          "property": "Stress"
+        },
+        "stress_23": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of stress values in direction 23 throughout the simulation.",
+          "property": "Stress"
+        }
+      },
+      "required": [],
+      "description": "The stress object is mandatory and must include at least the equivalent stress values."
+    },
+    "total_strain": {
+      "type": "object",
+      "properties": {
+        "equivalent_strain": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of equivalent strain values throughout the simulation.",
+          "property": "Strain"
+        },
+        "strain_11": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of total strain values in direction 11 throughout the simulation.",
+          "property": "Strain"
+        },
+        "strain_22": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of total strain values in direction 22 throughout the simulation.",
+          "property": "Strain"
+        },
+        "strain_33": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of total strain values in direction 33 throughout the simulation.",
+          "property": "Strain"
+        },
+        "strain_12": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of total strain values in direction 12 throughout the simulation.",
+          "property": "Strain"
+        },
+        "strain_13": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of total strain values in direction 13 throughout the simulation.",
+          "property": "Strain"
+        },
+        "strain_23": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of total strain values in direction 23 throughout the simulation.",
+          "property": "Strain"
+        }
+      },
+      "required": [],
+      "description": "The total_strain object is mandatory and must include at least the equivalent strain values."
+    },
+
+    "plastic_strain": {
+      "type": "object",
+      "description": "Plastic strain data throughout the simulation in the global coordinate system.",
+      "properties": {
+        "equivalent_plastic_strain": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of equivalent plastic strain values throughout the simulation.",
+          "property": "Strain"
+        },
+        "plastic_strain_11": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of plastic strain values in direction 11 throughout the simulation.",
+          "property": "Strain"
+        },
+        "plastic_strain_22": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of plastic strain values in direction 22 throughout the simulation.",
+          "property": "Strain"
+        },
+        "plastic_strain_33": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of plastic strain values in direction 33 throughout the simulation.",
+          "property": "Strain"
+        },
+        "plastic_strain_12": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of plastic strain values in direction 12 throughout the simulation.",
+          "property": "Strain"
+        },
+        "plastic_strain_13": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of plastic strain values in direction 13 throughout the simulation.",
+          "property": "Strain"
+        },
+        "plastic_strain_23": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "List of plastic strain values in direction 23 throughout the simulation.",
+          "property": "Strain"
+        }
+      },
+      "required": []
+    },
+  "units": {
+    "type": "object",
+    "description": "Units for different physical quantities.",
+    "properties": {
+      "Stress": {
+        "type": "string",
+        "default": "MPa",
+        "description": "Unit of stress, default is MPa."
+      },
+      "Strain": {
+        "type": "number",
+        "default": 1,
+        "description": "Unit of strain, dimensionless."
+      },
+      "Length": {
+        "type": "string",
+        "default": "mm",
+        "description": "Unit of length, default is mm."
+      },
+      "Force": {
+        "type": "string",
+        "default": "N",
+        "description": "Unit of force, default is Newton (N)."
+      },
+      "Angle": {
+        "type": "string",
+        "default": "Radian",
+        "description": "Unit of angle, default is Radians."
+      },
+      "Temperature": {
+        "type": "string",
+        "default": "Kelvin",
+        "description": "Unit of temperature, default is Kelvin."
+      }
+    },
+    "required": ["Stress", "Strain", "Length", "Force", "Angle", "Temperature"]
+  }
+  },
+  "required": [
+    "identifier",
+    "title",
+    "creator",
+    "creator_affiliation",
+    "date",
+    "shared_with",
+    "rights",
+    "rights_holder",
+    "software",
+    "software_version",
+    "system",
+    "system_version",
+    "processor_specifications",
+    "input_path",
+    "results_path",
+    "RVE_size",
+    "RVE_continuity",
+    "discretization_type",
+    "discretization_unit_size",
+    "discretization_count",
+    "mechanical_BC",
+    "phase",
+    "stress",
+    "total_strain",
+    "units"
+  ]
+}

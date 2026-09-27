@@ -7,6 +7,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils.html import escape
 
+from .upload_test_data import valid_upload_object
 from .models import DataNotification, JSONData, RateLimitBucket
 
 
@@ -22,17 +23,7 @@ class UploadProgressTests(TestCase):
         """
         cls.owner = User.objects.create_user(username="progress-owner")
         cls.recipient = User.objects.create_user(username="progress-recipient")
-        cls.example = {
-            "title": "Title", "creator": "Creator", "creator_affiliation": "Affiliation",
-            "date": "2026-09-18", "shared_with": [{"access_type": "c"}],
-            "rights": "Rights", "rights_holder": "Rights holder", "software": "Software",
-            "software_version": "1", "system": "System", "system_version": "1",
-            "processor_specifications": "Processor", "input_path": "input", "results_path": "results",
-            "RVE_size": "size", "RVE_continuity": True, "discretization_type": "type",
-            "discretization_unit_size": "unit", "discretization_count": 1,
-            "mechanical_BC": "boundary", "phase": "phase", "stress": "stress",
-            "total_strain": "strain", "units": "units",
-        }
+        cls.example = valid_upload_object()
 
     def setUp(self):
         """

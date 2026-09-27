@@ -334,9 +334,25 @@ def validate_json_depth(value: object, *, initial_depth: int = 0) -> None:
 def save_prepared_json_data(
     owner: User,
     objects: list[PreparedJSONData],
+    progress=None,
 ) -> list[JSONData]:
     """
     Atomically save prepared objects inside the owner's live quota
+
+    Parameters
+    ----------
+    owner : User
+        Authenticated uploader.
+    objects : list of PreparedJSONData
+        Validated data awaiting the final identifier and quota recheck.
+    progress : callable, optional
+        Observer receiving actual completed save work and the total. These
+        counts do not confirm persistence until the outer transaction commits.
+
+    Returns
+    -------
+    list of JSONData
+        Created records, still subject to the caller's outer transaction.
     """
     with transaction.atomic():
         global_lock_user = (
@@ -431,5 +447,7 @@ def save_prepared_json_data(
                     )
 
             saved_objects.append(data_object)
+            if progress is not None:
+                progress("saving", len(saved_objects), len(resolved_objects))
 
         return saved_objects
