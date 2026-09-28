@@ -44,7 +44,7 @@ class JSONData(models.Model):
     data : dict
         Raw JSON object
     identifier_fingerprint : str
-        Internal full digest for automatically assigned identifiers
+        Historical SHA256 digest retained for old records and unused by new uploads
     identifier_lookup : str
         Internal digest for matching identifiers under alternative field spellings
     size_bytes : int

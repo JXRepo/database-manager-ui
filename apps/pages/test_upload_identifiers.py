@@ -1,6 +1,5 @@
 import copy
 import json
-from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
@@ -17,8 +16,6 @@ class UploadIdentifierTests(TestCase):
     """
     Exercise identifier generation and conflicts through real uploads
     """
-
-    example_fingerprint = "684a6b9eaf174e77e12ab42a7243ba6509079ee959a3ac7f41562d839ec8e89f"
 
     @classmethod
     def setUpTestData(cls):
@@ -84,123 +81,78 @@ class UploadIdentifierTests(TestCase):
         self.assertEqual(JSONData.objects.count(), 1)
         stored = JSONData.objects.get()
         identifier = stored.data["identifier"]
-        self.assertRegex(identifier, r"^[0-9a-z]{8}$")
+        self.assertEqual(identifier, "49793b40")
         self.assertEqual(stored.data, dict(self.data, identifier=identifier))
         self.assertNotIn("identifier", self.data)
-        self.assertEqual(stored.identifier_fingerprint, self.example_fingerprint)
+        self.assertEqual(stored.identifier_fingerprint, "")
         self.assertEqual(stored.size_bytes, canonical_json_size(stored.data))
         exported = self.client.get(reverse("json_data_export", args=[stored.pk]))
         self.assertEqual(json.loads(exported.content), stored.data)
         self.assertNotIn("identifier_fingerprint", json.loads(exported.content))
 
-    def test_generated_identifiers_use_every_lowercase_base36_digit(self):
+    def test_database_collision_is_reported_without_extending_identifier(self):
         """
-        Encode the digest using all digits and lowercase letters
+        Preserve the existing object when distinct content generates its identifier
         """
-        for digit in "0123456789abcdefghijklmnopqrstuvwxyz":
-            with self.subTest(digit=digit):
-                digest = format(int(digit * 8, 36), "064x")
-                with patch("apps.pages.upload_services.hashlib.sha256") as sha256:
-                    sha256.return_value.hexdigest.return_value = digest
-                    identifier = generate_data_identifier(self.data)
-                self.assertEqual(identifier, digit * 8)
-        self.assertEqual(JSONData.objects.count(), 0)
-
-    def test_generated_identifier_starts_with_least_significant_digits(self):
-        """
-        Keep deterministic digest digits in the agreed identifier order
-        """
-        digest = format(int("76543210", 36), "064x")
-        with patch("apps.pages.upload_services.hashlib.sha256") as sha256:
-            sha256.return_value.hexdigest.return_value = digest
-            identifier = generate_data_identifier(self.data)
-        self.assertEqual(identifier, "01234567")
-
-    def test_database_collisions_extend_one_character_at_a_time(self):
-        """
-        Keep extending when different objects occupy successive prefixes
-        """
-        first_identifier = generate_data_identifier(self.data)
-        first = JSONData.objects.create(
+        original = dict(self.data, identifier="49793b40", title="Existing different object")
+        stored = JSONData.objects.create(
             owner=self.owner,
-            data=dict(self.data, identifier=first_identifier, title="First occupier"),
-        )
-        second_identifier = generate_data_identifier(self.data)
-        self.assertEqual(len(first_identifier), 8)
-        self.assertEqual(len(second_identifier), 9)
-        self.assertTrue(second_identifier.startswith(first_identifier))
-        second = JSONData.objects.create(
-            owner=self.owner,
-            data=dict(self.data, identifier=second_identifier, title="Second occupier"),
+            data=original,
         )
 
         response = self._upload(self.data)
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(JSONData.objects.count(), 3)
-        stored = JSONData.objects.exclude(pk__in=[first.pk, second.pk]).get()
-        self.assertEqual(len(stored.data["identifier"]), 10)
-        self.assertTrue(stored.data["identifier"].startswith(second_identifier))
+        self.assertEqual(JSONData.objects.count(), 1)
+        stored.refresh_from_db()
+        self.assertEqual(stored.data, original)
         self.assertEqual(stored.owner, self.owner)
-        first.refresh_from_db()
-        second.refresh_from_db()
-        self.assertEqual(first.data["identifier"], first_identifier)
-        self.assertEqual(second.data["identifier"], second_identifier)
+        self.assertIn("already exists", self._messages(response))
 
     def test_numeric_looking_identifiers_stay_text_and_block_repeat_uploads(self):
         """
         Preserve numeric and exponent shaped identifiers during digest lookup
         """
-        for identifier in ("87654321", "1e234567"):
+        for title, identifier in (("Numeric identifier fixture 70", "74846891"),
+                                  ("Numeric identifier fixture 1763", "9e619007")):
             with self.subTest(identifier=identifier):
-                JSONData.objects.all().delete()
-                digest = format(int(identifier[::-1], 36), "064x")
-                with patch("apps.pages.views.data_fingerprint", return_value=digest), patch(
-                    "apps.pages.upload_services.data_fingerprint", return_value=digest,
-                ):
-                    self._upload(self.data)
-                    self.assertEqual(JSONData.objects.get().data["identifier"], identifier)
-                    self.assertIsInstance(generate_data_identifier(self.data), str)
-                    response = self._upload(self.data)
+                data = dict(self.data, title=title)
+                self._upload(data)
+                self.assertEqual(JSONData.objects.get().data["identifier"], identifier)
+                response = self._upload(data)
                 self.assertEqual(JSONData.objects.count(), 1)
                 self.assertEqual(JSONData.objects.get().data["identifier"], identifier)
                 self.assertIn("already exists", self._messages(response))
                 JSONData.objects.all().delete()
 
-    def test_supplied_identifier_collision_in_batch_extends_generated_identifier(self):
+    def test_supplied_identifier_collision_in_batch_rejects_the_file(self):
         """
-        Allocate around an earlier supplied identifier without rejecting data
+        Reject a generated identifier that repeats an earlier supplied identifier
         """
         prefix = generate_data_identifier(self.data)
         explicit = dict(self.data, identifier=prefix, title="Distinct supplied object")
 
         response = self._upload([explicit, self.data])
 
-        self.assertEqual(JSONData.objects.count(), 2)
-        supplied = JSONData.objects.get(data__identifier=prefix)
-        generated = JSONData.objects.exclude(pk=supplied.pk).get()
-        self.assertEqual(supplied.data, explicit)
-        self.assertEqual(len(generated.data["identifier"]), 9)
-        self.assertTrue(generated.data["identifier"].startswith(prefix))
-        self.assertNotIn("duplicated", self._messages(response))
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertIn("used more than once", self._messages(response))
 
-    def test_supplied_identifier_collision_across_files_extends_generated_identifier(self):
+    def test_supplied_identifier_collision_across_files_preserves_the_first_file(self):
         """
         Reserve earlier supplied identifiers across files in one submission
         """
         prefix = generate_data_identifier(self.data)
         explicit = dict(self.data, identifier=prefix, title="Distinct file object")
 
-        self._upload(explicit, self.data)
+        response = self._upload(explicit, self.data)
 
-        self.assertEqual(JSONData.objects.count(), 2)
-        generated = JSONData.objects.exclude(data__identifier=prefix).get()
-        self.assertEqual(len(generated.data["identifier"]), 9)
-        self.assertTrue(generated.data["identifier"].startswith(prefix))
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.get().data, explicit)
+        self.assertIn("used more than once", self._messages(response))
 
-    def test_extended_identifier_still_blocks_duplicates_after_occupier_is_deleted(self):
+    def test_retry_after_conflicting_record_is_deleted_keeps_the_same_identifier(self):
         """
-        Find prior generated content even after its original prefix is free
+        Use the same eight characters when a previously occupied identifier is free
         """
         prefix = generate_data_identifier(self.data)
         occupier = JSONData.objects.create(
@@ -208,17 +160,13 @@ class UploadIdentifierTests(TestCase):
             data=dict(self.data, identifier=prefix, title="Temporary occupier"),
         )
         self._upload(self.data)
-        stored = JSONData.objects.exclude(pk=occupier.pk).get()
-        identifier = stored.data["identifier"]
-        self.assertEqual(len(identifier), 9)
+        self.assertEqual(JSONData.objects.count(), 1)
         occupier.delete()
 
-        response = self._upload(dict(self.data, description="Different optional note"))
+        self._upload(self.data)
 
         self.assertEqual(JSONData.objects.count(), 1)
-        stored.refresh_from_db()
-        self.assertEqual(stored.data["identifier"], identifier)
-        self.assertIn("already exists", self._messages(response))
+        self.assertEqual(JSONData.objects.get().data, dict(self.data, identifier=prefix))
 
     def test_supplied_collision_with_same_required_content_is_not_extended(self):
         """
@@ -234,19 +182,15 @@ class UploadIdentifierTests(TestCase):
         self.assertEqual(JSONData.objects.get().data, supplied)
         self.assertIn("already exists", self._messages(response))
 
-    def test_reimported_extended_identifier_still_recognizes_its_content(self):
+    def test_reimported_identifier_blocks_a_repeat_generated_upload(self):
         """
-        Recognize an exported long prefix even when its shorter prefix is free
+        Keep duplicate detection after exporting and reimporting a generated ID
         """
-        prefix = generate_data_identifier(self.data)
-        occupier = JSONData.objects.create(
-            owner=self.owner, data={"identifier": prefix},
-        )
         self._upload(self.data)
-        stored = JSONData.objects.exclude(pk=occupier.pk).get()
+        stored = JSONData.objects.get()
         exported = self.client.get(reverse("json_data_export", args=[stored.pk]))
         payload = json.loads(exported.content)
-        self.assertEqual(len(payload["identifier"]), 9)
+        self.assertEqual(payload["identifier"], "49793b40")
         JSONData.objects.all().delete()
         self._upload(payload)
         self.assertEqual(JSONData.objects.get().identifier_fingerprint, "")
@@ -257,29 +201,29 @@ class UploadIdentifierTests(TestCase):
         self.assertEqual(JSONData.objects.get().data, payload)
         self.assertIn("already exists", self._messages(response))
 
-    def test_legacy_full_digest_blocks_duplicates_without_rewriting_record(self):
+    def test_legacy_identifier_is_retained_without_affecting_new_generation(self):
         """
-        Recognize old generated identifiers without backfilling existing data
+        Leave historical records untouched while new IDs follow Ronak's template
         """
-        legacy = dict(self.data, identifier=self.example_fingerprint)
+        legacy = dict(self.data, identifier="684a6b9eaf174e77e12ab42a7243ba6509079ee959a3ac7f41562d839ec8e89f")
         stored = JSONData.objects.create(owner=self.owner, data=legacy)
 
-        response = self._upload(dict(self.data, keywords=["New optional metadata"]))
+        self._upload(self.data)
 
-        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.count(), 2)
         stored.refresh_from_db()
         self.assertEqual(stored.data, legacy)
         self.assertEqual(stored.identifier_fingerprint, "")
-        self.assertIn("already exists", self._messages(response))
+        self.assertEqual(JSONData.objects.exclude(pk=stored.pk).get().data["identifier"], "49793b40")
 
-    def test_legacy_full_digest_and_generated_content_conflict_in_either_batch_order(self):
+    def test_supplied_ronak_identifier_and_generated_identifier_conflict_in_either_order(self):
         """
-        Reject the whole file for repeated legacy content in either order
+        Reject the whole file when a supplied ID matches the template calculation
         """
-        legacy = dict(self.data, identifier=self.example_fingerprint)
-        for legacy_first in (True, False):
-            with self.subTest(legacy_first=legacy_first):
-                objects = [legacy, self.data] if legacy_first else [self.data, legacy]
+        supplied = dict(self.data, identifier="49793b40")
+        for supplied_first in (True, False):
+            with self.subTest(supplied_first=supplied_first):
+                objects = [supplied, self.data] if supplied_first else [self.data, supplied]
                 response = self._upload(objects)
                 self.assertEqual(JSONData.objects.count(), 0)
                 message = self._messages(response)
@@ -305,9 +249,9 @@ class UploadIdentifierTests(TestCase):
                     self.assertEqual(stored.identifier_fingerprint, "")
                 JSONData.objects.all().delete()
 
-    def test_private_collision_extends_without_disclosing_or_changing_other_data(self):
+    def test_private_collision_is_reported_without_disclosing_or_changing_other_data(self):
         """
-        Allocate globally without revealing another owner's private record
+        Reject duplicate identifiers without revealing another owner's private record
         """
         prefix = generate_data_identifier(self.data)
         private_data = dict(self.data, identifier=prefix, title="Confidential collision")
@@ -317,12 +261,9 @@ class UploadIdentifierTests(TestCase):
 
         response = self._upload(self.data)
 
-        self.assertEqual(JSONData.objects.count(), 2)
-        uploaded = JSONData.objects.exclude(pk=private.pk).get()
-        self.assertEqual(uploaded.owner, self.owner)
-        self.assertEqual(len(uploaded.data["identifier"]), 9)
-        self.assertTrue(uploaded.data["identifier"].startswith(prefix))
+        self.assertEqual(JSONData.objects.count(), 1)
         message = self._messages(response)
+        self.assertIn("already exists", message)
         self.assertNotIn(self.other.username, message)
         self.assertNotIn(private_data["title"], message)
         private.refresh_from_db()
@@ -342,7 +283,7 @@ class UploadIdentifierTests(TestCase):
         self.assertEqual(len(identifiers), 3)
         self.assertEqual(len(set(identifiers)), 3)
         for identifier in identifiers:
-            self.assertRegex(identifier, r"^[0-9a-z]{8}$")
+            self.assertRegex(identifier, r"^[0-9a-f]{8}$")
 
     def test_each_wrapped_object_gets_its_own_identifier(self):
         """
@@ -379,16 +320,18 @@ class UploadIdentifierTests(TestCase):
         self.assertIn("file-1.json", message)
         self.assertIn("Object 1 in this file", message)
 
-    def test_zero_and_false_remain_part_of_the_hashed_content(self):
+    def test_zero_and_false_remain_in_saved_json_after_template_hashing(self):
         """
-        Keep meaningful zero and false values instead of cleaning them away
+        Preserve meaningful zero and false values in storage and JSON exports
         """
         first = dict(self.data, RVE_continuity=False, RVE_size=[0, 1, 1])
         second = dict(first, RVE_continuity=True)
-        third = dict(first, RVE_size=[1, 1])
-        self._upload([first, second, third])
-        self.assertEqual(JSONData.objects.count(), 3)
-        self.assertEqual(len(set(JSONData.objects.values_list("data__identifier", flat=True))), 3)
+        self._upload([first, second])
+        self.assertEqual(JSONData.objects.count(), 2)
+        self.assertEqual(JSONData.objects.get(data__identifier="86e64d35").data,
+                         dict(first, identifier="86e64d35"))
+        self.assertEqual(JSONData.objects.get(data__identifier="14c819d5").data,
+                         dict(second, identifier="14c819d5"))
 
     def test_repeated_generated_content_in_one_file_is_reported(self):
         """
@@ -429,7 +372,7 @@ class UploadIdentifierTests(TestCase):
         self.assertIn("file-2.json", message)
         self.assertIn("Object 1 in this file", message)
         self.assertIn('data-upload-category="duplicate_identifier"', message)
-        self.assertEqual(JSONData.objects.get().identifier_fingerprint, self.example_fingerprint)
+        self.assertEqual(JSONData.objects.get().identifier_fingerprint, "")
 
     def test_explicit_duplicates_reject_the_file_without_reserving_ids_for_later_files(self):
         """

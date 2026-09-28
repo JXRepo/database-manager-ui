@@ -75,11 +75,13 @@ Current priority:
 - Release parsed JSON after each file's batch precheck and process one file at a time; application allowances do not guarantee the current hosting plan's capacity
 - Current required top-level fields include `phase`, not `material`, unless code is explicitly changed
 - Use the current MiMeDat `phase_name` for phase names in labels, summaries, and search; retain legacy name fallbacks without renaming uploaded JSON or treating phase_id as a name
-- `identifier` is not a required upload field: missing, null, or blank values receive an 8 character lowercase base36 identifier derived from the 24 required fields; collisions with different content extend it one character at a time
+- `identifier` is not a required upload field: missing, null, or blank values use Ronak's MiMeDat template exactly: clean a copy with remove_empty_entries, concatenate json.dumps(value, sort_keys=True) for non-null mandatory values in the template's fixed order, then take hashlib.md5(...).hexdigest()[:8]
+- Hash original field names and values without the metadata compatibility view; keep the template's exact field lookup and list cleanup semantics, including filtering falsy list entries, confined to the hash input; never remove values from stored or exported JSON
 - Preserve valid supplied text identifiers; reject malformed values and surrounding whitespace with actionable errors
 - Check generated and supplied identifiers against all stored records and the whole upload batch; retain the transactional recheck and never overwrite duplicates
-- Store the full SHA-256 fingerprint internally for generated identifiers; use it to recognize repeated required content even after extension, and also check legacy 64 character identifiers
-- Allocate and recheck generated identifiers under the final upload transaction lock, then account for their final JSON byte size; optional metadata is excluded from the fingerprint and existing identifiers are never recalculated automatically
+- Do not convert generated IDs to base36, extend collisions, or reuse historical content fingerprints; collisions reject the file through the ordinary duplicate checks
+- Recheck all identifiers and quota under the final upload transaction lock, including the generated identifier's JSON byte size; top-level optional metadata is excluded from hashing and existing identifiers are never recalculated automatically
+- Keep the historical identifier_fingerprint column and values untouched for compatibility with existing databases; new uploads leave it blank and do not consult it
 
 ## Access control rules
 

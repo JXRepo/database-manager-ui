@@ -2,7 +2,7 @@ import hashlib
 import json
 import math
 from contextlib import closing
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Sequence
 
 from django.conf import settings
@@ -10,10 +10,9 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
 from django.db.models import Q, Sum
-from django.utils.http import int_to_base36
 
 from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
-from apps.dyn_api.metadata_compat import field_value, identifier_lookup, metadata_view, set_field_value
+from apps.dyn_api.metadata_compat import field_value, identifier_lookup
 
 from .models import DataNotification, JSONData
 from .notifications import build_shared_data_notification_message
@@ -67,168 +66,64 @@ class PreparedJSONData:
     access_type: str
     shared_users: tuple[User, ...]
     size_bytes: int
-    identifier_fingerprint: str = ""
 
 
-def data_fingerprint(data: dict) -> str:
+def _remove_empty_entries(data):
     """
-    Hash the required metadata of one validated data object
+    Reproduce the template's cleanup on a separate value used only for hashing
 
-    Following Ronak Shoghi's MiMeDat content based identifier approach, this
-    uses required fields only. A canonical mapping preserves field boundaries,
-    zero and false values. The full digest identifies generated content even
-    when its public identifier has been extended to avoid a collision.
+    Ronak's list cleanup also removes falsy items, including zero and false.
+    Stored and exported JSON must keep those values, so this never edits data.
 
     Parameters
     ----------
-    data : dict
-        Object that has passed required field and numeric validation.
+    data : object
+        Original JSON value.
 
     Returns
     -------
-    str
-        Deterministic 64 character hexadecimal fingerprint.
+    object
+        Value cleaned as in MiMeDat metadata_template.py.
     """
-    content = {}
-    data = metadata_view(data)
-    for field in REQUIRED_TOP_LEVEL_FIELDS:
-        content[field] = data[field]
-    encoded = json.dumps(
-        content, sort_keys=True, ensure_ascii=True, separators=(",", ":"),
-        allow_nan=False,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
+    if isinstance(data, dict):
+        new_dict = {}
+        for key, value in data.items():
+            cleaned_value = _remove_empty_entries(value)
+            if cleaned_value is not None and cleaned_value != {} and cleaned_value != []:
+                new_dict[key] = cleaned_value
+        return new_dict if new_dict else None
+    elif isinstance(data, list):
+        cleaned_list = filter(None, (_remove_empty_entries(item) for item in data))
+        return [item for item in cleaned_list if item != {} and item != []]
+    else:
+        return data if data is not None else None
 
 
-def _identifier_candidates(fingerprint: str):
+def generate_data_identifier(data: dict) -> str:
     """
-    Yield progressively longer lowercase base36 identifiers
+    Generate exactly the eight character MD5 identifier from Ronak's template
 
-    Start at eight characters. Reading the least significant digits first
-    keeps the short prefix from being restricted by leading zero padding.
-
-    Parameters
-    ----------
-    fingerprint : str
-        Full SHA256 hexadecimal digest.
-
-    Yields
-    ------
-    str
-        Prefixes from eight to fifty characters, extending one at a time.
-    """
-    digits = int_to_base36(int(fingerprint, 16)).zfill(50)[::-1]
-    for length in range(8, len(digits) + 1):
-        yield digits[:length]
-
-
-def _has_fingerprint(data: dict, fingerprint: str) -> bool:
-    """
-    Compare content while tolerating incomplete historical objects
-
-    Parameters
-    ----------
-    data : dict
-        Existing JSON, which may predate current upload validation.
-    fingerprint : str
-        Fingerprint of the incoming validated object.
-
-    Returns
-    -------
-    bool
-        Whether the required content has the same fingerprint.
-    """
-    try:
-        return data_fingerprint(data) == fingerprint
-    except (KeyError, TypeError, ValueError, RecursionError):
-        return False
-
-
-def _resolve_generated_identifier(
-    fingerprint: str, pending_objects: Sequence[PreparedJSONData],
-) -> str:
-    """
-    Recognize repeated content or allocate its shortest available identifier
-
-    Existing matches are returned so callers can report duplicates instead
-    of giving identical content a new identifier. The final save invokes
-    this again under the upload transaction lock.
-
-    Parameters
-    ----------
-    fingerprint : str
-        Digest captured before adding the identifier to the uploaded JSON.
-    pending_objects : sequence of PreparedJSONData
-        Other objects already prepared or reserved in this upload.
-
-    Returns
-    -------
-    str
-        Existing identifier for duplicate content, or an available candidate.
-
-    Raises
-    ------
-    UploadResourceLimitError
-        If all candidate lengths are occupied by different content.
-    """
-    pending = {}
-    for prepared in pending_objects:
-        identifier = field_value(prepared.data, "identifier")
-        if prepared.identifier_fingerprint == fingerprint or identifier == fingerprint:
-            return identifier
-        pending[identifier] = prepared
-
-    existing = JSONData.objects.filter(
-        Q(identifier_fingerprint=fingerprint) | identifier_query(fingerprint)
-    ).values_list("data", flat=True).first()
-    if isinstance(field_value(existing, "identifier"), str):
-        return field_value(existing, "identifier")
-
-    candidates = list(_identifier_candidates(fingerprint))
-    for identifier, prepared in pending.items():
-        if identifier in candidates and _has_fingerprint(prepared.data, fingerprint):
-            return identifier
-
-    occupied = set()
-    for data in JSONData.objects.filter(
-        Q(identifier_lookup__in=[identifier_lookup(value) for value in candidates])
-        | Q(data__identifier__in=candidates),
-    ).values_list("data", flat=True):
-        identifier = field_value(data, "identifier")
-        if _has_fingerprint(data, fingerprint):
-            return identifier
-        occupied.add(identifier)
-
-    for candidate in candidates:
-        if candidate not in pending and candidate not in occupied:
-            return candidate
-
-    raise UploadResourceLimitError(
-        "Could not allocate a unique identifier. Please provide your own unique "
-        "identifier for this data object and upload it again.",
-        category="identifier_allocation",
-    )
-
-
-def generate_data_identifier(
-    data: dict, pending_objects: Sequence[PreparedJSONData] = (),
-) -> str:
-    """
-    Preview a short identifier without reserving or saving it
+    Use the original field names and values, template cleanup, mandatory field
+    order and default JSON serialization. Database contents never affect the ID.
+    Source: https://github.com/Ronakshoghi/MiMeDat/blob/main/metadata_template.py
 
     Parameters
     ----------
     data : dict
         Validated uploaded object.
-    pending_objects : sequence of PreparedJSONData, optional
-        Other accepted objects in the same upload.
 
     Returns
     -------
     str
-        Identifier to check for a duplicate or prepare for final allocation.
+        First eight lowercase hexadecimal characters of the MD5 digest.
     """
-    return _resolve_generated_identifier(data_fingerprint(data), pending_objects)
+    cleaned_data = _remove_empty_entries(data)
+    hash_string = ""
+    for field in REQUIRED_TOP_LEVEL_FIELDS:
+        value = cleaned_data.get(field)
+        if value is not None:
+            hash_string += json.dumps(value, sort_keys=True)
+    return hashlib.md5(hash_string.encode()).hexdigest()[:8]
 
 
 def identifier_query(identifier):
@@ -448,36 +343,22 @@ def iter_save_prepared_json_data(owner, objects):
 
         conflicts = []
         seen_identifiers = set()
-        resolved_objects = []
-        supplied_objects = [item for item in objects if not item.identifier_fingerprint]
-
         for prepared in objects:
-            original_identifier = str(field_value(prepared.data, "identifier", "")).strip()
-            identifier = original_identifier
-            if prepared.identifier_fingerprint:
-                identifier = _resolve_generated_identifier(
-                    prepared.identifier_fingerprint, resolved_objects + supplied_objects,
-                )
-                data = dict(prepared.data)
-                set_field_value(data, "identifier", identifier)
-                prepared = replace(prepared, data=data, size_bytes=canonical_json_size(data))
+            identifier = str(field_value(prepared.data, "identifier", "")).strip()
 
             if identifier in seen_identifiers:
-                conflicts.append(original_identifier)
+                conflicts.append(identifier)
             elif JSONData.objects.filter(
                 identifier_query(identifier)
             ).exists():
-                conflicts.append(original_identifier)
+                conflicts.append(identifier)
 
             seen_identifiers.add(identifier)
-            if prepared.identifier_fingerprint:
-                seen_identifiers.add(prepared.identifier_fingerprint)
-            resolved_objects.append(prepared)
 
         if conflicts:
             raise UploadIdentifierConflict(conflicts)
 
-        incoming_size = sum(item.size_bytes for item in resolved_objects)
+        incoming_size = sum(item.size_bytes for item in objects)
         used_size = (
             JSONData.objects.filter(owner=locked_owner).aggregate(
                 total=Sum("size_bytes")
@@ -492,11 +373,10 @@ def iter_save_prepared_json_data(owner, objects):
 
         saved_objects = []
 
-        for prepared in resolved_objects:
+        for prepared in objects:
             data_object = JSONData.objects.create(
                 owner=locked_owner,
                 data=prepared.data,
-                identifier_fingerprint=prepared.identifier_fingerprint,
                 access_type=prepared.access_type,
                 size_bytes=prepared.size_bytes,
             )
@@ -525,6 +405,6 @@ def iter_save_prepared_json_data(owner, objects):
                     )
 
             saved_objects.append(data_object)
-            yield "saving", len(saved_objects), len(resolved_objects)
+            yield "saving", len(saved_objects), len(objects)
 
         return saved_objects

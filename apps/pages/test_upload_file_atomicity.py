@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from .upload_test_data import valid_upload_object
 from .models import DataNotification, JSONData
-from .upload_services import canonical_json_size, data_fingerprint, generate_data_identifier
+from .upload_services import canonical_json_size, generate_data_identifier
 
 
 def _elements(element):
@@ -282,28 +282,25 @@ class UploadFileAtomicityTests(TestCase):
         self.assertContains(response, 'data-upload-category="duplicate_identifier"')
         self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
 
-    def test_generated_and_legacy_digest_duplicates_are_rejected_across_files_in_both_orders(self):
+    def test_generated_and_supplied_duplicates_are_rejected_across_files_in_both_orders(self):
         """
-        Keep generated content and its legacy full digest in the same batch namespace
+        Keep generated and supplied identifiers in the same batch namespace
         """
         for generated_first in (True, False):
             with self.subTest(generated_first=generated_first):
-                generated = self._data(f"Generated and legacy content {generated_first}")
-                fingerprint = data_fingerprint(generated)
-                legacy = dict(generated, identifier=fingerprint)
-                first, second = (generated, legacy) if generated_first else (legacy, generated)
-                later = self._data(f"Valid after legacy duplicate {generated_first}", f"legacy-later-{generated_first}")
+                generated = self._data(f"Generated and supplied content {generated_first}")
+                identifier = generate_data_identifier(generated)
+                supplied = dict(generated, identifier=identifier)
+                first, second = (generated, supplied) if generated_first else (supplied, generated)
+                later = self._data(f"Valid after duplicate {generated_first}", f"later-{generated_first}")
                 before = JSONData.objects.count()
 
                 response = self._upload_files(first, second, later)
 
                 self.assertEqual(JSONData.objects.count(), before + 2)
                 stored = JSONData.objects.get(data__title=generated["title"])
-                if generated_first:
-                    self.assertRegex(stored.data["identifier"], r"^[0-9a-z]{8}$")
-                    self.assertEqual(stored.identifier_fingerprint, fingerprint)
-                else:
-                    self.assertEqual(stored.data, legacy)
+                self.assertEqual(stored.data, supplied)
+                self.assertEqual(stored.identifier_fingerprint, "")
                 self.assertEqual(JSONData.objects.get(data__identifier=later["identifier"]).data, later)
                 self.assertContains(response, 'data-upload-category="duplicate_identifier"')
                 self._assert_file_statuses(response, ["uploaded", "failed", "uploaded"])
@@ -440,29 +437,36 @@ class UploadFileAtomicityTests(TestCase):
         self.assertEqual(JSONData.objects.get(data__identifier="retry-third").data, later)
         self.assertNotContains(corrected, "data-upload-report")
 
-    def test_generated_files_with_colliding_previews_extend_identifiers_during_save(self):
+    def test_generated_files_with_a_real_md5_collision_preserve_only_the_first_file(self):
         """
-        Allow distinct generated content to extend a shared preview prefix at commit
+        Reject a colliding file without changing either generated identifier
         """
-        first = self._data("First generated content with a shared prefix")
-        second = self._data("Second generated content with a shared prefix")
-        first_fingerprint = data_fingerprint(first)
-        second_fingerprint = data_fingerprint(second)
-        self.assertNotEqual(first_fingerprint, second_fingerprint)
-        with patch("apps.pages.upload_services._identifier_candidates", return_value=["abcd1234", "abcd1234a"]):
-            response = self._upload_files(first, second)
+        first = self._data("Ronak collision fixture 15801")
+        second = self._data("Ronak collision fixture 17431")
+        response = self._upload_files(first, second)
 
-        self.assertEqual(JSONData.objects.count(), 2)
-        for payload, identifier, fingerprint in [
-            (first, "abcd1234", first_fingerprint),
-            (second, "abcd1234a", second_fingerprint),
-        ]:
-            stored = JSONData.objects.get(data__title=payload["title"])
-            final_data = dict(payload, identifier=identifier)
-            self.assertEqual(stored.data, final_data)
-            self.assertEqual(stored.identifier_fingerprint, fingerprint)
-            self.assertEqual(stored.size_bytes, canonical_json_size(final_data))
-        self.assertNotContains(response, "data-upload-report")
+        self.assertEqual(JSONData.objects.count(), 1)
+        stored = JSONData.objects.get()
+        final_data = dict(first, identifier="13bc94e3")
+        self.assertEqual(stored.data, final_data)
+        self.assertEqual(stored.size_bytes, canonical_json_size(final_data))
+        self.assertContains(response, 'data-upload-category="duplicate_identifier"')
+        self._assert_file_statuses(response, ["uploaded", "failed"])
+
+    def test_real_md5_collision_in_one_file_rejects_every_object(self):
+        """
+        Reject both colliding records and their valid neighbor before saving
+        """
+        objects = [self._data("Valid neighbor", "collision-neighbor"),
+                   self._data("Ronak collision fixture 15801"),
+                   self._data("Ronak collision fixture 17431")]
+        response = self._upload(objects)
+
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertEqual(DataNotification.objects.count(), 0)
+        self.assertContains(response, "13bc94e3")
+        self.assertContains(response, 'data-upload-category="duplicate_identifier"')
+        self._assert_file_statuses(response, ["failed"])
 
     @override_settings(PILOT_RATE_LIMITS={"upload": {"limit": 1000, "window_seconds": 3600}})
     def test_one_to_five_files_are_all_checked_regardless_of_failure_positions(self):

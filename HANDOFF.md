@@ -2,21 +2,59 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: 052a04d65ca7abb6d771933a99e5591d384ef94d
+code_base: e3a40d9e56278f59fcecb5eb267ca09f1607f388
 files_modified:
-  - CPU metadata alias, streamed object progress, completed checking counts, tests and documentation
+  - Exact Ronak identifier generation, duplicate rejection, regression tests and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**9 月 28 日最新：兼容两个处理器字段名，补齐旧上传通道的对象进度。**
+**9 月 28 日最新：用户要求 identifier 完全采用 Ronak 原代码，不再自加算法。**
+
+- 已对照当日 MiMeDat `metadata_template.py`：先对副本执行相同的
+  `remove_empty_entries`，按原 24 项 `mandatory_fields` 顺序拼接
+  `json.dumps(value, sort_keys=True)`，再用 MD5 取前 8 位小写十六进制字符。
+- 删除 SHA-256 内容指纹生成、base36 转换、编号逐位延长及旧指纹复用逻辑。
+  编号完全由输入决定；碰到重复编号按原查重规则整文件拒绝，绝不覆盖已有记录。
+  事务内全库复查、配额、通知回滚、逐对象进度和后台上传继续保留。
+- 按用户“直接照搬”的要求，计算使用原始字段和值，不套兼容视图。
+  大小写、CPU 别名、数值字符串和单项列表仍能通过上传识别，但计算编号时
+  严格按 Ronak 原代码取字段、序列化，格式不同可能得到不同编号。
+  模板 mandatory_fields 仍写 processor_specifications，CPU_specifications 不参与该项哈希；
+  若所有必填字段都使用非标准名字，原算法会得到空输入的 MD5 前缀 d41d8cd9。
+  未私自修正这些参考代码行为。
+- Ronak 的清理代码会过滤列表中的 0、false、空字符串，已同样用于计算副本；
+  原始 JSON、曲线零点和空可选项仍完整保存及导出。原文件不改动。
+- 合法自带 identifier 继续保留；旧记录及 identifier_fingerprint 历史列保持原状，
+  新上传该历史列为空且不读取它。旧数据去掉原编号再上传可能得到新的 MD5 编号，
+  不再按旧 SHA-256 内容指纹去重。无新增数据库迁移或依赖。
+- 主要代码：`apps/pages/upload_services.py`、`apps/pages/views.py`。
+  README、AGENTS 和编号、原子保存、兼容上传测试同步更新。
+
+本次验证：
+
+- 先运行 Ronak 原代码取得固定预期值，再确认旧实现失败，修改后通过。
+  合成标准样例的预期为 49793b40；另有 Unicode、数字字符串、包装和清理边界样例。
+- 218 项上传、识别、校验、编号、原子保存、进度及后台任务相关测试通过。
+  使用真实 MD5 前缀冲突的两组不同数据验证整文件拒绝、跨文件保留先前成功结果。
+- 只读对照原代码与新实现：100 个合成对象全部一致，原对象均未被修改。
+  附件 a46fde6c.json 两边重新计算均为 e40094c3；文件原有编号 a46fde6c 按规则保留。
+  这个对照没有写数据库、改原文件或把私有文件上传到外部。
+- 本轮只改后端编号计算，未改 JavaScript 或布局；未重跑无关前端测试。
+  迁移检查无变化，git diff 空白检查通过；最终测试日志位于本机
+  `/tmp/ronak-identifiers-verified.log`。本次推送后 Render 是否部署完成仍需另行确认。
+
+### 9 月 28 日上一轮：CPU 别名和上传计数
+
+**兼容两个处理器字段名，补齐旧上传通道的对象进度。**
 
 - `processor_specifications` 和 `CPU_specifications` 都满足同一项必填要求，
   继续兼容大小写、分隔符和单项列表；原始字段名及值保存、导出不改写。
   两个名字同时提供且值不同仍报冲突，空值仍报错，不从其他父级借值。
-  自动编号指纹也按同一字段处理，详情页把 CPU 别名放到处理器字段位置、保留原名。
+  当时自动编号指纹也按同一字段处理（已由上方 Ronak 原算法替代）；
+  详情页仍把 CPU 别名放到处理器字段位置、保留原名。
 - 用户报告 `Sending files` → `Processing file 1 of 1` → 报错。
   已追踪到 NDJSON 回退通道：之前只发文件开始／结果事件，没有接入逐对象回调。
   此前只有后台任务路径有对象计数。用户使用本机还是线上尚未明确，修复覆盖两条路径。
@@ -723,11 +761,11 @@ Windows 全量 Django 测试中的部署构建测试需要 Bash。本机第一�
 ### Identifier
 
 - 页面短提示：`An identifier will be assigned automatically if missing.`
-- 缺失、null 或空白时，从 24 个必填字段生成 8 位小写 base36 identifier；
-  与不同内容冲突时逐位延长。合法自带文本 ID 保留，格式错误或首尾空白要报告。
-- 内部保留完整 SHA-256 指纹，识别扩展后的重复内容，并兼容旧 64 位 identifier。
-  可选字段不参与指纹，已有 identifier 不自动重算，重复记录不覆盖。
-- 全库和上传批次都检查重复；最终分配与配额记账在事务锁内完成。
+- 缺失、null 或空白时，完全照 Ronak 模板的清理、取字段、序列化和 MD5 前 8 位生成。
+  不做 base36 转换或冲突延长。合法自带文本 ID 保留，格式错误或首尾空白要报告。
+- 历史 SHA-256 指纹列保留但不再生成或读取；已有 identifier 不自动重算。
+  顶层可选字段不参与编号计算，原始数据不受计算副本清理影响。
+- 全库和上传批次都检查重复；最终查重与配额记账在事务锁内完成。
   失败文件不保留 identifier 或配额。自带不同 ID 不代表自动按完整内容去重。
 
 ### 当前额度

@@ -156,12 +156,12 @@ class UploadCompatibilityTests(TestCase):
         self.assertEqual(JSONData.objects.count(), 1)
         obj = JSONData.objects.get()
         identifier = field_value(obj.data, "identifier")
-        self.assertRegex(identifier, r"^[a-z0-9]{8}$")
+        self.assertEqual(identifier, "8ccf8eb1")
         expected = deepcopy(data)
         expected["identifier"] = [[identifier]]
         self.assertEqual(obj.data, expected)
         self.assertEqual(obj.size_bytes, canonical_json_size(expected))
-        self.assertContains(self.upload(valid_upload_object(title="Wrapped generated ID")), "already exists")
+        self.assertContains(self.upload(data), "already exists")
         self.assertEqual(JSONData.objects.count(), 1)
 
     def test_wrapped_sharing_preserves_explicit_permissions(self):
@@ -310,7 +310,7 @@ class UploadCompatibilityTests(TestCase):
 
     def test_auto_identifier_handles_aliases_without_changing_other_values(self):
         """
-        Generate an identifier from recognized required content and retain raw data
+        Accept alternative spellings while hashing the raw JSON as Ronak does
         """
         original = valid_upload_object()
         data = variant_field_names(original)
@@ -318,15 +318,17 @@ class UploadCompatibilityTests(TestCase):
         self.assertEqual(JSONData.objects.count(), 1)
         obj = JSONData.objects.get()
         expected = deepcopy(data)
-        expected["identifier"] = obj.data["identifier"]
+        expected["identifier"] = "d41d8cd9"
         self.assertEqual(obj.data, expected)
-        response = self.upload(original)
-        self.assertContains(response, "already exists")
+        self.assertContains(self.upload(data), "already exists")
         self.assertEqual(JSONData.objects.count(), 1)
+        self.upload(original)
+        self.assertEqual(JSONData.objects.count(), 2)
+        self.assertEqual(JSONData.objects.exclude(pk=obj.pk).get().data["identifier"], "49793b40")
 
-    def test_cpu_alias_keeps_raw_export_and_generated_identifier_deduplication(self):
+    def test_cpu_alias_keeps_raw_export_and_ronaks_identifier_calculation(self):
         """
-        Treat both processor field names as the same required content
+        Accept either processor name without changing Ronak's exact field lookup
         """
         original = valid_upload_object()
         data = deepcopy(original)
@@ -334,9 +336,12 @@ class UploadCompatibilityTests(TestCase):
         self.upload(data)
         self.assertEqual(JSONData.objects.count(), 1)
         obj = JSONData.objects.get()
-        expected = dict(data, identifier=obj.data["identifier"])
+        expected = dict(data, identifier="359e929d")
         self.assertEqual(obj.data, expected)
         response = self.client.get(reverse("json_data_export", args=[obj.pk]))
         self.assertEqual(json.loads(response.content), expected)
-        self.assertContains(self.upload(original), "already exists")
+        self.assertContains(self.upload(data), "already exists")
         self.assertEqual(JSONData.objects.count(), 1)
+        self.upload(original)
+        self.assertEqual(JSONData.objects.count(), 2)
+        self.assertEqual(JSONData.objects.exclude(pk=obj.pk).get().data["identifier"], "49793b40")

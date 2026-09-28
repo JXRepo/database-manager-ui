@@ -66,7 +66,6 @@ from .upload_services import (
     UploadResourceLimitError,
     canonical_json_size,
     consume_upload_progress,
-    data_fingerprint,
     generate_data_identifier,
     identifier_query,
     iter_save_prepared_json_data,
@@ -86,7 +85,6 @@ UPLOAD_ISSUE_CATEGORIES = (
     ("json_depth", "Too many nested levels", "Reduce the nesting of JSON objects and lists."),
     ("invalid_number", "Invalid numeric values", "Replace NaN and Infinity with finite JSON numbers."),
     ("invalid_unicode", "Invalid text encoding", "Replace invalid text characters and save the file as UTF-8 JSON."),
-    ("identifier_allocation", "Identifier could not be assigned", "Provide a unique text identifier for this data object."),
     ("missing_required", "Missing required fields", "Add each listed field to this data object."),
     ("empty_values", "Empty values", "Enter a value for each listed field. Null, blank text, and empty lists or objects count as empty."),
     ("invalid_identifier", "Invalid identifier", "Use a text identifier without surrounding spaces, or remove it to have one assigned automatically."),
@@ -973,7 +971,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
     object_depth : int or list of tuple
         Original container depth or exact paths produced by the batch precheck.
     saved_identifiers : set of str
-        Identifiers and fingerprints from successfully saved files in this request.
+        Identifiers from successfully saved files in this request.
 
     Yields
     ------
@@ -997,7 +995,6 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         })
 
     seen_identifiers = set()
-    pending_objects = []
     prepared_objects = []
     prepared_reports = {}
     for completed, (obj, object_report) in enumerate(zip(objects, file_report["objects"])):
@@ -1041,20 +1038,14 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
             isinstance(identifier, str) and bool(identifier.strip())
             and identifier == identifier.strip() and _upload_label(identifier) == identifier
         )
-        fingerprint = ""
         if not supplied:
             if content_error or not valid_objects:
                 continue
-            fingerprint = data_fingerprint(obj)
-            try:
-                identifier = generate_data_identifier(obj, pending_objects)
-            except UploadResourceLimitError as error:
-                _add_upload_issue(object_report["issues"], error.category, str(error))
-                continue
+            identifier = generate_data_identifier(obj)
             set_field_value(obj, "identifier", identifier)
             size_bytes = canonical_json_size(obj)
 
-        if identifier in seen_identifiers or (supplied and identifier in saved_identifiers):
+        if identifier in seen_identifiers or identifier in saved_identifiers:
             _add_upload_issue(
                 object_report["issues"], "duplicate_identifier",
                 f'Identifier "{identifier}" is used more than once in this upload.',
@@ -1066,13 +1057,10 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
             )
 
         seen_identifiers.add(identifier)
-        if fingerprint:
-            seen_identifiers.add(fingerprint)
         candidate = PreparedJSONData(
             data=obj, access_type=access_type, shared_users=tuple(shared_users),
-            size_bytes=size_bytes, identifier_fingerprint=fingerprint,
+            size_bytes=size_bytes,
         )
-        pending_objects.append(candidate)
         if not object_report["issues"]:
             prepared_objects.append(candidate)
             prepared_reports[identifier] = object_report
@@ -1157,7 +1145,7 @@ def _process_upload_file(
     object_depth : int or list of tuple
         Original container depth or exact inspected record paths.
     saved_identifiers : set of str
-        Identifiers and fingerprints committed earlier in this submission.
+        Identifiers committed earlier in this submission.
     progress : callable, optional
         Observer receiving parsing, validation and saving progress.
     on_saved : callable, optional
@@ -1224,7 +1212,7 @@ def _iter_process_upload_file(owner, file_report, uploaded_file, object_depth,
             object_report = prepared_object_reports[identifier]
             _add_upload_issue(
                 object_report["issues"], "duplicate_identifier",
-                f'Identifier "{identifier}" or the same data already exists.',
+                f'Identifier "{identifier}" already exists.',
             )
         return
     except UploadQuotaExceeded as error:
@@ -1241,8 +1229,6 @@ def _iter_process_upload_file(owner, file_report, uploaded_file, object_depth,
     file_report["saved_count"] = len(saved_objects)
     for data_object in saved_objects:
         saved_identifiers.add(field_value(data_object.data, "identifier"))
-        if data_object.identifier_fingerprint:
-            saved_identifiers.add(data_object.identifier_fingerprint)
 
 
 def _upload_progress(upload_files, parsed_files, owner):
