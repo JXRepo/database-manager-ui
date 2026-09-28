@@ -376,8 +376,18 @@ accessible**, **My uploads**, **Public**, or **Shared with me** to change the
 scope. Public still requires a platform account; another user's unshared private
 records never contribute to counts or linked object lists.
 
-- **Data composition:** phase, software, elastic/plastic model and loading
-  type/mode counts. Each object counts once per label, ignoring case and
+- **Stress–strain response:** a prominent plot of one selected accessible
+  object's matching stress and total-strain component, with equivalent results
+  preferred when available. Switch objects or components, inspect points with
+  the pointer or arrow keys, and save a labelled SVG. The default object must
+  have a matching pair; simply supplying two different components does not count.
+  Original sample order is preserved, including cyclic paths. Unequal arrays
+  pair by index to the shorter length and show both lengths. Previews above
+  2,400 points retain endpoints and local extrema, with the reduced count stated
+  on the page and in the SVG; the object's full arrays and exports are unchanged.
+- **Data composition:** switch one horizontal chart between phase, software,
+  elastic/plastic model, loading type/mode and texture counts. Each object
+  counts once per label, ignoring case and
   surrounding whitespace. Multiple phases or descriptions can place one object
   in several categories, so category counts need not sum to the object total.
 - **Simulation conditions:** temperature, grain number and discretization
@@ -385,7 +395,7 @@ records never contribute to counts or linked object lists.
   Kelvin, Celsius and Fahrenheit values are converted to Kelvin before
   aggregation. Unknown units and invalid values are excluded, never counted as
   zero. Grain observations belong to individual phases; links count distinct
-  objects. Texture counts are available in an expandable section.
+  objects. A single reported value still has a column and labelled count axis.
 - **Available results:** objects with numeric stress, total strain and plastic
   strain arrays, plus supplied and calculated equivalent availability. Any
   supported component can contribute, including equivalent-only results.
@@ -394,7 +404,8 @@ records never contribute to counts or linked object lists.
   physical comparability or a validation pass.
 - **Data notes:** inspect unequal curve lengths, missing result units,
   uncharted temperatures, unreadable arrays and conflicting metadata. Original
-  records remain accessible.
+  records remain accessible. Notes and the object list start collapsed so the
+  charts stay prominent; choosing a chart filter opens the matching objects.
 
 Select a bar, numeric interval or availability count to refine the current
 selection and open its paginated object list. All conditions must match the
@@ -402,7 +413,10 @@ same object, including successive selections within one category or across
 numeric measures. Remove a filter individually or clear the selection; changing
 the data scope resets filters. Malformed filters show an error without broadening
 the selection. Long category lists are expandable, and the charts and filtering
-remain usable without JavaScript.
+remain usable without JavaScript. Plots are server-rendered SVG with explicit
+axes and units, without a chart-library network dependency. Point readouts keep
+source precision; narrow ranges around large values use labelled axis offsets.
+Supplied and calculated curve origins remain visible, including in SVG downloads.
 
 Statistics use the shared metadata compatibility view without changing stored
 JSON, detail plots or exports. Functional conflicts never choose a value

@@ -1,0 +1,16 @@
+<svg class="charts-curve-svg" id="response-plot" viewBox="0 0 720 306" role="img" aria-labelledby="curve-title curve-description" tabindex="0" xmlns="http://www.w3.org/2000/svg">
+  <title id="curve-title">{{ curve.y_label }} versus {{ curve.x_label }}</title>
+  <desc id="curve-description">{{ curve.record.title }} ({{ curve.record.identifier }}). {{ curve.shown_count }} plotted points from {{ curve.count }} paired samples in their original order. Strain: {{ curve.x_count }}; stress: {{ curve.y_count }}. {% if curve.shown_count != curve.count %}Preview retains local extrema; full arrays are available on the object page. {% endif %}{% if curve.calculated %}Calculated equivalent results.{% else %}Supplied results.{% endif %} Use arrow keys to inspect plotted points.</desc>
+  <rect width="720" height="306" fill="#ffffff"/>
+  {% for tick in curve.y_ticks %}<line x1="74" x2="696" y1="{{ tick.y }}" y2="{{ tick.y }}" stroke="#e5ebf2" stroke-width="1"/><text x="62" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" fill="#64778a" font-family="Arial, sans-serif" font-size="12">{{ tick.label }}</text>{% endfor %}
+  {% for tick in curve.x_ticks %}<line x1="{{ tick.x }}" x2="{{ tick.x }}" y1="248" y2="253" stroke="#acbdcc"/><text x="{{ tick.x }}" y="271" text-anchor="middle" fill="#64778a" font-family="Arial, sans-serif" font-size="12">{{ tick.label }}</text>{% endfor %}
+  <line x1="74" x2="696" y1="248" y2="248" stroke="#acbdcc"/>
+  <text x="74" y="15" fill="#415c75" font-family="Arial, sans-serif" font-size="12">{{ curve.y_label }}</text>
+  {% if curve.y_offset %}<text x="696" y="15" text-anchor="end" fill="#415c75" font-family="Arial, sans-serif" font-size="11">Offset {{ curve.y_offset }}</text>{% endif %}
+  <text x="385" y="299" text-anchor="middle" fill="#415c75" font-family="Arial, sans-serif" font-size="12">{{ curve.x_label }}</text>
+  {% if curve.x_offset %}<text x="696" y="288" text-anchor="end" fill="#415c75" font-family="Arial, sans-serif" font-size="11">Offset {{ curve.x_offset }}</text>{% endif %}
+  <path id="response-line" d="{{ curve.path }}" fill="none" stroke="#2874c6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  <circle cx="{{ curve.points.0.px }}" cy="{{ curve.points.0.py }}" r="3.5" fill="#ffffff" stroke="#2874c6" stroke-width="1.5"><title>First point</title></circle>
+  {% with last=curve.points|last %}<circle cx="{{ last.px }}" cy="{{ last.py }}" r="3.5" fill="#2874c6"><title>Last point</title></circle>{% endwith %}
+  <g id="curve-focus" hidden><line id="curve-guide" x1="0" x2="0" y1="28" y2="248" stroke="#6c94bd" stroke-dasharray="3 4"/><circle id="curve-dot" cx="0" cy="0" r="5" fill="#ffffff" stroke="#2874c6" stroke-width="2"/></g>
+</svg>

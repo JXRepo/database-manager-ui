@@ -4,8 +4,8 @@ branch: main
 timestamp: 2026-09-28
 code_base: main (see git log -1 for the Charts commit)
 files_modified:
-  - apps/charts/analytics.py, views.py, tests.py and test_browser.py
-  - templates/charts/index.html and category.html
+  - apps/charts/analytics.py, plots.py, views.py, tests.py and test_browser.py
+  - templates/charts/index.html, curve.html, category.html and histogram.html
   - static/assets/css/charts.css and static/assets/js/charts.js
   - tests/browser/charts.cjs
   - README.md, AGENTS.md and the Charts implementation plan
@@ -15,10 +15,10 @@ files_modified:
 
 ## 当前状态
 
-**最新完成：用户授权直接重做 Charts，要求统计真正有用、页面清楚友好。**
+**最新完成：用户指出上一版没看到图、内容杂乱；本轮将真实曲线放到首屏，并收紧统计页面层级。**
 
 - 最初用户只让读交接、一起讨论，随后明确要求“直接做，不用跟我商量”。
-  本轮据此完成 Charts 重做，不要误以为仍停留在只读讨论阶段。
+  上一版 `3924c27` 的统计口径保留，但用户不满意其展示；本轮继续直接实现，不回到审批讨论。
 - 页面标题已是 **Charts**；标题小改提交为 `0882165`，本轮完整重做在其后。
   最终提交及同步状态以 `git log -1`、`git status` 和远端为准。
   Render 是否部署完成尚未核实，不能把推送成功说成线上已更新。
@@ -29,15 +29,26 @@ files_modified:
 
 - `/charts/` 仍用现有路由；`apps/charts/views.py` 管权限、筛选和分页，
   `apps/charts/analytics.py` 从共享 metadata compatibility view 提取精简统计。
-  逐个读取 JSON，不把原曲线保留在汇总记录中；没有新依赖、模型或迁移。
+  新增 `apps/charts/plots.py` 计算 SVG 几何。逐个读取 JSON，不把原曲线保留在汇总记录中；
+  只再次读取当前所选对象作图，没有新依赖、模型或迁移。
 - Data scope 有 All accessible、My uploads、Public、Shared with me。
   默认包含自己、公开、明确分享给自己的对象，统计与列表采用相同权限；公开仍需登录。
-- 顶部为对象总数、不同 phase 名称数、同时提供 stress/strain 的对象数和 plastic strain 数。
-  分类展示 Phase、Software、本构模型（Plastic/Elastic）和 Loading（Mode/Type）。
+- 顶部是一行精简计数；首屏左侧为真实 Stress–strain response，右侧是一个可切换的
+  Data composition 图，不再平铺多个分类面板。第二行是条件分布和 Available results。
+  Data notes 与 Data objects 默认收起，点统计项后展开匹配对象；标题仍为 Charts。
+- 主曲线每次只画一个可访问对象的同分量应力／总应变，默认优先等效曲线；对象与分量可切换。
+  复用详情页等效计算，用户提供的数组优先，空等效字段不触发计算。保持原始点序，支持循环路径。
+  默认选择须有实际匹配的分量，不让 stress_11 / strain_33 这样的不可配对新对象挡住可用曲线。
+  顶部 With stress & strain 计数仍只表示两组均有数据，不作物理可比性保证。
+- 曲线带单位、点数、Supplied results／Calculated equivalent 来源；鼠标与键盘可看精确点值。
+  不同长度按索引配到较短序列，同时显示两侧原始长度。超过 2,400 点的预览保留端点与局部极值，
+  明确标注显示点数；Save SVG 下载保留来源、长度和抽样说明，完整原数组与 CSV 导出不变。
+  刻度使用自适应 Decimal 精度，极窄范围使用 Offset 注记，有限大整数不会使整个页面报错。
+- 分类可切换 Phase、Software、本构模型（Plastic/Elastic）、Loading（Mode/Type）和 Texture。
   每对象在每个类别只计一次，大小写和首尾空白合并，多相／多模型可进入多个类别。
 - Simulation conditions 提供温度、晶粒数、离散单元数的分布、中位数、范围和覆盖数量。
   显式 K/Celsius/Fahrenheit 才换算为 K；无效值不当作零。
-  晶粒数以 phase 为观测单位，链接去重到对象；Texture distribution 可展开。
+  晶粒数以 phase 为观测单位，链接去重到对象；单值也显示带计数坐标轴的真实柱形。
 - Available results 识别所有现有支持的分量与用户提供的等效曲线，不再只看 11 分量。
   等效字段缺席且六个分量齐全才算可计算，遵循详情页现有规则。
   另有 Data notes 提示曲线长度不同、单位缺失、无效温度／曲线和字段冲突。
@@ -52,27 +63,30 @@ files_modified:
   循环小数导致最小值漏计的问题。接近的数值会增加显示精度，避免所有箱都显示相同范围。
   grain_number 的等价拼写和单值包装明确处理；别名冲突排除受影响的 phase 并提示。
 - 模板在 `templates/charts/`，样式／脚本在 `static/assets/css/charts.css` 和
-  `static/assets/js/charts.js`，不再依赖 ApexCharts。HTML 图表可键盘操作，
-  关闭 JavaScript 后仍能查看各组和用普通 GET 筛选。
+  `static/assets/js/charts.js`，不依赖外部图表库。四幅图均为服务器输出的 SVG，
+  关闭 JavaScript 后仍有图、普通 GET 控件和 Apply 按钮。
+  主题 loader 保留隐藏的清理节点，避免无 JS 遮挡图表或 pcoded.js 清理不存在节点报错。
 - 桌面布局用 `.charts-page` 的 padding-top 给导航留空间，不用会塌陷到 body 的 margin-top；
   浏览器验证还检查标题实际未被导航遮挡。
 
 ### Charts 本轮验证
 
-- 76 项相关 Django 测试通过，覆盖 Charts、共享字段兼容、上传兼容、详情曲线、CSV 和导航。
-  其中包括真实 Chromium 连接隔离 SQLite 的浏览器测试；日志 `/tmp/charts-backend.log`。
-- 117 项 JavaScript／Chromium 测试通过，0 跳过；日志 `/tmp/charts-js.log`。
-- 1280／1440／1920 桌面宽度验证多记录、长内容、空数据共 9 种布局，检查键盘切换、
-  条形／分箱筛选、清空、scope 表单、分页、无 JavaScript 回退和私有记录排除。
-  截图在 `/tmp/charts-browser-qa/`。完整截图改用临时加高的真实 viewport，避免
+- 83 项相关 Django 测试通过，覆盖 Charts、共享字段兼容、上传兼容、详情曲线、CSV 和导航。
+  其中包括真实 Chromium 连接隔离 SQLite 的浏览器测试；日志 `/tmp/charts-refined-backend.log`。
+- 117 项 JavaScript／Chromium 测试通过，0 跳过；日志 `/tmp/charts-refined-js.log`。
+- 1280／1440／1920 桌面宽度验证多记录、长内容、空数据共 9 种布局，检查四图可见、首屏主曲线、
+  键盘点值、普通／抽样 SVG 实际下载、对象／分量／分类／条件切换、条形／分箱筛选、清空、
+  scope、分页、无 JavaScript 回退和私有记录排除。
+  截图在 `/tmp/charts-refined-qa/`。完整截图改用临时加高的真实 viewport，避免
   CDP captureBeyondViewport 截图触发主题边距过渡造成假重叠。
 - 用户样例只放入隔离内存库核对：Copper、Abaqus CAE、Goss、298 K、343 grains、
   2744 discretization，曲线 242–250 点并有 Different curve lengths 提示；
   等效曲线为可计算，无用户提供的等效数组。所有图表链接数量与对象列表一致。
   原样例及多相副本另做 6 种桌面布局；无 JS 异常，原文件 SHA-256 未变。
-  临时记录与截图在 `/tmp/charts-example-qa/`，不纳入 Git。
-- 独立代码审查发现的连续筛选扩大集合、温度分箱漏计、grain_number 冲突和无效范围删除
-  均已补回归并修复。计划记录在 `docs/superpowers/plans/2026-09-28-charts-statistics.md`。
+  临时记录与截图在 `/tmp/charts-refined-sample/`，不纳入 Git。
+- 独立审查发现的有限大整数轴崩溃、相近刻度重复、不可配对默认对象和 SVG 遗漏抽样说明，
+  均已补回归并修复。上一轮的精确筛选与分箱回归也保留。
+  计划记录在 `docs/superpowers/plans/2026-09-28-charts-statistics.md`。
 - 继续改这里时先跑 `DEBUG=True ... manage.py test apps.charts`；真实浏览器需要
   Chromium 与有全局 WebSocket 的 Node。跳过不能算通过，仍不主动做移动端改版。
 

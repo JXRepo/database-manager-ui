@@ -1,30 +1,5 @@
-<div class="charts-category" data-category="{{ category.key }}">
-  {% if category.rows %}
-    <div class="charts-bars">
-      {% for row in category.rows|slice:':5' %}
-        <a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}. View matching objects." title="{{ row.label }}">
-          <span class="charts-bar-label">{{ row.label }}</span>
-          <span class="charts-bar-track" aria-hidden="true"><span style="width: {{ row.percent }}%"></span></span>
-          <span class="charts-bar-count">{{ row.count }}</span>
-        </a>
-      {% endfor %}
-    </div>
-    {% if category.rows|length > 5 %}
-      <details class="charts-more">
-        <summary>View all {{ category.rows|length }} categories</summary>
-        <div class="charts-bars">
-          {% for row in category.rows|slice:'5:' %}
-            <a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}. View matching objects." title="{{ row.label }}">
-              <span class="charts-bar-label">{{ row.label }}</span>
-              <span class="charts-bar-track" aria-hidden="true"><span style="width: {{ row.percent }}%"></span></span>
-              <span class="charts-bar-count">{{ row.count }}</span>
-            </a>
-          {% endfor %}
-        </div>
-      </details>
-    {% endif %}
-    <p class="charts-footnote">Reported in {{ category.available }} of {{ category.total }} object{{ category.total|pluralize }}{% if category.missing %}; {{ category.missing }} not supplied{% endif %}.</p>
-  {% else %}
-    <div class="charts-panel-empty">No {{ category.title|lower }} metadata in this selection.</div>
-  {% endif %}
-</div>
+<svg class="charts-bar-svg" viewBox="0 0 340 {{ plot.height }}" role="group" aria-label="{% if category %}{{ category.title }} counts{% else %}Available mechanical results{% endif %}"{% if category %} data-category="{{ category.key }}"{% endif %} xmlns="http://www.w3.org/2000/svg">
+  {% for tick in plot.ticks %}<line x1="{{ tick.x }}" x2="{{ tick.x }}" y1="12" y2="{{ plot.baseline }}" class="charts-grid-line"/><text x="{{ tick.x }}" y="{{ plot.baseline|add:'20' }}" text-anchor="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
+  {% for row in plot.rows %}<a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}. View objects." data-label="{{ row.label }}"><title>{{ row.label }}: {{ row.count }}</title><rect x="0" y="{{ row.y|add:'-5' }}" width="338" height="34" fill="transparent"/><text x="0" y="{{ row.label_y }}" class="charts-bar-label">{{ row.short_label }}</text><rect x="134" y="{{ row.y }}" width="{{ row.width }}" height="22" rx="3" class="charts-bar-mark"/><text x="{{ row.value_x }}" y="{{ row.label_y }}" class="charts-bar-count">{{ row.count }}</text></a>{% endfor %}
+  <text x="220" y="{{ plot.height|add:'-2' }}" text-anchor="middle" class="charts-axis-text">Data objects</text>
+</svg>

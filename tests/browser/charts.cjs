@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const {spawn} = require('node:child_process');
 const {once} = require('node:events');
-const {mkdirSync, mkdtempSync, rmSync, writeFileSync} = require('node:fs');
+const {existsSync, readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} = require('node:fs');
 const {tmpdir} = require('node:os');
 const {join} = require('node:path');
 
@@ -61,9 +61,7 @@ const {join} = require('node:path');
       const url = process.env.CHARTS_BASE_URL + path;
       await command('Page.navigate', {url});
       await until(`location.href === ${JSON.stringify(url)} && document.readyState === "complete" && !!document.querySelector(".charts-page")`);
-      if (enhanced && await evaluate('!!document.querySelector("[data-chart-switch]")')) {
-        await until('document.querySelectorAll(".charts-enhanced").length === 3');
-      }
+      if (enhanced) await until('document.querySelector(".charts-page").classList.contains("charts-js")');
     }
     async function settleLayout() {
       await evaluate(`(async () => {
@@ -90,12 +88,17 @@ const {join} = require('node:path');
         })(),
         titleLeft: document.querySelector('.charts-heading h1').getBoundingClientRect().left,
         height: document.documentElement.scrollHeight,
-        compositionTop: document.querySelector('.charts-composition')?.getBoundingClientRect().top,
+        curveTop: document.querySelector('.charts-curve-svg')?.getBoundingClientRect().top,
+        curveBottom: document.querySelector('.charts-curve-svg')?.getBoundingClientRect().bottom,
+        graphCount: document.querySelectorAll('.charts-curve-svg, .charts-bar-svg, .charts-histogram-svg').length,
       })`);
       assert.ok(metrics.documentWidth <= width, `${label} overflows at ${width}: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.mainLeft >= metrics.sidebarRight - 1, `${label} under sidebar: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.titleVisible && metrics.titleTop >= metrics.headerBottom, `${label} title under navigation: ${JSON.stringify(metrics)}`);
-      if (metrics.compositionTop) assert.ok(metrics.compositionTop < 560);
+      if (metrics.curveTop) {
+        assert.ok(metrics.curveTop < 400 && metrics.curveBottom < 850, 'Curve must be visible on the first screen');
+        assert.ok(metrics.graphCount >= 3);
+      }
       if (process.env.CHARTS_SCREENSHOT_DIR && width === 1440) {
         mkdirSync(process.env.CHARTS_SCREENSHOT_DIR, {recursive: true});
         const viewport = await command('Page.captureScreenshot', {format: 'png'});
@@ -119,26 +122,58 @@ const {join} = require('node:path');
     assert.equal(await evaluate('document.querySelector("h1").textContent'), 'Charts');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '26');
     assert.equal(await evaluate('document.body.textContent.includes("hidden-private-marker")'), false);
-    await evaluate('document.querySelector("[data-chart-target=elastic-model-panel]").focus()');
-    assert.equal(await evaluate('document.activeElement.dataset.chartTarget'), 'elastic-model-panel');
-    await command('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r'});
-    await command('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
-    assert.equal(await evaluate('document.getElementById("elastic-model-panel").hidden'), false);
-    assert.equal(await evaluate('document.getElementById("plastic-model-panel").hidden'), true);
-    assert.equal(await evaluate('document.getElementById("loading-mode-panel").hidden'), false);
-    await evaluate('document.querySelector("[data-chart-target=loading-type-panel]").click()');
-    assert.equal(await evaluate('document.getElementById("loading-type-panel").hidden'), false);
-    await evaluate('document.querySelector("[data-chart-target=distribution-grain_count]").click()');
-    assert.equal(await evaluate('document.getElementById("distribution-grain_count").hidden'), false);
-    assert.equal(await evaluate('document.getElementById("distribution-temperature").hidden'), true);
-    await evaluate('document.querySelector("[data-category=software] .charts-more").open = true');
-    assert.equal(await evaluate('document.querySelectorAll("[data-category=software] .charts-bar").length'), 14);
-    await evaluate('document.querySelector(".charts-objects").open = true');
+    assert.ok(await evaluate('document.getElementById("response-line").getTotalLength() > 0'));
+    assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, .charts-bar-svg, .charts-histogram-svg").length'), 4);
+    await evaluate('document.getElementById("response-plot").focus()');
+    await command('Input.dispatchKeyEvent', {type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39});
+    assert.ok(await evaluate('document.getElementById("curve-tooltip").textContent.includes("Point 2")'));
+    assert.equal(await evaluate('document.getElementById("curve-tooltip").hidden'), false);
+    await evaluate('document.getElementById("response-plot").blur()');
+    await send('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: profile});
+    await evaluate('document.getElementById("download-curve").click()');
+    for (let attempt = 0; attempt < 60 && !existsSync(join(profile, 'stress-strain.svg')); attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    const downloaded = readFileSync(join(profile, 'stress-strain.svg'), 'utf8');
+    assert.match(downloaded, /id="response-line"/);
+    assert.match(downloaded, /Equivalent stress/);
+    assert.match(downloaded, /Supplied results/);
+    assert.doesNotMatch(downloaded, /id="curve-focus"/);
     for (const width of [1280, 1440, 1920]) await layout('varied-data', width);
 
+    await evaluate('document.getElementById("charts-group").value = "software"; document.getElementById("charts-group").dispatchEvent(new Event("change", {bubbles: true}))');
+    await until('document.readyState === "complete" && !!document.querySelector("svg[data-category=software]")');
+    await evaluate('document.querySelector(".charts-composition details").open = true');
+    assert.equal(await evaluate('document.querySelectorAll(".charts-composition .charts-category-table a").length'), 14);
+    await evaluate('document.getElementById("charts-group").value = "elastic_model"; document.getElementById("charts-group").dispatchEvent(new Event("change", {bubbles: true}))');
+    await until('document.readyState === "complete" && !!document.querySelector("svg[data-category=elastic_model]")');
+    assert.ok(await evaluate('document.querySelector(".charts-composition").textContent.includes("Anisotropic elasticity")'));
+    await evaluate('document.getElementById("charts-measure").value = "grain_count"; document.getElementById("charts-measure").dispatchEvent(new Event("change", {bubbles: true}))');
+    await until('new URLSearchParams(location.search).get("measure") === "grain_count" && document.readyState === "complete" && document.querySelector(".charts-histogram-svg").getAttribute("aria-label").includes("Grain number")');
+    const specificObject = await evaluate('[...document.querySelectorAll("#curve-object option")].find(option => option.textContent.includes("charts-browser-0")).value');
+    await evaluate('document.getElementById("curve-object").value = ' + JSON.stringify(specificObject) + '; document.getElementById("curve-object").dispatchEvent(new Event("change", {bubbles: true}))');
+    await until('document.readyState === "complete" && document.querySelectorAll("#curve-component option").length === 2');
+    await evaluate('document.getElementById("curve-component").value = "33"; document.getElementById("curve-component").dispatchEvent(new Event("change", {bubbles: true}))');
+    await until('new URLSearchParams(location.search).get("component") === "33" && document.readyState === "complete" && document.querySelector("#curve-title").textContent.includes("σ₃₃")');
+    assert.deepEqual(await evaluate('JSON.parse(document.getElementById("curve-points").textContent).map(point => point.y)'), [0, -60, -100]);
+    const sampledObject = await evaluate('[...document.querySelectorAll("#curve-object option")].find(option => option.textContent.endsWith(" · charts-browser-23")).value');
+    await navigate('/charts/?curve=' + sampledObject);
+    assert.ok(await evaluate('JSON.parse(document.getElementById("curve-points").textContent).length <= 2400'));
+    rmSync(join(profile, 'stress-strain.svg'));
+    await evaluate('document.getElementById("download-curve").click()');
+    for (let attempt = 0; attempt < 60 && !existsSync(join(profile, 'stress-strain.svg')); attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    const sampledExport = readFileSync(join(profile, 'stress-strain.svg'), 'utf8');
+    assert.match(sampledExport, /charts-browser-23/);
+    assert.match(sampledExport, /plotted points from 12000 paired samples/);
+    assert.match(sampledExport, /Strain: 12002 points; stress: 12000/);
+    assert.match(sampledExport, /Preview shows \d+ points, retaining local extrema/);
+    await navigate();
+
     const phase = await evaluate(`(() => {
-      const link = [...document.querySelectorAll('[data-category=phase] .charts-bar')].find(el => el.title === 'Copper');
-      return {path: new URL(link.href).pathname + new URL(link.href).search + '#objects', count: Number(link.querySelector('.charts-bar-count').textContent)};
+      const link = [...document.querySelectorAll('[data-category=phase] .charts-bar')].find(el => el.getAttribute('data-label') === 'Copper');
+      return {path: link.getAttribute('href'), count: Number(link.querySelector('.charts-bar-count').textContent)};
     })()`);
     await navigate(phase.path);
     assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), phase.count);
@@ -150,7 +185,7 @@ const {join} = require('node:path');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '26');
 
     const bin = await evaluate(`(() => {
-      const link = document.querySelector('#distribution-temperature .charts-bin[href]');
+      const link = document.querySelector('.charts-histogram-svg .charts-bin[href]');
       return {path: link.getAttribute('href'), count: Number(link.querySelector('.charts-bin-count').textContent)};
     })()`);
     await navigate(bin.path);
@@ -172,9 +207,11 @@ const {join} = require('node:path');
 
     await command('Emulation.setScriptExecutionDisabled', {value: true});
     await navigate('/charts/?scope=mine', false);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-enhanced").length'), 0);
-    assert.equal(await evaluate('document.getElementById("elastic-model-panel").hidden'), false);
-    assert.equal(await evaluate('document.getElementById("plastic-model-panel").hidden'), false);
+    assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, .charts-bar-svg, .charts-histogram-svg").length'), 4);
+    assert.ok(await evaluate('getComputedStyle(document.querySelector(".charts-apply")).display !== "none"'));
+    const visible = await evaluate('(() => {const svg = document.getElementById("response-plot"); const r = svg.getBoundingClientRect(); return svg.contains(document.elementFromPoint(r.left + 100, r.top + 60));})()');
+    assert.ok(visible, 'The server-rendered curve remains visible without JavaScript');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '24');
     await command('Emulation.setScriptExecutionDisabled', {value: false});
 
@@ -185,7 +222,7 @@ const {join} = require('node:path');
     assert.ok(await evaluate('document.querySelector(".charts-empty h2").textContent.includes("starts here")'));
     for (const width of [1280, 1440, 1920]) await layout('empty-data', width);
     assert.deepEqual(exceptions, []);
-    console.log('Charts browser checks passed: keyboard switches, exact category and histogram drillthrough, clear, scopes, pagination, no JavaScript fallback, and 9 desktop layouts.');
+    console.log('Charts browser checks passed: four visible SVG plots, keyboard point inspection, SVG download, category/measure/object/component controls, exact drillthrough, pagination, permissions, no JavaScript, and 9 desktop layouts.');
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

@@ -257,7 +257,8 @@ class ChartsTests(TestCase):
                  {"lo": "10"}, {"measure": "unknown", "lo": "1", "hi": "2"},
                  {"measure": "temperature", "lo": "1", "hi": "2", "inclusive": "maybe"},
                  {"range": ""}, {"range": "bad"}, {"range": "temperature:1:2:maybe"},
-                 {"scope": ["mine", "all"]}]
+                 {"scope": ["mine", "all"]}, {"group": "unknown"}, {"component": "fake"},
+                 {"curve": "-1"}, {"curve": "1e2"}, {"curve": "1" * 5000}]
         for query in cases:
             with self.subTest(query=query):
                 response = self.dashboard(**query)
@@ -337,10 +338,15 @@ class ChartsTests(TestCase):
         Formatting cannot collapse different intervals into identical labels
         """
         for index in range(9):
-            self.create_object(str(index), global_temperature=298 + index / 100000)
-        distribution = self.dashboard().context["distributions"][0]
+            self.create_object(str(index), global_temperature=298 + index / 100000000)
+        response = self.dashboard()
+        distribution = response.context["distributions"][0]
         self.assertNotEqual(distribution["minimum"], distribution["maximum"])
         self.assertEqual(len({item["label"] for item in distribution["bins"]}), 8)
+        columns = response.context["histogram"]["columns"]
+        self.assertEqual(len({(item["low_label"], item["high_label"]) for item in columns}), 8)
+        for item in columns:
+            self.assertNotEqual(item["low_label"], item["high_label"])
 
     def test_grain_aliases_unwrap_scalars_and_reject_every_conflicting_spelling(self):
         """
@@ -431,7 +437,7 @@ class ChartsTests(TestCase):
         hostile = '<img src=x onerror="alert(1)">'
         for index in range(12):
             self.create_object(str(index), software=hostile if index == 0 else f"Software {index}")
-        response = self.dashboard()
+        response = self.dashboard(group="software")
         self.assertEqual(len(response.context["categories"]["software"]["rows"]), 12)
         self.assertNotContains(response, hostile)
         self.assertContains(response, "&lt;img")
@@ -466,3 +472,121 @@ class ChartsTests(TestCase):
         self.assertNotContains(response, "NaN")
         self.assertNotContains(response, "0 / 0")
         self.assertTrue(all(not group["rows"] for group in response.context["categories"].values()))
+
+    def test_curve_preview_uses_one_selected_accessible_object_in_original_order(self):
+        """
+        A cyclic response preserves sample order without combining objects
+        """
+        obj = self.create_object(stress={"stress_33": [0, 100, 40, -60]},
+                                 total_strain={"strain_33": [0, .03, .01, -.02]})
+        hidden = self.create_object("hidden-curve", owner=self.other,
+                                    stress={"stress_33": [0, 9876543]})
+        response = self.dashboard(curve=str(obj.pk), component="33")
+        curve = response.context["curve"]
+        self.assertEqual(curve["record"]["id"], obj.pk)
+        self.assertEqual([point["x"] for point in curve["points"]], [0, .03, .01, -.02])
+        self.assertEqual([point["y"] for point in curve["points"]], [0, 100, 40, -60])
+        self.assertContains(response, 'class="charts-curve-svg"')
+        self.assertNotContains(response, "9876543")
+        selected = self.dashboard(curve=str(hidden.pk))
+        self.assertIsNone(selected.context["curve"])
+        self.assertNotContains(selected, "hidden-curve")
+
+    def test_curve_equivalents_share_detail_rules_and_report_unpaired_values(self):
+        """
+        Calculated equivalents retain source lengths and never replace supplied arrays
+        """
+        stress = {f"stress_{key}": [0, 0, 0] for key in ("11", "22", "33", "12", "13", "23")}
+        stress["stress_33"] = [0, -100, -150]
+        strain = {f"strain_{key}": [0, 0, 0, 0] for key in ("11", "22", "33", "12", "13", "23")}
+        strain["strain_33"] = [0, -.03, -.06, -.09]
+        obj = self.create_object(stress=stress, total_strain=strain)
+        original = copy.deepcopy(obj.data)
+        curve = self.dashboard().context["curve"]
+        self.assertEqual(curve["component"], "equivalent")
+        self.assertEqual(curve["count"], 3)
+        self.assertEqual((curve["x_count"], curve["y_count"]), (4, 3))
+        self.assertTrue(curve["calculated"])
+        self.assertEqual([point["y"] for point in curve["points"]], [0, 100, 150])
+        obj.refresh_from_db()
+        self.assertEqual(obj.data, original)
+        obj.data["stress"]["equivalent_stress"] = [8, 9]
+        obj.data["total_strain"]["equivalent_strain"] = [1, 2]
+        obj.save()
+        supplied = self.dashboard().context["curve"]
+        self.assertFalse(supplied["calculated"])
+        self.assertEqual([point["y"] for point in supplied["points"]], [8, 9])
+
+    def test_curve_selection_cannot_escape_active_filters_and_empty_fields(self):
+        """
+        A chosen object or component outside the selection never supplies preview data
+        """
+        copper = self.create_object()
+        self.create_object("nickel", phase=[{"phase_name": "Nickel"}])
+        response = self.dashboard(phase="Nickel", curve=str(copper.pk))
+        self.assertIsNone(response.context["curve"])
+        self.assertEqual(response.context["total_objects"], 1)
+        response = self.dashboard(curve=str(copper.pk), component="equivalent")
+        self.assertIsNone(response.context["curve"])
+        filtered = self.dashboard(curve=str(copper.pk))
+        row = filtered.context["categories"]["phase"]["rows"][0]
+        self.assertNotIn("curve", parse_qs(urlsplit(row["url"]).query))
+
+    def test_large_curve_preview_preserves_extrema_and_export_source(self):
+        """
+        Bounded display sampling preserves spikes and sample traversal order
+        """
+        values = [0] * 12000
+        values[3456], values[7654] = 1500, -800
+        obj = self.create_object(stress={"stress_33": values},
+                                 total_strain={"strain_33": list(range(12002))})
+        response = self.dashboard()
+        curve = response.context["curve"]
+        self.assertEqual(curve["count"], 12000)
+        self.assertLessEqual(len(curve["points"]), 2400)
+        self.assertIn(1500, [point["y"] for point in curve["points"]])
+        self.assertIn(-800, [point["y"] for point in curve["points"]])
+        indices = [point["index"] for point in curve["points"]]
+        self.assertEqual(indices, sorted(set(indices)))
+        self.assertEqual((indices[0], indices[-1]), (0, 11999))
+        self.assertContains(response, f'{curve["shown_count"]} plotted points from 12000 paired samples')
+        self.assertContains(response, 'Strain: 12002; stress: 12000')
+        obj.refresh_from_db()
+        self.assertEqual(obj.data["stress"]["stress_33"], values)
+
+    def test_default_curve_skips_objects_without_matching_components(self):
+        """
+        Separate stress and strain groups alone cannot mask an available response
+        """
+        paired = self.create_object("matching-components")
+        self.create_object("unmatched-components", stress={"stress_11": [0, 1]},
+                           total_strain={"strain_33": [0, .1]})
+        response = self.dashboard()
+        self.assertEqual(response.context["paired_count"], 2)
+        self.assertEqual(response.context["curve"]["record"]["id"], paired.pk)
+        self.assertEqual([row["id"] for row in response.context["curve_objects"]], [paired.pk])
+
+    def test_large_finite_curve_values_keep_distinct_positions_and_readouts(self):
+        """
+        Exact integer offsets must neither crash the page nor collapse samples
+        """
+        values = [10 ** 50 + index for index in range(3)]
+        self.create_object(stress={"stress_33": values}, total_strain={"strain_33": [0, 1, 2]})
+        curve = self.dashboard().context["curve"]
+        self.assertEqual([point["y_text"] for point in curve["points"]], list(map(str, values)))
+        self.assertEqual(len({point["py"] for point in curve["points"]}), 3)
+        self.assertEqual(len({tick["label"] for tick in curve["y_ticks"]}), len(curve["y_ticks"]))
+        self.assertTrue(curve["y_offset"])
+
+    def test_close_curve_values_have_distinct_ticks_and_exact_readouts(self):
+        """
+        Small changes around a large baseline stay visible with a labelled offset
+        """
+        values = [100, 100.0000000001, 100.0000000002]
+        self.create_object(stress={"stress_33": values})
+        response = self.dashboard()
+        curve = response.context["curve"]
+        self.assertEqual([point["y_text"] for point in curve["points"]], list(map(str, values)))
+        self.assertEqual(len({tick["label"] for tick in curve["y_ticks"]}), len(curve["y_ticks"]))
+        self.assertTrue(curve["y_offset"])
+        self.assertContains(response, "Offset +100")

@@ -16,10 +16,12 @@ from .analytics import (
     CATEGORY_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
     distribution, format_number, in_bin, number, summarize_object,
 )
+from .plots import bar_plot, curve_preview, histogram_plot
 
 SCOPES = {"all": "All accessible", "mine": "My uploads", "public": "Public", "shared": "Shared with me"}
 MULTIPLE_FILTERS = (*CATEGORY_TITLES, "result", "note", "range")
 FILTER_KEYS = (*MULTIPLE_FILTERS, "measure", "lo", "hi", "inclusive")
+VIEW_KEYS = ("group", "curve", "component")
 
 
 def chart_url(query, changes=None, objects=False):
@@ -75,7 +77,7 @@ def refine_url(query, key, value, **changes):
     selected = query.get(key, [])
     if value.casefold() not in {item.casefold() for item in selected}:
         selected = [*selected, value]
-    return chart_url(query, {**changes, key: selected}, objects=True)
+    return chart_url(query, {"curve": None, "component": None, **changes, key: selected}, objects=True)
 
 
 def parse_filters(params):
@@ -92,7 +94,7 @@ def parse_filters(params):
     tuple
         Known parameters, errors and required numeric intervals.
     """
-    keys = ("scope", *FILTER_KEYS, "page", "show")
+    keys = ("scope", *FILTER_KEYS, *VIEW_KEYS, "page", "show")
     query = {}
     errors = []
     for key in keys:
@@ -113,6 +115,13 @@ def parse_filters(params):
         errors.append("Choose an available data note.")
     if query.get("measure") and query["measure"] not in MEASURES:
         errors.append("Choose temperature, grain number or discretization count.")
+    if query.get("group") and query["group"] not in CATEGORY_TITLES:
+        errors.append("Choose an available category.")
+    if query.get("component") and query["component"] not in {"equivalent", "11", "22", "33", "12", "13", "23"}:
+        errors.append("Choose an available response component.")
+    if query.get("curve") and (len(query["curve"]) > 20 or not query["curve"].isascii()
+                              or not query["curve"].isdigit() or int(query["curve"]) < 1):
+        errors.append("Choose a data object from this selection.")
     ranges = query.get("range", [])
     if any(key in query for key in ("lo", "hi", "inclusive")):
         ranges.append(":".join([query.get("measure", ""), query.pop("lo", ""),
@@ -248,6 +257,27 @@ def index(request):
                                "url": chart_url(query, {"range": query["range"][:index] + query["range"][index + 1:]})})
     page = Paginator(records, 10).get_page(query.get("page"))
     clear_url = chart_url({"scope": scope if scope in SCOPES else "all"})
+    group = query.get("group") or "phase"
+    selected_category = categories.get(group, categories["phase"])
+    measure = query.get("measure") or "temperature"
+    selected_distribution = next((item for item in distributions if item["key"] == measure), distributions[0])
+    curve_objects = [record for record in records if record["curve_components"]]
+    selected_record = next((record for record in curve_objects if str(record["id"]) == query.get("curve")), None)
+    if not query.get("curve"):
+        selected_record = next(iter(curve_objects), None)
+    curve, component_choices = None, []
+    if selected_record:
+        source = objects.filter(pk=selected_record["id"]).only("data").first()
+        if source:
+            curve, component_choices = curve_preview(source.data, query.get("component", ""))
+            if curve:
+                curve["record"] = selected_record
+            del source
+    controls = {}
+    for name, excluded in {"curve": {"curve", "component", "show", "page"},
+                           "group": {"group", "show", "page"}, "measure": {"measure", "show", "page"}}.items():
+        controls[name] = [(key, value) for key, values in query.items() if key not in excluded
+                          for value in (values if isinstance(values, list) else [values])]
     context = {
         "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "All accessible"),
         "scope_options": SCOPES.items(), "base_count": base_count, "total_objects": total,
@@ -264,5 +294,12 @@ def index(request):
         "objects_open": bool(active_filters or query.get("show") == "objects"),
         "previous_url": chart_url(query, {"page": page.previous_page_number()}, objects=True) if page.has_previous() else "",
         "next_url": chart_url(query, {"page": page.next_page_number()}, objects=True) if page.has_next() else "",
+        "group_options": CATEGORY_TITLES.items(), "selected_category": selected_category,
+        "category_plot": bar_plot(selected_category["rows"]), "group": group,
+        "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
+        "results_plot": bar_plot([{**row, "label": row["title"]} for row in result_rows[:3]]),
+        "curve": curve, "curve_objects": curve_objects, "curve_record": selected_record,
+        "component_choices": component_choices, "selected_component": query.get("component") or (curve or {}).get("component", ""),
+        "control_params": controls,
     }
     return render(request, "charts/index.html", context)

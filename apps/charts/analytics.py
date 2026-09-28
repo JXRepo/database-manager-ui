@@ -150,11 +150,12 @@ def curve_summary(data):
     Returns
     -------
     tuple
-        Availability flags, distinct series lengths and note keys.
+        Availability flags, distinct series lengths, note keys and paired components.
     """
     available = set()
     lengths = set()
     notes = set()
+    components = {}
     units = data.get("units")
     units = units if isinstance(units, dict) else {}
     definitions = (
@@ -181,11 +182,14 @@ def curve_summary(data):
             lengths.add(len(values))
         if not valid:
             continue
+        components[group_name] = {suffix for suffix in COMPONENTS if f"{prefix}_{suffix}" in valid}
         available.add(group_name)
         if equivalent in valid:
             available.add("supplied_equivalent")
+            components[group_name].add("equivalent")
         if equivalent not in group and all(f"{prefix}_{component}" in valid for component in COMPONENTS):
             available.add("calculated_equivalent")
+            components[group_name].add("equivalent")
         unit = units.get(unit_name)
         has_unit = isinstance(unit, str) and bool(unit.strip())
         if unit_name == "Strain" and not isinstance(unit, bool) and unit == 1:
@@ -196,7 +200,8 @@ def curve_summary(data):
         available.add("paired")
     if len(lengths) > 1:
         notes.add("unequal_lengths")
-    return available, lengths, notes
+    paired_components = components.get("stress", set()) & components.get("total_strain", set())
+    return available, lengths, notes, paired_components
 
 
 def summarize_object(obj):
@@ -264,7 +269,7 @@ def summarize_object(obj):
     cells = number(data.get("discretization_count"), integer=True)
     if cells is not None:
         numeric["discretization_count"].append(cells)
-    available, lengths, notes = curve_summary(data)
+    available, lengths, notes, paired_components = curve_summary(data)
     if conflicts:
         notes = {"conflicting_metadata"}
     elif temperature is None:
@@ -278,6 +283,7 @@ def summarize_object(obj):
     return {
         "id": obj.pk, "title": title, "identifier": identifier or f"Object {obj.pk}",
         "categories": categories, "numeric": numeric, "results": available, "notes": notes,
+        "curve_components": paired_components,
         "phase_label": " / ".join(categories["phase"]) or "Not supplied",
         "software_label": " / ".join(categories["software"]) or "Not supplied",
         "result_label": result_label, "points": points,

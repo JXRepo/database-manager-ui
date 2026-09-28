@@ -45,7 +45,11 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
                 plastic_strain={"equivalent_plastic_strain": [0, .005]} if index % 2 else {},
             )
             if index == 23:
-                data["stress"]["equivalent_stress"] = [0, 1, 2]
+                data["stress"]["equivalent_stress"] = list(range(12000))
+                data["total_strain"]["equivalent_strain"] = [value / 1000 for value in range(12002)]
+            if index == 0:
+                data["stress"]["stress_33"] = [0, -60, -100]
+                data["total_strain"]["strain_33"] = [0, -.005, -.015]
             JSONData.objects.create(owner=viewer, data=data, access_type="c")
         long_data = valid_upload_object(
             identifier="long-identifier-" * 25,

@@ -1,5 +1,25 @@
 # Charts statistics implementation plan
 
+## Visual revision after user feedback
+
+The user rejected the first presentation in `3924c27` because charts were not
+prominent and the page felt cluttered. Its statistical rules remain, but the
+interface described below is superseded by four server-rendered SVG plots:
+a dominant single-object stress–strain response, one selectable composition
+chart, one condition histogram and compact result availability. Notes and the
+object list start collapsed. The response preserves sample order, units,
+supplied/calculated provenance, unequal lengths and explicitly bounded previews;
+SVG downloads retain those qualifications. Default objects must have actual
+matching components. Close-value axes use precise labelled offsets.
+
+This revision passed 83 relevant Django tests, including real Chromium checks
+of visible charts, point inspection, actual SVG downloads, controls, permissions
+and nine desktop layouts. The existing JavaScript suite passed 117 tests with
+zero skips. The original local example also renders its actual 242-point
+equivalent response without modifying or uploading the source file.
+
+## Original implementation record
+
 **Goal:** Replace the temporary Charts page with a useful, permission-aware statistics workspace.
 
 **Authorization:** The user approved the proposed redesign and requested direct implementation, verification, commit and push without further design questions.
