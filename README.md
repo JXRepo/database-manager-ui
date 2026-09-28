@@ -127,8 +127,8 @@ another page. Reloading, closing the tab or leaving the site before server
 receipt can interrupt transfer. No submission or interrupted task is retried
 automatically. Ordinary form submission remains available without JavaScript.
 Local `runserver` sessions without an upload worker retain the existing NDJSON
-upload flow; use the Gunicorn command in the operator runbook to test background
-uploads locally.
+upload flow with actual object checking and saving counts; use the Gunicorn
+command in the operator runbook to test background uploads locally.
 
 Task status and confirmed outcomes are private to their owner and retained for
 seven days. Original files are temporarily staged outside public static files
@@ -197,14 +197,21 @@ failed files; successful files remain saved. A final identifier conflict, quota
 failure, or database save error also rejects that whole file while other files
 continue. Failed files do not reserve identifiers or consume storage quota.
 
-The background upload path shows `Checking 37 / 100`, then `Saving 70 / 100`,
-using actual completed work. Fast operations can skip intermediate displayed
-counts. Checking and saving use numbers without a spinner; reading and the
-legacy Processing fallback still indicate activity when no count is available.
+Both background uploads and the NDJSON upload flow show `Checking 37 / 100`,
+then `Saving 70 / 100`, using actual completed work. Fast operations can skip
+intermediate displayed counts; final file rows retain `Checked 100 / 100` even
+when validation fails. Checking and saving use numbers without a spinner;
+reading and processing indicate activity while no object count is available.
 Saving counts remain provisional until the whole file transaction commits.
 Only then is the file labelled Uploaded. A private temporary progress file lets
 other pages observe saving counts without waiting for that transaction; it
 contains no uploaded data and never overrides confirmed database results.
+The NDJSON response emits counts during the same checking and save operations.
+Updated clients request these events with `X-Upload-Progress: objects`; already
+open older pages keep receiving the original file event protocol.
+Closing that stream during a save rolls back its current file and notifications,
+while keeping earlier committed files. It does not create a background task;
+ordinary submissions without JavaScript still receive the final report.
 Errors appear directly beneath the form, before upload limits. Multiple object
 errors have a compact expandable list, retaining every affected field and its
 original object position and source location.
@@ -529,8 +536,10 @@ Before checking these requirements, the platform recognizes schema field names
 independently of case and separator punctuation: `Date`, `DATE` and `date` match,
 as do `input_path`, `Input Path` and `input-path`. Matching stays within each
 field's parent; it does not search unrelated subtrees or guess synonyms such as
-`Material` for `phase`. Two matching spellings with different values are reported
-as conflicting fields rather than choosing a value silently.
+`Material` for `phase`. The explicitly supported `CPU_specifications` alias also
+satisfies `processor_specifications`; either field name can be used, and its
+original spelling is preserved. Two matching spellings with different values
+are reported as conflicting fields rather than choosing a value silently.
 
 Text containing a finite number is accepted at known numeric fields, including
 `magnitude`, tensor components and curve arrays. For example, `" 1.5\n"` is read

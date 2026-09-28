@@ -50,6 +50,7 @@ Current priority:
 - Validate the 24 required top-level fields and applicable nested and conditional required rules from the bundled MiMeDat schema profile; do not claim full JSON Schema compliance or enforce unrelated optional constraints
 - Extra fields are allowed
 - Recognize schema field names within their own parent ignoring case and separator punctuation; accept finite numeric strings at known numeric paths and explicit all/c sharing shorthand
+- Accept CPU_specifications as an explicit alias for processor_specifications, preserving uploaded names and rejecting conflicting values when both are supplied
 - Unwrap singleton lists only at known scalar or object locations, including individual array entries; preserve genuine arrays and unknown metadata, never choose among multiple values, and check required emptiness after unwrapping
 - Wrapped identifiers and explicit sharing tokens use the same duplicate and access checks as bare values; retain existing wrappers when filling a blank identifier automatically
 - Preserve original JSON keys and values in storage and JSON export; use the shared metadata compatibility view for validation, search, summaries and plots
@@ -64,7 +65,8 @@ Current priority:
 - Identify an object by its title and valid supplied identifier when available, with its file position as a reference or fallback; escape all uploaded text in feedback
 - Treat each uploaded JSON file as one save unit: any validation, identifier, or sharing error rejects the entire file, with no partial objects or notifications saved
 - Check every file and every readable data object, collecting independent errors instead of stopping at the first issue; reject invalid files and continue processing the others
-- Show real Checking n / total and provisional Saving n / total counts beside each selected file; show Uploaded only after the entire file commits, and retain the ordinary form and Processing fallback
+- Show real Checking n / total and provisional Saving n / total counts in both background and NDJSON uploads; retain Checked n / total on final file rows, show Uploaded only after the entire file commits, and keep ordinary form submissions working
+- Stream counts from the actual validation and save operations, never replay or delay them; close processing iterators on disconnect so an interrupted file and its notifications roll back while earlier file commits remain
 - Use no spinner for object checking or saving counts; keep errors immediately below the form, with expandable details for multiple failed objects
 - Keep one multipart submission and all batch prechecks, stream real file results in order after each atomic save, and retain ordinary form submission as a fallback; never simulate progress or retry automatically after a connection failure
 - Prevent duplicate submissions without disabling the file input; retain confirmed results after an interrupted response and mark unfinished files as unconfirmed

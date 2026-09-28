@@ -88,10 +88,10 @@ class UploadProgressTests(TestCase):
         """
         return self.client.post(
             reverse("upload_json"), {"file": [self._file(payload) for payload in payloads]},
-            HTTP_ACCEPT="application/x-ndjson",
+            HTTP_ACCEPT="application/x-ndjson", HTTP_X_UPLOAD_PROGRESS="objects",
         )
 
-    def _events(self, response):
+    def _events(self, response, include_progress=False):
         """
         Consume application events while checking the streaming contract
 
@@ -99,6 +99,8 @@ class UploadProgressTests(TestCase):
         ----------
         response : HttpResponse
             Upload response to consume.
+        include_progress : bool, optional
+            Include intermediate object counts as well as file results.
 
         Yields
         ------
@@ -112,7 +114,69 @@ class UploadProgressTests(TestCase):
         for chunk in response.streaming_content:
             for line in chunk.splitlines():
                 if line.strip():
-                    yield json.loads(line)
+                    event = json.loads(line)
+                    if include_progress or event["type"] != "file_progress":
+                        yield event
+
+    def test_stream_checks_every_object_and_reports_counts_before_saving(self):
+        """
+        Expose real object checks even when thirty errors reject all hundred objects
+        """
+        records = [self._data(f"Object {index}", f"object-{index}") for index in range(100)]
+        for record in records[:30]:
+            record.pop("phase")
+        observed = []
+        for event in self._events(self._post(records), include_progress=True):
+            if event["type"] == "file_progress":
+                observed.append((event["stage"], event["completed"], event["total"]))
+                self.assertFalse(JSONData.objects.exists())
+        self.assertTrue(observed, "The stream must report object progress before its final result")
+        self.assertEqual(observed[0], ("parsing", 0, None))
+        self.assertEqual(observed[1:], [("validating", index, 100) for index in range(101)])
+        self.assertFalse(JSONData.objects.exists())
+        self.assertEqual(event["level"], "error")
+
+    def test_stream_reports_provisional_saves_before_the_confirmed_result(self):
+        """
+        Count each actual save without declaring success until the file commits
+        """
+        records = [self._data(f"Object {index}", f"object-{index}") for index in range(3)]
+        observed = []
+        for event in self._events(self._post(records), include_progress=True):
+            if event["type"] == "file_progress":
+                observed.append((event["stage"], event["completed"], event["total"]))
+                if event["stage"] == "validating":
+                    self.assertFalse(JSONData.objects.exists())
+                elif event["stage"] == "saving":
+                    self.assertEqual(JSONData.objects.count(), event["completed"])
+            elif event["type"] == "file_result":
+                self.assertEqual(event["status"], "uploaded")
+                self.assertEqual(event["saved_count"], 3)
+                self.assertTrue(observed, "The stream must report provisional saves before success")
+                self.assertEqual(observed[-1], ("saving", 3, 3))
+        self.assertEqual(observed, [("parsing", 0, None)] +
+                         [("validating", index, 3) for index in range(4)] +
+                         [("saving", index, 3) for index in range(4)])
+
+    def test_disconnected_stream_rolls_back_the_current_file_and_notifications(self):
+        """
+        Keep earlier commits and discard a file interrupted during provisional saving
+        """
+        shared = self._data("Shared", "shared")
+        shared["shared_with"] = [{"access_type": "c", "username": self.recipient.username}]
+        response = self._post(self._data("Confirmed", "confirmed"), [shared, self._data("Later", "later")])
+        events = self._events(response, include_progress=True)
+        for event in events:
+            if (event["type"] == "file_progress" and event["index"] == 1
+                    and event["stage"] == "saving" and event["completed"] == 1):
+                self.assertEqual(JSONData.objects.count(), 2)
+                self.assertEqual(DataNotification.objects.count(), 1)
+                response.close()
+                break
+        else:
+            self.fail("The stream never exposed a provisional object save")
+        self.assertEqual(list(JSONData.objects.values_list("data__identifier", flat=True)), ["confirmed"])
+        self.assertFalse(DataNotification.objects.exists())
 
     def test_each_file_starts_before_its_writes_and_finishes_before_the_next(self):
         """
@@ -296,6 +360,19 @@ class UploadProgressTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("/login/", response.headers["Location"])
         self.assertFalse(JSONData.objects.exists())
+
+    def test_existing_clients_keep_the_original_file_event_protocol(self):
+        """
+        Let an already open upload page finish after the server gains object progress
+        """
+        response = self.client.post(
+            reverse("upload_json"), {"file": self._file(self._data("Existing page", "existing-page"))},
+            HTTP_ACCEPT="application/x-ndjson",
+        )
+        events = list(self._events(response, include_progress=True))
+        self.assertEqual([event["type"] for event in events], ["file_start", "file_result", "complete"])
+        self.assertEqual(events[1]["status"], "uploaded")
+        self.assertEqual(JSONData.objects.count(), 1)
 
     def test_live_progress_requires_csrf_protection(self):
         """

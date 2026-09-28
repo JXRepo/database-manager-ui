@@ -1,5 +1,6 @@
 import json
 import math
+from contextlib import closing
 from tempfile import SpooledTemporaryFile
 from zipfile import ZipFile, ZIP_DEFLATED
 from decimal import Decimal, ROUND_HALF_UP, localcontext
@@ -64,10 +65,11 @@ from .upload_services import (
     PreparedJSONData,
     UploadResourceLimitError,
     canonical_json_size,
+    consume_upload_progress,
     data_fingerprint,
     generate_data_identifier,
     identifier_query,
-    save_prepared_json_data,
+    iter_save_prepared_json_data,
     validate_json_depth,
     validate_upload_files,
 )
@@ -956,7 +958,7 @@ def _upload_label(value):
     return value.encode("utf-8", errors="replace").decode("utf-8")
 
 
-def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identifiers, progress=None):
+def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identifiers):
     """
     Inspect every object and collect independent issues before saving a file
 
@@ -972,8 +974,11 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         Original container depth or exact paths produced by the batch precheck.
     saved_identifiers : set of str
         Identifiers and fingerprints from successfully saved files in this request.
-    progress : callable, optional
-        Observer receiving the stage, completed object count and total count.
+
+    Yields
+    ------
+    tuple
+        Validation stage, completed object count and total count.
 
     Returns
     -------
@@ -996,8 +1001,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
     prepared_objects = []
     prepared_reports = {}
     for completed, (obj, object_report) in enumerate(zip(objects, file_report["objects"])):
-        if progress is not None:
-            progress("validating", completed, len(objects))
+        yield "validating", completed, len(objects)
         valid_objects, errors = validate_json([obj], detailed=True)
         for error in errors:
             _add_upload_issue(object_report["issues"], error["category"], error["message"], fields=error["fields"])
@@ -1073,8 +1077,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
             prepared_objects.append(candidate)
             prepared_reports[identifier] = object_report
 
-    if progress is not None:
-        progress("validating", len(objects), len(objects))
+    yield "validating", len(objects), len(objects)
     return prepared_objects, prepared_reports
 
 
@@ -1161,8 +1164,39 @@ def _process_upload_file(
         Persist the successful file report inside the data save transaction.
         Failure to record this outcome also rolls back the data and notifications.
     """
-    if progress is not None:
-        progress("parsing", 0, None)
+    return consume_upload_progress(
+        _iter_process_upload_file(owner, file_report, uploaded_file, object_depth,
+                                  saved_identifiers, on_saved=on_saved),
+        progress,
+    )
+
+
+def _iter_process_upload_file(owner, file_report, uploaded_file, object_depth,
+                              saved_identifiers, on_saved=None):
+    """
+    Yield real object progress while preserving the file's atomic save
+
+    Parameters
+    ----------
+    owner : User
+        Authenticated uploader.
+    file_report : dict
+        File status and grouped issues to update.
+    uploaded_file : UploadedFile
+        Inspected file to read again for validation and saving.
+    object_depth : int or list of tuple
+        Original container depth or inspected record paths.
+    saved_identifiers : set of str
+        Identifiers committed by previous files.
+    on_saved : callable, optional
+        Persist the successful file report inside the save transaction.
+
+    Yields
+    ------
+    tuple
+        Stage, completed object count and total count, or None while parsing.
+    """
+    yield "parsing", 0, None
     uploaded_file.seek(0)
     payload = json.load(uploaded_file)
     if isinstance(object_depth, list):
@@ -1173,17 +1207,16 @@ def _process_upload_file(
         objects = payload
     else:
         objects = payload["data"]
-    prepared_objects, prepared_object_reports = _prepare_upload_file(
-        objects, owner, file_report, object_depth, saved_identifiers, progress=progress,
+    prepared_objects, prepared_object_reports = yield from _prepare_upload_file(
+        objects, owner, file_report, object_depth, saved_identifiers,
     )
     if file_report["issues"] or any(obj["issues"] for obj in file_report["objects"]):
         return
 
     try:
-        if progress is not None:
-            progress("saving", 0, len(objects))
+        yield "saving", 0, len(objects)
         with transaction.atomic():
-            saved_objects = save_prepared_json_data(owner, prepared_objects, progress=progress)
+            saved_objects = yield from iter_save_prepared_json_data(owner, prepared_objects)
             if on_saved is not None:
                 on_saved(dict(file_report, status="uploaded", saved_count=len(saved_objects)))
     except UploadIdentifierConflict as error:
@@ -1214,7 +1247,7 @@ def _process_upload_file(
 
 def _upload_progress(upload_files, parsed_files, owner):
     """
-    Process files in order and yield progress around each complete save
+    Process files in order and yield actual object counts and committed results
 
     Both ordinary form posts and streaming responses consume this iterator.
     The final event contains escaped feedback without changing the session.
@@ -1231,14 +1264,19 @@ def _upload_progress(upload_files, parsed_files, owner):
     Yields
     ------
     dict
-        A start event, a confirmed result, or the completed submission report.
+        A file start, object count, confirmed result or completed submission report.
     """
     saved_identifiers = set()
     for index, file_report in enumerate(upload_files):
         yield {"type": "file_start", "index": index}
         if index in parsed_files:
             uploaded_file, object_depth = parsed_files.pop(index)
-            _process_upload_file(owner, file_report, uploaded_file, object_depth, saved_identifiers)
+            with closing(_iter_process_upload_file(
+                owner, file_report, uploaded_file, object_depth, saved_identifiers,
+            )) as processing:
+                for stage, completed, total in processing:
+                    yield {"type": "file_progress", "index": index, "stage": stage,
+                           "completed": completed, "total": total}
         yield {
             "type": "file_result", "index": index,
             "status": file_report["status"], "saved_count": file_report["saved_count"],
@@ -1260,7 +1298,7 @@ def _upload_progress(upload_files, parsed_files, owner):
     }
 
 
-def _stream_upload_progress(events):
+def _stream_upload_progress(events, include_object_progress=False):
     """
     Encode each real upload event as one newline delimited JSON record
 
@@ -1268,14 +1306,18 @@ def _stream_upload_progress(events):
     ----------
     events : iterator of dict
         File processing events followed by the final report.
+    include_object_progress : bool, optional
+        Send object events only to clients that explicitly support them.
 
     Yields
     ------
     str
         One JSON event ready for the streaming response.
     """
-    for event in events:
-        yield json.dumps(event) + "\n"
+    with closing(events):
+        for event in events:
+            if include_object_progress or event["type"] != "file_progress":
+                yield json.dumps(event) + "\n"
 
 
 @login_required
@@ -1347,7 +1389,9 @@ def upload_json_view(request):
             events = _upload_progress(upload_files, parsed_files, request.user)
             if stream_requested:
                 return StreamingHttpResponse(
-                    _stream_upload_progress(events),
+                    _stream_upload_progress(
+                        events, include_object_progress=request.headers.get("X-Upload-Progress") == "objects",
+                    ),
                     content_type="application/x-ndjson",
                     headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
                 )

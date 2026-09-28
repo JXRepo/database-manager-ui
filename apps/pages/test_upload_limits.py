@@ -561,7 +561,7 @@ class UploadResourceViewTests(TestCase):
             self._json_file(self._valid("last-object"), "one-too-many.json"),
         ]
 
-        with patch("apps.pages.views.save_prepared_json_data") as save_mock:
+        with patch("apps.pages.views.iter_save_prepared_json_data") as save_mock:
             response = self.client.post(reverse("upload_json"), {"file": files})
 
         self.assertEqual(response.status_code, 200)

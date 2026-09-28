@@ -1,6 +1,7 @@
 import hashlib
 import json
 import math
+from contextlib import closing
 from dataclasses import dataclass, replace
 from typing import Sequence
 
@@ -355,6 +356,32 @@ def validate_json_depth(value: object, *, initial_depth: int = 0) -> None:
         pending.append((iter(children), current_depth))
 
 
+def consume_upload_progress(events, progress=None):
+    """
+    Run an upload iterator to completion and close it if an observer interrupts
+
+    Parameters
+    ----------
+    events : generator
+        Processing iterator yielding stage, completed count and total count.
+    progress : callable, optional
+        Observer for each actual progress event.
+
+    Returns
+    -------
+    object
+        The iterator's final return value.
+    """
+    with closing(events):
+        while True:
+            try:
+                event = next(events)
+            except StopIteration as finished:
+                return finished.value
+            if progress is not None:
+                progress(*event)
+
+
 def save_prepared_json_data(
     owner: User,
     objects: list[PreparedJSONData],
@@ -377,6 +404,32 @@ def save_prepared_json_data(
     -------
     list of JSONData
         Created records, still subject to the caller's outer transaction.
+    """
+    return consume_upload_progress(iter_save_prepared_json_data(owner, objects), progress)
+
+
+def iter_save_prepared_json_data(owner, objects):
+    """
+    Yield provisional object save counts within one atomic file transaction
+
+    Closing the iterator before completion rolls back its objects and notifications.
+
+    Parameters
+    ----------
+    owner : User
+        Authenticated uploader.
+    objects : list of PreparedJSONData
+        Validated data awaiting final identifier and quota checks.
+
+    Yields
+    ------
+    tuple
+        Saving stage, completed object count and total count.
+
+    Returns
+    -------
+    list of JSONData
+        Created records, still subject to any caller's outer transaction.
     """
     with transaction.atomic():
         global_lock_user = (
@@ -472,7 +525,6 @@ def save_prepared_json_data(
                     )
 
             saved_objects.append(data_object)
-            if progress is not None:
-                progress("saving", len(saved_objects), len(resolved_objects))
+            yield "saving", len(saved_objects), len(resolved_objects)
 
         return saved_objects

@@ -2,14 +2,51 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: 89b23e8ee854e17115b92be490640a79e4f930c4
+code_base: 052a04d65ca7abb6d771933a99e5591d384ef94d
 files_modified:
-  - singleton metadata wrappers, temperature unit lookup, regression tests and documentation
+  - CPU metadata alias, streamed object progress, completed checking counts, tests and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
+
+**9 月 28 日最新：兼容两个处理器字段名，补齐旧上传通道的对象进度。**
+
+- `processor_specifications` 和 `CPU_specifications` 都满足同一项必填要求，
+  继续兼容大小写、分隔符和单项列表；原始字段名及值保存、导出不改写。
+  两个名字同时提供且值不同仍报冲突，空值仍报错，不从其他父级借值。
+  自动编号指纹也按同一字段处理，详情页把 CPU 别名放到处理器字段位置、保留原名。
+- 用户报告 `Sending files` → `Processing file 1 of 1` → 报错。
+  已追踪到 NDJSON 回退通道：之前只发文件开始／结果事件，没有接入逐对象回调。
+  此前只有后台任务路径有对象计数。用户使用本机还是线上尚未明确，修复覆盖两条路径。
+- 现在 NDJSON 从实际检查和保存操作中直接发送 `file_progress`，显示
+  `Checking n / total`、`Saving n / total`；总提示明确写 `Checking data objects`。
+  后台任务继续用同一处理逻辑。最终行保留 `Checked n / total`，检查太快或有错误时也能看到总数。
+  不加假动画、不回放计数、不故意拖慢；检查失败的文件不进入保存阶段。
+- 检查和保存改成可迭代进度，原同步／后台接口通过同一消费函数执行。
+  保存数只表示事务内进度，提交后才发 Uploaded；流中途关闭会立即关闭迭代器，
+  回滚正在保存的文件及其通知，保留此前文件提交，所有批次预检、查重与配额复查不变。
+- 新网页请求头带 `X-Upload-Progress: objects` 才收到对象事件；
+  已经打开的旧网页继续收到旧文件事件，避免部署后把新事件误认成连接异常。
+  无 JavaScript 的普通表单仍返回最终结果。NDJSON 仍不是后台任务，原有跨页后台机制未改。
+- 主要文件：`apps/dyn_api/metadata_compat.py`、`apps/pages/views.py`、
+  `apps/pages/upload_services.py`、`static/assets/js/upload.js`。
+  无新增依赖、数据库迁移或用户数据修改。线上部署是否完成仍须另行确认。
+
+本次验证：
+
+- 430 项相关后端测试全部通过；117 项 JavaScript／Chromium 测试通过，0 跳过。
+  另有 1 项临时真实 HTTP 浏览器测试通过，上述后端与临时测试合并运行共 431 项。
+- Chromium 连接隔离的本地 Django，用 Ronak 原始 100 条文件上传：
+  实际观察到 `Checking 0 / 100` 到 `Checking 100 / 100`，最终保留
+  `Checked 100 / 100 · Not uploaded`；原有必填错误仍完整展示，数据库保存 0 条。
+  1280／1440／1920 桌面宽度均无横向溢出，错误摘要在首屏，无 JavaScript 异常。
+  临时脚本和截图仅位于本机 `/tmp/ronak-upload-diagnosis/`，未提交用户原文件。
+- 验证了真实保存计数、整文件回滚、流关闭时通知回滚、旧客户端协议兼容、
+  原始导出与 CPU 别名的自动编号去重；迁移检查无变化，diff 空白检查通过。
+
+### 9 月 28 日上一轮：单项列表识别
 
 **9 月 28 日后续：用户要求继续识别单项列表里的实际值，已实现。**
 

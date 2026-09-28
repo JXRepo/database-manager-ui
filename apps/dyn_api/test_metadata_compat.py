@@ -12,6 +12,39 @@ class MetadataCompatibilityTests(SimpleTestCase):
     Accept equivalent metadata spellings while retaining actual requirements
     """
 
+    def test_cpu_specifications_is_an_explicit_processor_alias(self):
+        """
+        Accept either requested name without rewriting the uploaded field
+        """
+        for name in ("CPU_specifications", "cpu specifications", "CPU-SPECIFICATIONS"):
+            with self.subTest(name=name):
+                data = valid_upload_object()
+                value = data.pop("processor_specifications")
+                data[name] = [[value]]
+                before = deepcopy(data)
+                self.assertEqual(validate_json([data], detailed=True), ([data], []))
+                self.assertEqual(metadata_view(data)["processor_specifications"], value)
+                self.assertEqual(field_value(data, "processor_specifications"), value)
+                self.assertEqual(data, before)
+
+    def test_processor_aliases_still_require_nonempty_consistent_values(self):
+        """
+        Preserve emptiness, parent boundaries and conflicts for the explicit alias
+        """
+        data = valid_upload_object(CPU_specifications=[["CPU"]])
+        self.assertEqual(validate_json([data], detailed=True), ([data], []))
+        data["CPU_specifications"] = "Different CPU"
+        _, errors = validate_json([data], detailed=True)
+        self.assertIn("conflicting_fields", [error["category"] for error in errors])
+        del data["processor_specifications"]
+        data["CPU_specifications"] = [[""]]
+        _, errors = validate_json([data], detailed=True)
+        self.assertIn("empty_values", [error["category"] for error in errors])
+        data.pop("CPU_specifications")
+        data["origin"] = {"CPU_specifications": "CPU"}
+        _, errors = validate_json([data], detailed=True)
+        self.assertIn("processor_specifications", [field for error in errors for field in error["fields"]])
+
     def test_single_value_wrappers_are_recognized_without_editing_the_source(self):
         """
         Read wrapped scalars, objects and array entries using their declared shape

@@ -323,3 +323,20 @@ class UploadCompatibilityTests(TestCase):
         response = self.upload(original)
         self.assertContains(response, "already exists")
         self.assertEqual(JSONData.objects.count(), 1)
+
+    def test_cpu_alias_keeps_raw_export_and_generated_identifier_deduplication(self):
+        """
+        Treat both processor field names as the same required content
+        """
+        original = valid_upload_object()
+        data = deepcopy(original)
+        data["CPU_specifications"] = data.pop("processor_specifications")
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        obj = JSONData.objects.get()
+        expected = dict(data, identifier=obj.data["identifier"])
+        self.assertEqual(obj.data, expected)
+        response = self.client.get(reverse("json_data_export", args=[obj.pk]))
+        self.assertEqual(json.loads(response.content), expected)
+        self.assertContains(self.upload(original), "already exists")
+        self.assertEqual(JSONData.objects.count(), 1)

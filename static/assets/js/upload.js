@@ -178,6 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let pending = '';
     let nextIndex = 0;
     let activeIndex = -1;
+    let lastProgress = null;
     let complete = null;
 
     function handleEvent(event) {
@@ -187,8 +188,42 @@ document.addEventListener('DOMContentLoaded', function() {
           throw new Error('Unexpected file order');
         }
         activeIndex = event.index;
+        lastProgress = null;
         setFileState(activeIndex, 'processing', 'Processing');
         showStatus(`Processing file ${activeIndex + 1} of ${fileRows.length}…`);
+      } else if (event.type === 'file_progress') {
+        const phases = {parsing: 0, validating: 1, saving: 2};
+        if (activeIndex < 0 || event.index !== activeIndex ||
+            !Object.prototype.hasOwnProperty.call(phases, event.stage)) {
+          throw new Error('Unexpected object progress');
+        }
+        if (event.stage === 'parsing') {
+          if (lastProgress || event.completed !== 0 || event.total !== null) {
+            throw new Error('Unexpected reading progress');
+          }
+        } else if (!Number.isInteger(event.completed) || !Number.isInteger(event.total) ||
+            event.total < 1 || event.completed < 0 || event.completed > event.total) {
+          throw new Error('Invalid object count');
+        }
+        if (lastProgress && (phases[event.stage] < phases[lastProgress.stage] ||
+            (lastProgress.total !== null && event.total !== lastProgress.total) ||
+            (event.stage === lastProgress.stage && event.completed < lastProgress.completed))) {
+          throw new Error('Regressing object progress');
+        }
+        if (event.stage === 'saving' && lastProgress?.stage !== 'saving' &&
+            (lastProgress?.stage !== 'validating' || lastProgress.completed !== event.total)) {
+          throw new Error('Saving before all objects were checked');
+        }
+        lastProgress = event;
+        if (event.stage === 'parsing') {
+          setFileState(activeIndex, 'parsing', 'Reading');
+          showStatus(`Reading file ${activeIndex + 1} of ${fileRows.length}…`);
+        } else {
+          const action = event.stage === 'validating' ? 'Checking' : 'Saving';
+          setFileState(activeIndex, event.stage, `${action} ${event.completed} / ${event.total}`);
+          showStatus(`${action} data objects: ${event.completed} / ${event.total}` +
+            (event.stage === 'saving' ? '. Uploaded is confirmed only after the whole file succeeds.' : ''));
+        }
       } else if (event.type === 'file_result') {
         if (activeIndex < 0 || event.index !== activeIndex ||
             !['uploaded', 'failed'].includes(event.status) ||
@@ -196,7 +231,17 @@ document.addEventListener('DOMContentLoaded', function() {
             (event.status === 'failed' && event.saved_count !== 0)) {
           throw new Error('Unexpected file result');
         }
-        setFileState(activeIndex, event.status, event.status === 'uploaded' ? 'Uploaded' : 'Failed');
+        if (event.status === 'uploaded' && lastProgress &&
+            (lastProgress.stage !== 'saving' || lastProgress.completed !== event.saved_count ||
+             event.saved_count !== lastProgress.total)) {
+          throw new Error('Incomplete object results');
+        }
+        let label = event.status === 'uploaded' ? 'Uploaded' : 'Failed';
+        if (lastProgress && Number.isInteger(lastProgress.total)) {
+          const checked = lastProgress.stage === 'saving' ? lastProgress.total : lastProgress.completed;
+          label = `Checked ${checked} / ${lastProgress.total} · ${event.status === 'uploaded' ? 'Uploaded' : 'Not uploaded'}`;
+        }
+        setFileState(activeIndex, event.status, label);
         activeIndex = -1;
         nextIndex += 1;
       } else if (event.type === 'complete') {
@@ -239,7 +284,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const response = await fetch(form.action || window.location.href, {
         method: 'POST',
         body: new FormData(form),
-        headers: {Accept: 'application/x-ndjson'},
+        headers: {Accept: 'application/x-ndjson', 'X-Upload-Progress': 'objects'},
         credentials: 'same-origin',
         signal: requestController.signal,
       });
@@ -322,6 +367,10 @@ document.addEventListener('DOMContentLoaded', function() {
         label = `Uploaded · ${file.saved_count} objects`;
       } else if (file.status === 'failed' && file.failed_object_count) {
         label = `Not uploaded · ${file.failed_object_count} objects need changes`;
+      }
+      if (['uploaded', 'failed'].includes(file.status) &&
+          Number.isInteger(file.validated_count) && Number.isInteger(file.object_count)) {
+        label = `Checked ${file.validated_count} / ${file.object_count} · ${label}`;
       }
       setFileState(index, file.status, label);
     });

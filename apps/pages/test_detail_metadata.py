@@ -65,7 +65,7 @@ class DetailMetadataTests(TestCase):
             "discretization_unit_size", "discretization_count", "solid_volume_fraction",
             "origin", "global_temperature", "thermal_BC", "phase", "microstructure", "units",
         ]
-        unknown = ["extra_z", "CPU_specifications", "extra_a"]
+        unknown = ["extra_z", "custom_hardware_notes", "extra_a"]
         hidden = ["mechanical_BC", "stress", "total_strain", "plastic_strain"]
         orders = (
             list(reversed(expected + unknown + hidden)),
@@ -312,7 +312,7 @@ class DetailMetadataTests(TestCase):
         fields = {row["label"]: row for row in displayed}
         self.assertEqual(
             list(fields),
-            ["system_version", "processor_specifications", "input_path", "origin", "phase", "CPU_specifications"],
+            ["system_version", "CPU_specifications", "processor_specifications", "input_path", "origin", "phase"],
         )
         self.assertEqual(fields["processor_specifications"]["value"], "Current CPU")
         self.assertEqual(fields["CPU_specifications"]["value"], "Legacy CPU")

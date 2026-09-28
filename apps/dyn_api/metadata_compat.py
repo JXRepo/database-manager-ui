@@ -12,11 +12,12 @@ from .required_schema import SCHEMA_DIRECTORY, SCHEMA_REFERENCES, field_path, is
 
 
 NUMBER_TEXT = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z")
+FIELD_NAME_ALIASES = {"cpuspecifications": "processorspecifications"}
 
 
 def field_name(value):
     """
-    Compare field names independently of case and separator punctuation
+    Compare field names independently of formatting and explicit supported aliases
 
     Parameters
     ----------
@@ -29,7 +30,8 @@ def field_name(value):
         Comparable name, retaining the reserved dollar prefix.
     """
     prefix = "$" if value.startswith("$") else ""
-    return prefix + re.sub(r"[\W_]+", "", value.casefold())
+    name = prefix + re.sub(r"[\W_]+", "", value.casefold())
+    return FIELD_NAME_ALIASES.get(name, name)
 
 
 def unwrap_single_value(value):

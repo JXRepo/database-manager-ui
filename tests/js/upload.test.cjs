@@ -148,11 +148,12 @@ describe('upload controls in Chromium', {skip: !existsSync(chromiumPath), timeou
         label: uploadButtonLabel.textContent, status: uploadStatus.textContent,
         busy: uploadForm.getAttribute('aria-busy'), inputDisabled: document.getElementById('file-input').disabled,
         files: requests[0]?.options.body.getAll('file').map(file => file.name),
-        accept: requests[0]?.options.headers.Accept, rows: rowStates(), requests: requests.length})`);
+        accept: requests[0]?.options.headers.Accept, progress: requests[0]?.options.headers['X-Upload-Progress'],
+        rows: rowStates(), requests: requests.length})`);
     assert.deepEqual(result, {
       submitted: false, disabled: true, spinners: 0, label: 'Uploading…',
       status: 'Sending files…', busy: 'true', inputDisabled: false,
-      files: ['first.json', 'second.json'], accept: 'application/x-ndjson',
+      files: ['first.json', 'second.json'], accept: 'application/x-ndjson', progress: 'objects',
       rows: ['Waiting', 'Waiting'], requests: 1,
     });
   });
@@ -199,6 +200,61 @@ describe('upload controls in Chromium', {skip: !existsSync(chromiumPath), timeou
     assert.deepEqual(await evaluate(`selectFiles(['new.json']); ({disabled:uploadButton.disabled,rows:rowStates()})`), {
       disabled: false, rows: ['Waiting'],
     });
+  });
+
+  test('object progress shows real checking and saving counts without a spinner', async t => {
+    const evaluate = await page(t);
+    await evaluate(`selectFiles(['objects.json']); submit(); flush()`);
+    await evaluate(`deliver([{type:'file_start',index:0},
+      {type:'file_progress',index:0,stage:'parsing',completed:0,total:null},
+      {type:'file_progress',index:0,stage:'validating',completed:0,total:100},
+      {type:'file_progress',index:0,stage:'validating',completed:37,total:100}])`);
+    const checking = await evaluate(`({rows:rowStates(),spinners:activeSpinners(),message:uploadStatus.textContent})`);
+    assert.deepEqual(checking.rows, ['Checking 37 / 100']);
+    assert.equal(checking.spinners, 0);
+    assert.match(checking.message, /Checking data objects: 37 \/ 100/);
+    await evaluate(`deliver([{type:'file_progress',index:0,stage:'validating',completed:100,total:100},
+      {type:'file_progress',index:0,stage:'saving',completed:0,total:100},
+      {type:'file_progress',index:0,stage:'saving',completed:70,total:100}])`);
+    assert.deepEqual(await evaluate('rowStates()'), ['Saving 70 / 100']);
+    assert.equal(await evaluate('activeSpinners()'), 0);
+    assert.match(await evaluate('uploadStatus.textContent'), /whole file/);
+    await evaluate(`deliver([{type:'file_progress',index:0,stage:'saving',completed:100,total:100},
+      {type:'file_result',index:0,status:'uploaded',saved_count:100},
+      {type:'complete',level:'success',summary:'100 data objects saved.',report_html:''}],true); waitForIdle()`);
+    assert.match(await evaluate('rowStates()[0]'), /Checked 100 \/ 100.*Uploaded/);
+  });
+
+  test('fast rejected checks retain their completed count after errors appear', async t => {
+    const evaluate = await page(t);
+    await evaluate(`selectFiles(['objects.json']); submit(); flush()`);
+    await evaluate(`deliver([{type:'file_start',index:0},
+      {type:'file_progress',index:0,stage:'validating',completed:0,total:100},
+      {type:'file_progress',index:0,stage:'validating',completed:100,total:100},
+      {type:'file_result',index:0,status:'failed',saved_count:0},
+      {type:'complete',level:'error',summary:'No objects saved.',report_html:'<p>30 objects need changes.</p>'}],true); waitForIdle()`);
+    assert.match(await evaluate('rowStates()[0]'), /Checked 100 \/ 100.*Not uploaded/);
+    assert.equal(await evaluate('activeSpinners()'), 0);
+    assert.match(await evaluate('document.getElementById("upload-results").textContent'), /30 objects need changes/);
+  });
+
+  test('invalid or regressing object counts become unconfirmed without retrying', async t => {
+    for (const update of [
+      {index:1,stage:'validating',completed:1,total:100},
+      {index:0,stage:'validating',completed:-1,total:100},
+      {index:0,stage:'validating',completed:101,total:100},
+      {index:0,stage:'validating',completed:36,total:100},
+      {index:0,stage:'validating',completed:38,total:101},
+      {index:0,stage:'saving',completed:1,total:100},
+    ]) {
+      const evaluate = await page(t);
+      await evaluate(`selectFiles(['objects.json']); submit(); flush()`);
+      await evaluate(`deliver([{type:'file_start',index:0},
+        {type:'file_progress',index:0,stage:'validating',completed:37,total:100},
+        {type:'file_progress',...${JSON.stringify(update)}}]); waitForIdle()`);
+      assert.deepEqual(await evaluate('rowStates()'), ['Unconfirmed']);
+      assert.equal(await evaluate('requests.length'), 1);
+    }
   });
 
   test('decoding keeps UTF-8 and JSON intact across arbitrary stream chunks', async t => {
