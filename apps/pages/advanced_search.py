@@ -7,7 +7,7 @@ import operator
 import re
 from decimal import Decimal, DecimalException, InvalidOperation, MAX_EMAX, MIN_EMIN, localcontext
 
-from apps.dyn_api.metadata_compat import field_name
+from apps.dyn_api.metadata_compat import field_name, unwrap_single_value
 
 
 MAX_CONDITIONS = 10
@@ -438,7 +438,8 @@ def _enclosing_temperature_unit(data, inherited):
         Local declaration or the inherited unit. Ambiguous declarations
         return None rather than selecting a unit by dictionary order.
     """
-    declarations = [value for key, value in data.items() if _normalize_field_name(key) == "units"]
+    declarations = [unwrap_single_value(value) for key, value in data.items()
+                    if _normalize_field_name(key) == "units"]
     if not declarations:
         return inherited
     if len(declarations) != 1 or not isinstance(declarations[0], dict):
@@ -446,7 +447,7 @@ def _enclosing_temperature_unit(data, inherited):
     units = [value for key, value in declarations[0].items() if _normalize_field_name(key) == "temperature"]
     if not units:
         return inherited
-    return units[0] if len(units) == 1 else None
+    return unwrap_single_value(units[0]) if len(units) == 1 else None
 
 
 def _temperature_in_kelvin(value, unit):

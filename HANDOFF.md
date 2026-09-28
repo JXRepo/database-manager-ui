@@ -2,14 +2,37 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: ae52c95035f17b6ebdc3fe494c026040f92353b7
+code_base: 89b23e8ee854e17115b92be490640a79e4f930c4
 files_modified:
-  - metadata compatibility, identifier lookup, upload and display integration, tests and documentation
+  - singleton metadata wrappers, temperature unit lookup, regression tests and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
+
+**9 月 28 日后续：用户要求继续识别单项列表里的实际值，已实现。**
+
+- 已知字段需要一个数值、字符串、布尔值或对象时，去掉外面一层或多层单项列表。
+  例如 magnitude 的 `1.5`、`"1.5"`、`["1.5"]`、`[["1.5"]]` 都能读成同一个数值。
+  数组中明确需要一个值或对象的条目也适用，units、张量和条件必填继续使用同一识别视图。
+- 真正的曲线、尺寸、作者等数组保留数组含义；单点曲线仍是一个数组。
+  多个值不会随便取第一个，未定义字段不擅自改结构。拆开后为空的必填值仍然报错。
+- 包在单项列表里的 identifier 仍作为用户自带编号；普通上传、后台上传和最终事务
+  都按同一个文本查重。自动补齐空编号时保留原有包装层数，并按最终 JSON 大小记账。
+- 显式分享标记和用户名也支持包装；仍按完整权限词和实际用户名判断，不扩大权限。
+  温度预设搜索能读取包装后的单位，同时保留最近上级单位和歧义拒绝规则。
+- 原始 JSON 字段和值保留，JSON 下载不拆包装；内部识别供校验、搜索、绘图及 CSV 使用。
+  实现在 `apps/dyn_api/metadata_compat.py` 和 `apps/pages/advanced_search.py`。
+- 本次相关后端回归 **423 项全部通过**，包括后台 100 条混合包装对象、原子保存、
+  查重、权限、空值、条件字段、张量方向、搜索、详情和导出。迁移检查无变化。
+  本轮未改 JavaScript 或布局，未重复前端或全量后端测试；旧全量失败记录见下一节。
+- 只读验证 a46fde6c 原件通过；在内存副本中给已知字段加多层包装也通过，
+  识别后的值与原件一致，副本未被校验修改；未定义字段保持原结构。
+  Data_Base_Cyclic 的 100 条仍因真实缺失／空值被拒绝。
+  两份用户文件未修改、未提交、未上传外部网站。Render 部署尚未确认。
+
+### 9 月 28 日上一轮：字段拼写及数值字符串
 
 **9 月 28 日用户明确要求放宽格式识别，本次提交实现以下兼容规则。**
 下面 9 月 27 日记录是上一轮实现，涉及严格字段拼写的描述以本节为准。

@@ -32,6 +32,25 @@ def field_name(value):
     return prefix + re.sub(r"[\W_]+", "", value.casefold())
 
 
+def unwrap_single_value(value):
+    """
+    Remove singleton list wrappers where the caller expects one value
+
+    Parameters
+    ----------
+    value : object
+        Value at a known scalar or object location.
+
+    Returns
+    -------
+    object
+        Innermost value, stopping at any empty or multiple item list.
+    """
+    while isinstance(value, list) and len(value) == 1:
+        value = value[0]
+    return value
+
+
 def field_value(data, name, default=None):
     """
     Read one field without normalizing a record's potentially large arrays
@@ -48,22 +67,28 @@ def field_value(data, name, default=None):
     Returns
     -------
     object
-        Original value under the matching field name.
+        Matched value with singleton wrappers removed for known non-array fields.
+        Other values and genuine arrays retain their original structure.
     """
     if not isinstance(data, dict):
         return default
     if name in data:
-        return data[name]
-    expected = field_name(name)
-    for key, value in data.items():
-        if field_name(key) == expected:
-            return value
-    return default
+        value = data[name]
+    else:
+        expected = field_name(name)
+        for key, value in data.items():
+            if field_name(key) == expected:
+                break
+        else:
+            return default
+    root = _metadata_shape()
+    shape = root["properties"].get(root["names"].get(field_name(name)))
+    return unwrap_single_value(value) if shape and shape["single_value"] else value
 
 
 def set_field_value(data, name, value):
     """
-    Set a generated value under the existing spelling of its field
+    Set a generated value while retaining its field spelling and singleton wrappers
 
     Parameters
     ----------
@@ -76,7 +101,12 @@ def set_field_value(data, name, value):
     """
     keys = [key for key in data if field_name(key) == field_name(name)]
     for key in keys or [name]:
-        data[key] = value
+        original = data.get(key)
+        replacement = value
+        while isinstance(original, list) and len(original) == 1:
+            replacement = [replacement]
+            original = original[0]
+        data[key] = replacement
 
 
 def identifier_lookup(value):
@@ -126,6 +156,7 @@ def _shape(schema):
         "names": {field_name(name): name for name in children},
         "properties": children,
         "items": _shape(schema["items"]) if isinstance(schema.get("items"), dict) else None,
+        "single_value": bool(types) and "array" not in types,
         "numeric": bool(types.intersection({"number", "integer"})),
         "enum": {value.casefold(): value for value in schema.get("enum", []) if isinstance(value, str)},
     }
@@ -162,6 +193,7 @@ def _sharing_entry(value):
     object
         Equivalent permission object or the original unrecognized entry.
     """
+    value = unwrap_single_value(value)
     if isinstance(value, str) and value.strip().casefold() in {"all", "c"}:
         return {"access_type": value.strip().casefold()}
     if isinstance(value, dict):
@@ -171,7 +203,7 @@ def _sharing_entry(value):
                 return dict(value, access_type="c")
             if len(value) == 1:
                 name, original = next(iter(names.items()))
-                if name in {"all", "c"} and value[original] is True:
+                if name in {"all", "c"} and unwrap_single_value(value[original]) is True:
                     return {"access_type": name}
     return value
 
@@ -196,6 +228,8 @@ def _recognized(value, shape, path, conflicts):
     object
         Recognized value, sharing unchanged containers when possible.
     """
+    if shape["single_value"]:
+        value = unwrap_single_value(value)
     if path == ("shared_with",) and not is_empty(value):
         entries = value if isinstance(value, list) else [value]
         value = [_sharing_entry(entry) for entry in entries]

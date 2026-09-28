@@ -536,8 +536,18 @@ Text containing a finite number is accepted at known numeric fields, including
 `magnitude`, tensor components and curve arrays. For example, `" 1.5\n"` is read
 as `1.5`; words, unit annotations and nonfinite magnitudes remain invalid.
 Known enumerated values also tolerate case and surrounding whitespace.
+At known scalar or object fields, one or more single-item list wrappers are also
+recognized: `magnitude: ["1.5"]` and `magnitude: [["1.5"]]` both mean `1.5`.
+The same applies to individual entries where an array expects scalars or objects.
+Genuine arrays, including a curve with only one point, retain their list shape;
+multiple values are never reduced to the first item, and unknown metadata keeps
+its structure. Required values are checked after removing wrappers, so `[""]`
+does not satisfy a required scalar field. Wrapped supplied identifiers retain
+their exact text and participate in all duplicate checks. When a blank identifier
+is filled automatically, its existing single-item wrappers are retained.
 Sharing accepts `"all"`, `["all"]`, `"c"`, `["c"]`, the usual permission objects,
-and a single explicit flag such as `{"all": true}`. A username object without
+and a single explicit flag such as `{"all": true}`, including single-item wrappers
+around entries and their values. A username object without
 `access_type` remains private. Permission tokens must match completely:
 `"not all"`, comments mentioning `all`, and usernames containing `all` do not
 make data public. Username lookup and existing sharing restrictions still apply.

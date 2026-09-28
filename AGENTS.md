@@ -50,6 +50,8 @@ Current priority:
 - Validate the 24 required top-level fields and applicable nested and conditional required rules from the bundled MiMeDat schema profile; do not claim full JSON Schema compliance or enforce unrelated optional constraints
 - Extra fields are allowed
 - Recognize schema field names within their own parent ignoring case and separator punctuation; accept finite numeric strings at known numeric paths and explicit all/c sharing shorthand
+- Unwrap singleton lists only at known scalar or object locations, including individual array entries; preserve genuine arrays and unknown metadata, never choose among multiple values, and check required emptiness after unwrapping
+- Wrapped identifiers and explicit sharing tokens use the same duplicate and access checks as bare values; retain existing wrappers when filling a blank identifier automatically
 - Preserve original JSON keys and values in storage and JSON export; use the shared metadata compatibility view for validation, search, summaries and plots
 - Do not infer synonyms, move nested values to other parents, search arbitrary text for permission tokens, or silently choose between conflicting aliases
 - Maintain the internal identifier lookup digest for alternative field spellings; preserve identifier text and the final duplicate and quota checks

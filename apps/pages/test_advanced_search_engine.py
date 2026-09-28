@@ -690,6 +690,23 @@ class RecursivePresetSearchTests(TestCase):
             {"units": {"Stress": "MPa"}, "global_temperature": 25}]},
             ("global_temperature", "eq", "298.15")))
 
+    def test_temperature_unit_wrappers_keep_scope_and_ambiguity_rules(self):
+        """
+        Read single wrapped units without selecting between multiple declarations
+        """
+        data = {"units": [[{"Temperature": [["K"]]}]], "phase": [
+            {"units": [{"Temperature": ["C"]}], "global_temperature": [["25"]]},
+            {"global_temperature": ["30"]},
+        ]}
+        self.assertTrue(self.matches(data, ("global_temperature", "eq", "298.15")))
+        self.assertTrue(self.matches(data, ("global_temperature", "eq", "30")))
+        self.assertFalse(self.matches(data, ("global_temperature", "eq", "303.15")))
+        for units in ([{"Temperature": "K"}, {"Temperature": "C"}],
+                      {"Temperature": ["K", "C"]}, {"Temperature": [], "temperature": ["K"]}):
+            with self.subTest(units=units):
+                self.assertFalse(self.matches({"units": units, "global_temperature": 298},
+                                              ("global_temperature", "eq", "298")))
+
     def test_temperatures_with_missing_unknown_or_nonfinite_units_values_do_not_match(self):
         """
         Avoid guessing units or coercing invalid numeric temperature candidates

@@ -15,6 +15,8 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.dyn_api.metadata_compat import field_value
+
 from .upload_test_data import valid_upload_object, variant_field_names
 from .models import DataNotification, JSONData, RateLimitBucket, UploadJob, UploadWorkerInstance
 from .upload_jobs import (
@@ -168,13 +170,17 @@ class UploadJobTests(TestCase):
 
     def test_background_accepts_one_hundred_format_variants_without_rewriting_them(self):
         """
-        Retain raw spellings while the background path checks and saves all objects
+        Retain raw spellings and wrappers while checking and saving all objects
         """
         records = {}
         for index in range(100):
             identifier = f"variant-job-{index}"
             data = valid_upload_object(identifier=identifier, shared_with=[" ALL "])
             data["mechanical_BC"][0]["applied_load"] = [{"magnitude": " 0.5\n"}]
+            if index % 2:
+                data["identifier"] = [[identifier]]
+                data["shared_with"] = [[[" ALL "]]]
+                data["mechanical_BC"][0]["applied_load"][0]["magnitude"] = [[" 0.5\n"]]
             records[identifier] = variant_field_names(data)
         self.assertEqual(self.submit(records).status_code, 202)
         job = self.process()
@@ -182,7 +188,7 @@ class UploadJobTests(TestCase):
         self.assertEqual(job.files[0]["validated_count"], 100)
         self.assertEqual(job.files[0]["saved_count"], 100)
         for obj in JSONData.objects.all():
-            self.assertEqual(obj.data, records[obj.data["IDENTIFIER"]])
+            self.assertEqual(obj.data, records[field_value(obj.data, "identifier")])
             self.assertEqual(obj.access_type, "all")
         self.assertEqual(JSONData.objects.count(), 100)
 

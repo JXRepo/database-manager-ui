@@ -6,6 +6,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
+from apps.dyn_api.metadata_compat import field_value
+
 from .models import DataNotification, JSONData
 from .upload_services import PreparedJSONData, UploadIdentifierConflict, canonical_json_size, save_prepared_json_data
 from .upload_test_data import valid_upload_object, variant_field_names
@@ -82,6 +84,123 @@ class UploadCompatibilityTests(TestCase):
         self.assertEqual(json.loads(response.content), data)
         self.client.force_login(self.viewer)
         self.assertEqual(self.client.get(reverse("json_data_detail", args=[obj.pk])).status_code, 200)
+
+    def test_wrapped_values_work_in_upload_details_search_and_export(self):
+        """
+        Keep supplied wrapped identifiers and metadata while using recognized values
+        """
+        data = valid_upload_object(identifier=[["wrapped-upload"]], title=["Wrapped simulation"], shared_with=[[["ALL"]]])
+        data["software"] = [[data["software"]]]
+        data["phase"][0]["phase_name"] = ["Copper"]
+        data["mechanical_BC"][0].update({
+            "constraints": ["loaded", "free", "free"], "loading_type": ["force"],
+            "applied_load": [[{"magnitude": [["1.5"]]}]],
+        })
+        data["stress"] = [{"equivalent_stress": [["1.5"]]}]
+        data["total_strain"] = [{"equivalent_strain": [["0.01"]]}]
+        data["units"] = [[{key: [value] for key, value in data["units"].items()}]]
+        data["global_temperature"] = [["298"]]
+        data = variant_field_names(data)
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        obj = JSONData.objects.get()
+        self.assertEqual(obj.data, data)
+        self.assertEqual(field_value(obj.data, "identifier"), "wrapped-upload")
+        self.assertEqual(obj.size_bytes, canonical_json_size(data))
+        self.assertEqual(obj.access_type, "all")
+        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        self.assertEqual(response.context["metadata"]["title"], "Wrapped simulation")
+        curve = next(item for item in response.context["plot_variables"] if item["key"] == "stress.equivalent_stress")
+        self.assertEqual(curve["values"], [1.5])
+        self.assertEqual(curve["unit"], "MPa")
+        self.assertTrue(response.context["mechanical_bc_items"])
+        response = self.client.get(reverse("mechanical_csv_export", args=[obj.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("1.5", b"".join(response.streaming_content).decode())
+        response = self.client.get(reverse("json_data_list"), {"software": "Solver", "phase": "Copper"})
+        self.assertEqual(response.context["result_count"], 1)
+        response = self.client.get(reverse("search"), {
+            "identifier": "wrapped-upload", "condition_field": "global_temperature",
+            "condition_operator": "eq", "condition_value": "298",
+        })
+        self.assertEqual(response.context["result_count"], 1)
+        response = self.client.get(reverse("json_data_export", args=[obj.pk]))
+        self.assertEqual(json.loads(response.content), data)
+        self.client.force_login(self.viewer)
+        self.assertEqual(self.client.get(reverse("json_data_detail", args=[obj.pk])).status_code, 200)
+
+    def test_wrapped_identifiers_cannot_bypass_duplicate_checks(self):
+        """
+        Detect stored, same-file and final transaction identifier conflicts
+        """
+        self.upload(valid_upload_object(identifier=[["repeat-wrapped"]]))
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertContains(self.upload(valid_upload_object(identifier="repeat-wrapped")), "already exists")
+        self.assertContains(self.upload(valid_upload_object(identifier=["repeat-wrapped"])), "already exists")
+        response = self.upload([valid_upload_object(identifier="same-file"),
+                                valid_upload_object(identifier=[["same-file"]])])
+        self.assertContains(response, "more than once")
+        candidate_data = valid_upload_object(identifier=["repeat-wrapped"])
+        candidate = PreparedJSONData(data=candidate_data, access_type="c", shared_users=(),
+                                     size_bytes=canonical_json_size(candidate_data))
+        with self.assertRaises(UploadIdentifierConflict):
+            save_prepared_json_data(self.owner, [candidate])
+        self.assertEqual(JSONData.objects.count(), 1)
+
+    def test_wrapped_empty_identifier_is_filled_without_changing_other_data(self):
+        """
+        Generate an identifier inside its original wrappers and deduplicate content
+        """
+        data = valid_upload_object(identifier=[[None]], title=["Wrapped generated ID"])
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        obj = JSONData.objects.get()
+        identifier = field_value(obj.data, "identifier")
+        self.assertRegex(identifier, r"^[a-z0-9]{8}$")
+        expected = deepcopy(data)
+        expected["identifier"] = [[identifier]]
+        self.assertEqual(obj.data, expected)
+        self.assertEqual(obj.size_bytes, canonical_json_size(expected))
+        self.assertContains(self.upload(valid_upload_object(title="Wrapped generated ID")), "already exists")
+        self.assertEqual(JSONData.objects.count(), 1)
+
+    def test_wrapped_sharing_preserves_explicit_permissions(self):
+        """
+        Recognize wrapped tokens and usernames without broadening private access
+        """
+        for index, sharing in enumerate(([[[" ALL "]]], [[{"Access-Type": [[" ALL "]]}]], [{"all": [[True]]}])):
+            with self.subTest(sharing=sharing):
+                self.upload(valid_upload_object(identifier=f"wrapped-public-{index}", shared_with=sharing))
+                self.assertEqual(JSONData.objects.filter(access_type="all").count(), index + 1)
+        data = valid_upload_object(identifier=["wrapped-private"], title=["Private simulation"],
+                                   shared_with=[[{"username": [[self.viewer.username]]}]])
+        self.upload(data)
+        obj = JSONData.objects.get(access_type="c")
+        self.assertEqual(obj.data, data)
+        self.assertEqual(list(obj.shared_users.all()), [self.viewer])
+        notification = DataNotification.objects.get()
+        self.assertEqual(notification.display_title, "wrapped-private")
+        self.assertEqual(notification.display_name, "Private simulation")
+        other = User.objects.create_user(username="compat-other")
+        self.client.force_login(other)
+        self.assertEqual(self.client.get(reverse("json_data_detail", args=[obj.pk])).status_code, 404)
+
+    def test_wrappers_cannot_hide_ambiguous_sharing_or_required_errors(self):
+        """
+        Reject the whole file if wrapped content is empty or permissions conflict
+        """
+        for index, sharing in enumerate(([["all", "c"]], [[["not all"]]],
+                                         [{"note": [["all"]]}], [{"all": [False]}],
+                                         [{"access_type": ["all", "c"]}],
+                                         [{"access_type": ["c"], "Access-Type": [["all"]]}])):
+            with self.subTest(sharing=sharing):
+                self.upload(valid_upload_object(identifier=f"ambiguous-wrapped-{index}", shared_with=sharing))
+                self.assertEqual(JSONData.objects.count(), 0)
+        response = self.upload([valid_upload_object(identifier="neighbor"),
+                                valid_upload_object(identifier=["bad-required"], title=[[""]])])
+        self.assertContains(response, "Empty values")
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertEqual(DataNotification.objects.count(), 0)
 
     def test_identifier_aliases_do_not_bypass_existing_or_batch_duplicates(self):
         """

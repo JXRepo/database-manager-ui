@@ -4,12 +4,110 @@ from django.test import SimpleTestCase
 
 from apps.pages.upload_test_data import valid_upload_object, variant_field_names
 from .helpers import validate_json
+from .metadata_compat import field_value, metadata_view
 
 
 class MetadataCompatibilityTests(SimpleTestCase):
     """
     Accept equivalent metadata spellings while retaining actual requirements
     """
+
+    def test_single_value_wrappers_are_recognized_without_editing_the_source(self):
+        """
+        Read wrapped scalars, objects and array entries using their declared shape
+        """
+        data = valid_upload_object(identifier=[["wrapped-id"]], title=["Wrapped simulation"])
+        data["RVE_continuity"] = [[False]]
+        data["creator"] = [[["Researcher"]]]
+        data["discretization_count"] = [["0"]]
+        data["units"] = [[{key: [[value]] for key, value in data["units"].items()}]]
+        data["phase"][0]["constitutive_model"] = [data["phase"][0]["constitutive_model"]]
+        data["phase"] = [[data["phase"][0]]]
+        data["mechanical_BC"][0]["applied_load"] = [[{"magnitude": [[" +1.5e-2\n"]]}]]
+        data["stress"] = [{"equivalent_stress": [["1.5"]]}]
+        data["extra"] = [["keep this structure"]]
+        data = variant_field_names(data)
+        before = deepcopy(data)
+        view = metadata_view(data)
+        self.assertEqual(validate_json([data], detailed=True), ([data], []))
+        self.assertEqual(view["identifier"], "wrapped-id")
+        self.assertEqual(field_value(data, "identifier"), "wrapped-id")
+        self.assertEqual(field_value(data, "title"), "Wrapped simulation")
+        self.assertEqual(view["discretization_count"], 0)
+        self.assertIs(view["RVE_continuity"], False)
+        self.assertEqual(view["creator"], ["Researcher"])
+        self.assertEqual(view["RVE_size"], [1, 1, 1])
+        self.assertEqual(view["units"]["Strain"], 1)
+        self.assertEqual(view["phase"][0]["constitutive_model"], {"elastic_model_name": "Hooke"})
+        self.assertEqual(view["mechanical_BC"][0]["applied_load"], [{"magnitude": 0.015}])
+        self.assertEqual(view["stress"]["equivalent_stress"], [1.5])
+        self.assertEqual(view["EXTRA"], [["keep this structure"]])
+        self.assertEqual(data, before)
+
+    def test_wrapped_tensor_components_remain_distinct(self):
+        """
+        Unwrap tensor components without merging reciprocal directions
+        """
+        tensor = {key: [[str(index)]] for index, key in enumerate(("xx", "yy", "zz", "xy", "yz", "xz", "yx"))}
+        data = valid_upload_object()
+        data["mechanical_BC"][0]["applied_load"] = [{"magnitude": [[tensor]]}]
+        self.assertEqual(validate_json([data], detailed=True), ([data], []))
+        view = metadata_view(data)["mechanical_BC"][0]["applied_load"][0]["magnitude"]
+        self.assertEqual(view["xx"], 0)
+        self.assertEqual(view["xy"], 3)
+        self.assertEqual(view["yx"], 6)
+
+    def test_wrappers_cannot_hide_empty_required_values(self):
+        """
+        Check emptiness after removing wrappers while allowing optional blanks
+        """
+        for empty in (None, " \n", [], {}):
+            with self.subTest(empty=empty):
+                data = valid_upload_object(title=[[empty]])
+                data["units"]["Stress"] = [[empty]]
+                data["mechanical_BC"][0]["applied_load"] = [{"magnitude": [[empty]]}]
+                valid, errors = validate_json([data], detailed=True)
+                self.assertFalse(valid)
+                fields = {field for error in errors if error["category"] == "empty_values" for field in error["fields"]}
+                self.assertTrue({"title", "units.Stress", "mechanical_BC[1].applied_load[1].magnitude"} <= fields)
+        data = valid_upload_object(origin=[[{}]], description=[[""]])
+        self.assertEqual(validate_json([data], detailed=True), ([data], []))
+
+    def test_wrapped_conditions_still_require_their_children(self):
+        """
+        Activate conditional requirements through wrapped array entries
+        """
+        data = valid_upload_object(thermal_BC=[[{"vertex_list": ["V000"], "constraints": [[[" LOADED "]]]}]])
+        valid, errors = validate_json([data], detailed=True)
+        self.assertFalse(valid)
+        fields = {field for error in errors for field in error["fields"]}
+        self.assertIn("thermal_BC[1].applied_load", fields)
+        self.assertIn("thermal_BC[1].loading_mode", fields)
+
+    def test_multiple_values_are_never_reduced_to_the_first_item(self):
+        """
+        Retain genuine sequences and reject ambiguous scalar magnitudes
+        """
+        data = valid_upload_object()
+        data["stress"]["equivalent_stress"] = ["1.5"]
+        self.assertEqual(metadata_view(data)["stress"]["equivalent_stress"], [1.5])
+        for value in (["1.5", "2.5"], [["1.5", "2.5"]]):
+            with self.subTest(value=value):
+                data["mechanical_BC"][0]["applied_load"] = [{"magnitude": value}]
+                view = metadata_view(data)
+                self.assertEqual(view["mechanical_BC"][0]["applied_load"][0]["magnitude"], ["1.5", "2.5"])
+                self.assertFalse(validate_json([data], detailed=True)[0])
+
+    def test_wrapped_aliases_are_compared_by_their_recognized_value(self):
+        """
+        Accept equivalent wrappers and still report genuinely conflicting fields
+        """
+        data = valid_upload_object()
+        data["Date"] = [[data["date"]]]
+        self.assertEqual(validate_json([data], detailed=True), ([data], []))
+        data["Date"] = [["1900-01-01"]]
+        _, errors = validate_json([data], detailed=True)
+        self.assertIn("conflicting_fields", [error["category"] for error in errors])
 
     def test_formatted_field_names_and_numeric_strings_preserve_the_source(self):
         """
