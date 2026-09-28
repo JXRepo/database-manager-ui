@@ -1295,8 +1295,8 @@ details[open] > .detail-group-summary {
 
     <div class="card detail-page-card">
       <div class="card-header">
-        {% if metadata.title %}
-          <h5>{{ metadata.title }}</h5>
+        {% if detail_title %}
+          <h5>{{ detail_title }}</h5>
         {% elif metadata.identifier %}
           <h5>{{ metadata.identifier }}</h5>
         {% else %}

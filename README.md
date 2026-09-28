@@ -536,10 +536,31 @@ Before checking these requirements, the platform recognizes schema field names
 independently of case and separator punctuation: `Date`, `DATE` and `date` match,
 as do `input_path`, `Input Path` and `input-path`. Matching stays within each
 field's parent; it does not search unrelated subtrees or guess synonyms such as
-`Material` for `phase`. The explicitly supported `CPU_specifications` alias also
-satisfies `processor_specifications`; either field name can be used, and its
-original spelling is preserved. Two matching spellings with different values
-are reported as conflicting fields rather than choosing a value silently.
+`Material` for `phase`. `processor_specification`, `CPU_specifications` and
+`CPU_specification` also satisfy `processor_specifications`.
+
+Descriptive fields additionally accept names containing all their words, in any
+order, with extra words, simple trailing-s plurals and camel case. For example,
+`processor_specification_of`, `Specifications of Processor` and
+`processorSpecificationOf` satisfy the same requirement. Supported descriptions
+are `title`, `creator`, `creator_affiliation`, `date`, `rights`, `rights_holder`,
+`software`, `software_version`, `system`, `system_version`,
+`processor_specifications`, `input_path`, `results_path`, `phase_name` and
+`texture_type`, only where the schema defines them. Words must occur in one
+field name at the correct parent. Exact schema names take precedence; more
+specific names remain distinct, so `system_version` cannot supply `system`,
+and `creator_affiliation` cannot supply `creator`. A name equally matching two
+different requirements does not fill either automatically.
+
+Multiple matching descriptions are accepted even when their values differ.
+At least one nonempty match satisfies the requirement; all-empty matches still
+produce an error. Lookup views combine the distinct supplied descriptions for
+search and summaries. Detail rows, storage and JSON exports retain every
+original field and value, including empty alternatives. Matching description
+rows share the schema field's display position and keep their relative order.
+Units, sharing permissions, identifiers, numeric and structural fields, load
+components and curve arrays keep their existing exact-name and conflict rules.
+Keyword matching never chooses a permission, unit or tensor value.
 
 Text containing a finite number is accepted at known numeric fields, including
 `magnitude`, tensor components and curve arrays. For example, `" 1.5\n"` is read

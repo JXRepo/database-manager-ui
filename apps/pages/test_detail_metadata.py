@@ -241,7 +241,7 @@ class DetailMetadataTests(TestCase):
         fields = {row["label"]: row for row in response.context["detail_rows"]}
         self.assertEqual(
             list(fields),
-            ["identifier", "title", "phase.note", "title / explanation", "units[custom]", "a.b", "a"],
+            ["identifier", "title", "title / explanation", "phase.note", "units[custom]", "a.b", "a"],
         )
         self.assertEqual(fields["a.b"]["value"], "A literal nested-looking field")
         nested = {row["label"]: row for row in fields["a"]["children"]}

@@ -2,16 +2,55 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: e3a40d9e56278f59fcecb5eb267ca09f1607f388
+code_base: 8a399ff202de9ba9908cad9afc5430d5e3cf8886
 files_modified:
-  - Exact Ronak identifier generation, duplicate rejection, regression tests and documentation
+  - Descriptive field keyword matching, multiple values, display, regression tests and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**9 月 28 日最新：用户要求 identifier 完全采用 Ronak 原代码，不再自加算法。**
+**9 月 28 日最新：用户确认描述字段按关键词识别，多个匹配项不再互相报冲突，全部保留展示。**
+
+- `processor_specification`、`processor_specification_of`、`Specifications of Processor`、
+  `processorSpecificationOf` 等可满足处理器必填项；同时支持 CPU 的单数／复数别名。
+  忽略大小写、分隔符、词序和简单复数 s；关键词须在同一个字段名、同一个父级。
+- 描述类范围在 `apps/dyn_api/metadata_compat.py` 的 `DESCRIPTIVE_FIELDS` 明确列出：
+  title、creator、creator_affiliation、date、rights、rights_holder、software、
+  software_version、system、system_version、processor_specifications、input_path、
+  results_path，以及各自 Schema 路径下的 phase_name、texture_type。
+- 同一描述有 A、B 等多个字段时，只要至少一个有内容就满足必填；全部为空仍报错。
+  不选一个值覆盖其他值。内部检索视图汇总不同内容，原字段名、值、列表顺序完整存储与导出。
+  详情页所有原字段仍独立展示，匹配项放在对应 Schema 顺序位置，保持相对顺序。
+  多标题、多材料名称在列表、详情标题及分享记录中正常显示，不露出 Python 列表写法。
+- 完整标准字段名优先，较具体的已知名字优先：system_version 不算 system，
+  creator_affiliation 不算 creator。一个名字同时指向两个不同要求时不替用户猜测。
+  这与“同一要求有多个匹配字段全部接受”是两回事。
+- 权限、单位、编号、结构、数值、载荷分量和曲线保持原识别／冲突校验；
+  不把 origin.system 借给根 system，不把 Material 猜成 phase。
+  对象拆分、上传反馈、搜索和 My Data 使用一致的描述识别规则。
+- Ronak 原始 MD5 编号算法没有更改：仍按原字段名计算，不用新识别视图；
+  新别名不擅自参与模板未指定的哈希项。合法自带编号、事务查重和整文件保存规则不变。
+- 本地只读验证：a46fde6c.json 的 1 条对象通过；Data_Base_Cyclic.json 的 100 条均已识别
+  processor_specification，仍各缺根 system、phase、units，且 total_strain 为空。
+  原附件未修改，也没有为测试上传到线上。
+
+测试与交接：
+
+- 新测试先验证旧实现失败，再实现关键词匹配、多值、空值、同父级边界、权限／单位冲突、
+  原样下载与搜索／展示。增加 100 条后台上传保留原值与真实计数的测试。
+- 最终运行 461 项 Django 测试：459 项通过，剩余 2 项是下一条说明的旧搜索样例测试，
+  本轮新增与受影响测试均通过。覆盖上传、后台任务、进度、整文件回滚、编号、权限、
+  搜索、详情、图表与 CSV；日志 `/tmp/metadata-keywords-verified.log`。
+  数据库迁移检查无变化，git diff 空白检查通过。
+- 扩展回归发现两项已有搜索样例测试失败（共 10 个子例）：
+  ExamplePresetSearchTests 把所有本机 example_json_files 文件当成相同的 GOSS 等固定样例，
+  与后来放入的 Data_Base_Cyclic.json 内容不符。已在 HEAD 8a399ff 的独立临时副本复现相同失败，
+  未为通过测试改动用户数据或搜索行为。基线日志 `/tmp/metadata-keywords-baseline.log`。
+- 本轮不改 JavaScript、布局、数据库字段或依赖；Render 部署状态仍需与 Git 推送区分。
+
+### 9 月 28 日上一轮：完全按 Ronak 原代码生成 identifier
 
 - 已对照当日 MiMeDat `metadata_template.py`：先对副本执行相同的
   `remove_empty_entries`，按原 24 项 `mandatory_fields` 顺序拼接

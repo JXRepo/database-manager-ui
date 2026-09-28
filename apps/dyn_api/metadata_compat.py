@@ -12,7 +12,16 @@ from .required_schema import SCHEMA_DIRECTORY, SCHEMA_REFERENCES, field_path, is
 
 
 NUMBER_TEXT = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?\Z")
-FIELD_NAME_ALIASES = {"cpuspecifications": "processorspecifications"}
+FIELD_NAME_ALIASES = {
+    "cpuspecifications": "processorspecifications",
+    "cpuspecification": "processorspecifications",
+    "processorspecification": "processorspecifications",
+}
+DESCRIPTIVE_FIELDS = frozenset({
+    "title", "creator", "creator_affiliation", "date", "rights", "rights_holder",
+    "software", "software_version", "system", "system_version",
+    "processor_specifications", "input_path", "results_path", "phase_name", "texture_type",
+})
 
 
 def field_name(value):
@@ -32,6 +41,117 @@ def field_name(value):
     prefix = "$" if value.startswith("$") else ""
     name = prefix + re.sub(r"[\W_]+", "", value.casefold())
     return FIELD_NAME_ALIASES.get(name, name)
+
+
+def _field_words(name):
+    """
+    Split descriptive names into comparable words with simple plural support
+
+    Parameters
+    ----------
+    name : str
+        Schema or uploaded field name.
+
+    Returns
+    -------
+    frozenset of str
+        Case-independent words, including the explicit CPU alias.
+    """
+    words = re.findall(r"[^\W_]+", name.casefold())
+    name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", name)
+    name = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", name)
+    words.extend(re.findall(r"[^\W_]+", name.casefold()))
+    words = [word[:-1] if len(word) > 3 and word.endswith("s") and not word.endswith("ss") else word
+             for word in words]
+    return frozenset("processor" if word == "cpu" else word for word in words)
+
+
+@lru_cache(maxsize=128)
+def _field_rules(fields):
+    """
+    Compile exact names and keyword sets for one schema parent
+
+    Parameters
+    ----------
+    fields : tuple of str
+        Known sibling field names.
+
+    Returns
+    -------
+    tuple
+        Exact spelling map and keyword sets for specificity comparisons.
+    """
+    return ({field_name(name): name for name in fields},
+            tuple((name, _field_words(name)) for name in fields if not name.startswith("$")))
+
+
+def matched_field_name(name, fields=None):
+    """
+    Match descriptive keywords within a parent while protecting functional fields
+
+    Parameters
+    ----------
+    name : str
+        Original uploaded name.
+    fields : tuple of str, optional
+        Schema names at the current parent; defaults to the metadata root.
+
+    Returns
+    -------
+    str
+        Exact or uniquely most specific descriptive match, otherwise the original name.
+    """
+    exact, rules = _field_rules(_metadata_shape()["fields"] if fields is None else fields)
+    normalized = field_name(name)
+    if normalized in exact:
+        return exact[normalized]
+    if name.startswith("$"):
+        return name
+    words = _field_words(name)
+    matches = [(len(required), candidate) for candidate, required in rules if required and required <= words]
+    if not matches:
+        return name
+    specificity = max(count for count, _ in matches)
+    candidates = [candidate for count, candidate in matches if count == specificity]
+    if len(candidates) == 1 and candidates[0] in DESCRIPTIVE_FIELDS:
+        return candidates[0]
+    return name
+
+
+def _descriptive_values(values, single_value):
+    """
+    Retain all distinct nonempty descriptions in the internal lookup view
+
+    Parameters
+    ----------
+    values : list
+        Recognized values from matching fields in source order.
+    single_value : bool
+        Whether the schema expects a scalar instead of an array.
+
+    Returns
+    -------
+    object
+        One value, all distinct values, or an empty value if no content was supplied.
+    """
+    result = []
+    seen = set()
+    pending = [iter(values)]
+    while pending:
+        for value in pending[-1]:
+            if isinstance(value, list):
+                pending.append(iter(value))
+                break
+            if not is_empty(value):
+                key = json.dumps(value, sort_keys=True, ensure_ascii=True)
+                if key not in seen:
+                    result.append(value)
+                    seen.add(key)
+        else:
+            pending.pop()
+    if len(result) == 1 and single_value:
+        return result[0]
+    return result
 
 
 def unwrap_single_value(value):
@@ -69,11 +189,17 @@ def field_value(data, name, default=None):
     Returns
     -------
     object
-        Matched value with singleton wrappers removed for known non-array fields.
-        Other values and genuine arrays retain their original structure.
+        Matched value or all matching descriptions, without changing source metadata.
     """
     if not isinstance(data, dict):
         return default
+    root = _metadata_shape()
+    canonical = root["names"].get(field_name(name))
+    shape = root["properties"].get(canonical)
+    if canonical in DESCRIPTIVE_FIELDS:
+        values = [_recognized(value, shape, (canonical,), []) for key, value in data.items()
+                  if matched_field_name(key, root["fields"]) == canonical]
+        return _descriptive_values(values, shape["single_value"]) if values else default
     if name in data:
         value = data[name]
     else:
@@ -83,8 +209,6 @@ def field_value(data, name, default=None):
                 break
         else:
             return default
-    root = _metadata_shape()
-    shape = root["properties"].get(root["names"].get(field_name(name)))
     return unwrap_single_value(value) if shape and shape["single_value"] else value
 
 
@@ -156,6 +280,7 @@ def _shape(schema):
     children = {name: _shape(child) for name, child in properties.items()}
     return {
         "names": {field_name(name): name for name in children},
+        "fields": tuple(children),
         "properties": children,
         "items": _shape(schema["items"]) if isinstance(schema.get("items"), dict) else None,
         "single_value": bool(types) and "array" not in types,
@@ -238,10 +363,15 @@ def _recognized(value, shape, path, conflicts):
     if isinstance(value, dict):
         result = {}
         originals = {}
+        descriptions = {}
         for key, child in value.items():
-            name = shape["names"].get(field_name(key), key)
+            name = matched_field_name(key, shape["fields"])
             child_shape = shape["properties"].get(name)
             recognized = _recognized(child, child_shape, path + (name,), conflicts) if child_shape else child
+            if child_shape and name in DESCRIPTIVE_FIELDS:
+                descriptions.setdefault(name, []).append(recognized)
+                result.setdefault(name, recognized)
+                continue
             if name in result:
                 first = json.dumps(result[name], sort_keys=True, ensure_ascii=True)
                 second = json.dumps(recognized, sort_keys=True, ensure_ascii=True)
@@ -250,6 +380,8 @@ def _recognized(value, shape, path, conflicts):
             else:
                 result[name] = recognized
                 originals[name] = key
+        for name, values in descriptions.items():
+            result[name] = _descriptive_values(values, shape["properties"][name]["single_value"])
         return result
     if isinstance(value, list) and shape["items"]:
         result = [_recognized(child, shape["items"], path + (index,), conflicts)

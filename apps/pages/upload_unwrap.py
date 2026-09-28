@@ -1,7 +1,7 @@
 from django.conf import settings
 
 from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
-from apps.dyn_api.metadata_compat import field_name
+from apps.dyn_api.metadata_compat import field_name, matched_field_name
 
 
 RECORD_FIELDS = frozenset(field_name(name) for name in REQUIRED_TOP_LEVEL_FIELDS) | {"identifier"}
@@ -43,7 +43,7 @@ def object_paths(payload):
             else:
                 pending.append((iter(_children(value, path)), True))
         elif isinstance(value, dict):
-            names = {field_name(key) for key in value}
+            names = {field_name(matched_field_name(key)) for key in value}
             known = RECORD_FIELDS.intersection(names)
             if len(known) >= 3 or SIMULATION_FIELDS.intersection(names) or not value:
                 paths.append(path)
@@ -83,7 +83,7 @@ def _children(value, path, excluded=()):
     """
     entries = value.items() if isinstance(value, dict) else enumerate(value)
     for key, child in entries:
-        if not isinstance(key, str) or field_name(key) not in excluded:
+        if not excluded or not isinstance(key, str) or field_name(matched_field_name(key)) not in excluded:
             yield path + (key,), child
 
 
@@ -109,7 +109,7 @@ def _contains_record(value):
             pending.pop()
             continue
         if isinstance(current, dict):
-            names = {field_name(key) for key in current}
+            names = {field_name(matched_field_name(key)) for key in current}
             if len(RECORD_FIELDS.intersection(names)) >= 3 or SIMULATION_FIELDS.intersection(names):
                 return True
             children = current.values()

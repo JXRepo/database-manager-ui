@@ -2,7 +2,7 @@
 Keep metadata display order independent of database JSON key order
 """
 
-from apps.dyn_api.metadata_compat import field_name
+from apps.dyn_api.metadata_compat import field_name, matched_field_name
 
 # Fields follow properties declarations in MiMeDat and its referenced schemas
 # Supplied root header fields precede properties in schema document order
@@ -82,8 +82,10 @@ DETAIL_FIELD_ORDERS = {
 }
 
 DETAIL_FIELD_RANKS = {}
+DETAIL_FIELDS_BY_PATH = {}
 for _path, _fields in DETAIL_FIELD_ORDERS.items():
     _parts = tuple(field_name(part) for part in _path.split(".")) if _path else ()
+    DETAIL_FIELDS_BY_PATH[_parts] = _fields
     DETAIL_FIELD_RANKS[_parts] = {field_name(name): index for index, name in enumerate(_fields)}
 
 
@@ -109,7 +111,8 @@ def detail_field_rank(name, path=()):
     """
     path = tuple(field_name(part) for part in path if not isinstance(part, int))
     ranks = DETAIL_FIELD_RANKS.get(path, {})
-    return ranks.get(field_name(name), len(ranks))
+    matched = matched_field_name(name, DETAIL_FIELDS_BY_PATH.get(path, ()))
+    return ranks.get(field_name(matched), len(ranks))
 
 
 def ordered_metadata_items(data, path=()):

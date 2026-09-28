@@ -65,6 +65,26 @@ class UploadUnwrapTests(TestCase):
                      "experiment": {"runs": [self.first, self.second]}})
         self.assertEqual(JSONData.objects.count(), 2)
 
+    def test_descriptive_keyword_variants_do_not_become_extra_records(self):
+        """
+        Count records consistently when a collection uses a descriptive title alias
+        """
+        self.upload({"collection_title": "Experiment collection", "runs": [self.first, self.second]})
+        self.assertEqual(list(JSONData.objects.order_by("pk").values_list("data", flat=True)),
+                         [self.first, self.second])
+
+    def test_incomplete_descriptive_record_is_not_split_into_its_values(self):
+        """
+        Report missing fields on the object instead of treating creators as records
+        """
+        response = self.upload({"record": {"simulation_title": "Incomplete",
+                                          "creator_primary": ["Researcher"],
+                                          "software_primary": "Solver"}})
+        self.assertFalse(JSONData.objects.exists())
+        self.assertContains(response, "Object 1 in this file")
+        self.assertNotContains(response, "Object 2 in this file")
+        self.assertContains(response, "Incomplete")
+
     def test_thirty_invalid_members_prevent_all_one_hundred_saves(self):
         """
         Collect all thirty errors while preserving the whole file save boundary

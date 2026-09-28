@@ -321,8 +321,7 @@ class DataNotification(models.Model):
         object
             Supplied identifier, title or a generic fallback.
         """
-        data = self.data_object.data
-        return field_value(data, "identifier") or field_value(data, "title") or "Data object"
+        return self.display_identifier or self.display_name
 
     @property
     def display_name(self):
@@ -332,9 +331,12 @@ class DataNotification(models.Model):
         Returns
         -------
         object
-            Original title or the notification's fallback label.
+            All recognized titles as readable text or the identifier fallback.
         """
-        return field_value(self.data_object.data, "title") or self.display_title
+        title = field_value(self.data_object.data, "title")
+        if isinstance(title, list):
+            title = ", ".join(str(value) for value in title)
+        return title or self.display_identifier or "Data object"
 
     @property
     def display_identifier(self):

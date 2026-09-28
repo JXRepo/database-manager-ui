@@ -984,7 +984,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         Prepared objects and their reports, indexed by the preview identifier.
     """
     for position, obj in enumerate(objects, start=1):
-        title = field_value(obj, "title")
+        title = _assistant_text(field_value(obj, "title"))
         identifier = field_value(obj, "identifier")
         file_report["objects"].append({
             "position": position,
@@ -1670,7 +1670,10 @@ def _assistant_phase_names(data):
                     or phase.get("identifier")
                 )
                 if name:
-                    names.append(str(name))
+                    for label in name if isinstance(name, list) else [name]:
+                        text = _assistant_text(label)
+                        if text:
+                            names.append(text)
             elif phase:
                 names.append(str(phase))
     elif phases:
@@ -2114,11 +2117,22 @@ def _build_search_text(obj, field):
 def _prepare_list_object(obj):
     """
     Attach summary fields to one data object
+
+    Parameters
+    ----------
+    obj : JSONData
+        Stored object to prepare for a result list.
+
+    Returns
+    -------
+    JSONData
+        Object with readable titles, metadata summaries and access badges.
     """
     data = metadata_view(obj.data)
     summary_fields = _build_summary_fields(data)
-    obj.list_display_name = data.get("identifier") or data.get("title") or "Object"
-    obj.search_display_name = data.get("title") or data.get("identifier") or "Object"
+    title = _assistant_text(data.get("title"))
+    obj.list_display_name = data.get("identifier") or title or "Object"
+    obj.search_display_name = title or data.get("identifier") or "Object"
 
     access_display = _get_access_display(obj)
     summary_fields.append(
@@ -2739,7 +2753,7 @@ def search_live_data_objects_view(request):
     for obj in data_objects[:20]:
         data = metadata_view(obj.data)
         uploaded_at = timezone.localtime(obj.uploaded_at)
-        display_name = str(data.get("title") or data.get("identifier") or "Object")
+        display_name = _assistant_text(data.get("title")) or str(data.get("identifier") or "Object")
         identifier = str(data.get("identifier") or "")
 
         objects.append(
@@ -4332,6 +4346,7 @@ def json_data_detail_view(request, pk):
     context = {
         "data_object": obj,
         "metadata": metadata,
+        "detail_title": _assistant_text(metadata.get("title")),
         "detail_rows": display_rows,
         "plot_variables": plot_variables,
         "mechanical_bc_items": mechanical_bc_items,

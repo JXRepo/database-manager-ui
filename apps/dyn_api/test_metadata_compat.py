@@ -27,15 +27,15 @@ class MetadataCompatibilityTests(SimpleTestCase):
                 self.assertEqual(field_value(data, "processor_specifications"), value)
                 self.assertEqual(data, before)
 
-    def test_processor_aliases_still_require_nonempty_consistent_values(self):
+    def test_processor_aliases_still_require_nonempty_values_at_the_same_parent(self):
         """
-        Preserve emptiness, parent boundaries and conflicts for the explicit alias
+        Preserve emptiness and parent boundaries while accepting multiple descriptions
         """
         data = valid_upload_object(CPU_specifications=[["CPU"]])
         self.assertEqual(validate_json([data], detailed=True), ([data], []))
         data["CPU_specifications"] = "Different CPU"
-        _, errors = validate_json([data], detailed=True)
-        self.assertIn("conflicting_fields", [error["category"] for error in errors])
+        self.assertEqual(validate_json([data], detailed=True), ([data], []))
+        self.assertEqual(metadata_view(data)["processor_specifications"], ["CPU", "Different CPU"])
         del data["processor_specifications"]
         data["CPU_specifications"] = [[""]]
         _, errors = validate_json([data], detailed=True)
@@ -136,9 +136,9 @@ class MetadataCompatibilityTests(SimpleTestCase):
         Accept equivalent wrappers and still report genuinely conflicting fields
         """
         data = valid_upload_object()
-        data["Date"] = [[data["date"]]]
+        data["units"]["STRESS"] = [[data["units"]["Stress"]]]
         self.assertEqual(validate_json([data], detailed=True), ([data], []))
-        data["Date"] = [["1900-01-01"]]
+        data["units"]["STRESS"] = [["Pa"]]
         _, errors = validate_json([data], detailed=True)
         self.assertIn("conflicting_fields", [error["category"] for error in errors])
 
@@ -177,10 +177,10 @@ class MetadataCompatibilityTests(SimpleTestCase):
 
     def test_conflicting_spellings_are_reported_instead_of_choosing_one(self):
         """
-        Reject two different values for the same recognized field
+        Reject two different values for the same functional field
         """
         data = valid_upload_object()
-        data["DATE"] = "1999-01-01"
+        data["units"]["STRESS"] = "Pa"
         valid, errors = validate_json([data], detailed=True)
         self.assertFalse(valid)
         self.assertIn("conflicting_fields", [error["category"] for error in errors])

@@ -50,11 +50,15 @@ Current priority:
 - Validate the 24 required top-level fields and applicable nested and conditional required rules from the bundled MiMeDat schema profile; do not claim full JSON Schema compliance or enforce unrelated optional constraints
 - Extra fields are allowed
 - Recognize schema field names within their own parent ignoring case and separator punctuation; accept finite numeric strings at known numeric paths and explicit all/c sharing shorthand
-- Accept CPU_specifications as an explicit alias for processor_specifications, preserving uploaded names and rejecting conflicting values when both are supplied
+- Accept CPU_specifications, CPU_specification and processor_specification as explicit aliases for processor_specifications, preserving uploaded names
+- Descriptive fields may match all their words within one key at the same schema parent, ignoring word order, case, separators, simple trailing-s plurals and camel case; exact schema names and more specific known fields take precedence, and a key equally matching different requirements stays unrecognized
+- Limit keyword matching and multiple-description aggregation to title, creator, creator_affiliation, date, rights, rights_holder, software, software_version, system, system_version, processor_specifications, input_path, results_path, phase_name and texture_type where defined by the schema
+- Accept multiple matching descriptions with different values when at least one has content; reject all-empty matches, preserve every original key and value in detail rows and JSON export, and combine descriptions only in internal search and summary views
+- Units, permissions, identifiers, numeric values, structural fields, load components and curves retain existing name and conflict checks; descriptive matching must not determine their meaning or select a value
 - Unwrap singleton lists only at known scalar or object locations, including individual array entries; preserve genuine arrays and unknown metadata, never choose among multiple values, and check required emptiness after unwrapping
 - Wrapped identifiers and explicit sharing tokens use the same duplicate and access checks as bare values; retain existing wrappers when filling a blank identifier automatically
 - Preserve original JSON keys and values in storage and JSON export; use the shared metadata compatibility view for validation, search, summaries and plots
-- Do not infer synonyms, move nested values to other parents, search arbitrary text for permission tokens, or silently choose between conflicting aliases
+- Do not infer synonyms, move nested values to other parents, search arbitrary text for permission tokens, or silently choose between conflicting functional aliases
 - Maintain the internal identifier lookup digest for alternative field spellings; preserve identifier text and the final duplicate and quota checks
 - Missing required fields must produce clear user-facing error messages
 - Empty required fields must produce clear user-facing error messages

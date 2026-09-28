@@ -131,6 +131,25 @@ class UploadJobTests(TestCase):
         self.assertNotIn("storage_name", recovered["files"][0])
         self.assertFalse(staging_directory(job).exists())
 
+    def test_one_hundred_objects_with_multiple_descriptions_keep_counts_and_values(self):
+        """
+        Apply keyword matching to background uploads without losing progress or source data
+        """
+        records = {}
+        for index in range(100):
+            data = self.data(f"Descriptive object {index}")
+            data["identifier"] = f"descriptive-object-{index}"
+            data["processor_specification_A"] = data.pop("processor_specifications")
+            data["specifications_of_processor_B"] = "Different CPU"
+            records[data["identifier"]] = data
+        self.assertEqual(self.submit(records).status_code, 202)
+        job = self.process()
+        self.assertEqual(job.status, "completed")
+        self.assertEqual(job.files[0]["validated_count"], 100)
+        self.assertEqual(job.files[0]["saved_count"], 100)
+        self.assertEqual(list(JSONData.objects.order_by("pk").values_list("data", flat=True)),
+                         list(records.values()))
+
     def test_saving_progress_is_readable_before_commit_without_claiming_saved_rows(self):
         """
         Publish completed save work outside the still uncommitted database transaction

@@ -129,6 +129,72 @@ class UploadCompatibilityTests(TestCase):
         self.client.force_login(self.viewer)
         self.assertEqual(self.client.get(reverse("json_data_detail", args=[obj.pk])).status_code, 200)
 
+    def test_multiple_descriptive_fields_are_stored_displayed_and_searchable(self):
+        """
+        Keep all matching descriptions and their original labels through upload
+        """
+        data = valid_upload_object(identifier="multiple-descriptions")
+        del data["processor_specifications"]
+        data.update(processor_specification_A="Intel", specification_of_processor_B="AMD",
+                    title_secondary="Alternative simulation", software_secondary="Other solver",
+                    creator_secondary=["Second researcher"])
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        obj = JSONData.objects.get()
+        self.assertEqual(obj.data, data)
+        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        for value in ("processor_specification_A", "specification_of_processor_B", "Intel", "AMD",
+                      "Alternative simulation", "Second researcher"):
+            self.assertContains(response, value)
+        self.assertContains(response, "<h5>Synthetic simulation, Alternative simulation</h5>", html=True)
+        self.assertLess(response.content.index(b"processor_specification_A"), response.content.index(b"input_path"))
+        response = self.client.get(reverse("search"), {"title": "Alternative simulation", "software": "Other solver"})
+        self.assertEqual(response.context["result_count"], 1)
+        response = self.client.get(reverse("json_data_list"), {"creator": "Second researcher", "software": "Other solver"})
+        self.assertEqual(response.context["result_count"], 1)
+        self.assertEqual(json.loads(self.client.get(reverse("json_data_export", args=[obj.pk])).content), data)
+        self.client.force_login(self.viewer)
+        self.assertEqual(self.client.get(reverse("json_data_detail", args=[obj.pk])).status_code, 404)
+
+    def test_blank_matching_fields_reject_the_whole_file(self):
+        """
+        Keep file atomicity when every candidate for a required description is empty
+        """
+        invalid = valid_upload_object(identifier="blank-descriptions", processor_specifications="",
+                                      processor_specification_A=[[None]], processor_specification_B=[])
+        response = self.upload([valid_upload_object(identifier="neighbor"), invalid])
+        self.assertContains(response, "Empty values")
+        self.assertContains(response, "processor_specifications")
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertEqual(DataNotification.objects.count(), 0)
+
+    def test_keyword_aliases_do_not_change_ronaks_raw_identifier_calculation(self):
+        """
+        Recognize descriptive fields while hashing the original template keys only
+        """
+        data = valid_upload_object()
+        data["processor_specification_of"] = data.pop("processor_specifications")
+        data["processor_specification_other"] = "Different CPU"
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(JSONData.objects.get().data, dict(data, identifier="359e929d"))
+
+    def test_multiple_names_remain_readable_in_sharing_and_phase_summaries(self):
+        """
+        Display every matched name without rendering Python list syntax
+        """
+        data = valid_upload_object(identifier="multiple-names", title_secondary="Other title",
+                                   shared_with=[{"username": self.viewer.username}])
+        data["phase"][0]["phase_name_secondary"] = "Nickel"
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        self.assertEqual(DataNotification.objects.get().display_name, "Synthetic simulation, Other title")
+        response = self.client.get(reverse("search"), {"phase": "Nickel"})
+        self.assertEqual(response.context["result_count"], 1)
+        self.assertNotContains(response, "[&#x27;Copper&#x27;, &#x27;Nickel&#x27;]")
+        response = self.client.get(reverse("json_data_list"), {"phase": "Nickel"})
+        self.assertEqual(response.context["result_count"], 1)
+
     def test_wrapped_identifiers_cannot_bypass_duplicate_checks(self):
         """
         Detect stored, same-file and final transaction identifier conflicts
@@ -239,7 +305,7 @@ class UploadCompatibilityTests(TestCase):
         """
         first = valid_upload_object(identifier="first")
         second = valid_upload_object(identifier="second")
-        second["Date"] = "1900-01-01"
+        second["units"]["STRESS"] = "Pa"
         response = self.upload([first, second])
         self.assertEqual(JSONData.objects.count(), 0)
         self.assertContains(response, "Conflicting fields")
@@ -249,7 +315,7 @@ class UploadCompatibilityTests(TestCase):
         Keep malformed field text from breaking the rendered error report
         """
         data = valid_upload_object(identifier="bad-alias")
-        data["da\ud800te"] = "1900-01-01"
+        data["iden\ud800tifier"] = "different-id"
         response = self.upload(data)
         self.assertEqual(JSONData.objects.count(), 0)
         self.assertContains(response, "invalid Unicode")
