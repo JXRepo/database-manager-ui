@@ -2,14 +2,62 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: c3c9be4
+code_base: ca10ba7
 files_modified:
-  - Smaller upload picker and removal of duplicate checking and failure messages
+  - HANDOFF.md for continuing work on Charts in a new chat
 ---
 
 # Project handoff
 
 ## 当前状态
+
+**下一轮任务：用户要开新聊天，接着做侧栏 Charts 部分。**
+
+- 本次只写交接，没有修改 Charts；用户尚未给出 Charts 的具体调整要求。
+  新聊天先读交接、了解现有页面，再按用户的新反馈推进，不自行开始整体重做。
+- 最新应用提交为 `ca10ba7`，已成功推送 `origin/main`；写本交接前工作区干净。
+  本交接是其后的文档提交。Render 是否部署完成尚未核实，不能把推送成功说成线上已更新。
+- 用户要中文、白话、简单直接的说明；页面文字仍用英文。明确要求的小改直接做，验证后提交推送。
+  用户在讨论或问问题时，先解释，不擅自修改。桌面布局优先，不主动做移动端改版。
+
+### Charts 接手入口
+
+- 页面路径 `/charts/`，侧栏名称 Charts，页面标题 Simulation Charts。
+  路由在 `apps/charts/urls.py`，处理入口是 `apps/charts/views.py` 的 `index`。
+- 页面结构、样式和图表初始化都在 `templates/charts/index.html`，使用本地
+  `static/assets/js/plugins/apexcharts.min.js`。现有区块包括 Simulation Setup Groups、
+  Metadata Coverage、Simulation Conditions、Mechanical Response、Curve-Ready Objects、
+  Material Model Parameters，以及 Phase / Material、Software / Solver、Constitutive Model 图表。
+- `apps/charts/views.py` 负责统计和分组，`apps/charts/tests.py` 已有访问权限、统计行和
+  phase_name 优先规则的测试。需要登录，只统计用户自己的、公开的、或明确分享给自己的数据。
+  公开仍指其他已登录用户可见；Charts 不采用 Live Data Objects 的“只看公开数据”规则。
+- 以下只是本次定位代码时的观察，尚未做 Charts 的完整审查或浏览器验证：
+  `index` 当前直接读取 `obj.data`，没有使用上传／搜索共用的 metadata compatibility view；
+  `_build_response_summary` 当前读取 stress.stress_11、total_strain.strain_11、
+  plastic_strain.plastic_strain_11。后续若遇到别名或曲线识别问题，先核对这些入口。
+  不要假定上传放宽后 Charts 已自动兼容所有写法，也不要未经用户要求改科学含义。
+- 详情页曲线的另一个入口是 `templates/pages/data_detail.html`，后端变量提取和 CSV 导出在
+  `apps/pages/views.py`；相关测试为 `apps/pages/test_plot_schema.py`、
+  `tests/js/mechanical-plot.test.cjs`。保留已经确认的去图题、坐标字号、从 units 读单位、
+  无量纲应变显示 (-)、用户提供的等效曲线优先，以及 CSV 精度和权限规则。
+- Charts 后端修改后运行本机项目解释器下的 `DEBUG=True ... manage.py test apps.charts`；
+  若涉及详情曲线，再运行对应测试。修改布局需查看真实桌面浏览器，覆盖长内容和无数据情况。
+  当前交接没有重跑 Charts 测试，下面的测试结果属于上一轮上传调整。
+
+### 上传部分交接补充
+
+- 一次最多 5 个文件。批次文件数、总大小、总对象数先检查；通过后按文件顺序处理。
+  文件旁的状态逐个更新，具体错误在整批处理结束后按文件顺序统一显示。
+- 每个文件独立保存：文件内任何对象有错，该文件整个不保存；其他合格文件照常保存。
+  例如整批未超限时，5 个文件中 2 个合格，则保存这 2 个，失败的 3 个修好后单独重传。
+- 报告当前有 19 类问题，定义在 `apps/pages/views.py` 的 `UPLOAD_ISSUE_CATEGORIES`。
+  登录、网络、批次超限等是额外操作提示；未知服务异常有通用中断提示，
+  结果未确认时提示先查看 My Data。不能承诺未写入校验规则的问题都会自动被发现。
+- 当前 `Data_Base_Cyclic.json` 的 100 个对象只报缺根 system、phase、units，以及空 total_strain；
+  `a46fde6c.json` 的 1 个对象已通过上一轮字段检查。不要修改用户原样例来凑齐要求。
+  附件位于本机 `example_json_files/`，被 Git 忽略；新电脑不会随拉取自动获得。
+
+### 最新完成：上传框与提示收紧
 
 **9 月 28 日最新：缩小上传框，去掉重复提示。**
 
@@ -339,6 +387,12 @@ Ronak 原始 `Data_Base_Cyclic.json` 现在能拆成 100 条对象，逐条返�
 
 | 提交 | 内容 |
 | --- | --- |
+| `ca10ba7` | 上传框缩到 200px 最小高度；Checking 只留文件旁边；删除重复失败句 |
+| `c3c9be4` | 同类错误合并为修改清单，完整对象细节可展开，最终结果不重复 |
+| `8ad5a4b` | 描述字段按同字段内关键词识别，多候选有内容即满足，原值全部保留 |
+| `8a399ff` | identifier 生成完全采用 Ronak 模板的 MD5 前 8 位算法 |
+| `e3a40d9` | CPU 别名和真实对象 Checking / Saving / Checked 计数 |
+| `052a04d` | 在已知字段位置识别单项列表包装，保持原始 JSON |
 | `4afb994` | 首页页头／页脚头像菜单：Account details、Enter platform、Log out；POST 退出回首页 |
 | `b947e46` | 助手只出现在登录后的平台内部；首页、登录和注册页不显示 |
 | `18d573b` / `2d9e33e` | 首页登录后显示头像；未登录页头及页脚显示 Register / Login，页脚入口居中 |
@@ -963,12 +1017,10 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 ## 下一步
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
-2. **用户将在新聊天继续贴 Ronak 试用反馈。** 按新反馈逐项核对当前代码，明确要求修改的直接落实；
-   先讨论或询问含义时先回答，不将每条反馈自动扩大成整体重构。
-3. 原始 Ronak JSON 已拿到并完成本地验证，上传新规则见开头 9 月 27 日章节。
-   下一步如用户反馈线上问题，记录实际步骤与返回结果；不要自动修改她的旧文件来凑齐字段。
-4. 如核对线上问题，先确认 Render 部署提交。Git push 成功不证明部署完成，也不证明迁移或线上行为成功。
-5. 继续保持限制区两列、每项一行“名称：数值”，不要恢复大段解释。
-6. CSV 已完成；笔记本可用实际样例核对下载内容和布局，再根据用户的新反馈修改。
-   科学公式未获修改指令；扩容入口、索引搜索、收费基础设施、AI 和知识图谱不应未经请求展开。
-   当前没有待完成的已授权代码任务，不要自行启动新功能。
+2. **下一轮专注 Charts。** 先看上面的 Charts 接手入口，再听用户具体要调整什么；
+   讨论时先白话解释，要求明确后再实施，不将“接着弄 Charts”扩大成整体重构。
+3. 上传最新界面调整已完成、验证并推送，不重复实现。新反馈涉及上传时，沿用当前字段识别、
+   原始数据保留、按文件保存和精简提示规则；不要自动修改 Ronak 的原文件来凑齐字段。
+4. 如核对线上问题，先确认 Render 部署提交。Git push 成功不证明部署完成，也不证明线上行为成功。
+5. 本机 `/tmp` 下日志和截图只是上轮验证证据，不随 Git 同步。新聊天或新电脑需重新核实环境和数据。
+6. 科学公式、扩容入口、索引搜索、收费基础设施、AI 和知识图谱没有新修改指令，勿自行展开。
