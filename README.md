@@ -369,6 +369,46 @@ Search scans stored JSON one record at a time and retains display summaries for
 matches rather than every original payload. It still reads the accessible data
 in the application; this is not an indexed search designed for large datasets.
 
+## Charts
+
+`/charts/` summarizes the signed-in user's accessible data. Choose **All
+accessible**, **My uploads**, **Public**, or **Shared with me** to change the
+scope. Public still requires a platform account; another user's unshared private
+records never contribute to counts or linked object lists.
+
+- **Data composition:** phase, software, elastic/plastic model and loading
+  type/mode counts. Each object counts once per label, ignoring case and
+  surrounding whitespace. Multiple phases or descriptions can place one object
+  in several categories, so category counts need not sum to the object total.
+- **Simulation conditions:** temperature, grain number and discretization
+  distributions, with median, range, observation count and coverage. Explicit
+  Kelvin, Celsius and Fahrenheit values are converted to Kelvin before
+  aggregation. Unknown units and invalid values are excluded, never counted as
+  zero. Grain observations belong to individual phases; links count distinct
+  objects. Texture counts are available in an expandable section.
+- **Available results:** objects with numeric stress, total strain and plastic
+  strain arrays, plus supplied and calculated equivalent availability. Any
+  supported component can contribute, including equivalent-only results.
+  Calculation follows the detail page's six-component rules and only applies
+  when the equivalent field is absent. These counts describe availability, not
+  physical comparability or a validation pass.
+- **Data notes:** inspect unequal curve lengths, missing result units,
+  uncharted temperatures, unreadable arrays and conflicting metadata. Original
+  records remain accessible.
+
+Select a bar, numeric interval or availability count to refine the current
+selection and open its paginated object list. All conditions must match the
+same object, including successive selections within one category or across
+numeric measures. Remove a filter individually or clear the selection; changing
+the data scope resets filters. Malformed filters show an error without broadening
+the selection. Long category lists are expandable, and the charts and filtering
+remain usable without JavaScript.
+
+Statistics use the shared metadata compatibility view without changing stored
+JSON, detail plots or exports. Functional conflicts never choose a value
+silently. Mechanical extrema with incompatible units are not aggregated, and
+matching category labels alone do not establish simulation comparability.
+
 ## Data Object Details
 
 The FAIR Data Assistant button is available inside the signed in workspace,

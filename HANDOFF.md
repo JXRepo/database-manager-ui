@@ -2,47 +2,79 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: ca10ba7
+code_base: main (see git log -1 for the Charts commit)
 files_modified:
-  - HANDOFF.md for continuing work on Charts in a new chat
+  - apps/charts/analytics.py, views.py, tests.py and test_browser.py
+  - templates/charts/index.html and category.html
+  - static/assets/css/charts.css and static/assets/js/charts.js
+  - tests/browser/charts.cjs
+  - README.md, AGENTS.md and the Charts implementation plan
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**下一轮任务：用户要开新聊天，接着做侧栏 Charts 部分。**
+**最新完成：用户授权直接重做 Charts，要求统计真正有用、页面清楚友好。**
 
-- 本次只写交接，没有修改 Charts；用户尚未给出 Charts 的具体调整要求。
-  新聊天先读交接、了解现有页面，再按用户的新反馈推进，不自行开始整体重做。
-- 最新应用提交为 `ca10ba7`，已成功推送 `origin/main`；写本交接前工作区干净。
-  本交接是其后的文档提交。Render 是否部署完成尚未核实，不能把推送成功说成线上已更新。
+- 最初用户只让读交接、一起讨论，随后明确要求“直接做，不用跟我商量”。
+  本轮据此完成 Charts 重做，不要误以为仍停留在只读讨论阶段。
+- 页面标题已是 **Charts**；标题小改提交为 `0882165`，本轮完整重做在其后。
+  最终提交及同步状态以 `git log -1`、`git status` 和远端为准。
+  Render 是否部署完成尚未核实，不能把推送成功说成线上已更新。
 - 用户要中文、白话、简单直接的说明；页面文字仍用英文。明确要求的小改直接做，验证后提交推送。
   用户在讨论或问问题时，先解释，不擅自修改。桌面布局优先，不主动做移动端改版。
 
-### Charts 接手入口
+### Charts 当前实现与统计口径
 
-- 页面路径 `/charts/`，侧栏名称 Charts，页面标题 Simulation Charts。
-  路由在 `apps/charts/urls.py`，处理入口是 `apps/charts/views.py` 的 `index`。
-- 页面结构、样式和图表初始化都在 `templates/charts/index.html`，使用本地
-  `static/assets/js/plugins/apexcharts.min.js`。现有区块包括 Simulation Setup Groups、
-  Metadata Coverage、Simulation Conditions、Mechanical Response、Curve-Ready Objects、
-  Material Model Parameters，以及 Phase / Material、Software / Solver、Constitutive Model 图表。
-- `apps/charts/views.py` 负责统计和分组，`apps/charts/tests.py` 已有访问权限、统计行和
-  phase_name 优先规则的测试。需要登录，只统计用户自己的、公开的、或明确分享给自己的数据。
-  公开仍指其他已登录用户可见；Charts 不采用 Live Data Objects 的“只看公开数据”规则。
-- 以下只是本次定位代码时的观察，尚未做 Charts 的完整审查或浏览器验证：
-  `index` 当前直接读取 `obj.data`，没有使用上传／搜索共用的 metadata compatibility view；
-  `_build_response_summary` 当前读取 stress.stress_11、total_strain.strain_11、
-  plastic_strain.plastic_strain_11。后续若遇到别名或曲线识别问题，先核对这些入口。
-  不要假定上传放宽后 Charts 已自动兼容所有写法，也不要未经用户要求改科学含义。
-- 详情页曲线的另一个入口是 `templates/pages/data_detail.html`，后端变量提取和 CSV 导出在
-  `apps/pages/views.py`；相关测试为 `apps/pages/test_plot_schema.py`、
-  `tests/js/mechanical-plot.test.cjs`。保留已经确认的去图题、坐标字号、从 units 读单位、
-  无量纲应变显示 (-)、用户提供的等效曲线优先，以及 CSV 精度和权限规则。
-- Charts 后端修改后运行本机项目解释器下的 `DEBUG=True ... manage.py test apps.charts`；
-  若涉及详情曲线，再运行对应测试。修改布局需查看真实桌面浏览器，覆盖长内容和无数据情况。
-  当前交接没有重跑 Charts 测试，下面的测试结果属于上一轮上传调整。
+- `/charts/` 仍用现有路由；`apps/charts/views.py` 管权限、筛选和分页，
+  `apps/charts/analytics.py` 从共享 metadata compatibility view 提取精简统计。
+  逐个读取 JSON，不把原曲线保留在汇总记录中；没有新依赖、模型或迁移。
+- Data scope 有 All accessible、My uploads、Public、Shared with me。
+  默认包含自己、公开、明确分享给自己的对象，统计与列表采用相同权限；公开仍需登录。
+- 顶部为对象总数、不同 phase 名称数、同时提供 stress/strain 的对象数和 plastic strain 数。
+  分类展示 Phase、Software、本构模型（Plastic/Elastic）和 Loading（Mode/Type）。
+  每对象在每个类别只计一次，大小写和首尾空白合并，多相／多模型可进入多个类别。
+- Simulation conditions 提供温度、晶粒数、离散单元数的分布、中位数、范围和覆盖数量。
+  显式 K/Celsius/Fahrenheit 才换算为 K；无效值不当作零。
+  晶粒数以 phase 为观测单位，链接去重到对象；Texture distribution 可展开。
+- Available results 识别所有现有支持的分量与用户提供的等效曲线，不再只看 11 分量。
+  等效字段缺席且六个分量齐全才算可计算，遵循详情页现有规则。
+  另有 Data notes 提示曲线长度不同、单位缺失、无效温度／曲线和字段冲突。
+- 删除了旧的自动 Comparable 分组和混单位力学极值；可用曲线不等于科学可比或校验通过。
+  原始 JSON、详情图和导出未改，样例也没有修改或上传到外部。
+- 点任意条形／分箱／结果数量，会保留已有条件并继续筛选同一对象。
+  分类和 result/note 可用重复 GET 参数；数字范围用可重复
+  `range=measure:low:high:inclusive`，兼容单个旧式 measure/lo/hi。
+  全部条件 AND，支持逐个移除、清空和每页 10 条的对象列表。
+  无效条件显示错误且结果为零；范围删除保留原参数索引，不误删别的条件。
+- 分箱保留 Decimal 原始极值，使用同一边界进行计数与跳转；已修复 Fahrenheit
+  循环小数导致最小值漏计的问题。接近的数值会增加显示精度，避免所有箱都显示相同范围。
+  grain_number 的等价拼写和单值包装明确处理；别名冲突排除受影响的 phase 并提示。
+- 模板在 `templates/charts/`，样式／脚本在 `static/assets/css/charts.css` 和
+  `static/assets/js/charts.js`，不再依赖 ApexCharts。HTML 图表可键盘操作，
+  关闭 JavaScript 后仍能查看各组和用普通 GET 筛选。
+- 桌面布局用 `.charts-page` 的 padding-top 给导航留空间，不用会塌陷到 body 的 margin-top；
+  浏览器验证还检查标题实际未被导航遮挡。
+
+### Charts 本轮验证
+
+- 76 项相关 Django 测试通过，覆盖 Charts、共享字段兼容、上传兼容、详情曲线、CSV 和导航。
+  其中包括真实 Chromium 连接隔离 SQLite 的浏览器测试；日志 `/tmp/charts-backend.log`。
+- 117 项 JavaScript／Chromium 测试通过，0 跳过；日志 `/tmp/charts-js.log`。
+- 1280／1440／1920 桌面宽度验证多记录、长内容、空数据共 9 种布局，检查键盘切换、
+  条形／分箱筛选、清空、scope 表单、分页、无 JavaScript 回退和私有记录排除。
+  截图在 `/tmp/charts-browser-qa/`。完整截图改用临时加高的真实 viewport，避免
+  CDP captureBeyondViewport 截图触发主题边距过渡造成假重叠。
+- 用户样例只放入隔离内存库核对：Copper、Abaqus CAE、Goss、298 K、343 grains、
+  2744 discretization，曲线 242–250 点并有 Different curve lengths 提示；
+  等效曲线为可计算，无用户提供的等效数组。所有图表链接数量与对象列表一致。
+  原样例及多相副本另做 6 种桌面布局；无 JS 异常，原文件 SHA-256 未变。
+  临时记录与截图在 `/tmp/charts-example-qa/`，不纳入 Git。
+- 独立代码审查发现的连续筛选扩大集合、温度分箱漏计、grain_number 冲突和无效范围删除
+  均已补回归并修复。计划记录在 `docs/superpowers/plans/2026-09-28-charts-statistics.md`。
+- 继续改这里时先跑 `DEBUG=True ... manage.py test apps.charts`；真实浏览器需要
+  Chromium 与有全局 WebSocket 的 Node。跳过不能算通过，仍不主动做移动端改版。
 
 ### 上传部分交接补充
 

@@ -1,0 +1,30 @@
+<div class="charts-category" data-category="{{ category.key }}">
+  {% if category.rows %}
+    <div class="charts-bars">
+      {% for row in category.rows|slice:':5' %}
+        <a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}. View matching objects." title="{{ row.label }}">
+          <span class="charts-bar-label">{{ row.label }}</span>
+          <span class="charts-bar-track" aria-hidden="true"><span style="width: {{ row.percent }}%"></span></span>
+          <span class="charts-bar-count">{{ row.count }}</span>
+        </a>
+      {% endfor %}
+    </div>
+    {% if category.rows|length > 5 %}
+      <details class="charts-more">
+        <summary>View all {{ category.rows|length }} categories</summary>
+        <div class="charts-bars">
+          {% for row in category.rows|slice:'5:' %}
+            <a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}. View matching objects." title="{{ row.label }}">
+              <span class="charts-bar-label">{{ row.label }}</span>
+              <span class="charts-bar-track" aria-hidden="true"><span style="width: {{ row.percent }}%"></span></span>
+              <span class="charts-bar-count">{{ row.count }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      </details>
+    {% endif %}
+    <p class="charts-footnote">Reported in {{ category.available }} of {{ category.total }} object{{ category.total|pluralize }}{% if category.missing %}; {{ category.missing }} not supplied{% endif %}.</p>
+  {% else %}
+    <div class="charts-panel-empty">No {{ category.title|lower }} metadata in this selection.</div>
+  {% endif %}
+</div>

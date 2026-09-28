@@ -134,6 +134,21 @@ Current priority:
 - Live Data Objects omits per-row Public badges and shows the total of all public objects, even when only the latest 20 are displayed
 - Search results show Public or Private without expanding the row, show the matching total, and place public objects before private ones; retain newest-first ordering within each group
 
+## Charts rules
+
+- Charts defaults to all accessible objects; offer My uploads, Public and Shared with me scopes using the same server-side permissions as detail pages
+- Use the shared metadata compatibility view, keep raw JSON out of retained statistical summaries, and never change stored data or exports while computing statistics
+- Count each object once per case-insensitive category label; multiple phases, models, descriptions or loading conditions may contribute to multiple labels
+- Every chart link refines the current selection with AND conditions on the same object, including repeated labels and numeric intervals; counts must equal the linked result count
+- Numeric chart boundaries and drillthrough must share exact Decimal comparisons, retain original extrema and never lose observations after Fahrenheit conversion
+- Convert temperatures only from explicit supported units to Kelvin; exclude missing, invalid, unknown-unit and below-zero temperatures instead of using zero
+- Grain counts are phase observations, with distinct-object counts for navigation; recognize grain_count and the explicit grain_number alias within orientation, unwrap scalar wrappers and exclude conflicting alternative values
+- Availability includes all supported mechanical components and supplied equivalent arrays; calculated equivalents require an absent equivalent field and all six components, following detail-page behavior
+- Do not infer physical comparability, combine mixed-unit mechanical extrema, or describe metadata and array availability as a validation pass
+- Preserve active filters and permissions in the object list and pagination; invalid filters show errors and no records, never a broader selection
+- Keep classification counts, distribution units and denominators visible; preserve empty states, long labels, expandable categories, keyboard operation and ordinary GET navigation without JavaScript
+- Verify desktop layout and drillthrough with `DEBUG=True ... manage.py test apps.charts`; the browser test needs Chromium and Node with global WebSocket and must not be skipped
+
 ## Search rules
 
 - Keep search practical and understandable

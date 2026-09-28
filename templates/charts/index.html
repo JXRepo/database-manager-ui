@@ -2,901 +2,185 @@
 {% load static %}
 
 {% block title %}Charts{% endblock title %}
+{% block extrastyle %}<link rel="stylesheet" href="{% static 'assets/css/charts.css' %}">{% endblock extrastyle %}
 
 {% block content %}
-<style>
-  .analytics-card,
-  .metric-card {
-    background: #ffffff;
-    border: 1px solid #e8edf3;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
-  }
-
-  .metric-card .card-body {
-    align-items: center;
-    display: flex;
-    gap: 14px;
-    min-height: 92px;
-    padding: 16px;
-  }
-
-  .metric-icon {
-    align-items: center;
-    border-radius: 8px;
-    color: #ffffff;
-    display: inline-flex;
-    flex: 0 0 42px;
-    height: 42px;
-    justify-content: center;
-    width: 42px;
-  }
-
-  .metric-icon svg {
-    height: 20px;
-    width: 20px;
-  }
-
-  .metric-icon.blue {
-    background: #2563eb;
-  }
-
-  .metric-icon.green {
-    background: #16a34a;
-  }
-
-  .metric-icon.orange {
-    background: #ea580c;
-  }
-
-  .metric-icon.red {
-    background: #dc2626;
-  }
-
-  .metric-label {
-    color: #64748b;
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0;
-    margin-bottom: 4px;
-    text-transform: uppercase;
-  }
-
-  .metric-value {
-    color: #0f172a;
-    font-size: 1.5rem;
-    font-weight: 750;
-    line-height: 1.15;
-  }
-
-  .analytics-card .card-header {
-    align-items: center;
-    background: #ffffff;
-    border-bottom: 1px solid #eef2f7;
-    display: flex;
-    justify-content: space-between;
-    min-height: 52px;
-    padding: 12px 16px;
-  }
-
-  .analytics-card .card-header h5 {
-    color: #0f172a;
-    font-size: 0.98rem;
-    font-weight: 750;
-    margin: 0;
-  }
-
-  .analytics-card .card-body {
-    padding: 14px 16px 16px;
-  }
-
-  .summary-grid {
-    display: grid;
-    gap: 10px;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .summary-item {
-    background: #f8fafc;
-    border: 1px solid #edf2f7;
-    border-radius: 8px;
-    min-width: 0;
-    padding: 11px 12px;
-  }
-
-  .summary-label {
-    color: #64748b;
-    font-size: 0.78rem;
-    font-weight: 700;
-    margin-bottom: 4px;
-  }
-
-  .summary-value {
-    color: #111827;
-    font-weight: 750;
-    overflow-wrap: anywhere;
-  }
-
-  .analytics-table {
-    margin-bottom: 0;
-  }
-
-  .analytics-table th {
-    border-top: 0;
-    color: #64748b;
-    font-size: 0.76rem;
-    font-weight: 800;
-    letter-spacing: 0;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .analytics-table td {
-    color: #1f2937;
-    font-size: 0.88rem;
-    vertical-align: middle;
-  }
-
-  .primary-cell {
-    color: #0f172a;
-    font-weight: 750;
-  }
-
-  .muted-cell {
-    color: #64748b;
-    font-size: 0.82rem;
-  }
-
-  .compact-badge {
-    border-radius: 999px;
-    font-size: 0.74rem;
-    font-weight: 750;
-    padding: 5px 8px;
-  }
-
-  .coverage-row {
-    align-items: center;
-    display: grid;
-    gap: 10px;
-    grid-template-columns: minmax(120px, 1fr) 74px 70px;
-    padding: 8px 0;
-  }
-
-  .coverage-row + .coverage-row {
-    border-top: 1px solid #eef2f7;
-  }
-
-  .coverage-label {
-    color: #1f2937;
-    font-weight: 700;
-    min-width: 0;
-  }
-
-  .coverage-count {
-    color: #64748b;
-    font-size: 0.82rem;
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .coverage-bar {
-    background: #e5e7eb;
-    border-radius: 999px;
-    height: 8px;
-    overflow: hidden;
-  }
-
-  .coverage-fill {
-    border-radius: inherit;
-    height: 100%;
-  }
-
-  .coverage-fill.success {
-    background: #16a34a;
-  }
-
-  .coverage-fill.warning {
-    background: #ea580c;
-  }
-
-  .coverage-fill.danger {
-    background: #dc2626;
-  }
-
-  .issue-list {
-    border-top: 1px solid #eef2f7;
-    margin-top: 12px;
-    padding-top: 10px;
-  }
-
-  .issue-heading {
-    color: #0f172a;
-    font-size: 0.84rem;
-    font-weight: 750;
-    margin-bottom: 8px;
-  }
-
-  .issue-row {
-    align-items: center;
-    display: grid;
-    gap: 10px;
-    grid-template-columns: minmax(120px, 1fr) auto auto;
-    padding: 6px 0;
-  }
-
-  .issue-label {
-    color: #1f2937;
-    font-weight: 700;
-    min-width: 0;
-  }
-
-  .issue-example {
-    color: #64748b;
-    font-size: 0.8rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .bc-matrix {
-    display: grid;
-    gap: 10px;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .bc-axis {
-    border: 1px solid #edf2f7;
-    border-radius: 8px;
-    padding: 12px;
-  }
-
-  .bc-axis-title {
-    color: #0f172a;
-    font-size: 1rem;
-    font-weight: 800;
-    margin-bottom: 10px;
-  }
-
-  .bc-axis-line {
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
-    padding: 3px 0;
-  }
-
-  .bc-axis-label {
-    color: #64748b;
-    font-size: 0.82rem;
-    font-weight: 700;
-  }
-
-  .bc-axis-value {
-    color: #111827;
-    font-weight: 750;
-  }
-
-  .chart-panel {
-    min-height: 275px;
-  }
-
-  .chart-error {
-    align-items: center;
-    border: 1px dashed #d8e0ea;
-    border-radius: 8px;
-    color: #64748b;
-    display: flex;
-    justify-content: center;
-    min-height: 230px;
-    padding: 16px;
-    text-align: center;
-  }
-
-  .empty-state {
-    color: #64748b;
-    padding: 18px;
-    text-align: center;
-  }
-
-  @media (max-width: 1200px) {
-    .summary-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 768px) {
-    .bc-matrix,
-    .summary-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .coverage-row {
-      grid-template-columns: 1fr 62px;
-    }
-
-    .issue-row {
-      grid-template-columns: 1fr auto;
-    }
-
-    .issue-example {
-      grid-column: 1 / -1;
-    }
-
-    .coverage-bar {
-      grid-column: 1 / -1;
-    }
-  }
-</style>
-
-<div class="pc-container">
-  <div class="pc-content">
-    <div class="page-header">
-      <div class="page-block">
-        <div class="row align-items-center">
-          <div class="col-md-12">
-            <div class="page-header-title">
-              <h5 class="mb-0">Charts</h5>
-            </div>
-          </div>
-          <div class="col-md-12">
-            <ul class="breadcrumb mb-0">
-              <li class="breadcrumb-item"><a href="{% url 'search' %}">Home</a></li>
-              <li class="breadcrumb-item" aria-current="page">Charts</li>
-            </ul>
-          </div>
-        </div>
+<main class="pc-container charts-page">
+  <div class="pc-content charts-content">
+    <header class="charts-heading">
+      <div>
+        <h1>Charts</h1>
+        <p>Explore the materials, simulation conditions and results in your data.</p>
       </div>
+      {% if total_objects %}<a class="charts-outline-button" href="{{ objects_url }}">View data objects <i data-feather="list" aria-hidden="true"></i></a>{% endif %}
+    </header>
+
+    <div class="charts-toolbar">
+      <form method="get" class="charts-scope-form">
+        <label for="charts-scope">Data scope</label>
+        <select name="scope" id="charts-scope" class="form-select form-select-sm">
+          {% for value, label in scope_options %}<option value="{{ value }}"{% if scope == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        <button class="charts-scope-submit" type="submit">Apply</button>
+      </form>
+      <span class="charts-scope-note"><i data-feather="lock" aria-hidden="true"></i> Only data you can access</span>
     </div>
 
-    <div class="row g-3 mb-3">
-      <div class="col-sm-6 col-xl-3">
-        <div class="card metric-card">
-          <div class="card-body">
-            <span class="metric-icon blue"><i data-feather="database"></i></span>
-            <div>
-              <div class="metric-label">Accessible Objects</div>
-              <div class="metric-value">{{ total_objects }}</div>
+    {% if active_filters or filter_errors %}
+      <div class="charts-filter-strip" aria-label="Active filters">
+        <span>Filtered by</span>
+        {% for item in active_filters %}<a class="charts-filter" href="{{ item.url }}" title="Remove {{ item.label }}"><span>{{ item.label }}</span><span aria-hidden="true">×</span><span class="visually-hidden">Remove filter</span></a>{% endfor %}
+        <a class="charts-clear" href="{{ clear_url }}">Clear filters</a>
+      </div>
+    {% endif %}
+    {% if filter_errors %}<div class="alert alert-warning charts-errors" role="alert">{% for error in filter_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+
+    {% if total_objects %}
+      <section class="charts-metrics" aria-label="Selection overview">
+        <div class="charts-metric charts-metric-total">
+          <span class="charts-metric-label">Data objects</span><strong>{{ total_objects }}</strong>
+          <span class="charts-metric-caption">{% if active_filters %}of {{ base_count }} in this scope{% else %}{{ scope_label }}{% endif %}</span>
+        </div>
+        <div class="charts-metric">
+          <span class="charts-metric-label">Phases</span><strong>{{ phase_count }}</strong><span class="charts-metric-caption">Distinct reported names</span>
+        </div>
+        <a class="charts-metric" href="{{ paired_url }}">
+          <span class="charts-metric-label">With stress &amp; strain</span><strong>{{ paired_count }}<small>/ {{ total_objects }}</small></strong><span class="charts-metric-caption">Both result groups available</span>
+        </a>
+        <a class="charts-metric" href="{{ plastic_url }}">
+          <span class="charts-metric-label">With plastic strain</span><strong>{{ plastic_count }}<small>/ {{ total_objects }}</small></strong><span class="charts-metric-caption">Plastic response available</span>
+        </a>
+      </section>
+
+      <div class="charts-section-heading">
+        <div><h2>Data composition</h2><p>Object counts by reported metadata. Select a bar to explore its data.</p></div>
+        <span class="charts-count-key"><span aria-hidden="true"></span> Data objects</span>
+      </div>
+      <section class="charts-composition" aria-label="Data composition">
+        <article class="charts-category-panel charts-blue">
+          <div class="charts-panel-heading"><h3>Phase</h3><span>{{ categories.phase.rows|length }} categor{{ categories.phase.rows|length|pluralize:"y,ies" }}</span></div>
+          {% include 'charts/category.html' with category=categories.phase %}
+        </article>
+        <article class="charts-category-panel charts-teal">
+          <div class="charts-panel-heading"><h3>Software</h3><span>{{ categories.software.rows|length }} categor{{ categories.software.rows|length|pluralize:"y,ies" }}</span></div>
+          {% include 'charts/category.html' with category=categories.software %}
+        </article>
+        <article class="charts-category-panel charts-indigo" data-chart-switch>
+          <div class="charts-panel-heading"><h3>Constitutive model</h3>
+            <div class="charts-switch" aria-label="Model type" hidden>
+              <button type="button" data-chart-target="plastic-model-panel" aria-pressed="true">Plastic</button>
+              <button type="button" data-chart-target="elastic-model-panel" aria-pressed="false">Elastic</button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="col-sm-6 col-xl-3">
-        <div class="card metric-card">
-          <div class="card-body">
-            <span class="metric-icon green"><i data-feather="layers"></i></span>
-            <div>
-              <div class="metric-label">Comparable Sets</div>
-              <div class="metric-value">{{ comparable_group_count }}</div>
+          <div id="plastic-model-panel" data-chart-panel><h4 class="charts-fallback-heading">Plastic model</h4>{% include 'charts/category.html' with category=categories.plastic_model %}</div>
+          <div id="elastic-model-panel" data-chart-panel><h4 class="charts-fallback-heading">Elastic model</h4>{% include 'charts/category.html' with category=categories.elastic_model %}</div>
+        </article>
+        <article class="charts-category-panel charts-slate" data-chart-switch>
+          <div class="charts-panel-heading"><h3>Loading</h3>
+            <div class="charts-switch" aria-label="Loading classification" hidden>
+              <button type="button" data-chart-target="loading-mode-panel" aria-pressed="true">Mode</button>
+              <button type="button" data-chart-target="loading-type-panel" aria-pressed="false">Type</button>
             </div>
           </div>
-        </div>
-      </div>
+          <div id="loading-mode-panel" data-chart-panel><h4 class="charts-fallback-heading">Loading mode</h4>{% include 'charts/category.html' with category=categories.loading_mode %}</div>
+          <div id="loading-type-panel" data-chart-panel><h4 class="charts-fallback-heading">Loading type</h4>{% include 'charts/category.html' with category=categories.loading_type %}</div>
+        </article>
+      </section>
+      <p class="charts-category-note">Each object is counted once per category. Objects with multiple phases, models or conditions can appear in more than one category.</p>
 
-      <div class="col-sm-6 col-xl-3">
-        <div class="card metric-card">
-          <div class="card-body">
-            <span class="metric-icon orange"><i data-feather="activity"></i></span>
-            <div>
-              <div class="metric-label">Curve Ready</div>
-              <div class="metric-value">{{ plot_ready_count }}</div>
-            </div>
+      <div class="charts-analysis-grid">
+        <section class="charts-surface charts-distributions" data-chart-switch data-active-panel="distribution-{{ active_measure }}" aria-labelledby="conditions-heading">
+          <div class="charts-panel-heading"><h2 id="conditions-heading">Simulation conditions</h2><i data-feather="sliders" aria-hidden="true"></i></div>
+          <div class="charts-switch charts-measure-switch" aria-label="Distribution measure" hidden>
+            {% for item in distributions %}<button type="button" data-chart-target="distribution-{{ item.key }}" aria-pressed="{% if item.key == active_measure %}true{% else %}false{% endif %}">{{ item.title }}</button>{% endfor %}
           </div>
-        </div>
-      </div>
-
-      <div class="col-sm-6 col-xl-3">
-        <div class="card metric-card">
-          <div class="card-body">
-            <span class="metric-icon red"><i data-feather="alert-triangle"></i></span>
-            <div>
-              <div class="metric-label">Objects With Gaps</div>
-              <div class="metric-value">{{ data_gap_count }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-      <div class="col-xl-7">
-        <div class="card analytics-card h-100">
-          <div class="card-header">
-            <h5>Simulation Setup Groups</h5>
-          </div>
-          <div class="card-body">
-            {% if comparable_group_rows %}
-              <div class="table-responsive">
-                <table class="table analytics-table">
-                  <thead>
-                    <tr>
-                      <th>Phase</th>
-                      <th>Setup</th>
-                      <th>Loading</th>
-                      <th>Conditions</th>
-                      <th>Status</th>
-                      <th>Objects</th>
-                      <th>Curve Ready</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for row in comparable_group_rows %}
-                      <tr>
-                        <td class="primary-cell">{{ row.phase }}</td>
-                        <td>
-                          <div>{{ row.setup }}</div>
-                        </td>
-                        <td>{{ row.loading }}</td>
-                        <td class="muted-cell">{{ row.conditions }}</td>
-                        <td>
-                          <span class="badge bg-{{ row.group_status_class }} compact-badge">{{ row.group_status }}</span>
-                        </td>
-                        <td class="primary-cell">{{ row.objects }}</td>
-                        <td>
-                          <span class="badge bg-{{ row.readiness_class }} compact-badge">{{ row.ready_label }}</span>
-                        </td>
-                        <td>
-                          <a href="{% url 'json_data_detail' row.representative_id %}" class="btn btn-outline-primary btn-sm">Open</a>
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              <div class="empty-state">No accessible data objects.</div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <div class="col-xl-5">
-        <div class="card analytics-card h-100">
-          <div class="card-header">
-            <h5>Metadata Coverage</h5>
-          </div>
-          <div class="card-body">
-            {% for row in quality_rows %}
-              <div class="coverage-row">
-                <div class="coverage-label">{{ row.label }}</div>
-                <div class="coverage-count">{{ row.present }} / {{ total_objects }}</div>
-                <div class="coverage-bar">
-                  <div class="coverage-fill {{ row.status_class }}" style="width: {{ row.coverage }}%"></div>
+          {% for item in distributions %}
+            <div id="distribution-{{ item.key }}" data-chart-panel>
+              <h3 class="charts-fallback-heading">{{ item.title }}</h3>
+              {% if item.observation_count %}
+                <div class="charts-distribution-summary">
+                  <div><span>Median{% if item.unit %} ({{ item.unit }}){% endif %}</span><strong>{{ item.median }}</strong></div>
+                  <div><span>Reported range{% if item.unit %} ({{ item.unit }}){% endif %}</span><strong class="charts-range">{{ item.minimum }}{% if item.minimum != item.maximum %} – {{ item.maximum }}{% endif %}</strong></div>
+                  <div><span>Observations</span><strong>{{ item.observation_count }} <small>{{ item.observation_unit|slice:":-1" }}{{ item.observation_count|pluralize }}</small></strong></div>
                 </div>
-              </div>
-            {% empty %}
-              <div class="empty-state">No coverage data.</div>
-            {% endfor %}
-
-            {% if quality_issue_rows %}
-              <div class="issue-list">
-                <div class="issue-heading">Needs Attention</div>
-                {% for row in quality_issue_rows %}
-                  <div class="issue-row">
-                    <div class="issue-label">{{ row.label }}</div>
-                    <span class="badge bg-{{ row.status_class }} compact-badge">{{ row.missing }} missing</span>
-                    {% if row.example_id %}
-                      <a href="{% url 'json_data_detail' row.example_id %}" class="issue-example">{{ row.example_label }}</a>
-                    {% else %}
-                      <span class="issue-example">-</span>
-                    {% endif %}
+                {% if item.bins|length == 1 %}
+                  <a class="charts-single-value" href="{{ item.bins.0.url }}">
+                    <span class="charts-single-dot" aria-hidden="true"></span>
+                    <span><strong>{{ item.bins.0.label }}{% if item.unit %} {{ item.unit }}{% endif %}</strong><span>{{ item.observation_count }} reported {{ item.observation_unit|slice:":-1" }}{{ item.observation_count|pluralize }} at this value.</span></span>
+                    <span class="charts-single-action">View {{ item.object_count }} object{{ item.object_count|pluralize }}</span>
+                  </a>
+                {% else %}
+                  <div class="charts-histogram" role="group" aria-label="{{ item.title }} distribution{% if item.unit %} in {{ item.unit }}{% endif %}. Counts are {{ item.observation_unit }}.">
+                    {% for bin in item.bins %}
+                      {% if bin.count %}<a class="charts-bin" href="{{ bin.url }}" title="{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit|slice:":-1" }}{{ bin.count|pluralize }} from {{ bin.object_count }} object{{ bin.object_count|pluralize }}">{% else %}<span class="charts-bin charts-bin-empty">{% endif %}
+                        <span class="charts-bin-plot"><span class="charts-bin-column" style="height: {{ bin.height }}%"><span class="charts-bin-count">{{ bin.count }}</span></span></span>
+                        <span class="charts-bin-label">{{ bin.label }}</span>
+                      {% if bin.count %}</a>{% else %}</span>{% endif %}
+                    {% endfor %}
                   </div>
-                {% endfor %}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-      <div class="col-xl-6">
-        <div class="card analytics-card h-100">
-          <div class="card-header">
-            <h5>Simulation Conditions</h5>
-          </div>
-          <div class="card-body">
-            <div class="summary-grid">
-              {% for item in condition_rows %}
-                <div class="summary-item">
-                  <div class="summary-label">{{ item.label }}</div>
-                  <div class="summary-value">{{ item.value }}</div>
-                </div>
-              {% endfor %}
+                {% endif %}
+                <p class="charts-footnote">{{ item.object_count }} of {{ total_objects }} object{{ total_objects|pluralize }} included{% if item.excluded_objects %}; {{ item.excluded_objects }} without a usable value{% endif %}.{% if item.key == 'temperature' %} Explicit K, Celsius and Fahrenheit units are converted to K.{% elif item.key == 'grain_count' %} Each supplied phase contributes one grain count; an object can contribute multiple phases.{% else %} Only reported nonnegative integer counts are included.{% endif %}</p>
+              {% else %}
+                <div class="charts-distribution-empty"><i data-feather="bar-chart-2" aria-hidden="true"></i><strong>No usable {{ item.title|lower }} values</strong><p>{% if item.key == 'temperature' %}Values need an explicit K, Celsius or Fahrenheit unit and must be at or above absolute zero.{% elif item.key == 'grain_count' %}Grain counts are read from each phase's orientation metadata.{% else %}This selection has no reported nonnegative integer discretization counts.{% endif %}</p></div>
+              {% endif %}
             </div>
+          {% endfor %}
+          <details class="charts-texture"><summary>Texture distribution <span>{{ categories.texture.rows|length }} categor{{ categories.texture.rows|length|pluralize:"y,ies" }}</span></summary>{% include 'charts/category.html' with category=categories.texture %}</details>
+        </section>
+
+        <section class="charts-surface charts-results" aria-labelledby="results-heading">
+          <div class="charts-panel-heading"><h2 id="results-heading">Available results</h2><i data-feather="activity" aria-hidden="true"></i></div>
+          <p class="charts-description">See which objects contain numeric mechanical series.</p>
+          <div class="charts-result-list">
+            {% for item in result_rows %}
+              <a class="charts-result-row{% if not item.count %} charts-result-absent{% endif %}" href="{{ item.url }}">
+                <span class="charts-result-top"><span>{{ item.title }}</span><strong>{{ item.count }} <small>/ {{ total_objects }}</small></strong></span>
+                <span class="charts-result-track" aria-hidden="true"><span style="width: {{ item.percent }}%"></span></span>
+              </a>
+            {% endfor %}
           </div>
-        </div>
+          <p class="charts-footnote">Equivalent results may be supplied, calculated, or both across different result groups. Calculations use the existing detail-page rules.</p>
+          <div class="charts-result-note"><i data-feather="info" aria-hidden="true"></i><span>Availability describes the recorded arrays. Check units, series lengths and simulation conditions before comparing objects.</span></div>
+        </section>
       </div>
 
-      <div class="col-xl-6">
-        <div class="card analytics-card h-100">
-          <div class="card-header">
-            <h5>Mechanical Response</h5>
-          </div>
-          <div class="card-body">
-            <div class="summary-grid">
-              {% for item in response_overview_rows %}
-                <div class="summary-item">
-                  <div class="summary-label">{{ item.label }}</div>
-                  <div class="summary-value">{{ item.value }}</div>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      {% if note_rows %}
+        <details class="charts-data-notes">
+          <summary><span><i data-feather="info" aria-hidden="true"></i> Data notes <span class="charts-note-badge">{{ noted_objects }} object{{ noted_objects|pluralize }}</span></span><span class="charts-summary-action">Review details</span></summary>
+          <div class="charts-note-list">{% for note in note_rows %}<div class="charts-note-row"><div><h3>{{ note.title }}</h3><p>{{ note.description }}</p></div><a href="{{ note.url }}">View {{ note.count }} object{{ note.count|pluralize }}</a></div>{% endfor %}</div>
+        </details>
+      {% endif %}
+    {% else %}
+      <section class="charts-empty">
+        <div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div>
+        <h2>{% if active_filters or filter_errors %}No objects match this selection{% else %}Your data overview starts here{% endif %}</h2>
+        <p>{% if active_filters or filter_errors %}Remove a filter or change the data scope to explore more objects.{% else %}There are no accessible objects in this scope yet. Choose another scope or upload simulation data to see its materials, conditions and results.{% endif %}</p>
+        <div>{% if active_filters or filter_errors %}<a class="charts-primary-button" href="{{ clear_url }}">Clear filters</a>{% else %}<a class="charts-primary-button" href="{% url 'upload_json' %}">Upload data</a><a class="charts-outline-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div>
+      </section>
+    {% endif %}
 
-    <div class="row g-3 mb-3">
-      <div class="col-12">
-        <div class="card analytics-card">
-          <div class="card-header">
-            <h5>Curve-Ready Objects</h5>
+    {% if total_objects %}
+      <details class="charts-objects"{% if objects_open %} open{% endif %}>
+        <summary id="objects"><span>Explore data objects <span>{{ total_objects }}</span></span><span class="charts-summary-action">{{ scope_label }}</span></summary>
+        <div class="charts-object-body">
+          <p class="charts-description">The objects behind this selection. Open an object to inspect its metadata, curves and downloads.</p>
+          <div class="charts-table-wrap">
+            <table class="charts-table">
+              <thead><tr><th scope="col">Data object</th><th scope="col">Phase</th><th scope="col">Software</th><th scope="col">Mechanical results</th><th scope="col">Access</th></tr></thead>
+              <tbody>{% for row in objects_page %}<tr>
+                <td><a class="charts-object-title" href="{% url 'json_data_detail' row.id %}" title="{{ row.title }}">{{ row.title }}</a><span class="charts-object-id">{{ row.identifier }}</span></td>
+                <td><span class="charts-cell-label" title="{{ row.phase_label }}">{{ row.phase_label }}</span></td>
+                <td><span class="charts-cell-label" title="{{ row.software_label }}">{{ row.software_label }}</span></td>
+                <td><span>{{ row.result_label }}</span><small>{{ row.points }}{% if row.notes %} · See data notes{% endif %}</small></td>
+                <td><span class="charts-access{% if row.access == 'Public' %} charts-access-public{% endif %}">{{ row.access }}</span></td>
+              </tr>{% endfor %}</tbody>
+            </table>
           </div>
-          <div class="card-body">
-            {% if response_rows %}
-              <div class="table-responsive">
-                <table class="table analytics-table">
-                  <thead>
-                    <tr>
-                      <th>Object</th>
-                      <th>Phase</th>
-                      <th>Model</th>
-                      <th>Loading</th>
-                      <th>Points</th>
-                      <th>Peak |stress_11|</th>
-                      <th>Peak |strain_11|</th>
-                      <th>Peak |plastic_strain_11|</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for row in response_rows %}
-                      <tr>
-                        <td class="primary-cell">
-                          <a href="{% url 'json_data_detail' row.id %}">{{ row.identifier }}</a>
-                        </td>
-                        <td>{{ row.phase }}</td>
-                        <td>{{ row.model }}</td>
-                        <td>{{ row.loading }}</td>
-                        <td class="primary-cell">{{ row.points }}</td>
-                        <td>{{ row.stress_peak }}</td>
-                        <td>{{ row.strain_peak }}</td>
-                        <td>{{ row.plastic_peak }}</td>
-                        <td>
-                          <span class="badge bg-{{ row.status_class }} compact-badge">{{ row.status }}</span>
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              <div class="empty-state">No accessible data objects.</div>
-            {% endif %}
-          </div>
+          <nav class="charts-pagination" aria-label="Data object pages"><span>{{ objects_page.start_index }}–{{ objects_page.end_index }} of {{ total_objects }} object{{ total_objects|pluralize }}</span><div>{% if previous_url %}<a href="{{ previous_url }}" rel="prev">Previous</a>{% endif %}<span>Page {{ objects_page.number }} of {{ objects_page.paginator.num_pages }}</span>{% if next_url %}<a href="{{ next_url }}" rel="next">Next</a>{% endif %}</div></nav>
         </div>
-      </div>
-    </div>
-
-    <div class="row g-3 mb-3">
-      <div class="col-12">
-        <div class="card analytics-card h-100">
-          <div class="card-header">
-            <h5>Material Model Parameters</h5>
-          </div>
-          <div class="card-body">
-            {% if material_model_rows %}
-              <div class="table-responsive">
-                <table class="table analytics-table">
-                  <thead>
-                    <tr>
-                      <th>Phase</th>
-                      <th>Model</th>
-                      <th>Objects</th>
-                      <th>Elastic Model</th>
-                      <th>Stiffness</th>
-                      <th>Strength</th>
-                      <th>Hardening</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for row in material_model_rows %}
-                      <tr>
-                        <td class="primary-cell">{{ row.phase }}</td>
-                        <td>{{ row.model }}</td>
-                        <td class="primary-cell">{{ row.objects }}</td>
-                        <td>{{ row.elastic_model }}</td>
-                        <td>{{ row.stiffness }}</td>
-                        <td>{{ row.strength }}</td>
-                        <td>{{ row.hardening }}</td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% else %}
-              <div class="empty-state">No material model metadata.</div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row g-3">
-      <div class="col-sm-12 col-xl-6">
-        <div class="card analytics-card">
-          <div class="card-header">
-            <h5>Phase / Material</h5>
-          </div>
-          <div class="card-body">
-            <div id="phase-chart" class="chart-panel"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-sm-12 col-xl-6">
-        <div class="card analytics-card">
-          <div class="card-header">
-            <h5>Software / Solver</h5>
-          </div>
-          <div class="card-body">
-            <div id="software-chart" class="chart-panel"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-sm-12 col-xl-6">
-        <div class="card analytics-card">
-          <div class="card-header">
-            <h5>Constitutive Model</h5>
-          </div>
-          <div class="card-body">
-            <div id="model-chart" class="chart-panel"></div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </details>
+    {% endif %}
   </div>
-</div>
+</main>
 {% endblock content %}
-
-{% block extra_js %}
-<script src="{% static 'assets/js/plugins/apexcharts.min.js' %}"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const phaseLabels = JSON.parse('{{ phase_labels_json|escapejs }}');
-    const phaseSeries = JSON.parse('{{ phase_series_json|escapejs }}');
-    const softwareLabels = JSON.parse('{{ software_labels_json|escapejs }}');
-    const softwareSeries = JSON.parse('{{ software_series_json|escapejs }}');
-    const modelLabels = JSON.parse('{{ model_labels_json|escapejs }}');
-    const modelSeries = JSON.parse('{{ model_series_json|escapejs }}');
-
-    const palette = {
-      phase: ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#dc2626"],
-      software: ["#0f766e", "#0284c7", "#16a34a", "#4f46e5", "#7c3aed", "#db2777"],
-      model: ["#4f46e5", "#0f766e", "#dc2626", "#ea580c", "#2563eb", "#16a34a"]
-    };
-
-    function getChartElement(selector) {
-      return document.querySelector(selector);
-    }
-
-    function hasChartData(labels, series) {
-      return labels.length > 0 && series.some(function (value) {
-        return Number(value) > 0;
-      });
-    }
-
-    function renderEmpty(selector, message) {
-      const element = getChartElement(selector);
-
-      if (element) {
-        element.innerHTML = `<div class="chart-error">${message}</div>`;
-      }
-    }
-
-    function renderApexChart(selector, options, labels, series) {
-      const element = getChartElement(selector);
-
-      if (!element) {
-        return;
-      }
-
-      if (!hasChartData(labels, series)) {
-        renderEmpty(selector, "No chart data");
-        return;
-      }
-
-      if (!window.ApexCharts) {
-        renderEmpty(selector, "Chart library could not be loaded.");
-        return;
-      }
-
-      try {
-        new ApexCharts(element, options).render();
-      } catch (error) {
-        renderEmpty(selector, "This chart could not be rendered.");
-        console.error(error);
-      }
-    }
-
-    function buildTreemapSeries(labels, series) {
-      return labels.map(function (label, index) {
-        return {
-          x: label,
-          y: series[index] || 0
-        };
-      });
-    }
-
-    function integerFormatter(value) {
-      return Number.isInteger(value) ? value.toString() : "";
-    }
-
-    function renderDonutChart(selector, labels, series, colors, valueName) {
-      const options = {
-        chart: {
-          type: "donut",
-          height: 275,
-          toolbar: {
-            show: false
-          }
-        },
-        series: series,
-        labels: labels,
-        colors: colors,
-        stroke: {
-          width: 2,
-          colors: ["#ffffff"]
-        },
-        plotOptions: {
-          pie: {
-            donut: {
-              size: "68%",
-              labels: {
-                show: true,
-                name: {
-                  color: "#64748b",
-                  fontSize: "13px",
-                  show: true
-                },
-                value: {
-                  color: "#0f172a",
-                  fontSize: "24px",
-                  fontWeight: 750,
-                  show: true
-                },
-                total: {
-                  color: "#64748b",
-                  label: valueName,
-                  show: true
-                }
-              }
-            }
-          }
-        },
-        dataLabels: {
-          enabled: false
-        },
-        legend: {
-          fontSize: "13px",
-          markers: {
-            radius: 8
-          },
-          position: "bottom"
-        },
-        tooltip: {
-          theme: "light"
-        }
-      };
-
-      renderApexChart(selector, options, labels, series);
-    }
-
-    function renderTreemapChart(selector, labels, series, colors) {
-      const options = {
-        chart: {
-          type: "treemap",
-          height: 275,
-          toolbar: {
-            show: false
-          }
-        },
-        colors: colors,
-        dataLabels: {
-          enabled: true,
-          formatter: function (text, options) {
-            const value = options.value || 0;
-            return `${text}: ${value}`;
-          },
-          style: {
-            fontSize: "12px",
-            fontWeight: 750
-          }
-        },
-        legend: {
-          show: false
-        },
-        plotOptions: {
-          treemap: {
-            distributed: true,
-            enableShades: false
-          }
-        },
-        series: [
-          {
-            data: buildTreemapSeries(labels, series)
-          }
-        ],
-        tooltip: {
-          theme: "light"
-        }
-      };
-
-      renderApexChart(selector, options, labels, series);
-    }
-
-    function renderColumnChart(selector, labels, series, colors, valueName) {
-      const options = {
-        chart: {
-          height: 275,
-          toolbar: {
-            show: false
-          },
-          type: "bar"
-        },
-        colors: colors,
-        dataLabels: {
-          enabled: true,
-          style: {
-            fontSize: "12px",
-            fontWeight: 750
-          }
-        },
-        grid: {
-          borderColor: "#eef2f7"
-        },
-        plotOptions: {
-          bar: {
-            borderRadius: 6,
-            columnWidth: "44%",
-            distributed: true
-          }
-        },
-        series: [
-          {
-            data: series,
-            name: valueName
-          }
-        ],
-        tooltip: {
-          theme: "light"
-        },
-        xaxis: {
-          categories: labels,
-          labels: {
-            hideOverlappingLabels: true,
-            rotate: -20,
-            style: {
-              fontSize: "12px"
-            },
-            trim: true
-          }
-        },
-        yaxis: {
-          labels: {
-            formatter: integerFormatter
-          }
-        }
-      };
-
-      renderApexChart(selector, options, labels, series);
-    }
-
-    renderDonutChart("#phase-chart", phaseLabels, phaseSeries, palette.phase, "Objects");
-    renderTreemapChart("#software-chart", softwareLabels, softwareSeries, palette.software);
-    renderColumnChart("#model-chart", modelLabels, modelSeries, palette.model, "Objects");
-  });
-</script>
-{% endblock extra_js %}
+{% block extra_js %}<script src="{% static 'assets/js/charts.js' %}" defer></script>{% endblock extra_js %}

@@ -1,4 +1,5 @@
-import json
+import copy
+from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -7,333 +8,461 @@ from django.urls import reverse
 from apps.pages.models import JSONData
 
 
-class ChartsAccessTests(TestCase):
+class ChartsTests(TestCase):
     """
-    Test chart data access rules
+    Verify statistical meaning, exact navigation and access boundaries
     """
+
+    @classmethod
+    def setUpTestData(cls):
+        """
+        Create independent owners without using application data
+        """
+        cls.viewer = User.objects.create_user(username="chart-viewer")
+        cls.other = User.objects.create_user(username="chart-other")
 
     def setUp(self):
         """
-        Create users used by chart tests
+        Authenticate the viewer for each isolated test
         """
-        self.owner = User.objects.create_user(
-            username="owner",
-            email="owner@example.com",
-            password="password",
-        )
-        self.viewer = User.objects.create_user(
-            username="viewer",
-            email="viewer@example.com",
-            password="password",
-        )
-
-    def _build_analysis_object_data(self, identifier):
-        """
-        Build a complete simulation object for chart analytics tests
-        """
-        return {
-            "identifier": identifier,
-            "phase": [
-                {
-                    "phase_identifier": "Copper",
-                    "constitutive_model": {
-                        "elastic_model_name": "Anisotropic Elasticity",
-                        "elastic_parameters": {
-                            "C11": 170000,
-                            "C12": 124000,
-                            "C44": 75000,
-                        },
-                        "plastic_model_name": "Crystal Plasticity",
-                        "plastic_parameters": {
-                            "initial_critical_resolved_shear_stress": 16,
-                            "saturated_slip_resistance": 148,
-                            "hardening_exponent": 2.5,
-                            "reference_hardening_rate": 250,
-                        },
-                        "units": {
-                            "Stress": "MPa",
-                            "Stiffness": "MPa",
-                        },
-                    },
-                }
-            ],
-            "software": "Abaqus CAE",
-            "mechanical_BC": [
-                {
-                    "constraints": ["fixed", "loaded", "free"],
-                    "loading_type": "force",
-                    "loading_mode": "static",
-                    "applied_load": [
-                        {
-                            "magnitude": -20,
-                            "duration": 250,
-                            "R": 0,
-                        }
-                    ],
-                }
-            ],
-            "global_temperature": 300,
-            "discretization_count": 12000,
-            "RVE_size": [4, 4, 4],
-            "RVE_continuity": True,
-            "units": {
-                "Force": "N",
-                "Stress": "MPa",
-                "Strain": 1,
-                "Temperature": "Kelvin",
-            },
-            "stress": {
-                "stress_11": [0, -12, -20],
-            },
-            "total_strain": {
-                "strain_11": [0, 0.01, 0.02],
-            },
-            "plastic_strain": {
-                "plastic_strain_11": [0, 0.001, 0.003],
-            },
-        }
-
-    def test_charts_include_only_accessible_data_objects(self):
-        """
-        Charts exclude private data owned by another user
-        """
-        own_obj = JSONData.objects.create(
-            owner=self.viewer,
-            data={
-                "identifier": "own-object",
-                "phase": [
-                    {
-                        "phase_identifier": "Nickel",
-                        "constitutive_model": {
-                            "plastic_model_name": "Crystal Plasticity",
-                        },
-                    }
-                ],
-                "software": "DAMASK",
-                "mechanical_BC": [
-                    {
-                        "constraints": ["fixed", "loaded", "fixed"],
-                        "loading_type": "force",
-                        "loading_mode": "static",
-                    }
-                ],
-                "global_temperature": 298,
-                "discretization_count": 1000,
-                "RVE_continuity": True,
-            },
-            access_type="c",
-        )
-        public_obj = JSONData.objects.create(
-            owner=self.owner,
-            data={
-                "identifier": "public-object",
-                "phase": [
-                    {
-                        "phase_identifier": "Copper",
-                        "constitutive_model": {
-                            "plastic_model_name": "J2 Plasticity",
-                        },
-                    }
-                ],
-                "software": "Abaqus",
-                "mechanical_BC": [
-                    {
-                        "constraints": ["loaded", "loaded", "fixed"],
-                        "loading_type": "displacement",
-                        "loading_mode": "static",
-                    }
-                ],
-                "global_temperature": 300,
-                "discretization_count": 2000,
-                "RVE_continuity": False,
-            },
-            access_type="all",
-        )
-        shared_obj = JSONData.objects.create(
-            owner=self.owner,
-            data={
-                "identifier": "shared-object",
-                "phase": [
-                    {
-                        "phase_identifier": "Steel",
-                        "constitutive_model": {
-                            "plastic_model_name": "Crystal Plasticity",
-                        },
-                    }
-                ],
-                "software": "MOOSE",
-                "mechanical_BC": [
-                    {
-                        "constraints": ["loaded", "free", "fixed"],
-                        "loading_type": "force",
-                        "loading_mode": "cyclic",
-                    }
-                ],
-                "global_temperature": 310,
-                "discretization_count": 3000,
-                "RVE_continuity": True,
-            },
-            access_type="c",
-        )
-        JSONData.objects.create(
-            owner=self.owner,
-            data={
-                "identifier": "hidden-object",
-                "phase": [
-                    {
-                        "phase_identifier": "Hidden",
-                        "constitutive_model": {
-                            "plastic_model_name": "Hidden Model",
-                        },
-                    }
-                ],
-                "software": "HiddenSoft",
-                "mechanical_BC": [
-                    {
-                        "constraints": ["hidden"],
-                        "loading_type": "hidden-load",
-                        "loading_mode": "hidden-mode",
-                    }
-                ],
-            },
-            access_type="c",
-        )
-        shared_obj.shared_users.add(self.viewer)
-
-        self.client.login(username="viewer", password="password")
-
-        response = self.client.get(reverse("charts"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["total_objects"], 3)
-        self.assertEqual(response.context["phase_count"], 3)
-        self.assertEqual(response.context["mechanical_bc_count"], 3)
-
-        software_labels = json.loads(response.context["software_labels_json"])
-        phase_labels = json.loads(response.context["phase_labels_json"])
-        loading_type_labels = json.loads(response.context["loading_type_labels_json"])
-        loading_mode_labels = json.loads(response.context["loading_mode_labels_json"])
-        model_labels = json.loads(response.context["model_labels_json"])
-        constraint_labels = json.loads(response.context["constraint_labels_json"])
-
-        self.assertIn(own_obj.data["software"], software_labels)
-        self.assertIn(public_obj.data["software"], software_labels)
-        self.assertIn(shared_obj.data["software"], software_labels)
-        self.assertNotIn("HiddenSoft", software_labels)
-        self.assertNotIn("Hidden", phase_labels)
-        self.assertIn("force", loading_type_labels)
-        self.assertIn("displacement", loading_type_labels)
-        self.assertIn("static", loading_mode_labels)
-        self.assertIn("cyclic", loading_mode_labels)
-        self.assertIn("Crystal Plasticity", model_labels)
-        self.assertNotIn("Hidden Model", model_labels)
-        self.assertNotIn("hidden-load", loading_type_labels)
-        self.assertNotIn("Hidden", constraint_labels)
-
-    def test_charts_build_domain_analysis_rows(self):
-        """
-        Charts build useful simulation analysis rows
-        """
-        JSONData.objects.create(
-            owner=self.viewer,
-            data=self._build_analysis_object_data("curve-a"),
-            access_type="c",
-        )
-        JSONData.objects.create(
-            owner=self.viewer,
-            data=self._build_analysis_object_data("curve-b"),
-            access_type="c",
-        )
-        JSONData.objects.create(
-            owner=self.viewer,
-            data={
-                "identifier": "metadata-gap",
-                "phase": "Copper",
-            },
-            access_type="c",
-        )
-
-        self.client.login(username="viewer", password="password")
-
-        response = self.client.get(reverse("charts"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["total_objects"], 3)
-        self.assertEqual(response.context["comparable_group_count"], 1)
-        self.assertEqual(response.context["plot_ready_count"], 2)
-        self.assertEqual(response.context["data_gap_count"], 1)
-
-        comparable_group = response.context["comparable_group_rows"][0]
-        self.assertEqual(comparable_group["objects"], 2)
-        self.assertEqual(comparable_group["group_status"], "Comparable")
-        self.assertEqual(comparable_group["ready_label"], "2 / 2")
-        self.assertIn("Abaqus CAE", comparable_group["setup"])
-        self.assertIn("Crystal Plasticity", comparable_group["setup"])
-
-        response_rows = response.context["response_rows"]
-        ready_rows = [row for row in response_rows if row["is_ready"]]
-        self.assertEqual(len(ready_rows), 2)
-        self.assertEqual(ready_rows[0]["points"], "3")
-        self.assertEqual(ready_rows[0]["stress_peak"], "20 MPa")
-
-        material_row = response.context["material_model_rows"][0]
-        self.assertEqual(material_row["phase"], "Copper")
-        self.assertEqual(material_row["objects"], 2)
-        self.assertIn("C11 170,000 MPa", material_row["stiffness"])
-        self.assertIn("CRSS 16 MPa", material_row["strength"])
-
-        x_axis = response.context["constraint_matrix_rows"][0]
-        self.assertEqual(x_axis["axis"], "X")
-        self.assertEqual(x_axis["fixed"], 2)
-
-        quality_rows = response.context["quality_rows"]
-        stress_row = next(
-            row for row in quality_rows if row["label"] == "Stress strain arrays"
-        )
-        self.assertEqual(stress_row["present"], 2)
-        self.assertEqual(stress_row["missing"], 1)
-
-        issue_rows = response.context["quality_issue_rows"]
-        issue_labels = {row["label"] for row in issue_rows}
-        self.assertIn("Software / solver", issue_labels)
-        self.assertIn("metadata-gap", [row["example_label"] for row in issue_rows])
-
-    def test_charts_prefer_phase_name_and_keep_legacy_phase_labels(self):
-        """
-        Use canonical phase names consistently across chart and material summaries
-        """
-        cases = (
-            ({"phase_name": "Canonical Copper"}, "Canonical Copper", False),
-            ({
-                "phase_name": "Canonical Nickel",
-                "phase_identifier": "Historical Nickel",
-                "name": "Generic Nickel",
-            }, "Canonical Nickel", False),
-            ({"phase_name": "Canonical Iron", "name": "Generic Iron"}, "Canonical Iron", True),
-            ({"phase_identifier": "Legacy Copper"}, "Legacy Copper", False),
-            ({"name": "Legacy Silver"}, "Legacy Silver", True),
-            ({"phase_name": "", "phase_identifier": "Legacy Tin"}, "Legacy Tin", False),
-            ({"phase_name": "  \t", "phase_identifier": "Legacy Lead"}, "Legacy Lead", False),
-        )
-        objects = []
-        for index, (phase_fields, expected, use_dict) in enumerate(cases):
-            data = self._build_analysis_object_data(f"phase-name-chart-{index}")
-            phase = {**phase_fields, "constitutive_model": data["phase"][0]["constitutive_model"]}
-            data["phase"] = phase if use_dict else [phase]
-            obj = JSONData.objects.create(owner=self.viewer, data=data)
-            objects.append((obj, json.dumps(data)))
         self.client.force_login(self.viewer)
 
-        response = self.client.get(reverse("charts"))
+    def create_object(self, identifier="example", owner=None, access="c", **changes):
+        """
+        Store a small fixture with independently known statistical values
 
+        Parameters
+        ----------
+        identifier : str
+            Supplied object identifier.
+        owner : User, optional
+            Record owner, defaulting to the viewer.
+        access : str
+            Stored access type.
+        **changes : object
+            Top-level metadata replacements.
+
+        Returns
+        -------
+        JSONData
+            Newly stored fixture.
+        """
+        data = {
+            "identifier": identifier,
+            "title": "Copper simulation",
+            "software": "Abaqus CAE",
+            "phase": [{
+                "phase_name": "Copper",
+                "constitutive_model": {
+                    "elastic_model_name": "Anisotropic Elasticity",
+                    "plastic_model_name": "Crystal Plasticity",
+                },
+                "orientation": {"grain_count": 343, "texture_type": "Goss"},
+            }],
+            "global_temperature": 298,
+            "discretization_count": 2744,
+            "mechanical_BC": [{"loading_type": "force", "loading_mode": "static"}],
+            "units": {"Stress": "MPa", "Strain": 1, "Temperature": "K"},
+            "stress": {"stress_33": [0, -100, -150]},
+            "total_strain": {"strain_33": [0, -0.01, -0.02]},
+            "plastic_strain": {"plastic_strain_33": [0, -0.005, -0.01]},
+        }
+        data.update(changes)
+        return JSONData.objects.create(owner=owner or self.viewer, data=data, access_type=access)
+
+    def dashboard(self, **query):
+        """
+        Request the real route and require the new statistics contract
+
+        Parameters
+        ----------
+        **query : str
+            GET filters for the page.
+
+        Returns
+        -------
+        HttpResponse
+            Rendered dashboard response.
+        """
+        response = self.client.get(reverse("charts"), query)
         self.assertEqual(response.status_code, 200)
-        expected_labels = {expected for _phase, expected, _use_dict in cases}
-        self.assertEqual(set(json.loads(response.context["phase_labels_json"])), expected_labels)
-        self.assertEqual(
-            {row["phase"] for row in response.context["material_model_rows"]},
-            expected_labels,
-        )
-        self.assertEqual(response.context["phase_count"], len(expected_labels))
-        for obj, original in objects:
-            obj.refresh_from_db()
-            self.assertEqual(json.dumps(obj.data), original)
+        self.assertIn("distributions", response.context)
+        return response
+
+    def test_all_scopes_and_drillthrough_exclude_inaccessible_records(self):
+        """
+        Private records cannot leak through any scope or category selection
+        """
+        own = self.create_object("own", software="Own solver")
+        public = self.create_object("public", owner=self.other, access="all", software="Public solver")
+        shared = self.create_object("shared", owner=self.other, software="Shared solver")
+        shared.shared_users.add(self.viewer, self.other)
+        self.create_object("hidden", owner=self.other, software="Secret solver")
+        expected = {"all": {own.pk, public.pk, shared.pk}, "mine": {own.pk},
+                    "public": {public.pk}, "shared": {shared.pk}}
+        for scope, ids in expected.items():
+            with self.subTest(scope=scope):
+                response = self.dashboard(scope=scope)
+                self.assertEqual(response.context["total_objects"], len(ids))
+                self.assertEqual({row["id"] for row in response.context["objects_page"]}, ids)
+                self.assertNotContains(response, "Secret solver")
+                for row in response.context["categories"]["software"]["rows"]:
+                    selected = self.client.get(row["url"])
+                    self.assertEqual(selected.context["total_objects"], row["count"])
+                    self.assertTrue({item["id"] for item in selected.context["objects_page"]} <= ids)
+        self.assertEqual(self.dashboard(software="Secret solver").context["total_objects"], 0)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("charts")).status_code, 302)
+
+    def test_multiple_phases_and_descriptions_count_each_object_once(self):
+        """
+        Repeated labels never inflate category counts or distinct phase totals
+        """
+        obj = self.create_object(software=[" Abaqus CAE ", "abaqus cae", "DAMASK"])
+        phase = obj.data["phase"][0]
+        obj.data["phase"] = [phase, copy.deepcopy(phase), {"phase_name": "Nickel"}]
+        obj.save()
+        self.create_object("two", software="ABAQUS CAE")
+        response = self.dashboard()
+        phases = {row["label"]: row["count"] for row in response.context["categories"]["phase"]["rows"]}
+        software = {row["label"].casefold(): row["count"] for row in response.context["categories"]["software"]["rows"]}
+        self.assertEqual(phases, {"Copper": 2, "Nickel": 1})
+        self.assertEqual(software, {"abaqus cae": 2, "damask": 1})
+        self.assertEqual(response.context["phase_count"], 2)
+
+    def test_category_filters_match_exact_names_on_the_same_object(self):
+        """
+        Combined conditions cannot match fragments or different records
+        """
+        wanted = self.create_object("wanted")
+        self.create_object("other-software", software="DAMASK")
+        self.create_object("other-phase", phase=[{"phase_name": "Copper oxide"}])
+        response = self.dashboard(phase=" copper ", software="ABAQUS CAE")
+        self.assertEqual([row["id"] for row in response.context["objects_page"]], [wanted.pk])
+        self.assertEqual(self.dashboard(phase="Copper", software="aba").context["total_objects"], 0)
+        for chip in response.context["active_filters"]:
+            query = parse_qs(urlsplit(chip["url"]).query)
+            self.assertEqual(len(set(query) & {"phase", "software"}), 1)
+
+    def test_schema_spellings_wrappers_and_original_values_are_preserved(self):
+        """
+        Charts use the same recognized metadata as upload and detail
+        """
+        obj = self.create_object()
+        raw = copy.deepcopy(obj.data)
+        raw["Phase"] = raw.pop("phase")
+        raw["Software used"] = raw.pop("software")
+        raw["Global Temperature"] = [["298"]]
+        del raw["global_temperature"]
+        raw["Stress"] = {"Stress 33": ["0", "-100", "-150"]}
+        del raw["stress"]
+        raw["Total Strain"] = {"Strain 33": ["0", "-0.01", "-0.02"]}
+        del raw["total_strain"]
+        obj.data = raw
+        obj.save()
+        response = self.dashboard()
+        self.assertEqual(response.context["paired_count"], 1)
+        self.assertEqual(response.context["distributions"][0]["median"], "298")
+        self.assertEqual(response.context["categories"]["software"]["rows"][0]["count"], 1)
+        obj.refresh_from_db()
+        self.assertEqual(obj.data, raw)
+
+    def test_phase_names_prefer_current_names_and_retain_legacy_fallbacks(self):
+        """
+        Identifiers are not guessed to be material names
+        """
+        self.create_object(phase=[{"phase_name": "Copper", "phase_identifier": "Old copper"},
+                                  {"phase_identifier": "Legacy nickel"}, {"phase_id": 42}])
+        response = self.dashboard()
+        self.assertEqual({row["label"] for row in response.context["categories"]["phase"]["rows"]},
+                         {"Copper", "Legacy nickel"})
+
+    def test_temperatures_convert_explicit_units_before_aggregation(self):
+        """
+        Physically identical temperatures share the same value and bin
+        """
+        self.create_object("kelvin")
+        self.create_object("celsius", global_temperature=24.85, units={"Temperature": "Celsius"})
+        self.create_object("fahrenheit", global_temperature=76.73, units={"Temperature": "Fahrenheit"})
+        response = self.dashboard()
+        temperature = response.context["distributions"][0]
+        self.assertEqual((temperature["minimum"], temperature["maximum"], temperature["median"]),
+                         ("298", "298", "298"))
+        self.assertEqual(temperature["observation_count"], 3)
+        self.assertEqual(len(temperature["bins"]), 1)
+        selected = self.client.get(temperature["bins"][0]["url"])
+        self.assertEqual(selected.context["total_objects"], 3)
+
+    def test_invalid_temperatures_and_count_values_are_excluded_not_zero(self):
+        """
+        Missing units, impossible temperatures and booleans cannot become observations
+        """
+        for index, (value, unit) in enumerate([(298, None), (298, "unknown"), (-1, "K"),
+                                               (True, "K"), ("bad", "K"), (None, "K")]):
+            self.create_object(str(index), global_temperature=value,
+                               units={"Temperature": unit}, discretization_count=True,
+                               phase=[{"phase_name": "Copper", "orientation": {"grain_count": False}}])
+        response = self.dashboard()
+        for distribution in response.context["distributions"]:
+            self.assertEqual(distribution["observation_count"], 0)
+            self.assertEqual(distribution["bins"], [])
+            self.assertEqual(distribution["excluded_objects"], 6)
+
+    def test_grains_are_phase_observations_and_bins_link_to_distinct_objects(self):
+        """
+        Phase counts stay separate from the number of linked objects
+        """
+        obj = self.create_object(phase=[
+            {"phase_name": "Copper", "orientation": {"grain_count": 10}},
+            {"phase_name": "Nickel", "orientation": {"grain_count": 10}},
+            {"phase_name": "Iron", "orientation": {"grain_number": "30"}},
+        ])
+        response = self.dashboard()
+        grains = response.context["distributions"][1]
+        self.assertEqual(grains["observation_count"], 3)
+        self.assertEqual(grains["object_count"], 1)
+        self.assertEqual(grains["median"], "10")
+        self.assertEqual(grains["bins"][0]["count"], 2)
+        self.assertEqual(grains["bins"][0]["object_count"], 1)
+        selected = self.client.get(grains["bins"][0]["url"])
+        self.assertEqual([row["id"] for row in selected.context["objects_page"]], [obj.pk])
+
+    def test_histogram_boundaries_do_not_drop_or_double_count_values(self):
+        """
+        Every observation belongs to exactly one displayed numeric bin
+        """
+        for index in range(21):
+            self.create_object(str(index), global_temperature=index * 10)
+        response = self.dashboard()
+        bins = response.context["distributions"][0]["bins"]
+        self.assertLessEqual(len(bins), 8)
+        self.assertEqual(sum(item["count"] for item in bins), 21)
+        seen = set()
+        for item in bins:
+            selected = self.client.get(item["url"])
+            ids = {row["id"] for row in selected.context["objects_page"]}
+            self.assertEqual(selected.context["total_objects"], item["count"])
+            self.assertFalse(seen & ids)
+            seen.update(ids)
+        self.assertEqual(len(seen), 21)
+
+    def test_invalid_filters_never_broaden_the_selection(self):
+        """
+        Malformed scope, result and numeric filters return errors and no records
+        """
+        self.create_object()
+        cases = [{"scope": "everyone"}, {"result": "secret"}, {"note": "unknown"},
+                 {"measure": "temperature", "lo": "NaN", "hi": "400"},
+                 {"measure": "temperature", "lo": "400", "hi": "100"},
+                 {"lo": "10"}, {"measure": "unknown", "lo": "1", "hi": "2"},
+                 {"measure": "temperature", "lo": "1", "hi": "2", "inclusive": "maybe"},
+                 {"range": ""}, {"range": "bad"}, {"range": "temperature:1:2:maybe"},
+                 {"scope": ["mine", "all"]}]
+        for query in cases:
+            with self.subTest(query=query):
+                response = self.dashboard(**query)
+                self.assertTrue(response.context["filter_errors"])
+                self.assertEqual(response.context["total_objects"], 0)
+
+    def test_removing_a_valid_range_preserves_other_invalid_conditions(self):
+        """
+        A removal link deletes its own interval even after a malformed parameter
+        """
+        self.create_object()
+        response = self.dashboard(range=["bad", "temperature:298:298:1", "grain_count:343:343:1"])
+        for index, chip in enumerate(response.context["active_filters"]):
+            query = parse_qs(urlsplit(chip["url"]).query)
+            self.assertEqual(query["range"][0], "bad")
+            self.assertNotIn(("temperature:298:298:1", "grain_count:343:343:1")[index], query["range"])
+            selected = self.client.get(chip["url"])
+            self.assertTrue(selected.context["filter_errors"])
+            self.assertEqual(selected.context["total_objects"], 0)
+
+    def test_successive_chart_selections_refine_the_same_objects(self):
+        """
+        Co-occurring labels and phase counts retain all earlier conditions
+        """
+        wanted = self.create_object("wanted", phase=[
+            {"phase_name": "Copper", "orientation": {"grain_count": 10}},
+            {"phase_name": "Nickel", "orientation": {"grain_count": 30}},
+        ])
+        self.create_object("other", global_temperature=500,
+                           phase=[{"phase_name": "Nickel", "orientation": {"grain_count": 30}}])
+        response = self.dashboard(phase="Copper")
+        nickel = next(row for row in response.context["categories"]["phase"]["rows"] if row["label"] == "Nickel")
+        selected = self.client.get(nickel["url"])
+        self.assertEqual(selected.context["total_objects"], nickel["count"])
+        self.assertEqual(len(selected.context["active_filters"]), 2)
+        for chip in selected.context["active_filters"]:
+            self.assertEqual(len(parse_qs(urlsplit(chip["url"]).query)["phase"]), 1)
+        response = self.dashboard(measure="temperature", lo="298", hi="298")
+        for value in ("10", "30"):
+            grains = response.context["distributions"][1]
+            bucket = next(item for item in grains["bins"] if item["low"] == value)
+            response = self.client.get(bucket["url"])
+            self.assertEqual(response.context["total_objects"], bucket["object_count"])
+            self.assertEqual([row["id"] for row in response.context["objects_page"]], [wanted.pk])
+        self.assertEqual(len(response.context["active_filters"]), 3)
+
+    def test_result_and_note_selections_keep_previous_conditions(self):
+        """
+        Selecting another availability flag never adds records outside the selection
+        """
+        self.create_object("both", stress={"stress_33": [0]}, units={})
+        self.create_object("strain-only", stress={}, units={})
+        self.create_object("lengths-only", stress={"stress_33": [0]})
+        response = self.dashboard(result="stress", note="result_units")
+        for key, rows in (("total_strain", response.context["result_rows"]),
+                          ("unequal_lengths", response.context["note_rows"])):
+            row = next(item for item in rows if item["key"] == key)
+            selected = self.client.get(row["url"])
+            self.assertEqual(selected.context["total_objects"], row["count"])
+            self.assertEqual(selected.context["total_objects"], 1)
+
+    def test_fahrenheit_bins_preserve_high_precision_extrema(self):
+        """
+        Repeating decimal conversions cannot fall outside rounded bin boundaries
+        """
+        for value in range(1, 10):
+            self.create_object(str(value), global_temperature=value, units={"Temperature": "F"})
+        response = self.dashboard()
+        distribution = response.context["distributions"][0]
+        self.assertEqual(sum(item["count"] for item in distribution["bins"]), 9)
+        for bucket in distribution["bins"]:
+            selected = self.client.get(bucket["url"])
+            self.assertEqual(selected.context["total_objects"], bucket["count"])
+
+    def test_close_temperatures_keep_distinct_visible_bounds(self):
+        """
+        Formatting cannot collapse different intervals into identical labels
+        """
+        for index in range(9):
+            self.create_object(str(index), global_temperature=298 + index / 100000)
+        distribution = self.dashboard().context["distributions"][0]
+        self.assertNotEqual(distribution["minimum"], distribution["maximum"])
+        self.assertEqual(len({item["label"] for item in distribution["bins"]}), 8)
+
+    def test_grain_aliases_unwrap_scalars_and_reject_every_conflicting_spelling(self):
+        """
+        Grain number aliases follow scalar wrapper and conflict rules
+        """
+        for index, orientation in enumerate([
+            {"grain_number": [["10"]]}, {"grain_number": 10, "Grain Number": 30},
+            {"grain_count": 10, "Grain Number": "10"},
+            {"grain_count": 10, "Grain Number": 30},
+        ]):
+            self.create_object(str(index), phase=[{"phase_name": "Copper", "orientation": orientation}])
+        response = self.dashboard()
+        grains = response.context["distributions"][1]
+        self.assertEqual(grains["observation_count"], 2)
+        self.assertEqual(grains["minimum"], "10")
+        self.assertEqual(grains["maximum"], "10")
+        notes = {row["key"]: row["count"] for row in response.context["note_rows"]}
+        self.assertEqual(notes["grain_conflicts"], 2)
+
+    def test_non_11_and_equivalent_only_results_are_counted(self):
+        """
+        Mechanical availability recognizes components and supplied equivalent arrays
+        """
+        self.create_object("component-33")
+        self.create_object("equivalents", stress={"equivalent_stress": [0, 100]},
+                           total_strain={"equivalent_strain": [0, 0.1]}, plastic_strain={})
+        response = self.dashboard()
+        counts = {row["key"]: row["count"] for row in response.context["result_rows"]}
+        self.assertEqual(response.context["paired_count"], 2)
+        self.assertEqual(counts["stress"], 2)
+        self.assertEqual(counts["plastic_strain"], 1)
+        self.assertEqual(counts["supplied_equivalent"], 1)
+        self.assertEqual(counts["calculated_equivalent"], 0)
+
+    def test_calculated_equivalents_respect_explicit_empty_fields(self):
+        """
+        Derivation is possible only for absent fields with all required components
+        """
+        stress = {f"stress_{key}": [0, 1] for key in ("11", "22", "33", "12", "13", "23")}
+        self.create_object("derived", stress=stress)
+        self.create_object("explicit-empty", stress={**stress, "equivalent_stress": []})
+        response = self.dashboard(result="calculated_equivalent")
+        self.assertEqual(response.context["total_objects"], 1)
+        self.assertEqual(response.context["objects_page"][0]["identifier"], "derived")
+
+    def test_length_and_unit_notes_do_not_label_objects_invalid(self):
+        """
+        Different curve lengths remain inspectable with precise availability notes
+        """
+        obj = self.create_object(stress={"stress_33": [0, 1], "stress_23": [0]}, units={})
+        response = self.dashboard()
+        counts = {row["key"]: row["count"] for row in response.context["note_rows"]}
+        self.assertEqual(counts["unequal_lengths"], 1)
+        self.assertEqual(counts["result_units"], 1)
+        self.assertEqual(response.context["paired_count"], 1)
+        notes = [row for row in response.context["note_rows"] if row["key"] == "unequal_lengths"]
+        selected = self.client.get(notes[0]["url"])
+        self.assertEqual(selected.context["objects_page"][0]["id"], obj.pk)
+        self.assertNotContains(response, "Comparable")
+
+    def test_boolean_or_malformed_arrays_do_not_count_as_results(self):
+        """
+        Only finite numeric mechanical arrays contribute to availability
+        """
+        self.create_object(stress={"stress_11": [False, True], "stress_22": ["NaN", 1]},
+                           total_strain={"strain_11": [0, None]}, plastic_strain={})
+        response = self.dashboard()
+        self.assertEqual(response.context["paired_count"], 0)
+        counts = {row["key"]: row["count"] for row in response.context["result_rows"]}
+        self.assertEqual(counts["stress"], 0)
+        self.assertEqual(counts["total_strain"], 0)
+
+    def test_conflicting_functional_aliases_do_not_select_a_value(self):
+        """
+        Legacy conflicts remain accessible but do not drive statistics
+        """
+        self.create_object(**{"Global Temperature": 500})
+        response = self.dashboard()
+        self.assertEqual(response.context["total_objects"], 1)
+        self.assertEqual(response.context["distributions"][0]["observation_count"], 0)
+        notes = {row["key"]: row["count"] for row in response.context["note_rows"]}
+        self.assertEqual(notes["conflicting_metadata"], 1)
+
+    def test_long_and_hostile_labels_are_escaped_and_all_categories_remain_available(self):
+        """
+        Uploaded labels cannot inject HTML and category limits never discard counts
+        """
+        hostile = '<img src=x onerror="alert(1)">'
+        for index in range(12):
+            self.create_object(str(index), software=hostile if index == 0 else f"Software {index}")
+        response = self.dashboard()
+        self.assertEqual(len(response.context["categories"]["software"]["rows"]), 12)
+        self.assertNotContains(response, hostile)
+        self.assertContains(response, "&lt;img")
+        self.assertEqual(response.context["total_objects"], 12)
+
+    def test_pagination_keeps_filters_and_all_matching_objects(self):
+        """
+        Every selected record remains reachable without changing its statistical scope
+        """
+        for index in range(25):
+            self.create_object(str(index))
+        response = self.dashboard(phase="Copper", scope="mine")
+        page = response.context["objects_page"]
+        self.assertEqual(page.paginator.count, 25)
+        self.assertLess(len(page), 25)
+        next_url = response.context["next_url"]
+        query = parse_qs(urlsplit(next_url).query)
+        self.assertEqual(query["phase"], ["Copper"])
+        self.assertEqual(query["scope"], ["mine"])
+        second = self.client.get(next_url)
+        self.assertFalse({row["id"] for row in page} & {row["id"] for row in second.context["objects_page"]})
+        self.assertEqual(second.context["total_objects"], 25)
+
+    def test_empty_scope_keeps_controls_without_nan_or_phantom_categories(self):
+        """
+        Empty data remains a useful starting point with no fabricated percentages
+        """
+        response = self.dashboard()
+        self.assertEqual(response.context["total_objects"], 0)
+        self.assertEqual(response.context["phase_count"], 0)
+        self.assertContains(response, 'name="scope"')
+        self.assertNotContains(response, "NaN")
+        self.assertNotContains(response, "0 / 0")
+        self.assertTrue(all(not group["rows"] for group in response.context["categories"].values()))
