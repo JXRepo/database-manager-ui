@@ -5,7 +5,7 @@
 
 {% block content %}
 {{ plot_variables|json_script:"plot-variables-data" }}
-{{ data_object.data.units|json_script:"plot-units-data" }}
+{{ metadata.units|json_script:"plot-units-data" }}
 {{ mechanical_bc_items|json_script:"mechanical-bc-data" }}
 <style>
 
@@ -1295,15 +1295,15 @@ details[open] > .detail-group-summary {
 
     <div class="card detail-page-card">
       <div class="card-header">
-        {% if data_object.data.title %}
-          <h5>{{ data_object.data.title }}</h5>
-        {% elif data_object.data.identifier %}
-          <h5>{{ data_object.data.identifier }}</h5>
+        {% if metadata.title %}
+          <h5>{{ metadata.title }}</h5>
+        {% elif metadata.identifier %}
+          <h5>{{ metadata.identifier }}</h5>
         {% else %}
           <h5>Data Detail</h5>
         {% endif %}
-        {% if data_object.data.identifier %}
-          <div class="text-muted small mt-1">Identifier: {{ data_object.data.identifier }}</div>
+        {% if metadata.identifier %}
+          <div class="text-muted small mt-1">Identifier: {{ metadata.identifier }}</div>
         {% endif %}
       </div>
 

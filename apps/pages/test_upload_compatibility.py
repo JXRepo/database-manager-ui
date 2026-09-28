@@ -1,0 +1,206 @@
+import json
+from copy import deepcopy
+
+from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
+from django.urls import reverse
+
+from .models import DataNotification, JSONData
+from .upload_services import PreparedJSONData, UploadIdentifierConflict, canonical_json_size, save_prepared_json_data
+from .upload_test_data import valid_upload_object, variant_field_names
+
+
+class UploadCompatibilityTests(TestCase):
+    """
+    Exercise relaxed uploads through storage, access, search and export
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        """
+        Create isolated uploaders and viewers
+        """
+        cls.owner = User.objects.create_user(username="compat-owner")
+        cls.viewer = User.objects.create_user(username="compat-viewer")
+
+    def setUp(self):
+        """
+        Authenticate the local test uploader
+        """
+        self.client.force_login(self.owner)
+
+    def upload(self, payload):
+        """
+        Submit one JSON file through the ordinary upload endpoint
+
+        Parameters
+        ----------
+        payload : object
+            Parsed content for the test file.
+
+        Returns
+        -------
+        HttpResponse
+            Upload result page.
+        """
+        file = SimpleUploadedFile("compat.json", json.dumps(payload).encode(), "application/json")
+        return self.client.post(reverse("upload_json"), {"file": file}, follow=True)
+
+    def test_relaxed_upload_supports_details_search_and_unchanged_json_export(self):
+        """
+        Use the recognized values across the platform and preserve original JSON
+        """
+        data = valid_upload_object(identifier="compatible-1", shared_with=[" ALL "])
+        data["mechanical_BC"][0]["constraints"] = ["loaded", "free", "free"]
+        data["mechanical_BC"][0]["loading_type"] = "force"
+        data["mechanical_BC"][0]["applied_load"] = [{"magnitude": " 1.5\n"}]
+        data["stress"]["equivalent_stress"] = ["0", "1.5"]
+        data = variant_field_names(data)
+        self.upload({"collection": {"record": data}})
+        self.assertEqual(JSONData.objects.count(), 1)
+        obj = JSONData.objects.get()
+        self.assertEqual(obj.data, data)
+        self.assertEqual(obj.size_bytes, canonical_json_size(data))
+        self.assertEqual(obj.access_type, "all")
+        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        self.assertContains(response, data["TITLE"])
+        curves = response.context["plot_variables"]
+        curve = next(item for item in curves if item["key"] == "stress.equivalent_stress")
+        self.assertEqual(curve["values"], [0, 1.5])
+        self.assertEqual(curve["unit"], "MPa")
+        self.assertTrue(response.context["mechanical_bc_items"])
+        response = self.client.get(reverse("mechanical_csv_export", args=[obj.pk]))
+        self.assertEqual(response.status_code, 200)
+        content = b"".join(response.streaming_content).decode()
+        self.assertIn("1.5", content)
+        response = self.client.get(reverse("json_data_list"), {"software": "Solver", "phase": "Copper"})
+        self.assertEqual(response.context["result_count"], 1)
+        response = self.client.get(reverse("search"), {"identifier": "compatible-1"})
+        self.assertContains(response, data["TITLE"])
+        response = self.client.get(reverse("json_data_export", args=[obj.pk]))
+        self.assertEqual(json.loads(response.content), data)
+        self.client.force_login(self.viewer)
+        self.assertEqual(self.client.get(reverse("json_data_detail", args=[obj.pk])).status_code, 200)
+
+    def test_identifier_aliases_do_not_bypass_existing_or_batch_duplicates(self):
+        """
+        Treat formatted identifier field names as the same lookup key
+        """
+        first = variant_field_names(valid_upload_object(identifier="repeat-id"))
+        self.upload(first)
+        self.assertEqual(JSONData.objects.count(), 1)
+        response = self.upload(valid_upload_object(identifier="repeat-id"))
+        self.assertContains(response, "already exists")
+        self.assertEqual(JSONData.objects.count(), 1)
+        batch = [valid_upload_object(identifier="batch-id"),
+                 variant_field_names(valid_upload_object(identifier="batch-id"))]
+        response = self.upload(batch)
+        self.assertContains(response, "more than once")
+        self.assertEqual(JSONData.objects.count(), 1)
+
+    def test_preset_search_uses_the_same_separator_matching_as_upload(self):
+        """
+        Find accepted dotted field spellings through scientific preset filters
+        """
+        data = valid_upload_object(identifier="dotted-fields")
+        boundary = data.pop("mechanical_BC")[0]
+        boundary["Loading.Type"] = "force"
+        data["Mechanical.BC"] = [boundary]
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        response = self.client.get(reverse("search"), {
+            "condition_field": "loading_type", "condition_operator": "words", "condition_value": "force",
+        })
+        self.assertEqual(response.context["result_count"], 1)
+
+    def test_one_conflicting_record_rejects_the_entire_file(self):
+        """
+        Keep file atomicity when normalized aliases disagree
+        """
+        first = valid_upload_object(identifier="first")
+        second = valid_upload_object(identifier="second")
+        second["Date"] = "1900-01-01"
+        response = self.upload([first, second])
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertContains(response, "Conflicting fields")
+
+    def test_invalid_unicode_in_a_conflicting_alias_still_returns_feedback(self):
+        """
+        Keep malformed field text from breaking the rendered error report
+        """
+        data = valid_upload_object(identifier="bad-alias")
+        data["da\ud800te"] = "1900-01-01"
+        response = self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertContains(response, "invalid Unicode")
+        self.assertContains(response, "Conflicting fields")
+
+    def test_public_word_inside_other_text_never_grants_access(self):
+        """
+        Reject ambiguous sharing and retain explicit private user permissions
+        """
+        for index, sharing in enumerate((["small"], ["not all"], [{"note": "all"}],
+                                         [{"username": "all"}], [{"all": False}])):
+            with self.subTest(sharing=sharing):
+                self.upload(valid_upload_object(identifier=f"unsafe-{index}", shared_with=sharing))
+                self.assertEqual(JSONData.objects.count(), 0)
+        data = variant_field_names(valid_upload_object(
+            identifier="private-share", shared_with=[{"username": self.viewer.username}],
+        ))
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        obj = JSONData.objects.get()
+        self.assertEqual(obj.access_type, "c")
+        self.assertEqual(list(obj.shared_users.all()), [self.viewer])
+        self.assertEqual(DataNotification.objects.get().display_title, "private-share")
+
+    def test_a_user_named_all_remains_an_explicit_private_share(self):
+        """
+        Keep usernames separate from permission tokens even when their text matches
+        """
+        recipient = User.objects.create_user(username="all")
+        self.upload(valid_upload_object(identifier="share-with-all-user", shared_with=[{"username": "all"}]))
+        obj = JSONData.objects.get()
+        self.assertEqual(obj.access_type, "c")
+        self.assertEqual(list(obj.shared_users.all()), [recipient])
+        self.client.force_login(self.viewer)
+        self.assertEqual(self.client.get(reverse("json_data_detail", args=[obj.pk])).status_code, 404)
+
+    def test_nested_permission_alias_conflicts_reject_all_neighbors(self):
+        """
+        Reject contradictory public and private aliases before any file is saved
+        """
+        ambiguous = valid_upload_object(identifier="ambiguous", shared_with=[{
+            "access_type": "c", "Access-Type": "all",
+        }])
+        response = self.upload([valid_upload_object(identifier="good"), ambiguous])
+        self.assertEqual(JSONData.objects.count(), 0)
+        self.assertContains(response, "Conflicting fields")
+
+    def test_final_save_rechecks_formatted_identifiers(self):
+        """
+        Prevent a late duplicate from bypassing the transactional check
+        """
+        data = variant_field_names(valid_upload_object(identifier="late-conflict"))
+        candidate = PreparedJSONData(data=data, access_type="c", shared_users=(), size_bytes=canonical_json_size(data))
+        JSONData.objects.create(owner=self.owner, data=valid_upload_object(identifier="late-conflict"))
+        with self.assertRaises(UploadIdentifierConflict):
+            save_prepared_json_data(self.owner, [candidate])
+        self.assertEqual(JSONData.objects.count(), 1)
+
+    def test_auto_identifier_handles_aliases_without_changing_other_values(self):
+        """
+        Generate an identifier from recognized required content and retain raw data
+        """
+        original = valid_upload_object()
+        data = variant_field_names(original)
+        self.upload(data)
+        self.assertEqual(JSONData.objects.count(), 1)
+        obj = JSONData.objects.get()
+        expected = deepcopy(data)
+        expected["identifier"] = obj.data["identifier"]
+        self.assertEqual(obj.data, expected)
+        response = self.upload(original)
+        self.assertContains(response, "already exists")
+        self.assertEqual(JSONData.objects.count(), 1)

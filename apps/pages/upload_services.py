@@ -12,6 +12,7 @@ from django.db.models import Q, Sum
 from django.utils.http import int_to_base36
 
 from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
+from apps.dyn_api.metadata_compat import field_value, identifier_lookup, metadata_view, set_field_value
 
 from .models import DataNotification, JSONData
 from .notifications import build_shared_data_notification_message
@@ -88,6 +89,7 @@ def data_fingerprint(data: dict) -> str:
         Deterministic 64 character hexadecimal fingerprint.
     """
     content = {}
+    data = metadata_view(data)
     for field in REQUIRED_TOP_LEVEL_FIELDS:
         content[field] = data[field]
     encoded = json.dumps(
@@ -170,16 +172,16 @@ def _resolve_generated_identifier(
     """
     pending = {}
     for prepared in pending_objects:
-        identifier = prepared.data.get("identifier")
+        identifier = field_value(prepared.data, "identifier")
         if prepared.identifier_fingerprint == fingerprint or identifier == fingerprint:
             return identifier
         pending[identifier] = prepared
 
     existing = JSONData.objects.filter(
-        Q(identifier_fingerprint=fingerprint) | Q(data__identifier=fingerprint)
+        Q(identifier_fingerprint=fingerprint) | identifier_query(fingerprint)
     ).values_list("data", flat=True).first()
-    if isinstance(existing, dict) and isinstance(existing.get("identifier"), str):
-        return existing["identifier"]
+    if isinstance(field_value(existing, "identifier"), str):
+        return field_value(existing, "identifier")
 
     candidates = list(_identifier_candidates(fingerprint))
     for identifier, prepared in pending.items():
@@ -188,9 +190,10 @@ def _resolve_generated_identifier(
 
     occupied = set()
     for data in JSONData.objects.filter(
-        data__identifier__in=candidates,
+        Q(identifier_lookup__in=[identifier_lookup(value) for value in candidates])
+        | Q(data__identifier__in=candidates),
     ).values_list("data", flat=True):
-        identifier = data["identifier"]
+        identifier = field_value(data, "identifier")
         if _has_fingerprint(data, fingerprint):
             return identifier
         occupied.add(identifier)
@@ -225,6 +228,27 @@ def generate_data_identifier(
         Identifier to check for a duplicate or prepare for final allocation.
     """
     return _resolve_generated_identifier(data_fingerprint(data), pending_objects)
+
+
+def identifier_query(identifier):
+    """
+    Match an identifier regardless of its original metadata field spelling
+
+    Parameters
+    ----------
+    identifier : str
+        Exact identifier value, without case folding.
+
+    Returns
+    -------
+    Q
+        Indexed lookup with a fallback for older canonical records.
+    """
+    query = Q(data__identifier=identifier)
+    digest = identifier_lookup(identifier)
+    if digest:
+        query |= Q(identifier_lookup=digest)
+    return query
 
 
 def canonical_json_size(value: object) -> int:
@@ -375,19 +399,20 @@ def save_prepared_json_data(
         supplied_objects = [item for item in objects if not item.identifier_fingerprint]
 
         for prepared in objects:
-            original_identifier = str(prepared.data.get("identifier", "")).strip()
+            original_identifier = str(field_value(prepared.data, "identifier", "")).strip()
             identifier = original_identifier
             if prepared.identifier_fingerprint:
                 identifier = _resolve_generated_identifier(
                     prepared.identifier_fingerprint, resolved_objects + supplied_objects,
                 )
-                data = dict(prepared.data, identifier=identifier)
+                data = dict(prepared.data)
+                set_field_value(data, "identifier", identifier)
                 prepared = replace(prepared, data=data, size_bytes=canonical_json_size(data))
 
             if identifier in seen_identifiers:
                 conflicts.append(original_identifier)
             elif JSONData.objects.filter(
-                data__identifier=identifier
+                identifier_query(identifier)
             ).exists():
                 conflicts.append(original_identifier)
 
@@ -431,8 +456,8 @@ def save_prepared_json_data(
                         continue
 
                     title = (
-                        prepared.data.get("identifier")
-                        or prepared.data.get("title")
+                        field_value(prepared.data, "identifier")
+                        or field_value(prepared.data, "title")
                         or "Data object"
                     )
                     DataNotification.objects.create(

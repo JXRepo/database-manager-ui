@@ -1,5 +1,7 @@
 from collections import Counter
 
+from apps.dyn_api.metadata_compat import metadata_view
+
 
 FILTER_FIELDS = (
     ("access", "Access", ()),
@@ -83,7 +85,7 @@ def filter_my_data_objects(data_objects, query):
     total_count = 0
     for obj in data_objects:
         total_count += 1
-        data = obj.data if isinstance(obj.data, dict) else {}
+        data = metadata_view(obj.data)
         access = "public" if obj.access_type == "all" else "private"
         values = {"access": {access: labels["access"][access]}}
         for name, label, name_keys in FILTER_FIELDS[1:]:

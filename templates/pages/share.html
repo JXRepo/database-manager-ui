@@ -208,10 +208,10 @@
                         <tr>
                           <td>
                             <div class="share-title">
-                              {{ event.data_object.data.title|default:event.data_object.data.identifier|default:event.display_title }}
+                              {{ event.display_name }}
                             </div>
                             <div class="share-meta">
-                              {{ event.data_object.data.identifier|default:"No identifier" }}
+                              {{ event.display_identifier|default:"No identifier" }}
                             </div>
                           </td>
                           <td>

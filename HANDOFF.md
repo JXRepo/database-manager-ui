@@ -1,15 +1,59 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-09-27
-code_base: f577399bfd48de167a969e111150884a5d914431
+timestamp: 2026-09-28
+code_base: ae52c95035f17b6ebdc3fe494c026040f92353b7
 files_modified:
-  - upload recognition, required validation, progress, feedback, tests and documentation
+  - metadata compatibility, identifier lookup, upload and display integration, tests and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
+
+**9 月 28 日用户明确要求放宽格式识别，本次提交实现以下兼容规则。**
+下面 9 月 27 日记录是上一轮实现，涉及严格字段拼写的描述以本节为准。
+
+- 已知 Schema 字段在各自父级内忽略大小写和分隔符。例如 `Date`、`DATE`、`date`，
+  `input_path`、`Input Path`、`input-path` 都能识别。记录拆分也使用同一规则。
+- 已知数值位置接受有限数值字符串，包括 magnitude、张量分量和曲线数组。
+  空格、换行、正负号和科学计数法可以识别；文字、带单位的数值、NaN、Infinity 等不会当作载荷数值。
+  Schema 中明确列举的值也兼容大小写和首尾空白。
+- shared_with 支持 `"all"`、`["all"]`、`"c"`、`["c"]`、原有权限对象，
+  以及独立的 `{"all": true}` 标记。仅 username 的对象按私有分享处理。
+  权限按完整值匹配；`not all`、说明里的 all、用户名中的 all 不会把数据公开。
+  同名用户 all 仍可作为私有分享对象。既有权限限制和用户名检查不变。
+- 原始字段名、值和数组顺序仍保存于 JSON，JSON 下载也保留原样；新增的是内部识别视图。
+  搜索摘要、My Data 筛选、详情曲线、边界载荷、CSV、分享通知都使用识别结果。
+  元数据标签仍显示原字段名。已有明确路径的高级搜索仍读取原始路径。
+- 不猜同义词、不挪动不同父级的字段，不把 Material 自动当成 phase，
+  也不把 processor_specification 自动补成 processor_specifications。
+  真正缺失或为空的必填字段仍报错。同一字段的两种拼写若值冲突，整份文件拒绝保存。
+  冲突字段含非法 Unicode 时也能正常返回错误，不会让报错页面本身失败。
+- 主要实现：`apps/dyn_api/metadata_compat.py`、`helpers.py`，以及 upload_unwrap、
+  upload_services、views、详情排序与模板。没有新增依赖，也没有启用完整 Schema 校验。
+- 新增迁移 `0014_jsondata_identifier_lookup`，用内部摘要匹配不同拼写的 identifier 字段。
+  原编号文本和 JSON 不变，编号值仍区分大小写；重复编号及最终事务复查保留。
+  旧记录的标准 identifier 字段有 JSON 查询回退，不需要改写历史 JSON。
+  本机 DEBUG=True 的 SQLite 已应用迁移，其他电脑须按 README 运行 migrate。
+
+验证结果：
+
+- 上传、必填、编号、权限和详情相关后端回归 **297 项通过**；
+  搜索及兼容流程回归 **123 项通过**（与上一组有部分重复）；前端 **114 项通过、0 跳过**。
+- 全量后端 **731 项**仅剩已知的 **11 个旧失败子案例**：一个旧 logout 预期，
+  两个搜索样例方法对本地 cyclic 文件的假定。追加的非法 Unicode 回归包含在最终 297 项通过中，
+  预设搜索对点号等分隔符的匹配回归包含在最终 123 项通过中。
+  本轮未改动登录流程，也未为旧样例测试修改搜索行为。
+- 后台 100 条不同拼写的合成对象全部检查、保存成功，原始 JSON 保持不变。
+  已验证普通上传、CSV、JSON 下载、My Data、搜索、跨用户权限、冲突字段及最终重复编号检查。
+- 只读检查用户原文件：a46fde6c.json 识别 1 条并通过；Data_Base_Cyclic.json 识别 100 条，
+  数字字符串、Date、input-path、results-path 和共享简写问题消失。
+  仍有 system、processor_specifications、phase、units 缺失，以及 total_strain 为空；全部不保存。
+  两份用户文件均未修改、未提交、未上传到外部网站。
+- makemigrations 检查无遗漏，git diff 空白检查通过。Render 部署及线上效果尚未确认。
+
+### 9 月 27 日上一轮实现
 
 **9 月 27 日用户已明确授权“改上传这部分”，本次提交实现下方新规则。**
 此前首页账户菜单、助手范围、图表和详情页、CSV／ZIP 导出继续保留。

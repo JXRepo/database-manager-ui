@@ -1,10 +1,11 @@
 from django.conf import settings
 
 from apps.dyn_api.helpers import REQUIRED_TOP_LEVEL_FIELDS
+from apps.dyn_api.metadata_compat import field_name
 
 
-RECORD_FIELDS = frozenset(REQUIRED_TOP_LEVEL_FIELDS) | {"identifier"}
-SIMULATION_FIELDS = frozenset({"mechanical_BC", "phase", "stress", "total_strain", "RVE_size"})
+RECORD_FIELDS = frozenset(field_name(name) for name in REQUIRED_TOP_LEVEL_FIELDS) | {"identifier"}
+SIMULATION_FIELDS = frozenset(field_name(name) for name in ("mechanical_BC", "phase", "stress", "total_strain", "RVE_size"))
 WRAPPER_METADATA_FIELDS = RECORD_FIELDS | {"description", "$schema", "$id", "version"}
 
 
@@ -42,8 +43,9 @@ def object_paths(payload):
             else:
                 pending.append((iter(_children(value, path)), True))
         elif isinstance(value, dict):
-            known = RECORD_FIELDS.intersection(value)
-            if len(known) >= 3 or SIMULATION_FIELDS.intersection(value) or not value:
+            names = {field_name(key) for key in value}
+            known = RECORD_FIELDS.intersection(names)
+            if len(known) >= 3 or SIMULATION_FIELDS.intersection(names) or not value:
                 paths.append(path)
             elif isinstance(value.get("data"), list):
                 pending.append((iter(_children(value["data"], path + ("data",))), True))
@@ -81,7 +83,7 @@ def _children(value, path, excluded=()):
     """
     entries = value.items() if isinstance(value, dict) else enumerate(value)
     for key, child in entries:
-        if key not in excluded:
+        if not isinstance(key, str) or field_name(key) not in excluded:
             yield path + (key,), child
 
 
@@ -107,7 +109,8 @@ def _contains_record(value):
             pending.pop()
             continue
         if isinstance(current, dict):
-            if len(RECORD_FIELDS.intersection(current)) >= 3 or SIMULATION_FIELDS.intersection(current):
+            names = {field_name(key) for key in current}
+            if len(RECORD_FIELDS.intersection(names)) >= 3 or SIMULATION_FIELDS.intersection(names):
                 return True
             children = current.values()
         elif isinstance(current, list):

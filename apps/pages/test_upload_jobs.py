@@ -15,7 +15,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .upload_test_data import valid_upload_object
+from .upload_test_data import valid_upload_object, variant_field_names
 from .models import DataNotification, JSONData, RateLimitBucket, UploadJob, UploadWorkerInstance
 from .upload_jobs import (
     _update_file, claim_upload_job, cleanup_upload_jobs, expire_upload_jobs,
@@ -165,6 +165,26 @@ class UploadJobTests(TestCase):
         self.assertTrue(all(item["status"] == "saving" and item["saved_count"] == 0 for item in snapshots))
         self.assertEqual(job.files[0]["saved_count"], 3)
         self.assertEqual(job_snapshot(job)["files"][0]["status"], "uploaded")
+
+    def test_background_accepts_one_hundred_format_variants_without_rewriting_them(self):
+        """
+        Retain raw spellings while the background path checks and saves all objects
+        """
+        records = {}
+        for index in range(100):
+            identifier = f"variant-job-{index}"
+            data = valid_upload_object(identifier=identifier, shared_with=[" ALL "])
+            data["mechanical_BC"][0]["applied_load"] = [{"magnitude": " 0.5\n"}]
+            records[identifier] = variant_field_names(data)
+        self.assertEqual(self.submit(records).status_code, 202)
+        job = self.process()
+        self.assertEqual(job.status, "completed")
+        self.assertEqual(job.files[0]["validated_count"], 100)
+        self.assertEqual(job.files[0]["saved_count"], 100)
+        for obj in JSONData.objects.all():
+            self.assertEqual(obj.data, records[obj.data["IDENTIFIER"]])
+            self.assertEqual(obj.access_type, "all")
+        self.assertEqual(JSONData.objects.count(), 100)
 
     @override_settings(PILOT_MAX_UPLOAD_OBJECTS=2)
     def test_batch_object_limit_prevents_every_file_save(self):

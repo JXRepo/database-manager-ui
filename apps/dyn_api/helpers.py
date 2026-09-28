@@ -8,6 +8,7 @@ from django.http import HttpResponseRedirect, HttpResponse
 
 from rest_framework import serializers
 from .required_schema import is_empty, nested_required_issues
+from .metadata_compat import metadata_view
 
 
 REQUIRED_TOP_LEVEL_FIELDS = [
@@ -144,16 +145,28 @@ def validate_json(data, *, detailed=False):
                 errors.append(f"Data object {index}: not a valid JSON object")
             continue
 
+        conflicts = []
+        recognized = metadata_view(obj, conflicts)
+        if conflicts:
+            fields = list(dict.fromkeys(field for pair in conflicts for field in pair))
+            message = "These field names refer to the same field but contain different values."
+            if detailed:
+                errors.append({
+                    "object_index": index, "category": "conflicting_fields", "fields": fields,
+                    "message": message,
+                })
+            else:
+                errors.append(f"Data object {index}: {message} {', '.join(fields)}.")
         missing_fields = []
         empty_fields = []
 
         for field in REQUIRED_TOP_LEVEL_FIELDS:
-            if field not in obj:
+            if field not in recognized:
                 missing_fields.append(field)
-            elif _is_empty_required_value(obj.get(field)):
+            elif _is_empty_required_value(recognized.get(field)):
                 empty_fields.append(field)
 
-        nested = nested_required_issues(obj)
+        nested = nested_required_issues(recognized)
         missing_fields.extend(nested.get("missing_required", []))
         empty_fields.extend(nested.get("empty_values", []))
 
@@ -203,7 +216,7 @@ def validate_json(data, *, detailed=False):
             continue
 
 
-        identifier = obj.get("identifier")
+        identifier = recognized.get("identifier")
         if identifier is not None:
             if not isinstance(identifier, str):
                 if detailed:
@@ -230,7 +243,7 @@ def validate_json(data, *, detailed=False):
                     )
                 continue
 
-        if not missing_fields and not empty_fields and not nested.get("invalid_structure"):
+        if not conflicts and not missing_fields and not empty_fields and not nested.get("invalid_structure"):
             valid_data.append(obj)
 
     return valid_data, errors

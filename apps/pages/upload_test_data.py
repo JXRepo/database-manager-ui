@@ -34,3 +34,25 @@ def valid_upload_object(**changes):
     }
     data.update(deepcopy(changes))
     return data
+
+
+def variant_field_names(value):
+    """
+    Vary case and separators throughout synthetic uploaded metadata
+
+    Parameters
+    ----------
+    value : object
+        Original fixture value.
+
+    Returns
+    -------
+    object
+        Independent metadata with differently formatted keys.
+    """
+    if isinstance(value, dict):
+        return {key.upper().replace("_", " - "): variant_field_names(child)
+                for key, child in value.items()}
+    if isinstance(value, list):
+        return [variant_field_names(child) for child in value]
+    return value

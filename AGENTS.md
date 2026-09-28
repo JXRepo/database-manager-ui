@@ -49,11 +49,15 @@ Current priority:
 
 - Validate the 24 required top-level fields and applicable nested and conditional required rules from the bundled MiMeDat schema profile; do not claim full JSON Schema compliance or enforce unrelated optional constraints
 - Extra fields are allowed
+- Recognize schema field names within their own parent ignoring case and separator punctuation; accept finite numeric strings at known numeric paths and explicit all/c sharing shorthand
+- Preserve original JSON keys and values in storage and JSON export; use the shared metadata compatibility view for validation, search, summaries and plots
+- Do not infer synonyms, move nested values to other parents, search arbitrary text for permission tokens, or silently choose between conflicting aliases
+- Maintain the internal identifier lookup digest for alternative field spellings; preserve identifier text and the final duplicate and quota checks
 - Missing required fields must produce clear user-facing error messages
 - Empty required fields must produce clear user-facing error messages
 - Required fields include active conditional requirements; null, blank text, empty lists and empty objects are empty, but zero and false are not; optional blanks are preserved
 - Resolve schema references only through the bundled trusted snapshots; never fetch a user's uploaded $schema URL
-- Recognize records in lists, identifier dictionaries and nested collections; stop at record boundaries and retain incomplete members for errors instead of dropping them or changing field names
+- Recognize records in lists, identifier dictionaries and nested collections using the same field name matching; stop at record boundaries and retain incomplete members for errors instead of dropping them or changing stored field names
 - Group upload feedback by JSON file, then data object in original order, then issue category; list each affected field separately and give guidance specific to that category
 - Identify an object by its title and valid supplied identifier when available, with its file position as a reference or fallback; escape all uploaded text in feedback
 - Treat each uploaded JSON file as one save unit: any validation, identifier, or sharing error rejects the entire file, with no partial objects or notifications saved
@@ -125,7 +129,7 @@ Current priority:
 - Common filters starts with Identifier, Access, and Owner (uploaded by), followed by Creator, Software, Phase, and Title; keep the `owner` query parameter for Owner and do not add fields without a request
 - Top and advanced-panel Search buttons submit the same combined GET form; both Clear links reset all conditions while preserving the panel's expanded or collapsed state, and a keyword is optional
 - Data field filters uses 12 preset simulation fields grouped by microstructure, discretization and boundaries, material models, and loading and temperature; do not populate it from arbitrary uploaded JSON keys or duplicate common metadata
-- Presets recursively search dicts and arrays by normalized field name, ignoring case, whitespace, underscores, and hyphens; `grain_number` is an explicit count alias, not permission to guess arbitrary synonyms
+- Presets recursively search dicts and arrays using the same case and separator punctuation matching as uploads; `grain_number` is an explicit count alias, not permission to guess arbitrary synonyms
 - Keep loading type and mode within `mechanical_BC`, excluding `thermal_BC`; counts and text must match values of the appropriate type, not arbitrary parameter containers
 - Test every offered field against the synthetic `apps/pages/fixtures/search_fields.json` and local `example_json_files` when available; allow extra nesting without changing explicit bookmarked path semantics
 - RVE continuity uses the Is comparison with actual JSON booleans; do not treat zero, one, or strings as booleans

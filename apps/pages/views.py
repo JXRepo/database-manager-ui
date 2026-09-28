@@ -26,6 +26,7 @@ from .models import *
 from .forms import AccountSettingsForm, ORCIDAccountSetupForm, SignUpForm, JSONUploadForm
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
 from apps.dyn_api.helpers import validate_json
+from apps.dyn_api.metadata_compat import field_name, field_value, metadata_view, set_field_value
 from numbers import Number
 
 from .rate_limits import consume_rate_limit, get_client_identifier
@@ -65,6 +66,7 @@ from .upload_services import (
     canonical_json_size,
     data_fingerprint,
     generate_data_identifier,
+    identifier_query,
     save_prepared_json_data,
     validate_json_depth,
     validate_upload_files,
@@ -76,6 +78,7 @@ SHARE_USERNAME_KEY = "username"
 UPLOAD_ISSUE_CATEGORIES = (
     ("invalid_file", "Invalid JSON file", "Correct the JSON syntax in this file before uploading it again."),
     ("invalid_structure", "Invalid JSON structure", "Keep each data object together in a list or a dictionary of objects. Use the schema's object and list structures for its fields."),
+    ("conflicting_fields", "Conflicting fields", "These names identify the same field. Keep one value, or make the values agree."),
     ("empty_file", "No data objects", "Add at least one data object to this file."),
     ("file_size", "File size limit", "Reduce the file size or split its data objects into smaller JSON files."),
     ("json_depth", "Too many nested levels", "Reduce the nesting of JSON objects and lists."),
@@ -86,7 +89,7 @@ UPLOAD_ISSUE_CATEGORIES = (
     ("empty_values", "Empty values", "Enter a value for each listed field. Null, blank text, and empty lists or objects count as empty."),
     ("invalid_identifier", "Invalid identifier", "Use a text identifier without surrounding spaces, or remove it to have one assigned automatically."),
     ("duplicate_identifier", "Duplicate identifiers", "Remove this object if it has already been uploaded. If it is a different object, give it a unique identifier."),
-    ("invalid_share_structure", "Invalid sharing entries", "Replace each listed shared_with entry with a JSON object containing access_type and, if needed, username."),
+    ("invalid_share_structure", "Invalid sharing entries", 'Use "all" for public data, "c" for private data, or a JSON object with access_type and, if needed, username.'),
     ("invalid_access", "Invalid access metadata", 'Use "all" for public data or "c" for private data.'),
     ("public_share_username", "Usernames in public data", 'Remove username from shared_with when access_type is "all".'),
     ("unknown_share_user", "Unknown shared users", "Use an existing platform username, not an email address."),
@@ -624,7 +627,7 @@ def _get_shared_with_entries(data):
     list
         Sharing entries from the top-level shared_with field.
     """
-    shared_with = data.get("shared_with", [])
+    shared_with = metadata_view(data).get("shared_with", [])
 
     if isinstance(shared_with, list):
         return shared_with
@@ -685,6 +688,9 @@ def _add_upload_issue(upload_issues, category, message="", fields=()):
     """
     Add one upload issue to its display category
 
+    Uploaded field aliases can contain invalid Unicode. Replace those characters
+    so the error report itself remains readable and serializable.
+
     Parameters
     ----------
     upload_issues : dict
@@ -697,9 +703,9 @@ def _add_upload_issue(upload_issues, category, message="", fields=()):
         Field names to list separately within this category.
     """
     group = upload_issues.setdefault(category, {"fields": [], "messages": []})
-    group["fields"].extend(fields)
+    group["fields"].extend(_upload_label(field) for field in fields)
     if message:
-        group["messages"].append(message)
+        group["messages"].append(_upload_label(message))
 
 
 def _upload_issue_groups(upload_issues):
@@ -790,7 +796,7 @@ def _resolve_upload_access_metadata(data, owner):
             issues.append(
                 (
                     "invalid_share_structure",
-                    f"shared_with entry {index} must be an object.",
+                    f'shared_with entry {index} must be "all", "c", or an object with access details.',
                 )
             )
             continue
@@ -899,14 +905,14 @@ def _identifier_exists(identifier):
     bool
         True when any JSONData row already stores this identifier.
     """
-    return JSONData.objects.filter(data__identifier=identifier).exists()
+    return JSONData.objects.filter(identifier_query(identifier)).exists()
 
 
 def _get_data_object_display_title(data_object):
     """
     Return the best display title for one data object
     """
-    data = data_object.data or {}
+    data = metadata_view(data_object.data)
     return data.get("identifier") or data.get("title") or "Data object"
 
 
@@ -975,8 +981,8 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         Prepared objects and their reports, indexed by the preview identifier.
     """
     for position, obj in enumerate(objects, start=1):
-        title = obj.get("title") if isinstance(obj, dict) else None
-        identifier = obj.get("identifier") if isinstance(obj, dict) else None
+        title = field_value(obj, "title")
+        identifier = field_value(obj, "identifier")
         file_report["objects"].append({
             "position": position,
             "title": _upload_label(title).strip(),
@@ -1010,7 +1016,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
         access_type, shared_users = "c", []
         try:
             if content_error:
-                shared_with = obj.get("shared_with", [])
+                shared_with = field_value(obj, "shared_with", [])
                 validate_json_depth(shared_with, initial_depth=depth + 1)
                 canonical_json_size(shared_with)
             access_type, shared_users, access_issues = _resolve_upload_access_metadata(obj, owner)
@@ -1026,7 +1032,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
             if error.category not in object_report["issues"]:
                 _add_upload_issue(object_report["issues"], error.category, str(error))
 
-        identifier = obj.get("identifier")
+        identifier = field_value(obj, "identifier")
         supplied = (
             isinstance(identifier, str) and bool(identifier.strip())
             and identifier == identifier.strip() and _upload_label(identifier) == identifier
@@ -1041,7 +1047,7 @@ def _prepare_upload_file(objects, owner, file_report, object_depth, saved_identi
             except UploadResourceLimitError as error:
                 _add_upload_issue(object_report["issues"], error.category, str(error))
                 continue
-            obj["identifier"] = identifier
+            set_field_value(obj, "identifier", identifier)
             size_bytes = canonical_json_size(obj)
 
         if identifier in seen_identifiers or (supplied and identifier in saved_identifiers):
@@ -1201,7 +1207,7 @@ def _process_upload_file(
     file_report["status"] = "uploaded"
     file_report["saved_count"] = len(saved_objects)
     for data_object in saved_objects:
-        saved_identifiers.add(data_object.data["identifier"])
+        saved_identifiers.add(field_value(data_object.data, "identifier"))
         if data_object.identifier_fingerprint:
             saved_identifiers.add(data_object.identifier_fingerprint)
 
@@ -1781,7 +1787,7 @@ def _assistant_object_overview(obj):
     str
         Object summary.
     """
-    data = obj.data or {}
+    data = metadata_view(obj.data)
     title = _assistant_text(data.get("title")) or "Untitled data object"
     identifier = _assistant_text(data.get("identifier")) or "No identifier"
     software = _assistant_text(data.get("software")) or "Software not specified"
@@ -1908,7 +1914,7 @@ def _assistant_detail_answer(question, obj):
         Detail page answer.
     """
     normalized_question = question.casefold()
-    data = obj.data or {}
+    data = metadata_view(obj.data)
 
     if any(
         term in normalized_question
@@ -2041,7 +2047,7 @@ def _build_basic_search_text(obj, access_text):
     """
     Build basic-search text from meaningful JSON values and ownership metadata
     """
-    values = _collect_basic_search_values(obj.data or {})
+    values = _collect_basic_search_values(metadata_view(obj.data))
     values.extend([obj.owner.username, access_text])
     return " ".join(str(value) for value in values if str(value).strip()).casefold()
 
@@ -2050,7 +2056,7 @@ def _build_search_text(obj, field):
     """
     Build searchable text for one JSON data object
     """
-    data = obj.data or {}
+    data = metadata_view(obj.data)
     access_text = "public all shared" if obj.access_type == "all" else "private c"
 
     field_map = {
@@ -2079,7 +2085,7 @@ def _prepare_list_object(obj):
     """
     Attach summary fields to one data object
     """
-    data = obj.data or {}
+    data = metadata_view(obj.data)
     summary_fields = _build_summary_fields(data)
     obj.list_display_name = data.get("identifier") or data.get("title") or "Object"
     obj.search_display_name = data.get("title") or data.get("identifier") or "Object"
@@ -2102,7 +2108,7 @@ def _build_data_object_filename(obj):
     """
     Build a compact JSON filename for one data object
     """
-    data = obj.data or {}
+    data = metadata_view(obj.data)
     label = str(data.get("identifier") or data.get("title") or f"data_object_{obj.pk}")
     filename = []
 
@@ -2557,7 +2563,7 @@ def search_view(request):
         data_objects = data_objects.none()
 
     for obj in data_objects.iterator(chunk_size=1):
-        data = obj.data if isinstance(obj.data, dict) else {}
+        data = metadata_view(obj.data)
         try:
             specifically_shared = (
                 obj.owner_id != request.user.id
@@ -2601,7 +2607,7 @@ def search_view(request):
                 if not matches_whole_words((text,), terms):
                     common_match = False
                     break
-            if not common_match or not matches_conditions(data, conditions):
+            if not common_match or not matches_conditions(obj.data, conditions):
                 continue
 
             filtered_objects.append(_prepare_list_object(obj))
@@ -2701,7 +2707,7 @@ def search_live_data_objects_view(request):
     objects = []
 
     for obj in data_objects[:20]:
-        data = obj.data or {}
+        data = metadata_view(obj.data)
         uploaded_at = timezone.localtime(obj.uploaded_at)
         display_name = str(data.get("title") or data.get("identifier") or "Object")
         identifier = str(data.get("identifier") or "")
@@ -2805,7 +2811,7 @@ def _mechanical_csv_variables(obj, fields=None):
     ValueError
         No curves exist or requested paths are empty or unavailable.
     """
-    data = obj.data or {}
+    data = metadata_view(obj.data)
     variables = _extract_plot_variables(data, units=data.get("units", {}))
     if not variables:
         raise ValueError(f"Data object {obj.pk} has no numeric stress or strain series to export.")
@@ -4266,19 +4272,18 @@ def json_data_detail_view(request, pk):
         raise Http404("Data object not found")
 
     detail_rows = _build_detail_rows(obj.data or {})
+    visualized_fields = {field_name(name) for name in VISUALIZED_DETAIL_FIELDS}
     detail_rows = [
         row for row in detail_rows
-        if row["path"][0] not in VISUALIZED_DETAIL_FIELDS
+        if field_name(row["path"][0]) not in visualized_fields
     ]
     for index, row in enumerate(detail_rows):
         row["value_id"] = f"detail-value-{index}"
 
     display_rows = _group_detail_rows(detail_rows)
-    plot_variables = _extract_plot_variables(
-        obj.data or {},
-        units=(obj.data or {}).get("units", {}),
-    )
-    mechanical_bc_items = _build_mechanical_bc_items(obj.data or {})
+    metadata = metadata_view(obj.data)
+    plot_variables = _extract_plot_variables(metadata, units=metadata.get("units", {}))
+    mechanical_bc_items = _build_mechanical_bc_items(metadata)
     is_owner = obj.owner_id == request.user.id
 
     if is_owner:
@@ -4296,6 +4301,7 @@ def json_data_detail_view(request, pk):
 
     context = {
         "data_object": obj,
+        "metadata": metadata,
         "detail_rows": display_rows,
         "plot_variables": plot_variables,
         "mechanical_bc_items": mechanical_bc_items,

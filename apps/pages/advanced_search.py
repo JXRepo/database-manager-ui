@@ -7,6 +7,8 @@ import operator
 import re
 from decimal import Decimal, DecimalException, InvalidOperation, MAX_EMAX, MIN_EMIN, localcontext
 
+from apps.dyn_api.metadata_compat import field_name
+
 
 MAX_CONDITIONS = 10
 MAX_PATH_LENGTH = 1024
@@ -414,9 +416,9 @@ def _normalize_field_name(key):
     Returns
     -------
     str
-        Case folded name without whitespace, underscores, or hyphens.
+        Case folded name without separator punctuation, matching uploads.
     """
-    return re.sub(r"[\s_-]+", "", key).casefold()
+    return field_name(key)
 
 
 def _enclosing_temperature_unit(data, inherited):

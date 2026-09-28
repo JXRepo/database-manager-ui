@@ -276,7 +276,8 @@ The 12 choices are grouped within one dropdown and search these field names:
 
 Presets recursively traverse objects and arrays, including extra nesting levels,
 up to the search depth limit of 32. Field names ignore letter case, whitespace,
-underscores, and hyphens: `Grain Count` and `grain_count` are equivalent.
+underscores, hyphens and other separator punctuation, using the same recognition
+as uploads: `Grain Count` and `grain_count` are equivalent.
 Only explicit aliases are recognized; arbitrary synonyms are not inferred.
 `grain_number` must mean a count, not a grain identifier. Loading fields stay
 within mechanical boundary conditions and do not match thermal boundary conditions.
@@ -524,6 +525,30 @@ a required field profile, including the container structures needed to reach
 those fields. This is not full validation of every numeric, enum or optional
 property constraint in the original schema. Extra fields remain allowed.
 
+Before checking these requirements, the platform recognizes schema field names
+independently of case and separator punctuation: `Date`, `DATE` and `date` match,
+as do `input_path`, `Input Path` and `input-path`. Matching stays within each
+field's parent; it does not search unrelated subtrees or guess synonyms such as
+`Material` for `phase`. Two matching spellings with different values are reported
+as conflicting fields rather than choosing a value silently.
+
+Text containing a finite number is accepted at known numeric fields, including
+`magnitude`, tensor components and curve arrays. For example, `" 1.5\n"` is read
+as `1.5`; words, unit annotations and nonfinite magnitudes remain invalid.
+Known enumerated values also tolerate case and surrounding whitespace.
+Sharing accepts `"all"`, `["all"]`, `"c"`, `["c"]`, the usual permission objects,
+and a single explicit flag such as `{"all": true}`. A username object without
+`access_type` remains private. Permission tokens must match completely:
+`"not all"`, comments mentioning `all`, and usernames containing `all` do not
+make data public. Username lookup and existing sharing restrictions still apply.
+
+This recognition is also used for search summaries, filters, detail plots and
+curve exports. Original field spellings, values and array order remain in stored
+JSON and JSON downloads. Metadata labels retain those spellings. A valid JSON
+document is still required; this compatibility does not imply that its original
+representation passes an external validator's full schema.
+The implementation is in [metadata compatibility](apps/dyn_api/metadata_compat.py).
+
 Required values cannot be null, blank strings (including whitespace), or empty
 lists or objects. Zero and false are not empty. Conditional requirements activate
 only when their controlling fields are supplied and the condition matches.
@@ -580,7 +605,9 @@ only the new identifier grows, one character at a time, until it is available.
 Previously assigned identifiers never change to accommodate new uploads.
 
 The fingerprint input is a JSON mapping of the 24 required fields
-above, serialized with sorted keys, compact separators, and ASCII escaping.
+above in their recognized form, serialized with sorted keys, compact separators,
+and ASCII escaping. Equivalent field spellings use the same names internally;
+numeric text and sharing shorthand use their recognized values for this calculation.
 Field names and nested content are included; array order, zero, and false values
 are preserved. The upload does not remove empty optional values or change other
 fields. This is not byte-for-byte compatible with Ronak's eight character IDs;
@@ -590,6 +617,10 @@ The complete fingerprint is stored separately from the JSON for generated IDs,
 so uploading the same required content again is still reported as a duplicate,
 even if its short identifier was extended or a conflicting record was deleted.
 Old 64 character SHA-256 identifiers remain recognized without rewriting them.
+The separate `identifier_lookup` digest lets alternative field spellings participate
+in duplicate checks without changing the exported JSON. Migration
+`0014_jsondata_identifier_lookup` adds this internal index; existing records with
+the canonical `identifier` field remain covered by the JSON lookup fallback.
 JSON key order and optional fields such as `description` and `keywords` do not
 affect the fingerprint. Different supplied identifiers may still refer to the
 same content; user supplied identifiers are not automatically changed.

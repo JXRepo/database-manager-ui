@@ -4,6 +4,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import URLValidator
 
+from apps.dyn_api.metadata_compat import field_value, identifier_lookup
+
 class Product(models.Model):
     """
     Store product information
@@ -43,6 +45,8 @@ class JSONData(models.Model):
         Raw JSON object
     identifier_fingerprint : str
         Internal full digest for automatically assigned identifiers
+    identifier_lookup : str
+        Internal digest for matching identifiers under alternative field spellings
     size_bytes : int
         Persisted UTF-8 byte size for the JSON object
     access_type : str
@@ -56,6 +60,9 @@ class JSONData(models.Model):
     identifier_fingerprint = models.CharField(
         max_length=64, blank=True, default="", db_index=True, editable=False,
     )
+    identifier_lookup = models.CharField(
+        max_length=64, blank=True, default="", db_index=True, editable=False,
+    )
     size_bytes = models.PositiveBigIntegerField(default=0)
     access_type = models.CharField(max_length=10, default="c")
     shared_users = models.ManyToManyField(
@@ -64,6 +71,24 @@ class JSONData(models.Model):
         related_name="shared_json_data",
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        """
+        Maintain the identifier index while retaining the original JSON spelling
+
+        Parameters
+        ----------
+        *args : object
+            Standard model save arguments.
+        **kwargs : object
+            Standard model save options.
+        """
+        fields = kwargs.get("update_fields")
+        if fields is None or "data" in fields:
+            self.identifier_lookup = identifier_lookup(field_value(self.data, "identifier"))
+            if fields is not None:
+                kwargs["update_fields"] = set(fields) | {"identifier_lookup"}
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """
@@ -290,9 +315,38 @@ class DataNotification(models.Model):
     def display_title(self):
         """
         Return the related data object's best display title
+
+        Returns
+        -------
+        object
+            Supplied identifier, title or a generic fallback.
         """
-        data = self.data_object.data or {}
-        return data.get("identifier") or data.get("title") or "Data object"
+        data = self.data_object.data
+        return field_value(data, "identifier") or field_value(data, "title") or "Data object"
+
+    @property
+    def display_name(self):
+        """
+        Prefer the supplied title when showing the sharing history
+
+        Returns
+        -------
+        object
+            Original title or the notification's fallback label.
+        """
+        return field_value(self.data_object.data, "title") or self.display_title
+
+    @property
+    def display_identifier(self):
+        """
+        Read the identifier under its uploaded field spelling
+
+        Returns
+        -------
+        object
+            Original identifier value, if supplied.
+        """
+        return field_value(self.data_object.data, "identifier")
 
     def __str__(self):
         """

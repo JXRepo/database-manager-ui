@@ -260,9 +260,9 @@ class DetailMetadataTests(TestCase):
         self.assertEqual(rows, [])
         self.assertContains(response, "No displayable detail fields found")
 
-    def test_nested_legacy_order_and_top_level_cpu_preserve_original_names(self):
+    def test_formatted_origin_fields_and_legacy_cpu_preserve_original_names(self):
         """
-        Order current origin fields while preserving legacy fields as unknown keys
+        Group equivalent field spellings while retaining legacy names and values
         """
         data = {
             "phase": [{
@@ -294,10 +294,10 @@ class DetailMetadataTests(TestCase):
         self.assertEqual(
             [label for label in labels if label.startswith("origin / ")],
             [
-                "origin / software", "origin / software_version", "origin / system",
-                "origin / system_version", "origin / input_path", "origin / results_path",
-                "origin / Results Path", "origin / Input Path", "origin / system Version",
-                "origin / software Version",
+                "origin / software", "origin / software Version", "origin / software_version",
+                "origin / system", "origin / system Version", "origin / system_version",
+                "origin / Input Path", "origin / input_path",
+                "origin / Results Path", "origin / results_path",
             ],
         )
         self.assertEqual(
