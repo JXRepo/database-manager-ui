@@ -2,16 +2,32 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: 8ad5a4bda40f2c52b7429a313a06a1058f46ad2b
+code_base: c3c9be4
 files_modified:
-  - Compact upload correction summaries, expandable details, desktop layout and regression tests
+  - Smaller upload picker and removal of duplicate checking and failure messages
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**9 月 28 日最新：用户要求报错更短，直接告诉用户该改哪里。**
+**9 月 28 日最新：缩小上传框，去掉重复提示。**
+
+- 上传框最小高度从 300px 调整到 200px，选中多个文件时继续自动撑开。
+- 错误报告删除 `Not uploaded. No data from this file was saved.`，文件名后直接显示修改要求。
+- Checking n / total 只显示在文件旁边，Upload 按钮下面不再重复；后台任务与 NDJSON 均适用。
+  其他页面的顶部进度和网络异常提示仍保留，保存阶段继续说明成功提交后才算 Uploaded。
+- 涉及 `static/assets/css/custom.css`、`static/assets/js/upload.js`、
+  `static/assets/js/upload-host.js`、`templates/includes/upload_issue_report.html` 和现有浏览器测试。
+- 52 项相关 Django 测试通过；117 项 JavaScript／Chromium 测试通过，0 跳过。
+  日志为 `/tmp/upload-trim-backend.log` 和 `/tmp/upload-trim-js.log`。
+- 另有 1 项真实 HTTP 浏览器检查通过：1280／1440／1920 桌面宽度下的空框、单文件、
+  5 个长文件名、100 对象错误、展开明细、长内容及空文件均无横向溢出或 JavaScript 异常。
+  截图与临时检查在 `/tmp/upload-trim-qa/`，日志为 `/tmp/upload-trim-browser.log`。
+
+### 9 月 28 日上一轮：简化错误报告
+
+用户要求报错更短，直接告诉用户该改哪里。
 
 - 多对象的同类同字段同原因错误合并显示，并标明 All 100 objects 或确切位置，例如 Objects 1, 4–5。
   不把只涉及部分对象的问题说成所有对象都有；缺字段与空值保持分开。

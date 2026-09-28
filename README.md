@@ -202,6 +202,8 @@ then `Saving 70 / 100`, using actual completed work. Fast operations can skip
 intermediate displayed counts; final file rows retain `Checked 100 / 100` even
 when validation fails. Checking and saving use numbers without a spinner;
 reading and processing indicate activity while no object count is available.
+Counts appear beside each file, without a second checking counter beneath the
+Upload button. The compact file picker grows to fit multiple selected files.
 Saving counts remain provisional until the whole file transaction commits.
 Only then is the file labelled Uploaded. A private temporary progress file lets
 other pages observe saving counts without waiting for that transaction; it
@@ -219,7 +221,9 @@ Missing and empty fields use short actions: `Add` and `Fill in`. For example,
 Individual objects stay available in an expandable list in their original order;
 a single failed object opens immediately. Extra technical reasons can be expanded
 without repeating field paths in the main list. All titles, identifiers and
-distinct source locations remain available. The final result appears once.
+distinct source locations remain available. The final result appears once;
+failed file sections go straight to corrections without repeating that nothing
+was saved.
 
 The browser sends the selected files in one submission so batch limits are
 checked before saving. It then reads progress from the server as each file is

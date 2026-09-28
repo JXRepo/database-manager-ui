@@ -69,7 +69,7 @@
   if (window.FairUploadHost) return;
 
   const listeners = new Set();
-  const state = {active: false, transferring: false, job: null, message: '', loaded: 0, total: 0};
+  const state = {active: false, transferring: false, job: null, message: '', messageStage: '', loaded: 0, total: 0};
   let frame = null;
   let banner = null;
   let pollTimer = null;
@@ -84,7 +84,7 @@
     generation += 1;
     clearTimeout(pollTimer);
     Object.assign(state, {active: false, transferring: false, job: null,
-      message: 'Sign in again to check your upload result.', authExpired: true});
+      message: 'Sign in again to check your upload result.', messageStage: '', authExpired: true});
     emit();
     location.assign(url);
   }
@@ -179,6 +179,7 @@
           document.title = frame.contentDocument.title;
         } catch (_) {
           state.message = 'This page could not open here. Return to upload details before continuing.';
+          state.messageStage = '';
           emit();
         }
       });
@@ -202,6 +203,9 @@
     state.transferring = false;
     state.active = !terminalStates.includes(job.status);
     state.message = jobMessage(job);
+    state.messageStage = state.active
+      ? job.files.find(file => ['parsing', 'validating', 'saving'].includes(file.status))?.status || ''
+      : '';
     emit();
     clearTimeout(pollTimer);
     if (state.active) pollTimer = setTimeout(() => refresh(false), 1000);
@@ -224,6 +228,7 @@
     } catch (_) {
       if (currentGeneration !== generation || state.transferring || !state.job) return;
       state.message = 'Upload status is temporarily unavailable. Checking again…';
+      state.messageStage = '';
       emit();
       pollTimer = setTimeout(() => refresh(false), 3000);
     }
@@ -250,7 +255,8 @@
       generation += 1;
       clearTimeout(pollTimer);
       returnUrl = location.href;
-      Object.assign(state, {active: true, transferring: true, job: null, message: 'Sending files…', loaded: 0, total: 0});
+      Object.assign(state, {active: true, transferring: true, job: null,
+        message: 'Sending files…', messageStage: '', loaded: 0, total: 0});
       emit();
       return true;
     },
@@ -273,6 +279,7 @@
       state.active = false;
       state.transferring = false;
       state.message = message;
+      state.messageStage = '';
       emit();
     },
   };

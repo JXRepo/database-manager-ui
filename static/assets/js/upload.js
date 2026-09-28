@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function showStatus(message) {
     lastMessage = message;
     status.textContent = message;
-    status.hidden = false;
+    status.hidden = !message;
   }
 
   function setFileState(index, state, label) {
@@ -223,8 +223,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
           const action = event.stage === 'validating' ? 'Checking' : 'Saving';
           setFileState(activeIndex, event.stage, `${action} ${event.completed} / ${event.total}`);
-          showStatus(`${action} data objects: ${event.completed} / ${event.total}` +
-            (event.stage === 'saving' ? '. Uploaded is confirmed only after the whole file succeeds.' : ''));
+          showStatus(event.stage === 'saving'
+            ? 'Saving in progress. Uploaded is confirmed only after the whole file succeeds.'
+            : '');
         }
       } else if (event.type === 'file_result') {
         if (activeIndex < 0 || event.index !== activeIndex ||
@@ -333,6 +334,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (elapsedTimer) return;
     startedAt = Date.parse(createdAt) || Date.now();
     elapsedTimer = window.setInterval(function() {
+      if (status.hidden) return;
       const seconds = Math.floor((Date.now() - startedAt) / 1000);
       status.textContent = `${lastMessage} · ${seconds}s elapsed`;
       if (seconds >= 30 && host.getState().transferring) {
@@ -489,7 +491,7 @@ document.addEventListener('DOMContentLoaded', function() {
         submitButton.disabled = true;
       }
       if (ignoreJobUpdates && state.job && !state.authExpired) return;
-      if (state.message) showStatus(state.message);
+      if (state.message) showStatus(state.messageStage === 'validating' ? '' : state.message);
       if (state.job) renderJob(state.job);
     });
   }

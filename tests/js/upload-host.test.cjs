@@ -227,7 +227,8 @@ describe('uploads across ordinary page navigation', {skip: !existsSync(chromium)
     await waitFor(evaluate, 'location.pathname === "/upload/"');
     assert.equal(await evaluate('!!document.querySelector("#upload-page-frame")'), false);
     assert.equal(await evaluate('document.getElementById("uploadForm").inert'), false);
-    assert.match(await evaluate('uploadStatus.textContent'), /37.*100/);
+    assert.equal(await evaluate('uploadStatus.hidden'), true);
+    assert.match(await evaluate('document.querySelector(".selected-file-status").textContent'), /37.*100/);
     assert.equal(await evaluate('uploadButton.disabled'), true);
     await evaluate(`window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted:true}))`);
     assert.match(await evaluate('document.querySelector(".selected-file-status").textContent'), /37.*100/);
@@ -253,6 +254,14 @@ describe('uploads across ordinary page navigation', {skip: !existsSync(chromium)
     await waitFor(evaluate, 'document.querySelector(".selected-file-status")?.textContent.includes("37")');
     assert.equal(await evaluate('document.querySelector(".selected-file-status").textContent'), 'Checking 37 / 100');
     assert.equal(await evaluate('document.querySelector(".selected-file-spinner").hidden'), true);
+    assert.equal(await evaluate('uploadStatus.hidden'), true);
+    await evaluate(`window.savedFetch = window.fetch;
+      window.fetch = async () => new Response('', {status: 503});
+      FairUploadHost.resume()`);
+    await waitFor(evaluate, 'uploadStatus.textContent.includes("temporarily unavailable")');
+    assert.equal(await evaluate('uploadStatus.hidden'), false);
+    await evaluate('window.fetch = window.savedFetch; FairUploadHost.resume()');
+    await waitFor(evaluate, 'uploadStatus.hidden');
     job.files[0] = {...job.files[0], status: 'saving', validated_count: 100, saving_count: 70};
     await waitFor(evaluate, 'document.querySelector(".selected-file-status")?.textContent === "Saving 70 / 100"');
     assert.match(await evaluate('uploadStatus.textContent'), /whole file/);
@@ -283,7 +292,8 @@ describe('uploads across ordinary page navigation', {skip: !existsSync(chromium)
         assert.equal(await evaluate('window.FairUploadHost.getState().job'), null);
       } else {
         await waitFor(evaluate, 'window.FairUploadHost.getState().job?.status === "processing"');
-        assert.match(await evaluate('uploadStatus.textContent'), /37.*100/);
+        assert.equal(await evaluate('uploadStatus.hidden'), true);
+        assert.match(await evaluate('document.querySelector(".selected-file-status").textContent'), /37.*100/);
       }
       assert.equal(postCount, 1);
     });

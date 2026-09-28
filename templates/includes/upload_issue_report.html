@@ -2,13 +2,9 @@
   {% for file in upload_files %}
     <section class="upload-report-file" data-upload-file data-upload-file-status="{{ file.status }}">
       <h6 class="upload-report-file-title">{{ file.name }}</h6>
-      <p>
-        {% if file.status == "uploaded" %}
-          Uploaded. {{ file.saved_count }} data object{{ file.saved_count|pluralize }} saved.
-        {% else %}
-          Not uploaded. No data from this file was saved.
-        {% endif %}
-      </p>
+      {% if file.status == "uploaded" %}
+        <p>Uploaded. {{ file.saved_count }} data object{{ file.saved_count|pluralize }} saved.</p>
+      {% endif %}
       {% include "includes/upload_issue_groups.html" with groups=file.groups only %}
       {% if file.objects %}
       {% if file.fixes %}

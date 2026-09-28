@@ -211,10 +211,12 @@ describe('upload controls in Chromium', {skip: !existsSync(chromiumPath), timeou
       {type:'file_progress',index:0,stage:'parsing',completed:0,total:null},
       {type:'file_progress',index:0,stage:'validating',completed:0,total:100},
       {type:'file_progress',index:0,stage:'validating',completed:37,total:100}])`);
-    const checking = await evaluate(`({rows:rowStates(),spinners:activeSpinners(),message:uploadStatus.textContent})`);
+    const checking = await evaluate(`({rows:rowStates(),spinners:activeSpinners(),message:uploadStatus.textContent,
+      messageHidden:uploadStatus.hidden})`);
     assert.deepEqual(checking.rows, ['Checking 37 / 100']);
     assert.equal(checking.spinners, 0);
-    assert.match(checking.message, /Checking data objects: 37 \/ 100/);
+    assert.equal(checking.message, '');
+    assert.equal(checking.messageHidden, true);
     await evaluate(`deliver([{type:'file_progress',index:0,stage:'validating',completed:100,total:100},
       {type:'file_progress',index:0,stage:'saving',completed:0,total:100},
       {type:'file_progress',index:0,stage:'saving',completed:70,total:100}])`);

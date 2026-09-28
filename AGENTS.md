@@ -74,6 +74,7 @@ Current priority:
 - Show real Checking n / total and provisional Saving n / total counts in both background and NDJSON uploads; retain Checked n / total on final file rows, show Uploaded only after the entire file commits, and keep ordinary form submissions working
 - Stream counts from the actual validation and save operations, never replay or delay them; close processing iterators on disconnect so an interrupted file and its notifications roll back while earlier file commits remain
 - Use no spinner for object checking or saving counts; keep errors immediately below the form, with expandable details for multiple failed objects
+- Keep the upload picker compact and allow it to grow with selected files; show checking counts beside each file only, retain progress on other pages and operational warnings, and omit the repeated failure sentence before corrections
 - Keep one multipart submission and all batch prechecks, stream real file results in order after each atomic save, and retain ordinary form submission as a fallback; never simulate progress or retry automatically after a connection failure
 - Prevent duplicate submissions without disabling the file input; retain confirmed results after an interrupted response and mark unfinished files as unconfirmed
 - Check request file count, total bytes, and total object count before any saves; treat file size and content errors as local to that file, and retain a separate atomic identifier and quota recheck for each file
