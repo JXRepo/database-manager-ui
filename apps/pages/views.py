@@ -77,24 +77,24 @@ SHORT_NUMERIC_ARRAY_INLINE_LIMIT = 6
 ASSISTANT_MAX_QUESTION_LENGTH = 600
 SHARE_USERNAME_KEY = "username"
 UPLOAD_ISSUE_CATEGORIES = (
-    ("invalid_file", "Invalid JSON file", "Correct the JSON syntax in this file before uploading it again."),
-    ("invalid_structure", "Invalid JSON structure", "Keep each data object together in a list or a dictionary of objects. Use the schema's object and list structures for its fields."),
-    ("conflicting_fields", "Conflicting fields", "These names identify the same field. Keep one value, or make the values agree."),
+    ("invalid_file", "Invalid JSON file", "Fix the JSON syntax."),
+    ("invalid_structure", "Invalid JSON structure", "Use a list or dictionary of data objects."),
+    ("conflicting_fields", "Conflicting fields", "Make these values agree"),
     ("empty_file", "No data objects", "Add at least one data object to this file."),
-    ("file_size", "File size limit", "Reduce the file size or split its data objects into smaller JSON files."),
+    ("file_size", "File size limit", "Split this file into smaller JSON files."),
     ("json_depth", "Too many nested levels", "Reduce the nesting of JSON objects and lists."),
     ("invalid_number", "Invalid numeric values", "Replace NaN and Infinity with finite JSON numbers."),
-    ("invalid_unicode", "Invalid text encoding", "Replace invalid text characters and save the file as UTF-8 JSON."),
-    ("missing_required", "Missing required fields", "Add each listed field to this data object."),
-    ("empty_values", "Empty values", "Enter a value for each listed field. Null, blank text, and empty lists or objects count as empty."),
-    ("invalid_identifier", "Invalid identifier", "Use a text identifier without surrounding spaces, or remove it to have one assigned automatically."),
-    ("duplicate_identifier", "Duplicate identifiers", "Remove this object if it has already been uploaded. If it is a different object, give it a unique identifier."),
-    ("invalid_share_structure", "Invalid sharing entries", 'Use "all" for public data, "c" for private data, or a JSON object with access_type and, if needed, username.'),
-    ("invalid_access", "Invalid access metadata", 'Use "all" for public data or "c" for private data.'),
+    ("invalid_unicode", "Invalid text encoding", "Save valid text as UTF-8 JSON."),
+    ("missing_required", "Missing required fields", "Add"),
+    ("empty_values", "Empty values", "Fill in"),
+    ("invalid_identifier", "Invalid identifier", "Use a text identifier without surrounding spaces, or remove it."),
+    ("duplicate_identifier", "Duplicate identifiers", "Remove an already uploaded object; use a unique identifier for a different object."),
+    ("invalid_share_structure", "Invalid sharing entries", 'Use "all", "c", or a JSON object with sharing details.'),
+    ("invalid_access", "Invalid access metadata", 'Use "all" (public) or "c" (private).'),
     ("public_share_username", "Usernames in public data", 'Remove username from shared_with when access_type is "all".'),
-    ("unknown_share_user", "Unknown shared users", "Use an existing platform username, not an email address."),
-    ("self_share", "Invalid share targets", "Remove your own username from shared_with. You already have access as the owner."),
-    ("storage_limit", "Storage limit", "Delete data you no longer need or reduce this file before uploading it again."),
+    ("unknown_share_user", "Unknown shared users", "Use an existing platform username."),
+    ("self_share", "Invalid share targets", "Remove your own username from shared_with."),
+    ("storage_limit", "Storage limit", "Free up storage or upload less data."),
     ("save_error", "File could not be saved", "Try uploading this file again."),
 )
 MECHANICAL_BC_VERTICES = (
@@ -727,9 +727,70 @@ def _upload_issue_groups(upload_issues):
         if category in upload_issues:
             groups.append({
                 "category": category, "label": label, "guidance": guidance,
-                **upload_issues[category],
+                "fields": list(dict.fromkeys(upload_issues[category]["fields"])),
+                "messages": list(dict.fromkeys(upload_issues[category]["messages"])),
             })
     return groups
+
+
+def _upload_object_positions(positions):
+    """
+    Describe affected object positions with consecutive ranges
+
+    Parameters
+    ----------
+    positions : list of int
+        Nonempty positions in original file order.
+
+    Returns
+    -------
+    str
+        One-based positions without omitting any affected object.
+    """
+    ranges = []
+    start = previous = positions[0]
+    for position in positions[1:]:
+        if position != previous + 1:
+            ranges.append(str(start) if start == previous else f"{start}–{previous}")
+            start = position
+        previous = position
+    ranges.append(str(start) if start == previous else f"{start}–{previous}")
+    return ", ".join(ranges)
+
+
+def _summarize_upload_fixes(objects, total_objects):
+    """
+    Combine identical correction groups without losing their affected objects
+
+    Parameters
+    ----------
+    objects : list of dict
+        Failed object reports with categorized correction groups.
+    total_objects : int
+        All objects checked in the file, including valid neighbors.
+
+    Returns
+    -------
+    list of dict
+        Distinct fixes in first occurrence order with their exact scope.
+    """
+    fixes = {}
+    for obj in objects:
+        for group in obj["groups"]:
+            key = (group["category"], tuple(group["fields"]), tuple(group["messages"]))
+            if key not in fixes:
+                fixes[key] = {"groups": [group], "positions": []}
+            fixes[key]["positions"].append(obj["position"])
+    for fix in fixes.values():
+        positions = fix["positions"]
+        fix["count"] = len(positions)
+        if len(positions) == total_objects:
+            fix["scope"] = f"All {total_objects} objects"
+        else:
+            label = "Object" if len(positions) == 1 else "Objects"
+            fix["scope"] = f"{label} {_upload_object_positions(positions)}"
+        fix["expand_scope"] = len(fix["scope"]) > 80
+    return list(fixes.values())
 
 
 def _get_upload_issue_messages(upload_files):
@@ -760,13 +821,14 @@ def _get_upload_issue_messages(upload_files):
             groups = _upload_issue_groups(object_report["issues"])
             for group in groups:
                 if group["category"] == "invalid_structure":
-                    group["guidance"] = ("Use the expected value type and structure at each listed field."
+                    group["guidance"] = ("Correct the value type"
                                          if group["fields"] else
                                          "Replace this entry with a JSON object containing the required fields.")
             if groups:
                 objects.append({**object_report, "groups": groups})
         groups = _upload_issue_groups(file_report["issues"]) if file_report["status"] == "failed" else []
-        files.append({**file_report, "groups": groups, "objects": objects})
+        fixes = _summarize_upload_fixes(objects, len(file_report["objects"])) if len(objects) > 1 else []
+        files.append({**file_report, "groups": groups, "objects": objects, "fixes": fixes})
     return [render_to_string("includes/upload_issue_report.html", {"upload_files": files})]
 
 

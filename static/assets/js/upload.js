@@ -157,6 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const alert = document.createElement('div');
     const level = event.level === 'error' ? 'danger' : event.level;
     alert.className = `alert alert-${level} mb-3`;
+    alert.setAttribute('role', 'status');
     const summary = document.createElement('p');
     summary.className = 'mb-0';
     summary.textContent = event.summary;
@@ -169,7 +170,8 @@ document.addEventListener('DOMContentLoaded', function() {
       alert.appendChild(report);
     }
     results.replaceChildren(alert);
-    showStatus(event.summary);
+    status.textContent = '';
+    status.hidden = true;
   }
 
   async function readProgress(response, currentRequest) {

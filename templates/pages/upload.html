@@ -29,15 +29,59 @@
   }
 
   .upload-report-object {
-    margin-top: 12px;
-    padding-left: 12px;
-    border-left: 2px solid rgba(0, 0, 0, 0.12);
+    margin-top: 8px;
+    padding: 8px 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.12);
   }
 
   .upload-report-object-title,
-  .upload-report-group-label {
+  .upload-report-summary-title {
     margin: 0 0 4px;
     font-weight: 600;
+  }
+
+  .upload-report-object-position {
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 12px;
+  }
+
+  .upload-object-issues {
+    margin-top: 12px;
+  }
+
+  .upload-issue-report summary {
+    cursor: pointer;
+    overflow-wrap: anywhere;
+  }
+
+  .upload-issue-report summary:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
+
+  .upload-fix {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 8px 16px;
+    padding: 6px 0;
+  }
+
+  .upload-fix-scope {
+    min-width: 0;
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .upload-report-group {
+    display: grid;
+    grid-template-columns: minmax(70px, max-content) minmax(0, 1fr);
+    gap: 4px 12px;
+    min-width: 0;
+  }
+
+  .upload-report-group-text {
+    display: block;
   }
 
   .upload-report-object-meta {
@@ -54,7 +98,31 @@
   }
 
   .upload-report-group + .upload-report-group {
-    margin-top: 12px;
+    margin-top: 8px;
+  }
+
+  .upload-report-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-width: 0;
+  }
+
+  .upload-report-fields li {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .upload-report-technical {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .upload-report-technical > summary {
+    font-size: 12px;
   }
 
   .upload-report-issues {
@@ -68,12 +136,17 @@
 
   .upload-report-guidance {
     margin: 0;
+    font-weight: 600;
+    max-width: 70ch;
   }
 
   .upload-issue-report code {
     color: inherit;
     font-size: inherit;
     white-space: normal;
+    max-width: 100%;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .file-upload-box[aria-disabled="true"] {

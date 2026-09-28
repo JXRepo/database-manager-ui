@@ -81,8 +81,8 @@ class UploadUnwrapTests(TestCase):
                                           "creator_primary": ["Researcher"],
                                           "software_primary": "Solver"}})
         self.assertFalse(JSONData.objects.exists())
-        self.assertContains(response, "Object 1 in this file")
-        self.assertNotContains(response, "Object 2 in this file")
+        self.assertContains(response, "Object 1")
+        self.assertNotContains(response, "Object 2")
         self.assertContains(response, "Incomplete")
 
     def test_thirty_invalid_members_prevent_all_one_hundred_saves(self):
@@ -96,7 +96,8 @@ class UploadUnwrapTests(TestCase):
         response = self.upload(records)
         self.assertFalse(JSONData.objects.exists())
         self.assertContains(response, "30 data objects need changes")
-        self.assertContains(response, "units.Stress", count=30)
+        self.assertContains(response, "data-upload-object", count=30)
+        self.assertContains(response, "units.Stress", count=31)
 
     def test_incomplete_mapping_member_is_not_silently_dropped(self):
         """
@@ -105,7 +106,7 @@ class UploadUnwrapTests(TestCase):
         response = self.upload({"first": self.first, "second": {"title": "Incomplete"}})
         self.assertFalse(JSONData.objects.exists())
         self.assertContains(response, "Incomplete")
-        self.assertContains(response, "Object 2 in this file")
+        self.assertContains(response, "Object 2")
         self.assertContains(response, "units")
 
     def test_scalar_mapping_member_cannot_disappear(self):
@@ -114,7 +115,7 @@ class UploadUnwrapTests(TestCase):
         """
         response = self.upload({"first": self.first, "broken": 42})
         self.assertFalse(JSONData.objects.exists())
-        self.assertContains(response, "Data object 2")
+        self.assertContains(response, "Object 2")
 
     def test_complete_object_keeps_nested_metadata_even_when_named_data(self):
         """

@@ -199,6 +199,79 @@ class UploadFeedbackTests(TestCase):
             self.assertLess(header.index(title), header.index(identifier))
             self.assertRegex(header.casefold(), rf"object\s+{position}\b")
 
+    def test_repeated_errors_show_one_action_per_group_with_all_objects_available(self):
+        """
+        Summarize identical fixes once without losing object identities or field paths
+        """
+        records = []
+        for index in range(100):
+            data = self._data(f"Simulation {index + 1}", f"record-{index + 1}")
+            for field in ("system", "phase", "units"):
+                data.pop(field)
+            data["total_strain"] = {}
+            records.append(data)
+        response = self._upload(("repeated.json", records))
+        report = self._report(response)
+        summary = _marked(report, "data-upload-fix-summary")
+        self.assertEqual(len(summary), 1)
+        fixes = _marked(summary[0], "data-upload-fix")
+        self.assertEqual(len(fixes), 2)
+        for fix, action, fields in ((fixes[0], "Add", ("system", "phase", "units")),
+                                   (fixes[1], "Fill in", ("total_strain",))):
+            self.assertIn("All 100 objects", _text(fix))
+            self.assertIn(action, _text(fix))
+            self.assertEqual([_text(node) for node in _elements(fix) if node.name == "code"], list(fields))
+        objects = _marked(report, "data-upload-object")
+        self.assertEqual(len(objects), 100)
+        self.assertTrue(all(node.name == "details" and "open" not in dict(node.attributes) for node in objects))
+        self.assertIn("record-100", _text(objects[-1]))
+        self.assertFalse(JSONData.objects.exists())
+
+    def test_summary_identifies_only_the_objects_affected_by_each_fix(self):
+        """
+        Keep missing and empty fields distinct and do not include valid neighbors
+        """
+        first = self._data("Missing phase", "missing-phase")
+        first.pop("phase")
+        second = self._data("Empty phase", "empty-phase")
+        second["phase"] = []
+        fourth = self._data("Missing phase again", "missing-phase-again")
+        fourth.pop("phase")
+        fifth = self._data("Another missing phase", "another-missing-phase")
+        fifth.pop("phase")
+        response = self._upload(("mixed.json", [first, second, self._data("Valid neighbor"), fourth, fifth]))
+        fixes = _marked(self._report(response), "data-upload-fix")
+        self.assertEqual(len(fixes), 2)
+        self.assertIn("Objects 1, 4–5", _text(fixes[0]))
+        self.assertIn("Object 2", _text(fixes[1]))
+        self.assertNotIn("All", _text(fixes[0]))
+        self.assertNotIn("Valid neighbor", _text(self._report(response)))
+        self.assertFalse(JSONData.objects.exists())
+
+    def test_single_object_shows_short_actions_and_keeps_structure_details_available(self):
+        """
+        Show field corrections immediately and collapse duplicated technical messages
+        """
+        data = self._data("One object", "one-object")
+        data.pop("units")
+        data["total_strain"] = {}
+        data["mechanical_BC"][0]["applied_load"] = [{"magnitude": "not a number"}]
+        response = self._upload(("single.json", {"one-object": data}))
+        report = self._report(response)
+        self.assertFalse(_marked(report, "data-upload-fix-summary"))
+        objects = _marked(report, "data-upload-object")
+        self.assertEqual(len(objects), 1)
+        self.assertIn("open", dict(objects[0].attributes))
+        guidance = [_text(node) for node in _marked(objects[0], "data-upload-guidance")]
+        self.assertIn("Add", guidance)
+        self.assertIn("Fill in", guidance)
+        self.assertNotIn("Null, blank text", _text(report))
+        self.assertNotIn("Location:", _text(report))
+        technical = _marked(objects[0], "data-upload-technical-details")
+        self.assertEqual(len(technical), 1)
+        self.assertNotIn("open", dict(technical[0].attributes))
+        self.assertIn("expected a number or a tensor object", _text(technical[0]))
+
     def test_file_and_object_structure_errors_keep_their_own_location_and_guidance(self):
         """
         Distinguish JSON syntax and root structure errors from invalid list entries
@@ -285,7 +358,7 @@ class UploadFeedbackTests(TestCase):
         self.assertEqual(categories, ["missing_required", "empty_values", "invalid_identifier"])
         guidance_text = []
         for section, fields in zip(sections[:2], [("creator", "phase"), ("software", "rights")]):
-            lists = [node for node in _elements(section) if node.name == "ol"]
+            lists = [node for node in _elements(section) if node.name == "ul"]
             self.assertEqual(len(lists), 1)
             field_text = _text(lists[0])
             for field in fields:
@@ -295,14 +368,14 @@ class UploadFeedbackTests(TestCase):
                 self.assertNotIn(field, field_text)
         for section in sections:
             nodes = list(_elements(section))
-            lists = [node for node in nodes if node.name == "ol"]
+            lists = [node for node in nodes if node.name == "ul"]
             self.assertEqual(len(lists), 1)
             self.assertTrue(any(node.name == "li" for node in _elements(lists[0])))
             guidance = _marked(section, "data-upload-guidance")
             self.assertEqual(len(guidance), 1)
             self.assertEqual(guidance[0].name, "p")
             self.assertTrue(_text(guidance[0]).strip())
-            self.assertLess(nodes.index(lists[0]), nodes.index(guidance[0]))
+            self.assertLess(nodes.index(guidance[0]), nodes.index(lists[0]))
             guidance_text.append(_text(guidance[0]))
         self.assertEqual(len(set(guidance_text)), 3)
 

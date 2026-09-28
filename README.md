@@ -212,9 +212,14 @@ open older pages keep receiving the original file event protocol.
 Closing that stream during a save rolls back its current file and notifications,
 while keeping earlier committed files. It does not create a background task;
 ordinary submissions without JavaScript still receive the final report.
-Errors appear directly beneath the form, before upload limits. Multiple object
-errors have a compact expandable list, retaining every affected field and its
-original object position and source location.
+Errors appear directly beneath the form, before upload limits. Identical fixes
+across multiple objects appear once, with the affected count or exact positions.
+Missing and empty fields use short actions: `Add` and `Fill in`. For example,
+100 objects missing the same three fields receive one shared correction line.
+Individual objects stay available in an expandable list in their original order;
+a single failed object opens immediately. Extra technical reasons can be expanded
+without repeating field paths in the main list. All titles, identifiers and
+distinct source locations remain available. The final result appears once.
 
 The browser sends the selected files in one submission so batch limits are
 checked before saving. It then reads progress from the server as each file is
@@ -243,9 +248,9 @@ and values are not converted, and wrapper keys are not substituted for identifie
 Upload errors follow the selected file order, then the original data object order
 within each file. Each object is identified by its title and supplied identifier
 when available, with its position in the file for reference. Missing fields,
-empty values, identifier problems, and sharing problems appear in separate lists,
-each followed by instructions for that issue. Missing or blank identifiers are
-assigned automatically and are not reported as errors.
+empty values, identifier problems, and sharing problems remain distinct, with
+short correction instructions and complete details on demand. Missing or blank
+identifiers are assigned automatically and are not reported as errors.
 
 ## Search
 

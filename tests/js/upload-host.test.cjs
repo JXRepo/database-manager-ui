@@ -261,7 +261,8 @@ describe('uploads across ordinary page navigation', {skip: !existsSync(chromium)
       report_html: '<p>Correct units.Stress and upload the file again.</p>',
       files: [{...job.files[0], status: 'failed', failed_object_count: 30, saved_count: 0}]};
     await waitFor(evaluate, 'document.getElementById("upload-results").textContent.includes("units.Stress")');
-    assert.match(await evaluate('uploadStatus.textContent'), /No data/);
+    assert.match(await evaluate('document.getElementById("upload-results").textContent'), /No data/);
+    assert.equal(await evaluate('uploadStatus.hidden'), true);
     assert.match(await evaluate('document.querySelector(".selected-file-status").textContent'), /30.*need changes/);
     assert.match(await evaluate('document.querySelector(".selected-file-status").textContent'), /Checked 100 \/ 100/);
   });

@@ -2,16 +2,49 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-28
-code_base: 8a399ff202de9ba9908cad9afc5430d5e3cf8886
+code_base: 8ad5a4bda40f2c52b7429a313a06a1058f46ad2b
 files_modified:
-  - Descriptive field keyword matching, multiple values, display, regression tests and documentation
+  - Compact upload correction summaries, expandable details, desktop layout and regression tests
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**9 月 28 日最新：用户确认描述字段按关键词识别，多个匹配项不再互相报冲突，全部保留展示。**
+**9 月 28 日最新：用户要求报错更短，直接告诉用户该改哪里。**
+
+- 多对象的同类同字段同原因错误合并显示，并标明 All 100 objects 或确切位置，例如 Objects 1, 4–5。
+  不把只涉及部分对象的问题说成所有对象都有；缺字段与空值保持分开。
+  Ronak 的当前文件默认只需两行操作：Add system / phase / units；Fill in total_strain。
+- View individual objects 展开全部有问题的对象，顺序与原文件一致；每条对象还可单独展开。
+  只有一条错误对象时直接展开。保留标题、有效 identifier、位置和所有字段错误；
+  Location 与 identifier 完全相同则不重复显示，对象序号也不重复写两遍。
+- 具体字段与修改动作直接显示，重复字段路径的技术原因放在 Show reason 中。
+  文件级 JSON 语法、空文件、共享、编号等仍有各自简短指引；全部上传内容继续转义。
+- 结束时只显示一份最终结果，不再在按钮下方和错误框各重复一遍 Upload finished。
+  同步表单、NDJSON 与后台上传共用服务器报告模板；进度和整文件保存规则未改。
+  已存储的旧后台任务报告仍是当时生成的 HTML，新上传使用本轮展示。
+- 主要文件：`apps/pages/views.py`、`templates/includes/upload_issue_report.html`、
+  `templates/includes/upload_issue_groups.html`、`templates/pages/upload.html`、
+  `static/assets/js/upload.js`。未改必填规则、编号算法、权限、用户原文件或数据库结构。
+
+验证：
+
+- 聚合、部分对象范围、单条对象直接展示与完成提示去重先验证旧实现失败，再修改通过。
+  236 项相关 Django 测试通过；117 项 JavaScript／Chromium 测试通过，0 跳过。
+- 真实 Chromium 连接隔离的本地 Django 测试库，上传原始 Data_Base_Cyclic.json，
+  默认报告只有 213 个可见字符、两组修正；100 条对象明细保留，实际保存 0 条。
+  同时测试展开明细、超长标题／identifier／位置、非法值原因和空文件。
+  1280／1440／1920 桌面宽度均无横向溢出，无 JavaScript 异常；原附件没有修改或外传。
+- 浏览器测试中发现公共 code 样式使超长位置撑宽，已在上传报告内限定宽度并允许换行，复测通过。
+  截图与临时测试在本机 `/tmp/compact-upload-qa/`；日志为
+  `/tmp/compact-upload-backend.log`、`/tmp/compact-upload-js-all.log`、`/tmp/compact-upload-browser.log`。
+- 最后去除重复对象序号后，再跑 25 项报错／拆分测试及 1 项真实 HTTP 浏览器测试，26 项通过，
+  见 `/tmp/compact-upload-final.log`；git diff 空白检查通过。
+- 未扩大到无关搜索测试；上一轮确认的旧搜索样例测试问题仍见下方记录。
+  Git 推送与 Render 完成部署必须区分。
+
+### 9 月 28 日上一轮：描述字段按关键词识别并保留多值
 
 - `processor_specification`、`processor_specification_of`、`Specifications of Processor`、
   `processorSpecificationOf` 等可满足处理器必填项；同时支持 CPU 的单数／复数别名。

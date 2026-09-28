@@ -197,6 +197,8 @@ describe('upload controls in Chromium', {skip: !existsSync(chromiumPath), timeou
         busy:uploadForm.getAttribute('aria-busy'),disabled:uploadButton.disabled,repeat:submit(),requests:requests.length}))`);
     assert.deepEqual(final, {rows: ['Uploaded', 'Failed', 'Uploaded'], spinners: 0,
       report: '2 uploaded, 1 failed.Missing: phase', busy: 'false', disabled: true, repeat: false, requests: 1});
+    assert.equal(await evaluate('uploadStatus.hidden'), true);
+    assert.equal(await evaluate('document.querySelector("#upload-results > .alert").getAttribute("role")'), 'status');
     assert.deepEqual(await evaluate(`selectFiles(['new.json']); ({disabled:uploadButton.disabled,rows:rowStates()})`), {
       disabled: false, rows: ['Waiting'],
     });

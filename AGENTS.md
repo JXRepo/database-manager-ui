@@ -66,6 +66,8 @@ Current priority:
 - Resolve schema references only through the bundled trusted snapshots; never fetch a user's uploaded $schema URL
 - Recognize records in lists, identifier dictionaries and nested collections using the same field name matching; stop at record boundaries and retain incomplete members for errors instead of dropping them or changing stored field names
 - Group upload feedback by JSON file, then data object in original order, then issue category; list each affected field separately and give guidance specific to that category
+- Lead errors across objects with a compact summary of identical fixes and their affected count or exact positions; keep missing and empty values distinct, use short actions such as Add and Fill in, and retain all object details in original order behind expandable sections
+- Open a single failed object's corrections immediately, collapse repeated technical messages behind Show reason, omit a source location that repeats the identifier, and show the final upload summary only once
 - Identify an object by its title and valid supplied identifier when available, with its file position as a reference or fallback; escape all uploaded text in feedback
 - Treat each uploaded JSON file as one save unit: any validation, identifier, or sharing error rejects the entire file, with no partial objects or notifications saved
 - Check every file and every readable data object, collecting independent errors instead of stopping at the first issue; reject invalid files and continue processing the others

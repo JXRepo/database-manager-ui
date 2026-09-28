@@ -11,34 +11,50 @@
       </p>
       {% include "includes/upload_issue_groups.html" with groups=file.groups only %}
       {% if file.objects %}
-      <details class="upload-object-issues"{% if file.objects|length == 1 %} open{% endif %}>
-        <summary>{{ file.objects|length }} data object{{ file.objects|pluralize }} need{{ file.objects|pluralize:"s," }} changes — view field errors</summary>
+      {% if file.fixes %}
+      <div class="upload-fix-summary" data-upload-fix-summary>
+        <p class="upload-report-summary-title">{{ file.objects|length }} data objects need changes</p>
+        {% for fix in file.fixes %}
+        <div class="upload-fix" data-upload-fix>
+          {% if fix.expand_scope %}
+          <details class="upload-fix-scope">
+            <summary>{{ fix.count }} objects</summary>
+            <p>{{ fix.scope }}</p>
+          </details>
+          {% else %}
+          <p class="upload-fix-scope">{{ fix.scope }}</p>
+          {% endif %}
+          {% include "includes/upload_issue_groups.html" with groups=fix.groups compact_summary=True only %}
+        </div>
+        {% endfor %}
+      </div>
+      <details class="upload-object-issues">
+        <summary>View individual objects ({{ file.objects|length }})</summary>
+      {% endif %}
       {% for object in file.objects %}
-        <section class="upload-report-object" data-upload-object>
-          <p class="upload-report-object-title">
+        <details class="upload-report-object" data-upload-object{% if file.objects|length == 1 %} open{% endif %}>
+          <summary class="upload-report-object-title">
+            <span class="upload-report-object-position">Object {{ object.position }}</span>
             {% if object.title %}
-              {{ object.title }}
+              <span>{{ object.title }}</span>
             {% elif object.identifier %}
-              Identifier: <code>{{ object.identifier }}</code>
-            {% else %}
-              Data object {{ object.position }}
+              <code>{{ object.identifier }}</code>
             {% endif %}
-          </p>
-          {% if object.title or object.identifier %}
+          </summary>
+          {% if object.title and object.identifier %}
             <p class="upload-report-object-meta">
-              {% if object.title and object.identifier %}
-                <span>Identifier: <code>{{ object.identifier }}</code></span>
-              {% endif %}
-              <span>Object {{ object.position }} in this file</span>
+              <span>Identifier: <code>{{ object.identifier }}</code></span>
             </p>
           {% endif %}
-          {% if object.source %}
+          {% if object.source and object.source != object.identifier %}
             <p class="upload-report-object-meta">Location: <code>{{ object.source }}</code></p>
           {% endif %}
           {% include "includes/upload_issue_groups.html" with groups=object.groups only %}
-        </section>
+        </details>
       {% endfor %}
+      {% if file.fixes %}
       </details>
+      {% endif %}
       {% endif %}
     </section>
   {% endfor %}

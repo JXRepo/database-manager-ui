@@ -1,14 +1,26 @@
 {% for group in groups %}
-  <section class="upload-report-group" data-upload-category="{{ group.category }}">
-    <p class="upload-report-group-label">{{ group.label }}</p>
-    <ol class="upload-report-issues">
+  <section class="upload-report-group{% if not group.fields %} upload-report-group-text{% endif %}" aria-label="{{ group.label }}" {% if compact_summary %}data-upload-summary-category{% else %}data-upload-category{% endif %}="{{ group.category }}">
+    <p class="upload-report-guidance" data-upload-guidance>{{ group.guidance }}</p>
+    {% if group.fields %}
+    <ul class="upload-report-fields" aria-label="Fields to change">
       {% for field in group.fields %}
         <li><code>{{ field }}</code></li>
       {% endfor %}
+    </ul>
+    {% endif %}
+    {% if group.messages %}
+    {% if group.fields %}
+    <details class="upload-report-technical" data-upload-technical-details>
+      <summary>Show reason</summary>
+    {% endif %}
+    <ul class="upload-report-issues">
       {% for issue in group.messages %}
         <li>{{ issue }}</li>
       {% endfor %}
-    </ol>
-    <p class="upload-report-guidance" data-upload-guidance>{{ group.guidance }}</p>
+    </ul>
+    {% if group.fields %}
+    </details>
+    {% endif %}
+    {% endif %}
   </section>
 {% endfor %}
