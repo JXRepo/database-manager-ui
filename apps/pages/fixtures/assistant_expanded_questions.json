@@ -1,0 +1,1208 @@
+{
+  "title": "Independent held-out questions for the task-grouped platform FAQ expansion",
+  "created_at": "2026-09-29T17:15:33.490Z",
+  "base_commit": "b4a3d8b",
+  "question_count": 43,
+  "scenario_count": 40,
+  "policy": {
+    "independence": "Written from routes, forms, views, templates and README before reading the expanded assistant knowledge examples.",
+    "topic_mapping": "Concept names describe intent, not required implementation IDs; map semantically equivalent new topic IDs at first evaluation.",
+    "correct_direct_answer": "Must address the user question and satisfy required facts without any prohibited claim. A correct generic topic label is not enough.",
+    "useful_clarification": "A correct candidate may defer the answer, with at most four choices; complete expected concept sets are required for intentionally ambiguous prompts.",
+    "matching_vs_facts": "Report direct-answer factual accuracy separately from candidate coverage and strict expected mode.",
+    "security": "Evaluate only through isolated DEBUG=True SQLite fixtures; no real user data or external services."
+  },
+  "cases": [
+    {
+      "id": "E01",
+      "tags": [
+        "account",
+        "registration",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Do I have to give you my email address to make a login?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.registration",
+              "account.email"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Email is optional for platform registration.",
+            "The pilot has no email verification or email password recovery."
+          ],
+          "must_not_claim": [
+            "Email is required.",
+            "An activation email will be sent."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E02",
+      "tags": [
+        "account",
+        "registration",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "注册用户名里想写王同学加一个空格，为什么不让过？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.username",
+              "account.registration"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Usernames do not allow spaces.",
+            "Valid usernames are unique ignoring case and limited to 150 characters."
+          ],
+          "must_not_claim": [
+            "Any display name can be used as a username with spaces."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E03",
+      "tags": [
+        "account",
+        "password_rules",
+        "en",
+        "typo"
+      ],
+      "turns": [
+        {
+          "question": "Does my pasword really need a capital letter and a symbol?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.password_rules",
+              "account.registration"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "At least eight characters.",
+            "No mandatory uppercase/lowercase/symbol mixture.",
+            "All numeric, common or too similar passwords are rejected."
+          ],
+          "must_not_claim": [
+            "A symbol and uppercase character are compulsory."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E04",
+      "tags": [
+        "account",
+        "profile",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "我换了单位，页面上个人简介的机构去哪里改？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.profile"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Account Settings has an editable optional Institution field.",
+            "Save changes applies the profile update."
+          ],
+          "must_not_claim": [
+            "Edit the uploaded JSON to change the account institution."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E05",
+      "tags": [
+        "account",
+        "session",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "If I shut Chrome and open it tomorrow, will the site have logged me out even without remember me?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.sessions"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Without Remember me an ordinary login lasts 30 days and survives browser restart.",
+            "It has a fixed deadline; clearing cookies or explicit logout can end it earlier."
+          ],
+          "must_not_claim": [
+            "Unchecked Remember me means browser-session-only login."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E06",
+      "tags": [
+        "account",
+        "session",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "勾上记住我以后，只是让网页一直开着就能自动续一年吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.sessions"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Remember me provides a 365-day persistent session.",
+            "Successful ordinary page visits renew at most once per day.",
+            "Background refresh alone does not renew it."
+          ],
+          "must_not_claim": [
+            "Keeping the tab open guarantees indefinite access."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E07",
+      "tags": [
+        "account",
+        "password_recovery",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "I lost the password and the forgot-password text does nothing. Where is the reset email?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.password_recovery",
+              "account.password"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Email password recovery is unavailable in the pilot.",
+            "Changing a usable local password normally requires the current password."
+          ],
+          "must_not_claim": [
+            "A reset email can be requested here.",
+            "ORCID sign-in resets or bypasses the current local password."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E08",
+      "tags": [
+        "account",
+        "password",
+        "zh",
+        "follow_up"
+      ],
+      "turns": [
+        {
+          "question": "还记得旧密码，只是想换一个。在哪里操作？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.password"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Account Settings offers Change password.",
+            "Enter current password and the new password twice."
+          ],
+          "must_not_claim": []
+        },
+        {
+          "question": "那原来的忘了呢？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.password_recovery",
+              "account.password"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "There is no email password recovery in this pilot.",
+            "ORCID does not make the old-password requirement disappear."
+          ],
+          "must_not_claim": [
+            "The user can use Change password without knowing the current usable password."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E09",
+      "tags": [
+        "orcid",
+        "link",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "I already uploaded with a normal login. How do I add my researcher iD without ending up with another empty account?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.connect",
+              "orcid.login"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Sign in to the existing platform account first.",
+            "Use Account Settings → Connect ORCID.",
+            "An unlinked ORCID login may create a separate account."
+          ],
+          "must_not_claim": [
+            "Matching email automatically merges accounts."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E10",
+      "tags": [
+        "orcid",
+        "separate_account",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "用 ORCID 登进来后以前上传的东西没了，邮箱还是同一个，会自动合并回来吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.accounts",
+              "orcid.connect"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Same name or email does not merge platform accounts.",
+            "Unlinked ORCID sign-in can create a different account.",
+            "Previously uploaded data stays with the original owner account."
+          ],
+          "must_not_claim": [
+            "Uploads have been deleted.",
+            "Accounts merge after email verification."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E11",
+      "tags": [
+        "orcid",
+        "setup",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Why is it asking me to choose another password when I just authenticated at ORCID?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.setup"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "An ORCID-only platform account must choose its platform username and local password twice before entering.",
+            "This does not change ORCID credentials.",
+            "The account, uploaded data and ORCID connection are retained."
+          ],
+          "must_not_claim": [
+            "Enter the ORCID password into the platform form.",
+            "Skip setup and continue normally."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E12",
+      "tags": [
+        "orcid",
+        "disconnect",
+        "zh",
+        "follow_up"
+      ],
+      "turns": [
+        {
+          "question": "把研究者账号解绑会连同我的上传记录一起删掉吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.disconnect"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Disconnect only removes the verified ORCID link.",
+            "The platform account, uploads and local credentials remain."
+          ],
+          "must_not_claim": []
+        },
+        {
+          "question": "之后还怎么登录？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.disconnect",
+              "orcid.login",
+              "account.login"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Use the retained platform username and password after disconnecting ORCID."
+          ],
+          "must_not_claim": [
+            "The disconnected ORCID still signs in to the same account automatically."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E13",
+      "tags": [
+        "orcid",
+        "link_conflict",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "It says this iD belongs to my other account. Can I attach it here as well?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.connect",
+              "orcid.accounts"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "One verified ORCID iD can be linked to only one platform account.",
+            "Disconnect it from the other account before connecting it here."
+          ],
+          "must_not_claim": [
+            "The same iD may remain linked to both accounts.",
+            "The assistant can merge the accounts."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E14",
+      "tags": [
+        "orcid",
+        "profile_import",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "ORCID 里面明明有单位，为什么这里机构还是空的？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.profile"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Only available public profile information fills empty optional fields.",
+            "Ambiguous or incompatible employment information may be left blank.",
+            "Existing local values are preserved and users can edit profile fields manually."
+          ],
+          "must_not_claim": [
+            "All private ORCID information is imported.",
+            "A blank institution means sign-in failed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E15",
+      "tags": [
+        "orcid",
+        "failure",
+        "en",
+        "typo"
+      ],
+      "turns": [
+        {
+          "question": "ORICD sign-in was cancelled and I am back at the login screen. Did that create a connection?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "orcid.errors",
+              "orcid.login",
+              "orcid.connect"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Cancelled or failed authorization does not establish a verified ORCID connection.",
+            "Start sign-in or connection again from the appropriate page."
+          ],
+          "must_not_claim": [
+            "Cancellation successfully links the account.",
+            "Paste a password or authorization token into chat."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E16",
+      "tags": [
+        "sharing",
+        "recipient",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Trying to invite my coworker by her email, but Add user cannot find her. What should I type?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.share",
+              "sharing.usernames"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Use the existing platform username, not an email address.",
+            "Only the owner can share a private object with another platform user."
+          ],
+          "must_not_claim": [
+            "Email invitations create a platform account."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E17",
+      "tags": [
+        "sharing",
+        "history",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "已经把同事从共享名单移除了，为什么发出的分享记录还留着？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.history",
+              "sharing.revoke"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Sharing History records sent sharing events and is not the current permission list.",
+            "Remove stops that user’s current shared access.",
+            "The object detail page shows the current sharing list."
+          ],
+          "must_not_claim": [
+            "History presence proves that access is still active."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E18",
+      "tags": [
+        "sharing",
+        "public",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "I sent a Public object URL to someone outside the site and it asks them to sign in. Is that expected?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.access",
+              "sharing.public"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Public means available to other signed-in platform users.",
+            "It does not allow anonymous access."
+          ],
+          "must_not_claim": [
+            "Anyone on the internet can open public objects without login."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E19",
+      "tags": [
+        "sharing",
+        "visibility_change",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "已经传好的私有数据，现在在哪个按钮改成公开？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.visibility",
+              "limits.editing"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The current UI does not offer a public/private switch for an existing object.",
+            "Detail sharing controls add or remove named users for a private object."
+          ],
+          "must_not_claim": [
+            "There is a Change access dropdown on the detail page.",
+            "The assistant has made the object public."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E20",
+      "tags": [
+        "sharing",
+        "rights",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Public means I can republish the dataset under any licence, right?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.rights",
+              "sharing.access"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Platform access does not grant a reuse or copyright license.",
+            "Check the supplied rights metadata separately."
+          ],
+          "must_not_claim": [
+            "Public access waives copyright."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E21",
+      "tags": [
+        "sharing",
+        "owner",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "别人分享给我的那份，我能再在站内加一个查看人吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.share",
+              "sharing.ownership"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Only the owner can manage sharing.",
+            "Being a shared recipient does not make the user the owner."
+          ],
+          "must_not_claim": [
+            "All viewers can add recipients."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E22",
+      "tags": [
+        "notifications",
+        "scope",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Will the bell tell me whenever somebody publishes a new public dataset?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "notifications.about"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Notifications are created by explicit sharing of private data with the user.",
+            "Public uploads are found through Search or Live Data Objects, not per-upload notifications."
+          ],
+          "must_not_claim": [
+            "Every public upload creates a notification for all users."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E23",
+      "tags": [
+        "notifications",
+        "read",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "通知那里“全部已读”会把别人给我的数据删了吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "notifications.read"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Mark all read only changes notification read status.",
+            "It does not delete data or revoke shared access."
+          ],
+          "must_not_claim": [
+            "Marking read removes shared data."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E24",
+      "tags": [
+        "notifications",
+        "unavailable",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "An old sharing alert opens a not-found page, but the alert is still there. What happened?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "notifications.unavailable",
+              "sharing.revoke"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Opening a notification checks current object access.",
+            "The owner may have removed shared access; a stale alert does not preserve it.",
+            "The assistant cannot grant access."
+          ],
+          "must_not_claim": [
+            "The notification bypasses current permissions.",
+            "The object definitely still exists or definitely was deleted."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E25",
+      "tags": [
+        "sharing",
+        "navigation",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "想看谁给我分享过东西，跟我发给别人的记录是在一个地方吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.page",
+              "sharing.history"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Share has Shared with Me for accessible private objects shared by others.",
+            "Sharing History lists outgoing share events."
+          ],
+          "must_not_claim": [
+            "Sharing History is the list of current recipients only."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E26",
+      "tags": [
+        "export",
+        "json",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "The detail list hides the big stress array. Will Download JSON leave that out too?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.json",
+              "object.fields"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Download JSON preserves the complete stored object including stress, strain and boundary data omitted from metadata display.",
+            "Original keys and values are preserved."
+          ],
+          "must_not_claim": [
+            "The omitted display arrays are removed from JSON export."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E27",
+      "tags": [
+        "export",
+        "csv_selection",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "勾了三条模拟记录下载曲线，为什么得到的是压缩包而不是一个表？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.csv"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "One selected object downloads one CSV.",
+            "Multiple selected objects download a ZIP containing one CSV per object.",
+            "The data is not combined into one cross-object table."
+          ],
+          "must_not_claim": [
+            "A multi-object CSV merges all samples into one physically comparable dataset."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E28",
+      "tags": [
+        "export",
+        "csv_lengths",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "The last rows of one CSV column are blank while another continues. Has export thrown away my measurements?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.csv_details",
+              "export.csv"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Unequal-length arrays retain every value.",
+            "Shorter columns end in blank cells without interpolation or resampling.",
+            "The index is array position, not a measured time."
+          ],
+          "must_not_claim": [
+            "Blank values are measurements of zero.",
+            "Arrays are truncated to the shortest length."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E29",
+      "tags": [
+        "export",
+        "calculated",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "CSV 列名里的 calculated 是谁计算的，原来上传的数被覆盖了？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.calculated",
+              "export.csv",
+              "object.curves"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Calculated equivalent curves are labelled.",
+            "Supplied equivalent arrays take precedence; only absent equivalent fields can use the existing complete-component calculations.",
+            "Stored and exported raw JSON is unchanged."
+          ],
+          "must_not_claim": [
+            "All supplied curves are recalculated and overwrite raw JSON."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E30",
+      "tags": [
+        "export",
+        "csv_failure",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "One of my selected records has no curves. Can I still download the others as the same CSV batch?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.csv_failure",
+              "export.csv"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The whole selected curve download is rejected if any selected object lacks exportable curves or current access.",
+            "Change the selection and request the download again."
+          ],
+          "must_not_claim": [
+            "CSV silently omits that record and downloads the rest."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E31",
+      "tags": [
+        "export",
+        "json_selection",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "搜索页批量下 JSON 时，一条的权限刚被收回，其他有权限的也全部下不了吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.json_selection",
+              "export.json"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Selected JSON export skips inaccessible or missing records and exports remaining accessible records.",
+            "It shows an error if no selected accessible objects remain.",
+            "This differs from the full-selection check for curve CSV."
+          ],
+          "must_not_claim": [
+            "Any inaccessible selection always rejects the entire JSON export."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E32",
+      "tags": [
+        "export",
+        "format",
+        "en",
+        "typo"
+      ],
+      "turns": [
+        {
+          "question": "Can this give me an xslx spreadsheet instead of csv?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.formats",
+              "export.csv"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The current curve export format is UTF-8 CSV, with multiple objects in a ZIP.",
+            "There is no native Excel workbook export."
+          ],
+          "must_not_claim": [
+            "There is an XLSX download button."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E33",
+      "tags": [
+        "limits",
+        "data_edit",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "我把材料名字填错了，能直接在详情页改一下并覆盖原文件吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "limits.editing",
+              "manage.editing"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "There is no inline JSON data editor or overwrite action on the current detail page.",
+            "Duplicate identifiers are rejected rather than overwritten.",
+            "Original uploaded data is preserved."
+          ],
+          "must_not_claim": [
+            "Edit the material field in the detail form.",
+            "Uploading the same identifier updates the existing record."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E34",
+      "tags": [
+        "manage",
+        "delete",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "I deleted an object by mistake. Where is its recycle bin?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "manage.delete",
+              "limits.restore"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Deletion is owner-only.",
+            "The current platform has no recycle bin or self-service restore action.",
+            "Keep original files; do not promise recovery."
+          ],
+          "must_not_claim": [
+            "Deleted records can be restored from a Recycle Bin page."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E35",
+      "tags": [
+        "account",
+        "unsupported",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "想把平台账号彻底注销，设置里哪个按钮？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.delete",
+              "limits.account"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "There is no self-service account deletion control in the current account settings.",
+            "Disconnecting ORCID does not delete the platform account."
+          ],
+          "must_not_claim": [
+            "Click Delete account in Settings.",
+            "Disconnect ORCID deletes all uploads."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E36",
+      "tags": [
+        "assistant",
+        "unsupported_action",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Please fix the typo in my uploaded title and share the corrected record with Priya for me.",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "assistant.capabilities",
+              "limits.editing"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The assistant provides prepared guidance and cannot edit uploaded data or execute sharing actions.",
+            "Only the owner can use the implemented sharing controls."
+          ],
+          "must_not_claim": [
+            "The record has been changed or shared.",
+            "The assistant will generate a corrected file and upload it automatically."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E37",
+      "tags": [
+        "navigation",
+        "tour",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "上次跳过的新手步骤还能再看一遍吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "navigation.tour",
+              "navigation.quick_start"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The top-bar help icon reopens the tour.",
+            "Quick start provides the core Search → Upload Data → My Data → Share guidance."
+          ],
+          "must_not_claim": [
+            "The tour is permanently unavailable after Skip."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E38",
+      "tags": [
+        "storage",
+        "environment",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "I uploaded on localhost yesterday, but on the public site my account and files are missing. Does a push copy them over?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "limits.environment",
+              "storage.local_hosted"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Local and hosted accounts and data are separate.",
+            "Deploying or pushing code does not copy the local database and uploads to the hosted site."
+          ],
+          "must_not_claim": [
+            "Git push copies local users and datasets to production."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E39",
+      "tags": [
+        "storage",
+        "archive",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "传到这个网站后，本地原始文件可以删了长期只用网站备份吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "limits.archive",
+              "storage.backup"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The pilot is not a permanent archive.",
+            "Keep original files and use test data as appropriate."
+          ],
+          "must_not_claim": [
+            "The platform guarantees permanent archival preservation."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E40",
+      "tags": [
+        "ambiguity",
+        "download",
+        "en",
+        "follow_up"
+      ],
+      "turns": [
+        {
+          "question": "Which download do I need?",
+          "expected": {
+            "mode": "clarify",
+            "required_concepts": [
+              "export.json",
+              "export.csv"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The response should ask what is needed or present the JSON and curve CSV alternatives."
+          ],
+          "must_not_claim": []
+        },
+        {
+          "question": "The whole original object, including every field.",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "export.json",
+              "object.fields"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Download JSON gives the complete stored object, preserving original keys and values."
+          ],
+          "must_not_claim": [
+            "Download CSV contains all nested JSON metadata."
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -434,13 +434,20 @@ and data access.
 The assistant matches English and Chinese questions to maintained platform
 answers with a small multilingual model running inside Django. It uses no
 external model API, API key, model training or live support handoff. Answers
-remain in English. **Browse help topics** opens Upload, Search, Access and
-sharing, My Data and Charts categories, plus Current object on detail pages.
-Exact menu choices work even when semantic matching is unavailable.
+remain in English. **Browse help topics** opens nine general categories:
+Getting started, Prepare data, Upload, Search, Access and sharing, My Data,
+Reading data and plots, Charts, and Account. Current object is also available
+on detail pages. There are 76 prepared guides and six current-object summaries.
+Each category offers at most six questions per page, with page buttons and
+`more`/`back` navigation. Exact menu choices work even when semantic matching
+is unavailable. See the [coverage and maintenance guide](docs/assistant-coverage.md).
 
 Ambiguous questions offer choices: `data form` asks about JSON format or the
 upload form; `format`, `which fields?` and `how big?` can continue that conversation.
-Numbered choices such as `the second one` refer to the last suggested questions.
+Numbered choices such as `the second one` refer to the last suggested questions,
+up to the sixth question on a category page. Password and ORCID questions can
+offer more specific choices before answering. Answers link to relevant pages
+and suggest the next related tasks, including troubleshooting and current limits.
 A complete new question can change topics. Low confidence produces clarification
 or platform help choices; this is not a general chat or answer generation model.
 

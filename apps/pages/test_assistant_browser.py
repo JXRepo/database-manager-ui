@@ -6,7 +6,9 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.core.servers.basehttp import WSGIServer
 from django.test import Client, override_settings
+from django.test.testcases import LiveServerThread, QuietWSGIRequestHandler
 from django.urls import reverse
 from django.utils import timezone
 
@@ -14,11 +16,36 @@ from .models import AccountProfile, JSONData
 from .upload_test_data import valid_upload_object
 
 
+class AssistantLiveServerThread(LiveServerThread):
+    """
+    Serialize browser requests that share one in-memory SQLite connection
+    """
+
+    def _create_server(self, connections_override=None):
+        """
+        Serve UI checks without concurrent access to SQLite's statement cache
+
+        Parameters
+        ----------
+        connections_override : dict or None
+            Connections already installed by LiveServerThread.run.
+
+        Returns
+        -------
+        WSGIServer
+            Sequential HTTP server for this browser test.
+        """
+        return WSGIServer((self.host, self.port), QuietWSGIRequestHandler,
+                          allow_reuse_address=False)
+
+
 @override_settings(DEBUG=True, ALLOWED_HOSTS=["localhost", "127.0.0.1", "testserver"])
 class AssistantBrowserTests(StaticLiveServerTestCase):
     """
     Verify the help widget against real HTTP responses in desktop Chromium
     """
+
+    server_thread_class = AssistantLiveServerThread
 
     def test_help_navigation_and_desktop_layout(self):
         """

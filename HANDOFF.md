@@ -2,17 +2,17 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-29
-code_base: see latest git commit (local semantic assistant and follow-ups)
-next_topic: Try the assistant after deployment and collect real platform questions
+code_base: see latest git commit (expanded task-based assistant help)
+next_topic: Try the expanded assistant after deployment and collect real platform questions
 files_modified:
-  - Local semantic assistant, setup, regression tests and documentation
+  - Assistant knowledge, category paging, follow-ups, coverage tests and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**右下角 FAIR Data Assistant 已从关键词 FAQ 升级为本地语义匹配、平台知识答案和简短追问。**
+**右下角 FAIR Data Assistant 已扩充为 82 个主题的初版平台助手，继续使用本地语义匹配、维护好的答案和简短追问。**
 
 - 用户试用旧版后指出 data form 都无法理解，随后同意推荐的改进方案。
   不要继续把这轮当成纯讨论，也不要回退为只补关键词。
@@ -22,7 +22,47 @@ files_modified:
 - Charts、上传处理、权限和原始 JSON 未改。样例 example_json_files/a46fde6c.json 未修改、未发送到外部。
 - 用户要求完成后验证、提交、推送。Git 推送成功与 Render 部署完成必须分别说明。
 
-### 助手当前实现
+### 本轮：按用户任务扩充初版帮助
+
+- 用户确认当前答案是预设知识后，要求尽量想全，按问题大类扩充为真正可用的初版。
+  这是明确的实现请求，不再停在方案讨论；也没有要求训练或接入生成式模型。
+- 从 25 个主题扩到 82 个：9 类通用帮助共 76 条，另有当前授权对象的 6 种摘要。
+  分类是 Getting started、Prepare data、Upload、Search、Access and sharing、My Data、
+  Reading data and plots、Charts、Account；详情页额外显示 Current object。
+- 新增注册／密码／ORCID／通知、撤权和共享历史、上传语法／进度／配额、搜索范围和空结果、
+  导出格式／CSV 空尾／计算来源、修改及恢复限制、张量图和统计口径等具体步骤。
+  来源与维护方式见 docs/assistant-coverage.md。条目仍位于 assistant_knowledge.py。
+- assistant.py 按 category 分页，每页最多 6 个问题；页码按钮不依赖会话或语义模型。
+  more/back、下一页/上一页、第一至第六项可使用签名上下文；回答推荐后续任务。
+  password、ORCID 单词先澄清具体需求；常见 pasword/ORICD/xslx 拼写可修正。
+  新增忘记旧密码、解绑后登录和删除后恢复的短追问；撤权后的 how 不再误答成添加共享。
+- 答案明确当前没有邮件验证码／邮件找回密码、现有对象公开私有切换、在线 JSON 编辑、
+  回收站和自助销号。JSON 批量下载可跳过失效对象，CSV 必须整个选择都可导出，不能混淆。
+  原来的界面风格、模型、依赖、数据库和权限实现未改；不执行用户请求的数据操作。
+
+### 本轮验证
+
+- 47 项相关 Django 测试通过，包含完整 assistant 模块、原有权限／输入检查和 phase 回归。
+  117 项 JavaScript / Chromium 测试通过，0 跳过。真实 Chromium 验证 18 种桌面布局，
+  包括分页、序号选择、长内容、空数据、连接失败重试和账户帮助；未做专门移动端改版。
+- 浏览器夹具使用顺序 HTTP 服务器，避免 Python 3.10 下后台轮询与请求并发使用同一个
+  内存 SQLite 连接时的 statement-cache KeyError；生产服务器未改，这不是并发负载测试。
+- 原 52 轮回归现为 27 直接答对、21 相关澄清、3 正确范围提示、1 正确权限拒绝。
+  新增独立编写的 40 场景／43 轮原样保存在 fixtures/assistant_expanded_questions.json。
+  首轮发现 16 个误选或回答不完整，修正后自动回归为 29 直接答复、14 相关澄清。
+  自动回归检查能否得到正确答案或入口，不等于每个答案满足全部细节；独立评估另核内容。
+  这些题已用于迭代，是回归集，不能宣称泛化准确率 100%。
+- 又单独固定了 10 条新问题（fixtures/assistant_followup_questions.json），首轮 4 直接、
+  2 相关澄清、4 失败。修正了曲线 CSV 选列、已下载副本不能追回及站外邮箱／云盘范围问题。
+  全部 105 轮现已纳入回归，不能把已见题通过率称为新问题理解率。
+- 最终独立真实 HTTP 复核：新增 43 轮为 29 直接、14 澄清；后加 10 轮为 5 直接、3 澄清、
+  2 正确站外范围提示，均无核心问题失败。严格原要求为 52/53：唯一差异是“Which download
+  do I need?” 给出了正确 JSON/CSV 概览，而原题期待先澄清。所有请求 HTTP 200，数据未改。
+- 日志 /tmp/assistant-expanded-final-backend.log、/tmp/assistant-expanded-js.log；
+  截图 /tmp/assistant-expanded-qa。首轮独立评估在
+  /tmp/assistant-expanded-independent-results-draft1-reviewed.json。临时文件不随 Git 同步。
+
+### 助手语义基础（继续保留）
 
 - apps/pages/assistant_knowledge.py：平台答案、导航分类、明确别名和中英文代表问法。
   增加 JSON 格式、模板准备、实际 24 个顶层必填字段和科学分析能力边界。
@@ -56,7 +96,7 @@ files_modified:
   后续串行请求中位 6.55 ms。测试包含菜单及语义问题，不是 Render 并发或大文件上传容量证明。
   上传进程另有内存开销；线上部署后应观察内存和重启记录，不擅自升级付费套餐。
 
-### 本轮验证与限制
+### 上轮语义升级的验证记录
 
 - 38 项相关 Django 测试通过；包含真实 Chromium 的 12 种桌面布局、上下文重试、长内容和空数据。
   117 项 JavaScript / Chromium 测试通过，0 跳过。pip check 和模型 setup 命令通过。

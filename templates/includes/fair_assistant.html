@@ -241,7 +241,7 @@
     {% endif %}
 
     <div class="fair-assistant-messages" role="log" aria-label="Help conversation" aria-live="polite">
-      <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Ask me about data formats, uploads, search, sharing or plots. You can use your own words. If a question could mean several things, I'll help you choose.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
+      <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Ask me about getting started, data preparation, uploads, search, sharing, exports, plots or your account. You can use your own words or browse the help topics. If a question could mean several things, I'll help you choose.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
     </div>
 
     {% if request.user.is_authenticated %}

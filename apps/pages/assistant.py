@@ -12,7 +12,7 @@ from django.conf import settings
 from django.core import signing
 from django.urls import reverse
 
-from .assistant_knowledge import CATEGORIES, EXAMPLES, TOPICS
+from .assistant_knowledge import CATEGORIES, CATEGORY_ALIASES, EXAMPLES, TOPICS
 from .assistant_semantics import ModelUnavailable, rank_topics
 
 
@@ -21,8 +21,14 @@ CHOICE_LABELS = {"upload.format": "JSON format", "upload.start": "Upload form",
                  "upload.required": "Required fields", "upload.template": "JSON template"}
 SEMANTIC_EXAMPLES = tuple((topic["id"], topic["question"]) for topic in TOPICS) + tuple(
     (topic_id, example) for topic_id, examples in EXAMPLES.items() for example in examples
+) + tuple(
+    (topic["id"], example) for topic in TOPICS for example in topic.get("examples", ())
 )
 CONTEXT_SALT = "fair-assistant-conversation-v1"
+MENU_PAGE_SIZE = 6
+CATEGORY_TOPICS = {key: [] for key in CATEGORIES}
+for _topic in TOPICS:
+    CATEGORY_TOPICS[_topic.get("category", _topic["id"].split(".")[0])].append(_topic["id"])
 
 
 def _normalize(text):
@@ -112,9 +118,62 @@ def _menu(has_object, answer=None):
         Prepared category reply.
     """
     return {
-        "answer": answer or "I can help with data files, uploads, search, sharing and plots. What would you like to do?",
+        "answer": answer or "I can help you get started, prepare and upload data, search, share, export, read plots or manage your account. Choose a category or ask in your own words.",
         "suggestions": [label for key, label in CATEGORIES.items() if key != "object" or has_object],
         "links": [], "topic": None if answer else "menu", "conversation": {},
+    }
+
+
+def _page_label(category, page):
+    """
+    Label a category page so its navigation works without conversation state
+
+    Parameters
+    ----------
+    category : str
+        Maintained category key.
+    page : int
+        Zero-based page index.
+
+    Returns
+    -------
+    str
+        Visible navigation label.
+    """
+    pages = (len(CATEGORY_TOPICS[category]) + MENU_PAGE_SIZE - 1) // MENU_PAGE_SIZE
+    return f"{CATEGORIES[category]} ({page + 1}/{pages})"
+
+
+def _category_menu(category, page=0):
+    """
+    Offer a short page of questions and retain their visible selection order
+
+    Parameters
+    ----------
+    category : str
+        Already authorized help category.
+    page : int, optional
+        Requested page, bounded to the available questions.
+
+    Returns
+    -------
+    dict
+        Category questions, adjacent page buttons and signed-state input.
+    """
+    topics = CATEGORY_TOPICS[category]
+    last_page = (len(topics) - 1) // MENU_PAGE_SIZE
+    page = max(0, min(page, last_page))
+    choices = topics[page * MENU_PAGE_SIZE:(page + 1) * MENU_PAGE_SIZE]
+    suggestions = [TOPIC_BY_ID[key]["question"] for key in choices]
+    if page > 0:
+        suggestions.append(_page_label(category, page - 1))
+    if page < last_page:
+        suggestions.append(_page_label(category, page + 1))
+    return {
+        "topic": "menu." + category,
+        "answer": f"{CATEGORIES[category]} — page {page + 1} of {last_page + 1}. Choose a question, or describe what you need.",
+        "suggestions": suggestions, "links": [],
+        "conversation": {"category": category, "page": page, "choices": choices},
     }
 
 
@@ -157,8 +216,8 @@ def _answer(topic_id, has_object):
     """
     topic = TOPIC_BY_ID[topic_id]
     reply = {"topic": topic_id, "answer": topic.get("answer", ""), "links": []}
-    category = topic_id.split(".")[0]
-    related = [entry["id"] for entry in TOPICS if entry["id"].startswith(category + ".") and entry != topic][:3]
+    category = topic.get("category", topic_id.split(".")[0])
+    related = list(topic.get("related", [key for key in CATEGORY_TOPICS[category] if key != topic_id][:3]))
     if topic_id in ("upload.format", "upload.template", "upload.start"):
         related = [key for key in ("upload.required", "upload.template", "upload.limits") if key != topic_id]
     reply["suggestions"] = [CHOICE_LABELS.get(key, TOPIC_BY_ID[key]["question"]) for key in related]
@@ -183,6 +242,22 @@ def _answer(topic_id, has_object):
             "Exceeding a batch limit rejects the submission before any files are saved. "
             "A file size or content error rejects that file; other files can still be processed."
         )
+    elif topic_id == "upload.quota":
+        reply["answer"] = (
+            f"Your allowance is {settings.PILOT_MAX_USER_JSON_BYTES / 1024**3:g} GiB of currently stored JSON. "
+            "It counts compact UTF-8 JSON including generated identifiers, not the original file's byte size. "
+            "It is not a monthly allowance. Deleting your own objects frees your quota; keep a JSON backup first. "
+            "There is no quota expansion request feature. A personal allowance does not guarantee free space "
+            "or memory on the shared hosting service."
+        )
+    elif topic_id == "upload.rate":
+        policy = settings.PILOT_RATE_LIMITS["upload"]
+        reply["answer"] = (
+            f"Uploads allow {policy['limit']} submissions per {policy['window_seconds'] / 60:g} minutes per user. "
+            "Failed submissions also count. Wait for the current window to expire, then correct the errors "
+            "before submitting again; repeated clicks do not help. A separate notice about an active upload "
+            "means you should return to its progress first. Interrupted or unconfirmed files are not retried automatically."
+        )
     return reply
 
 
@@ -201,6 +276,11 @@ def _correct_typo(text):
         Question with a conservative spelling correction, if any.
     """
     words = text.split()
+    known_typos = {"pasword": "password", "passwrod": "password", "oricd": "orcid", "xslx": "xlsx"}
+    for index, word in enumerate(words):
+        if word in known_typos:
+            words[index] = known_typos[word]
+            return " ".join(words)
     if len(words) > 6:
         return text
     vocabulary = set()
@@ -237,12 +317,15 @@ def _follow_up(text, context):
     choices = context.get("choices", [])
     ordinals = {"1": 0, "first": 0, "the first one": 0, "第一个": 0,
                 "2": 1, "second": 1, "the second one": 1, "第二个": 1,
-                "3": 2, "third": 2, "the third one": 2, "第三个": 2}
+                "3": 2, "third": 2, "the third one": 2, "第三个": 2,
+                "4": 3, "fourth": 3, "the fourth one": 3, "第四个": 3,
+                "5": 4, "fifth": 4, "the fifth one": 4, "第五个": 4,
+                "6": 5, "sixth": 5, "the sixth one": 5, "第六个": 5}
     position = ordinals.get(text)
     if position is not None and position < len(choices):
         return choices[position]
     topic = context.get("topic") or ""
-    if topic.startswith("upload."):
+    if topic.startswith(("upload.", "prepare.")):
         if text in ("how big", "how much", "how many", "and the size", "what about size", "多大", "多少", "大小呢"):
             return "upload.limits"
         if text in ("which fields", "what fields", "and the fields", "哪些字段", "哪些必填"):
@@ -251,8 +334,18 @@ def _follow_up(text, context):
             return "upload.format"
     if topic == "upload.identifier" and text in ("can i leave it blank", "is it required", "能不填吗"):
         return topic
-    if topic.startswith("sharing.") and text in ("how", "how do i do that", "怎么设置", "怎么做"):
-        return "sharing.share"
+    if text in ("how", "how do i do that", "怎么设置", "怎么做"):
+        if topic in ("sharing.access", "sharing.share"):
+            return "sharing.share"
+        if topic in ("sharing.revoke", "sharing.visibility"):
+            return topic
+    if topic == "manage.delete" and text in ("can i undo it", "can i get it back", "能撤销吗", "能恢复吗"):
+        return "manage.restore"
+    if topic == "account.password" and text in ("what if i forgot it", "i forgot the old one", "那原来的忘了呢", "忘了旧密码呢"):
+        return "account.recovery"
+    if (topic == "account.orcid_disconnect" or not topic and "account.orcid_disconnect" in choices):
+        if text in ("how do i sign in afterwards", "how do i log in after that", "之后还怎么登录", "解绑后怎么登录"):
+            return "account.orcid_disconnect"
     return None
 
 
@@ -280,14 +373,29 @@ def help_reply(question, has_object=False, context=None):
                 "none of these", "none of those", "something else", "neither", "都不是"):
         return _menu(has_object)
     for category, label in CATEGORIES.items():
-        if text == _normalize(label) and (category != "object" or has_object):
-            reply = _menu(has_object)
-            reply.update(topic="menu." + category, answer="Choose a question about " + label.removesuffix(" help").lower() + ".",
-                         suggestions=[topic["question"] for topic in TOPICS if topic["id"].startswith(category + ".")])
-            return reply
+        if category == "object" and not has_object:
+            continue
+        if text in {_normalize(alias) for alias in (label, *CATEGORY_ALIASES[category])}:
+            return _category_menu(category)
+        pages = (len(CATEGORY_TOPICS[category]) + MENU_PAGE_SIZE - 1) // MENU_PAGE_SIZE
+        for page in range(pages):
+            if text == _normalize(_page_label(category, page)):
+                return _category_menu(category, page)
+    category = context.get("category")
+    if category in CATEGORY_TOPICS and (category != "object" or has_object):
+        if text in ("more", "next", "next page", "更多", "下一页"):
+            return _category_menu(category, context.get("page", 0) + 1)
+        if text in ("back", "previous", "previous page", "返回", "上一页"):
+            return _category_menu(category, context.get("page", 0) - 1)
     if (text in ("dataform", "form", "表单", "数据表单")
             or re.search(r"\bdata forms?\b", text)):
         return _clarify(["upload.format", "upload.start"], "Do you mean the JSON data format or the upload form?")
+    if text in ("password", "密码"):
+        return _clarify(["account.password", "account.recovery", "account.registration"],
+                        "Do you want to change a password, recover access, or check the registration requirements?")
+    if text == "orcid":
+        return _clarify(["account.orcid_connect", "account.orcid_setup", "account.orcid_disconnect"],
+                        "Do you want to connect ORCID, finish account setup, or disconnect it?")
     selected = _follow_up(text, context)
     if selected:
         return _answer(selected, has_object)
@@ -295,7 +403,7 @@ def help_reply(question, has_object=False, context=None):
         labels = (topic["question"], CHOICE_LABELS.get(topic["id"], ""), *topic["patterns"])
         if text in {_normalize(label) for label in labels if label}:
             return _answer(topic["id"], has_object)
-    if re.fullmatch(r"(?:(?:the )?(?:first|second|third)(?: one)?|[123]|第[一二三]个)", text):
+    if re.fullmatch(r"(?:(?:the )?(?:first|second|third|fourth|fifth|sixth)(?: one)?|[1-6]|第[一二三四五六]个)", text):
         return _menu(has_object, "Choose a help topic first, then I can follow your selection.")
     words = set(text.split())
     if (((words & {"delete", "remove", "erase"} or "get rid" in text)
@@ -336,7 +444,10 @@ def help_reply(question, has_object=False, context=None):
                               or (score >= 0.50 and margin >= 0.12)):
         return _answer(best, has_object)
     if best in ("sharing.access", "sharing.share"):
-        return _clarify(["sharing.access", "sharing.share"],
+        choices = ["sharing.access", "sharing.share"]
+        nearby = [key for key, value in candidates[:3]
+                  if key.startswith("sharing.") and key not in choices and value >= score - 0.12]
+        return _clarify(choices + nearby[:1],
                         "Do you want to check who can view data, or change who it is shared with?")
     close = [key for key, value in candidates[:3] if value >= score - 0.12]
     return _clarify(close)

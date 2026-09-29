@@ -1,0 +1,284 @@
+{
+  "title": "Second independently frozen fresh questions after expanded FAQ first-pass fixes",
+  "created_at": "2026-09-29T17:46:41.635Z",
+  "question_count": 10,
+  "scenario_count": 10,
+  "policy": {
+    "independence": "Written and fixed before inspecting the latest knowledge/retrieval changes; not disclosed before evaluation.",
+    "scope": "Eight platform questions and two outside-platform questions with similar account/sharing vocabulary.",
+    "topic_mapping": "Semantically equivalent implementation topic IDs are allowed; judge the answer contents and do not count an unrelated safe answer as correct."
+  },
+  "cases": [
+    {
+      "id": "N01",
+      "tags": [
+        "account",
+        "profile",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Changing my login name will not make my uploads belong to a new account, will it?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.profile"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Editing the login username keeps the same account and uploaded-object ownership.",
+            "The account name and optional profile display name are separate."
+          ],
+          "must_not_claim": [
+            "Changing the username creates a new owner account or transfers the data."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N02",
+      "tags": [
+        "account",
+        "recovery",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "邮箱后来补上了，是不是就能用邮件找回旧密码了？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.recovery",
+              "account.registration"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Email password recovery remains unavailable in the current pilot even if an email is present."
+          ],
+          "must_not_claim": [
+            "Adding an email enables a reset-password message."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N03",
+      "tags": [
+        "notifications",
+        "deletion",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Why did an old sharing notification disappear after the owner removed the dataset?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.history",
+              "account.notifications"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Notifications tied to a deleted object are removed along with that object.",
+            "This is distinct from merely marking a notification read."
+          ],
+          "must_not_claim": [
+            "All read notifications are automatically deleted."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N04",
+      "tags": [
+        "notifications",
+        "read",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "把提醒设成已读以后，原来的共享权限还在吧？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "account.notifications"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Marking read changes only notification read status.",
+            "It does not revoke access or delete the shared data."
+          ],
+          "must_not_claim": [
+            "The shared relation is removed when a notification is read."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N05",
+      "tags": [
+        "export",
+        "columns",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Can I pick just stress_11 and strain_11 for a CSV, without all the other components?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "manage.download",
+              "manage.formats",
+              "export.csv_columns"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The detail plot supports exporting the current X/Y series or checked CSV columns.",
+            "CSV export retains the selected available series rather than requiring all components."
+          ],
+          "must_not_claim": [
+            "The user must export every component and manually delete unwanted columns."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N06",
+      "tags": [
+        "export",
+        "index",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "CSV 第一列从0开始，是模拟时间的0秒吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "manage.formats",
+              "charts.curves",
+              "export.csv_details"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "The zero-based index is array position, not time.",
+            "The export does not derive a time history from that index."
+          ],
+          "must_not_claim": [
+            "Each row index is elapsed seconds."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N07",
+      "tags": [
+        "sharing",
+        "revocation",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "My collaborator downloaded the file before I removed them. Will removing access wipe that copy?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "sharing.revoke"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Revocation affects subsequent platform access.",
+            "It cannot recall or erase a file that has already been downloaded."
+          ],
+          "must_not_claim": [
+            "Removing a recipient remotely deletes their local files."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N08",
+      "tags": [
+        "sharing",
+        "ownership",
+        "zh"
+      ],
+      "turns": [
+        {
+          "question": "creator写的是我，可是上传人是同事，为什么我没有删除或修改按钮？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "acceptable_concepts": [
+              "search.creator",
+              "manage.delete",
+              "manage.edit"
+            ],
+            "max_candidates": 4
+          },
+          "required_facts": [
+            "Creator metadata does not confer ownership or deletion permission; the uploader owns the record.",
+            "Only the owner can delete.",
+            "There is no in-place editor for stored JSON in the current interface."
+          ],
+          "must_not_claim": [
+            "Any named Creator can delete or edit the record."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N09",
+      "tags": [
+        "outside",
+        "account",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Can you recover the password for my university email account?",
+          "expected": {
+            "mode": "fallback",
+            "scope": "outside_platform"
+          },
+          "required_facts": [
+            "The assistant is limited to this platform and cannot recover an external email account."
+          ],
+          "must_not_claim": [
+            "The platform password-change form resets a university email password."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "N10",
+      "tags": [
+        "outside",
+        "sharing",
+        "en"
+      ],
+      "turns": [
+        {
+          "question": "Give everyone in my Google Drive folder permission to view it.",
+          "expected": {
+            "mode": "fallback",
+            "scope": "outside_platform"
+          },
+          "required_facts": [
+            "The assistant cannot change Google Drive permissions and only provides help for this platform."
+          ],
+          "must_not_claim": [
+            "Google Drive access was changed.",
+            "Platform shared_with or Share settings control Google Drive permissions."
+          ]
+        }
+      ]
+    }
+  ]
+}

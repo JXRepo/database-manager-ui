@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from .assistant import read_context
 from .models import JSONData
 from .upload_test_data import valid_upload_object
 
@@ -86,11 +87,22 @@ class AssistantDialogueTests(TestCase):
         for question, expected in (
             ("My file will not go through", "upload.errors"),
             ("I want to erase my old simulations", "manage.delete"),
-            ("我不想让别人看到我的结果", "sharing.access"),
             ("What file layout does the platform expect?", "upload.format"),
         ):
             with self.subTest(question=question):
                 self.assertEqual(self.ask(question)["topic"], expected)
+
+    def test_privacy_question_can_distinguish_access_from_revocation(self):
+        """
+        Offer the relevant next step when a privacy request leaves intent open
+        """
+        reply = self.ask("我不想让别人看到我的结果")
+        if reply["topic"]:
+            self.assertEqual(reply["topic"], "sharing.access")
+        else:
+            state = read_context(reply["context"], self.viewer.pk, None)
+            self.assertIn("sharing.access", state["choices"])
+            self.assertIn("sharing.revoke", state["choices"])
 
     def test_unrelated_question_never_inherits_the_last_answer(self):
         """
