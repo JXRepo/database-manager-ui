@@ -2,62 +2,78 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-29
-code_base: see latest git commit (local FAQ assistant implementation)
-next_topic: Review the local FAQ assistant and refine its prepared questions
+code_base: see latest git commit (local semantic assistant and follow-ups)
+next_topic: Try the assistant after deployment and collect real platform questions
 files_modified:
-  - Local FAQ assistant, tests, README.md and HANDOFF.md
+  - Local semantic assistant, setup, regression tests and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**右下角 FAIR Data Assistant 采用网站自身运行的固定问答方案，不接外部大模型，不提供转人工。**
+**右下角 FAIR Data Assistant 已从关键词 FAQ 升级为本地语义匹配、平台知识答案和简短追问。**
 
-- 用户讨论过类似 ChatGPT 的平台助手，了解 API 收费后改选本地规则问答：
-  “咱们先做一个没有转人工功能的。”这取代了上次交接中的纯讨论范围。
-- 用户希望从简单版本开始，用中文、白话解释；应用 UI 仍为英文。无需模型账户、API Key 或训练。
-  不要继续要求用户充值，或把规则问答当成模型接入的临时占位。
-- Charts 仍保留 bc1e11a 的首屏真实曲线设计，本轮没有改 Charts、上传处理或权限规则。
-- 用户样例仍在被忽略的 example_json_files/a46fde6c.json；没有修改或上传到外部服务。
-- 用户要求功能完成后验证、提交、推送。推送成功与 Render 完成部署必须分别说明。
+- 用户试用旧版后指出 data form 都无法理解，随后同意推荐的改进方案。
+  不要继续把这轮当成纯讨论，也不要回退为只补关键词。
+- 小模型在本项目 Django 进程内运行，理解问法后选择维护好的答案；不是生成式 ChatGPT。
+  无需模型账户、API Key、额外模型训练或按次付费 API，不提供转人工。
+- 用户不熟悉开发，希望用中文白话解释；应用 UI、代码注释与 docstring 保持英文。
+- Charts、上传处理、权限和原始 JSON 未改。样例 example_json_files/a46fde6c.json 未修改、未发送到外部。
+- 用户要求完成后验证、提交、推送。Git 推送成功与 Render 部署完成必须分别说明。
 
 ### 助手当前实现
 
-- 保留已登录工作区右下角入口、模板类名和 /assistant/ask/ 路由。
-  首页、登录和注册页不显示，详情页仍附带当前 object_id。
-- 新增 apps/pages/assistant.py 集中维护固定答案、问题标题和明确的匹配词。
-  Browse help topics 提供 Upload、Search、Access and sharing、My Data、Charts 分类；
-  当前对象可访问时增加 Current object 分类。
-- 可以点选分类和问题，也可以输入简短文字。英文按完整词识别，支持明确列出的中文词组，回复为英文。
-  精确问题标题优先；较具体的关键词组合优先；同等匹配提供候选问题，不任意选一个。
-  未匹配到问题时返回分类入口，不再把无关问题都回复成对象摘要。
-- 问答涵盖上传、必填与空值、编号、额度、中断、搜索、筛选、共享、管理、下载和 Charts。
-  当前对象保留摘要、phase、软件、边界条件、绘图和访问范围回答。
-  全 RVE 张量按 tensor 描述并保留提供的载荷条目，普通载荷使用已有格式化文字，不输出内部字典。
-- 上传回答已同步整文件原子保存、嵌套和条件必填规则、缺失编号自动生成；上传额度从当前 settings 读取。
-  不声称完整 JSON Schema 验证，不自动诊断上传表单选中的文件。
-- 答案可带站内导航链接；只提供指导，不执行搜索、分享、删除等操作。
-  没有模型调用、外部知识库或聊天记录数据库，也没有人工转接。
-  页面内会保留消息，切页或刷新会清空；暂未实现多轮语义理解。
-- 仍要求登录、POST、CSRF，逐次检查传入对象的访问权限。错误的请求类型返回 400。
-  回复和上传文本用 textContent 展示，链接限定同源；没有把原 JSON 当作指令执行。
-- 桌面聊天窗口限定视口高度、长文本换行，增加 Escape 关闭、输入标签、请求中防重复提交。
-  请求中断保留问题供手动重试，不自动重试，不提供虚假的成功回复。
+- apps/pages/assistant_knowledge.py：平台答案、导航分类、明确别名和中英文代表问法。
+  增加 JSON 格式、模板准备、实际 24 个顶层必填字段和科学分析能力边界。
+  数据规则以 README、当前代码、bundled MiMeDat profile 为准，额度仍读取 settings。
+- apps/pages/assistant.py：精确按钮、有限拼写纠正、语义匹配、置信度和候选差距判断。
+  data form（包括完整句中的这个词组）先区分 JSON format / Upload form；
+  format → which fields? → how big? 可连续追问，the second one 按上次候选顺序选择。
+  完整新问题能换话题；未知短词不直接猜答案；访问范围与分享设置不确定时一并询问。
+  不保证理解任意表达；低置信度仍可能展示一至三个选项，其中有时有不相关候选。
+- apps/pages/assistant_semantics.py：multilingual MiniLM 的量化 ONNX 编码器，
+  不是大型生成模型，不根据用户数据训练。只缓存公开知识问题的向量，不缓存用户问题或对象值。
+  单 CPU 推理线程、每问最多 128 tokens、推理锁等待最多 2 秒；逐句建立索引，避免量化批次干扰。
+- apps/pages/views.py：保留登录、POST、CSRF 和逐次对象权限检查。
+  新增 30 分钟过期、绑定用户及对象的签名 topic/choices token；不含问题或对象内容。
+- templates/includes/fair_assistant.html：只在当前页面内存保留对话和 token。
+  切页或刷新清空，Browse help topics 重置话题；连接失败保留问题与上一 token 供手动重试。
+  所有文本继续 textContent 展示，链接保持站内；助手不执行删除、分享、搜索、上传或拟合。
+- 缺模型、加载或推理失败、推理繁忙时明确提示，并保留可点击的固定问答与授权对象摘要。
 
-### 本轮验证入口
+### 安装与部署
 
-- 21 项相关 Django 测试通过，包含真实 Chromium 的 9 种桌面布局；
-  117 项现有 JavaScript／Chromium 测试通过，0 跳过。
-  原始 a46fde6c.json 的 5 类对象回答另作本地只读检查，文件 SHA-256 未变，无数据库写入或外部请求。
-- 后端：apps/pages/test_assistant_faq.py、test_assistant_widget.py、test_phase_names.py，
-  以及 apps/pages/tests.py 中原有的四个 test_assistant_*。
-- 真实浏览器：apps/pages/test_assistant_browser.py 调用 tests/browser/assistant.cjs，
-  使用隔离 SQLite，检查真实 HTTP 分类问答、异常重试、长内容转义、键盘操作和空数据。
-  浏览器只验证桌面 1280 / 1440 / 1920，需 Chromium 与支持 WebSocket 的 Node，不接受跳过。
-  该测试阻断外部请求；详情测试记录无曲线，避免依赖既有 Chart.js CDN。
-- Python 命令前用 PyCharm 环境工具解析本机解释器，设置 DEBUG=True；不使用生产数据库。
-- 页面截图保存在本机临时目录 /tmp/assistant-faq-qa，不提交测试数据或截图。
+- 新增 NumPy 2.2.6、ONNX Runtime 1.23.2、SentencePiece 0.2.1 的明确依赖。
+  本机 Python 3.10.12，Render 配置仍是 Python 3.12.13，未改套餐或 worker 数。
+- 安装依赖后运行 manage.py prepare_assistant_model；build.sh 已加入此步骤。
+  只在 setup/build 从 Hugging Face 下载约 118 MiB 的公开权重及词表，无需账号。
+  模型 snapshot 固定为 e8f8c211226b894fcb81acc59f3b34ba3efd5f42；两文件均校验大小和 SHA-256。
+  下载临时文件验证后原子替换，失败会停止新 build，已有正确文件可复用。
+- 文件位于被 Git 忽略的 .assistant-models/；不提交权重，不在问答请求中联网补下载。
+  新电脑不能只拉代码就假定模型已存在，README 和 docs/deployment/public-pilot.md 已更新。
+- 完整本地 HTTP 进程约 279 MiB RSS、357 MiB 峰值；首次语义问题约 1.06 秒，
+  后续串行请求中位 6.55 ms。测试包含菜单及语义问题，不是 Render 并发或大文件上传容量证明。
+  上传进程另有内存开销；线上部署后应观察内存和重启记录，不擅自升级付费套餐。
+
+### 本轮验证与限制
+
+- 38 项相关 Django 测试通过；包含真实 Chromium 的 12 种桌面布局、上下文重试、长内容和空数据。
+  117 项 JavaScript / Chromium 测试通过，0 跳过。pip check 和模型 setup 命令通过。
+- 保留原 35 场景 / 42 轮及另行编写的 10 条新问题在 apps/pages/fixtures/assistant_questions.json。
+  真实 HTTP 最终 52 轮：33 直接答对、15 给出正确候选、3 正确范围提示、1 正确拒绝撤回权限。
+  严格按原先要求的回答类型和候选组合为 42/52；不能宣称 52 条都直接答对或泛化准确率 100%。
+  题库已用于迭代，后续作为回归集；继续改时应另补真实用户或新编问题。
+- apps/pages/test_assistant_acceptance.py 明确检查“答对或能选到正确入口”；其余测试验证
+  模型真实语义、离线请求、参考 token IDs、长度限制、下载完整性、过期/伪造/跨用户/跨对象 token、
+  缺模型及推理故障、权限撤回。原有助手、phase 和权限测试保持通过。
+- 独立审查未发现剩余阻断项；修复了误选删除、完整句 data form 遗漏、中断/边界条件候选遗漏、
+  分享歧义候选不完整，以及量化索引受同批其他文本影响的问题。
+- 日志 /tmp/assistant-semantic-backend.log、/tmp/assistant-semantic-js.log；
+  桌面截图 /tmp/assistant-semantic-qa；最终 HTTP 报告 /tmp/assistant-independent-results-reviewed.json。
+  这些临时文件不随 Git 同步。规格与计划在 docs/superpowers/ 的 2026-09-29-assistant-understanding 文件。
+- Python 命令前用 PyCharm 环境工具解析本机解释器；DEBUG=True、隔离 SQLite；不使用生产凭证。
+  后续助手检查需先 prepare_assistant_model，浏览器需 Chromium 与支持 WebSocket 的 Node，不能跳过。
 
 ### Charts 当前实现与统计口径
 

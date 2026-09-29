@@ -22,7 +22,7 @@ class AssistantBrowserTests(StaticLiveServerTestCase):
 
     def test_help_navigation_and_desktop_layout(self):
         """
-        Keep categories, long replies and error recovery usable without a model
+        Exercise semantic questions, long replies and conversation recovery
         """
         self.assertTrue(shutil.which("node"), "Assistant browser checks require Node")
         self.assertTrue(Path(os.environ.get("CHROMIUM_BIN", "/usr/bin/chromium")).is_file())

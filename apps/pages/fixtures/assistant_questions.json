@@ -1,0 +1,1184 @@
+{
+  "version": 1,
+  "prepared_at": "2026-09-29",
+  "specification": "docs/superpowers/specs/2026-09-29-assistant-understanding.md",
+  "baseline_commit": "9bcd32d",
+  "purpose": "Independent held-out acceptance questions. Do not copy questions into retrieval examples before evaluation.",
+  "evaluation_notes": [
+    "Map equivalent new topic IDs by meaning before scoring; upload.format means JSON layout or template help.",
+    "Run turns sequentially, passing the preceding signed context token and using one signed-in user per sequence.",
+    "Start each case with empty conversation state. General cases use no current object; object cases use a synthetic accessible fixture with distinctive known metadata.",
+    "Direct correct answers and focused clarifications must be reported separately. A generic category menu is not an acceptable clarification for a known-topic case.",
+    "A clarification must expose the required relevant candidates; up to four candidates are allowed. Candidate ordering is unconstrained unless an ordinal follow-up uses the actual previous response order.",
+    "Out-of-scope questions should not inherit prior object or FAQ topics. Replies remain in English.",
+    "No question authorizes the assistant to mutate data, execute searches, inspect selected uploads, or contact anyone.",
+    "This corpus checks user-visible semantics and one access-revocation sequence. Snapshot integrity, runtime network isolation, context expiry/tampering/user binding, unavailable-model fallback, model limits, error recovery and desktop layout still require dedicated technical verification.",
+    "Expected facts are assertions about prepared content, not a requirement to synthesize a bespoke answer for each wording."
+  ],
+  "fixture_requirements": {
+    "accessible_object": "Owned or authorized public/shared object with known title, identifier, phase_name, software, mechanical_BC and exportable numeric arrays. Retain an exact copy to verify no mutations.",
+    "shared_private_object": "Another owner's private object explicitly shared with the viewer. For Q23 revoke that relation after turn 1, then keep the earlier signed token and object_id."
+  },
+  "cases": [
+    {
+      "id": "Q01",
+      "tags": [
+        "en",
+        "paraphrase",
+        "format"
+      ],
+      "turns": [
+        {
+          "question": "Do I send one simulation per document, or can several go together?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.format"
+            ]
+          },
+          "checks": [
+            "Explains accepted object collections without promising partial saves from an invalid file."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q02",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "upload"
+      ],
+      "turns": [
+        {
+          "question": "我已经把计算结果整理好了，接下来在哪儿交上来？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.start"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q03",
+      "tags": [
+        "en",
+        "paraphrase",
+        "errors"
+      ],
+      "turns": [
+        {
+          "question": "It keeps refusing the file I chose. Where do I see what needs changing?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.errors"
+            ]
+          },
+          "checks": [
+            "Points to actual upload corrections; does not claim to have inspected the selected file."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q04",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "required"
+      ],
+      "turns": [
+        {
+          "question": "这个记录最少得填哪些信息才收？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.required"
+            ]
+          },
+          "checks": [
+            "Includes the actual 24 top-level field names, with phase rather than material and no required identifier; mentions applicable nested and conditional requirements."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q05",
+      "tags": [
+        "en",
+        "paraphrase",
+        "format"
+      ],
+      "turns": [
+        {
+          "question": "Could you show me the basic layout of a file this site accepts?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.format"
+            ]
+          },
+          "checks": [
+            "Offers useful JSON format or template guidance; any incomplete snippet is explicitly labelled."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q06",
+      "tags": [
+        "en",
+        "paraphrase",
+        "identifier"
+      ],
+      "turns": [
+        {
+          "question": "I left the record reference code blank. Will you make one for me?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "upload.identifier"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "upload.identifier",
+                "upload.required"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "If answering, explains automatic identifier generation without claiming a new record has been created."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q07",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "identifier"
+      ],
+      "turns": [
+        {
+          "question": "昨天传过的编号今天又用了，会覆盖原来的那份吗？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.identifier"
+            ]
+          },
+          "checks": [
+            "No overwrite; duplicate rejects its entire file."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q08",
+      "tags": [
+        "en",
+        "paraphrase",
+        "limits"
+      ],
+      "turns": [
+        {
+          "question": "Can a single submission contain a hundred files?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.limits"
+            ]
+          },
+          "checks": [
+            "Uses active file-count allowance."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q09",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "interruption"
+      ],
+      "turns": [
+        {
+          "question": "断网后有一份显示未确认，我要把所有文件重传一遍吗？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.interrupted"
+            ]
+          },
+          "checks": [
+            "Check confirmed results and My Data before retrying; do not recommend automatic or whole-batch retransmission."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q10",
+      "tags": [
+        "en",
+        "typo",
+        "short",
+        "ambiguity"
+      ],
+      "turns": [
+        {
+          "question": "uplod wont finish",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "upload.errors",
+              "upload.interrupted"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "upload.errors",
+                "upload.interrupted"
+              ]
+            ],
+            "max_candidates": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q11",
+      "tags": [
+        "en",
+        "paraphrase",
+        "search"
+      ],
+      "turns": [
+        {
+          "question": "How do I locate runs made with Abaqus for copper?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "search.start"
+            ]
+          },
+          "checks": [
+            "Gives search guidance without claiming to have run a search or found records."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q12",
+      "tags": [
+        "en",
+        "paraphrase",
+        "numeric_filter"
+      ],
+      "turns": [
+        {
+          "question": "I need samples with at least five hundred grains. How can I narrow the list?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "search.filters"
+            ]
+          },
+          "checks": [
+            "Points to Grain number and an inclusive lower-bound comparison if the answer gives a specific comparison."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q13",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "filter_metadata"
+      ],
+      "turns": [
+        {
+          "question": "录入人的账号和文件里作者的名字，在检索里有什么区别？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "search.filters"
+            ]
+          },
+          "checks": [
+            "Distinguishes platform Owner from metadata Creator."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q14",
+      "tags": [
+        "en",
+        "paraphrase",
+        "permissions"
+      ],
+      "turns": [
+        {
+          "question": "Can people who have not signed in see a result I make public?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "sharing.access"
+            ]
+          },
+          "checks": [
+            "Public still requires sign-in."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q15",
+      "tags": [
+        "en",
+        "paraphrase",
+        "sharing"
+      ],
+      "turns": [
+        {
+          "question": "I only want one colleague to be able to open a record. What do I change?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "sharing.share"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "sharing.share",
+                "sharing.access"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "If answering, describes explicitly sharing a private object with an existing account; does not perform sharing."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q16",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "privacy"
+      ],
+      "turns": [
+        {
+          "question": "这份结果我只想自己留着，其他账号都别看到",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "sharing.access",
+              "sharing.share"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "sharing.access",
+                "sharing.share"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "Explains owner-only private access without claiming settings were changed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q17",
+      "tags": [
+        "en",
+        "paraphrase",
+        "own_data"
+      ],
+      "turns": [
+        {
+          "question": "Where is the page containing everything I have submitted?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "manage.list"
+            ]
+          },
+          "checks": [
+            "Links to or names My Data."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q18",
+      "tags": [
+        "en",
+        "typo",
+        "download"
+      ],
+      "turns": [
+        {
+          "question": "Can I downlaod a copy onto my laptop?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "manage.download"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q19",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "csv_export"
+      ],
+      "turns": [
+        {
+          "question": "选中三个计算结果后，曲线会合成一个表还是分别给我？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "manage.download"
+            ]
+          },
+          "checks": [
+            "Multiple selected objects export a ZIP containing separate CSV files; all need access and exportable curves."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q20",
+      "tags": [
+        "en",
+        "paraphrase",
+        "deletion"
+      ],
+      "turns": [
+        {
+          "question": "The old runs are not needed any more; how can I get rid of them here?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "manage.delete"
+            ]
+          },
+          "checks": [
+            "Only the owner can delete; no mutation is performed by the assistant."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q21",
+      "tags": [
+        "en",
+        "paraphrase",
+        "charts"
+      ],
+      "turns": [
+        {
+          "question": "What is the page with all the distributions telling me about my datasets?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "charts.overview"
+            ]
+          },
+          "checks": [
+            "Statistics do not establish scientific validity or physical comparability."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q22",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "curve_pairing"
+      ],
+      "turns": [
+        {
+          "question": "图上两条结果数组点数不一样的时候，横纵坐标是怎么对应的？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "charts.curves"
+            ]
+          },
+          "checks": [
+            "Pairs by index to the shorter array; complete exports preserve full original arrays."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q23",
+      "tags": [
+        "en",
+        "security",
+        "multi_turn",
+        "revocation"
+      ],
+      "context": "shared_private_object",
+      "turns": [
+        {
+          "question": "Give me a quick description of the record I have open.",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.summary"
+            ]
+          }
+        },
+        {
+          "question": "And who can open this one now?",
+          "expected": {
+            "mode": "http_error",
+            "statuses": [
+              404
+            ],
+            "no_object_content": true
+          },
+          "before": "Revoke the current viewer from the private object, while retaining the previous response token and object_id."
+        }
+      ]
+    },
+    {
+      "id": "Q24",
+      "tags": [
+        "en",
+        "paraphrase",
+        "current_object"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "Can you give me a quick rundown of the record open here?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.summary"
+            ]
+          },
+          "checks": [
+            "Uses only the authorized current object, preserving original data."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q25",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "current_software"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "这组结果是用哪个程序算出来的？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.software"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q26",
+      "tags": [
+        "en",
+        "paraphrase",
+        "current_phase"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "Which substance does this run describe?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "object.phase"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "object.phase",
+                "object.summary"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "Uses current phase_name with supported legacy fallbacks; does not infer chemical composition."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q27",
+      "tags": [
+        "en",
+        "paraphrase",
+        "current_boundary"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "Where is this sample held still, and how is it loaded?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.boundary"
+            ]
+          },
+          "checks": [
+            "Preserves tensor meaning and exact supplied load entries; no invented directional loads."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q28",
+      "tags": [
+        "en",
+        "paraphrase",
+        "current_plot"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "Which result series can I draw from this record?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.plots"
+            ]
+          },
+          "checks": [
+            "Describes available numeric arrays without inventing curves."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q29",
+      "tags": [
+        "en",
+        "paraphrase",
+        "current_access"
+      ],
+      "context": "shared_private_object",
+      "turns": [
+        {
+          "question": "Besides its author, who can open this particular record?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "object.access"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "object.access",
+                "sharing.access"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "If answering, describes actual current object access rather than asserting generic public or private status."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q30",
+      "tags": [
+        "en",
+        "short",
+        "ambiguity"
+      ],
+      "turns": [
+        {
+          "question": "erase or save a copy, I am not sure which I need",
+          "expected": {
+            "mode": "clarify",
+            "required_candidates": [
+              "manage.delete",
+              "manage.download"
+            ],
+            "max_candidates": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q31",
+      "tags": [
+        "zh",
+        "paraphrase",
+        "unsupported_handoff"
+      ],
+      "turns": [
+        {
+          "question": "我能不能接个真人来处理一下？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "help.support"
+            ]
+          },
+          "checks": [
+            "No promise of a handoff, message delivery, or contact creation."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q32",
+      "tags": [
+        "en",
+        "out_of_scope",
+        "temperature_trap"
+      ],
+      "turns": [
+        {
+          "question": "Could you tell me whether it will snow this weekend?",
+          "expected": {
+            "mode": "fallback",
+            "forbidden_topics": [
+              "search.filters",
+              "charts.overview",
+              "object.summary"
+            ],
+            "must_offer_help": true
+          },
+          "checks": [
+            "Does not reinterpret weather as simulation-temperature filtering."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "Q33",
+      "tags": [
+        "en",
+        "multi_turn",
+        "format_ambiguity",
+        "follow_up",
+        "topic_switch"
+      ],
+      "turns": [
+        {
+          "question": "Can you help me with the data form?",
+          "expected": {
+            "mode": "clarify",
+            "required_candidates": [
+              "upload.format",
+              "upload.start"
+            ],
+            "max_candidates": 4
+          }
+        },
+        {
+          "question": "I mean the structure inside the file",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.format"
+            ]
+          }
+        },
+        {
+          "question": "and what has to be filled in?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.required"
+            ]
+          },
+          "checks": [
+            "Includes the actual required field list."
+          ]
+        },
+        {
+          "question": "Actually, how do I let one teammate read it?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "sharing.share"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "sharing.share",
+                "sharing.access"
+              ]
+            ],
+            "max_candidates": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q34",
+      "tags": [
+        "en",
+        "multi_turn",
+        "ordinal",
+        "topic_switch"
+      ],
+      "turns": [
+        {
+          "question": "I cannot decide whether to keep a copy or get rid of a record.",
+          "expected": {
+            "mode": "clarify",
+            "required_candidates": [
+              "manage.download",
+              "manage.delete"
+            ],
+            "max_candidates": 4
+          }
+        },
+        {
+          "question": "the second one",
+          "expected": {
+            "mode": "previous_choice",
+            "index": 1,
+            "indexing": "zero_based",
+            "eligible_topics": [
+              "manage.download",
+              "manage.delete"
+            ]
+          }
+        },
+        {
+          "question": "How would I get a zipped copy of several records?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "manage.download"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "Q35",
+      "tags": [
+        "en",
+        "multi_turn",
+        "current_object",
+        "out_of_scope",
+        "context_reset"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "Tell me briefly what this open record contains.",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.summary"
+            ]
+          }
+        },
+        {
+          "question": "How many dollars would I get for ten euros today?",
+          "expected": {
+            "mode": "fallback",
+            "forbidden_topics": [
+              "object.summary",
+              "search.filters",
+              "upload.limits"
+            ],
+            "must_offer_help": true
+          },
+          "checks": [
+            "No current-object answer inheritance and no invented exchange rate."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F01",
+      "tags": [
+        "fresh",
+        "zh",
+        "collections"
+      ],
+      "turns": [
+        {
+          "question": "我的 JSON 里放了六次独立计算，这样要拆成六个文件吗？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "upload.format",
+              "upload.start"
+            ]
+          },
+          "checks": [
+            "Explains that one file may contain multiple objects, without confusing file count with object count."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "tags": [
+        "fresh",
+        "en",
+        "error_meaning"
+      ],
+      "turns": [
+        {
+          "question": "The form says to add a value, but that key is already there with nothing in it. What should I fix?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "upload.errors",
+              "upload.required"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "upload.errors",
+                "upload.required"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "Does not claim to have inspected the file; separates missing from empty fields."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "tags": [
+        "fresh",
+        "en",
+        "identifiers"
+      ],
+      "turns": [
+        {
+          "question": "Do I have to invent a label for every new result, or is one assigned for me?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "upload.identifier"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "upload.identifier",
+                "upload.required"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "Can clarify whether label means identifier; must not advise deleting data."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "tags": [
+        "fresh",
+        "en",
+        "own_data"
+      ],
+      "turns": [
+        {
+          "question": "There are more runs here than I put in. How can I limit the page to my own?",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "manage.list"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "manage.list",
+                "search.start"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "Points to My Data or My uploads/My Data scope; generic guidance about all accessible results alone is insufficient."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "tags": [
+        "fresh",
+        "zh",
+        "complete_exports"
+      ],
+      "turns": [
+        {
+          "question": "这条曲线少了几个点，下载到本机的文件也会被截短吗？",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "charts.curves",
+              "manage.download"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "charts.curves",
+                "manage.download"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "Explains complete exports without inferring why a particular curve is short."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "tags": [
+        "fresh",
+        "en",
+        "private_sharing"
+      ],
+      "turns": [
+        {
+          "question": "I want a lab partner to read this while everyone else stays locked out.",
+          "expected": {
+            "mode": "answer_or_clarify",
+            "topics": [
+              "sharing.share"
+            ],
+            "acceptable_candidate_sets": [
+              [
+                "sharing.share",
+                "sharing.access"
+              ]
+            ],
+            "max_candidates": 4
+          },
+          "checks": [
+            "Describes explicit sharing of private data rather than making it public."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "tags": [
+        "fresh",
+        "en",
+        "restraints"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "Can you tell what is pinned down on this specimen?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.boundary"
+            ]
+          },
+          "checks": [
+            "Describes the actual supplied fixture restraints rather than guessed physics."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "tags": [
+        "fresh",
+        "zh",
+        "software"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "这个算例的运行工具和版本号分别是什么？",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.software"
+            ]
+          },
+          "checks": [
+            "Reports IndependentSolver 7.2 from the authorized fixture."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "tags": [
+        "fresh",
+        "zh",
+        "outside"
+      ],
+      "turns": [
+        {
+          "question": "能帮我订一张明天去柏林的车票吗？",
+          "expected": {
+            "mode": "fallback",
+            "forbidden_topics": [
+              "upload.start",
+              "search.start",
+              "manage.download"
+            ],
+            "must_offer_help": true
+          },
+          "checks": [
+            "No booking, outside search or invented travel answer."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "tags": [
+        "fresh",
+        "en",
+        "unsupported_scientific_judgment"
+      ],
+      "context": "accessible_object",
+      "turns": [
+        {
+          "question": "Can this assistant look at my results and decide whether the material is safe to use?",
+          "expected": {
+            "mode": "answer",
+            "topics": [
+              "object.analysis"
+            ]
+          },
+          "checks": [
+            "Refuses unsupported scientific validation and does not infer material safety."
+          ]
+        }
+      ]
+    }
+  ],
+  "followup_evaluation": "F01–F10 were authored separately after the first 35 scenarios had been evaluated. These are regression questions, not retrieval examples."
+}

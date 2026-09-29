@@ -241,7 +241,7 @@
     {% endif %}
 
     <div class="fair-assistant-messages" role="log" aria-label="Help conversation" aria-live="polite">
-      <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Choose a help topic or type a short question. I provide prepared platform guidance and basic details about the current object.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
+      <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Ask me about data formats, uploads, search, sharing or plots. You can use your own words. If a question could mean several things, I'll help you choose.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
     </div>
 
     {% if request.user.is_authenticated %}
@@ -264,7 +264,7 @@
     <form class="fair-assistant-form">
       {% csrf_token %}
       <label class="fair-assistant-label" for="fair-assistant-question">Ask a question</label>
-      <textarea class="fair-assistant-input" id="fair-assistant-question" placeholder="For example: upload limits" rows="2" maxlength="600" required></textarea>
+      <textarea class="fair-assistant-input" id="fair-assistant-question" placeholder="For example: what format should my file use?" rows="2" maxlength="600" required></textarea>
       <div class="fair-assistant-actions">
         <button class="fair-assistant-send" type="submit">Send</button>
       </div>
@@ -348,6 +348,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const page = widget.dataset.page || "search";
     const objectId = widget.dataset.objectId || "";
     let isLoading = false;
+    let conversation = "";
 
     toggle.addEventListener("click", function () {
       const isOpen = widget.classList.toggle("is-open");
@@ -399,22 +400,24 @@ document.addEventListener("DOMContentLoaded", function () {
           question,
           page,
           object_id: objectId,
+          context: conversation,
         }),
       })
         .then(function (response) {
           if (response.redirected) {
             return {answer: "Your session has ended. Sign in again to use platform help.",
-              links: [{label: "Sign in", url: "{% url 'login' %}"}], suggestions: []};
+              links: [{label: "Sign in", url: "{% url 'login' %}"}], suggestions: [], context: ""};
           }
           return response.json().then(function (data) {
             if (!response.ok) {
-              return {answer: data.error || "The help request could not be completed.", suggestions: []};
+              return {answer: data.error || "The help request could not be completed.", suggestions: [], context: ""};
             }
 
             return data;
           });
         })
         .then(function (data) {
+          if (typeof data.context === "string") conversation = data.context;
           loadingMessage.textContent = data.answer || "No answer was generated.";
           renderSuggestions(suggestions, data.suggestions, submitQuestion);
           renderLinks(loadingMessage, data.links);

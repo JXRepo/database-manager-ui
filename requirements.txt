@@ -18,6 +18,10 @@ jsonschema==4.26.0
 
 # AI
 anthropic==0.34.2
+# Local assistant sentence matching, without a training framework
+numpy==2.2.6
+onnxruntime==1.23.2
+sentencepiece==0.2.1
 
 # Deployment
 whitenoise==6.7.0

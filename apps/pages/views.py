@@ -33,7 +33,7 @@ from numbers import Number
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
-from .assistant import help_reply
+from .assistant import help_reply, read_context, sign_context
 from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
 from .mechanical_csv import write_mechanical_csv
 from .advanced_search import (
@@ -1900,7 +1900,7 @@ def _assistant_object_overview(obj):
     return "\n".join(lines)
 
 
-def _build_assistant_answer(question, page, obj=None):
+def _build_assistant_answer(question, page, obj=None, context=None):
     """
     Build a prepared help response using an already authorized object
 
@@ -1912,13 +1912,15 @@ def _build_assistant_answer(question, page, obj=None):
         Current page context retained for request compatibility.
     obj : JSONData, optional
         Data object authorized by the requesting view.
+    context : dict, optional
+        Verified previous topic and clarification choices.
 
     Returns
     -------
     dict
         Answer, suggested questions and trusted navigation links.
     """
-    reply = help_reply(question, has_object=obj is not None)
+    reply = help_reply(question, has_object=obj is not None, context=context)
     action = reply.pop("object_action", None)
     if not action:
         return reply
@@ -1976,6 +1978,9 @@ def fair_assistant_ask_view(request):
     question = payload.get("question", "").strip()
     page = str(payload.get("page", "search")).strip().casefold()
     object_id = payload.get("object_id")
+    token = payload.get("context", "")
+    if not isinstance(token, str) or len(token) > 4096:
+        return JsonResponse({"error": "Invalid help conversation. Please start a new question."}, status=400)
 
     if not question:
         return JsonResponse({"error": "Enter a question for the assistant."}, status=400)
@@ -1991,13 +1996,17 @@ def fair_assistant_ask_view(request):
                 .prefetch_related("shared_users")
                 .get(pk=int(object_id))
             )
-        except (TypeError, ValueError, JSONData.DoesNotExist):
+        except (TypeError, ValueError, OverflowError, JSONData.DoesNotExist):
             return JsonResponse({"error": "Data object not found."}, status=404)
 
         if not _user_can_access_object(obj, request.user):
             return JsonResponse({"error": "Data object not found."}, status=404)
 
-    return JsonResponse(_build_assistant_answer(question, page, obj=obj))
+    object_key = obj.pk if obj is not None else None
+    context = read_context(token, request.user.pk, object_key)
+    reply = _build_assistant_answer(question, page, obj=obj, context=context)
+    reply["context"] = sign_context(reply.pop("conversation", {}), request.user.pk, object_key)
+    return JsonResponse(reply)
 
 
 def _build_basic_search_text(obj, access_text):

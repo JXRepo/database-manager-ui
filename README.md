@@ -431,21 +431,39 @@ from the home, login, and registration pages. Upload and detail pages retain
 their specific suggestions and data context; questions require authentication
 and data access.
 
-The assistant provides prepared help entirely within this Django application.
-It uses no external model service, API key or training, and has no live support
-handoff. **Browse help topics** opens Upload, Search, Access and sharing, My Data
-and Charts categories, plus Current object on detail pages. Users can select a
-question or type supported wording. English matching uses complete words;
-explicit Chinese phrases are also recognized, with answers in English. Ambiguous
-matches offer candidate questions; unknown questions return help categories.
+The assistant matches English and Chinese questions to maintained platform
+answers with a small multilingual model running inside Django. It uses no
+external model API, API key, model training or live support handoff. Answers
+remain in English. **Browse help topics** opens Upload, Search, Access and
+sharing, My Data and Charts categories, plus Current object on detail pages.
+Exact menu choices work even when semantic matching is unavailable.
 
-The catalogue is maintained in [`apps/pages/assistant.py`](apps/pages/assistant.py)
-against these platform rules and the bundled schema profile. Upload allowances
-come from active settings. Answers can link to the relevant platform page.
-Object summaries require the same server access check as details and preserve
-stored JSON. The assistant gives instructions; it does not execute searches,
-modify data or inspect selected upload files. Conversation history lasts only
-on the current page and is cleared by navigation or refresh.
+Ambiguous questions offer choices: `data form` asks about JSON format or the
+upload form; `format`, `which fields?` and `how big?` can continue that conversation.
+Numbered choices such as `the second one` refer to the last suggested questions.
+A complete new question can change topics. Low confidence produces clarification
+or platform help choices; this is not a general chat or answer generation model.
+
+The answer catalogue and representative phrases live in
+[`apps/pages/assistant_knowledge.py`](apps/pages/assistant_knowledge.py), grounded
+in these platform rules and the bundled schema profile. Upload allowances come
+from active settings. [`apps/pages/assistant.py`](apps/pages/assistant.py) handles
+matching and follow-ups. Object summaries recheck access on every request.
+The assistant does not execute searches, modify data, fit curves or inspect
+selected upload files. Questions and object contents are never sent to a model
+service or retained in its example cache. Page memory holds the visible messages
+and a signed topic/choice token bound to the user and current object, expiring
+after 30 minutes. Browse help topics resets the topic; navigation or refresh
+clears the page conversation.
+
+Run `manage.py prepare_assistant_model` during setup as described below. It fetches
+about 118 MiB of public model assets, pinned and SHA-256 checked in
+[`apps/pages/assistant_semantics.py`](apps/pages/assistant_semantics.py), into the
+ignored `.assistant-models/` directory. The model is the Apache-2.0 licensed
+[multilingual MiniLM](https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2),
+using its quantized ONNX export and SentencePiece vocabulary. Questions never
+trigger a download. See the [operator runbook](docs/deployment/public-pilot.md#local-assistant-model)
+for deployment and resource limits.
 
 Standard field names follow the
 [MiMeDat schema, version 1.2.0](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json):
@@ -842,9 +860,12 @@ With `DEBUG=True`, the application uses the local `db.sqlite3` database. Cloud
 database settings are not needed for ordinary local development. Do not use
 `DEBUG=True` for a public deployment or commit `.env` to GitHub.
 
-Initialize the local database and start the development server:
+Prepare the assistant model, initialize the local database and start the server.
+The model setup needs network access to Hugging Face but no account or API key;
+repeating it reuses verified files:
 
 ```bash
+.venv/bin/python manage.py prepare_assistant_model
 .venv/bin/python manage.py migrate
 .venv/bin/python manage.py runserver 127.0.0.1:8001
 ```
@@ -852,6 +873,7 @@ Initialize the local database and start the development server:
 On Windows, use:
 
 ```powershell
+.\.venv\Scripts\python.exe manage.py prepare_assistant_model
 .\.venv\Scripts\python.exe manage.py migrate
 .\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001
 ```

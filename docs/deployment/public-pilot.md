@@ -53,6 +53,32 @@ DEBUG=True .venv/bin/python -m gunicorn config.wsgi:application --bind 127.0.0.1
 Ordinary `manage.py runserver` does not start this background process. The original
 form submission route remains available without the background JavaScript.
 
+## Local Assistant Model
+
+`build.sh` runs `manage.py prepare_assistant_model` after installing dependencies
+and before static collection and migrations. This downloads only the pinned
+public ONNX model and SentencePiece vocabulary (about 118 MiB combined); each
+asset must match its stored size and SHA-256 digest before atomic replacement.
+A failed download fails the new build. Repeated setup reuses verified files.
+No Hugging Face account, token or paid model API is required. Keep
+`.assistant-models/` out of Git and outside static/media serving.
+
+Runtime matching makes no external requests. A web worker lazily loads one CPU
+model and public example index on its first semantic question. Matching uses one
+CPU thread, at most 128 tokens per question and a lock with a two-second wait
+limit. Exact help buttons do not require the model. Missing files, load/inference
+failure or a busy matcher return an explicit unavailable notice and usable help
+categories. Runtime never attempts to repair or download assets.
+
+Model memory belongs to each web worker; the upload processor does not load it.
+Keep the existing single web worker unless the instance has capacity for more.
+Local measurements are recorded in the assistant implementation spec; they do
+not establish capacity for concurrent large uploads on Render Free. The model
+does not change upload allowances or hosting capacity. After deployment, verify
+`data form` → `format` → `which fields?`, then a new question such as
+`I want to erase my old simulations`, and check memory/restart metrics alongside
+ordinary uploads. A successful Git push is separate from a completed deployment.
+
 ## Render Environment Variables
 
 Set these non-secret defaults in Render exactly as shown:

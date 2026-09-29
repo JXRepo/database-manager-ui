@@ -1,205 +1,38 @@
 """
-Provide curated platform help and conservative local question matching
+Resolve platform questions and short follow-ups against trusted answers
 
-Answers follow README.md and the bundled MiMeDat required field profile.
-This catalogue uses no model service and never reads data objects itself.
+Local embeddings match meaning; the model never generates factual answers.
 """
 
 import re
 import unicodedata
+from difflib import get_close_matches
 
 from django.conf import settings
+from django.core import signing
 from django.urls import reverse
 
+from .assistant_knowledge import CATEGORIES, EXAMPLES, TOPICS
+from .assistant_semantics import ModelUnavailable, rank_topics
 
-CATEGORIES = {
-    "upload": "Upload help",
-    "search": "Search help",
-    "sharing": "Access and sharing help",
-    "manage": "My Data help",
-    "charts": "Charts help",
-    "object": "Current object help",
-}
 
-TOPICS = (
-    {
-        "id": "upload.start", "question": "How do I upload JSON files?",
-        "patterns": ("upload", "uploading", "上传"),
-        "answer": "Open Upload, select your JSON files, then submit them once. A file may contain one object "
-                  "or a collection of objects. Checking shows validation progress; Saving is provisional. "
-                  "Uploaded confirms that the entire file was saved. Keep the page open during transfer.",
-        "route": "upload_json", "link": "Open Upload",
-    },
-    {
-        "id": "upload.errors", "question": "Why was my upload rejected?",
-        "patterns": ("upload failed", "upload rejected", "upload reject", "upload error", "upload empty", "file rejected", "empty", "上传失败", "上传错误", "空值"),
-        "answer": "Read the corrections below the upload form: Add means a required field is missing; "
-                  "Fill in means it is empty. Expand an object's details for the affected fields. "
-                  "Any validation, identifier or sharing error rejects the entire file. Valid other files "
-                  "can still be saved. Fix and resubmit only failed files. This assistant does not inspect "
-                  "your selected files or diagnose the current upload report.",
-        "route": "upload_json", "link": "Open Upload",
-    },
-    {
-        "id": "upload.required", "question": "Which fields are required?",
-        "patterns": ("required", "missing", "mandatory", "schema", "mimedat", "必填", "缺少字段", "数据格式"),
-        "answer": "Uploads check 24 required top-level fields, including phase, plus applicable nested and "
-                  "conditional requirements from the bundled MiMeDat profile. This is not full JSON Schema "
-                  "validation. Extra fields are allowed. Required nulls, blank text, empty lists and empty "
-                  "objects are rejected; zero and false are not empty. An identifier may be omitted and "
-                  "will be generated. Follow the field paths in the upload corrections.",
-        "route": "upload_json", "link": "Open Upload",
-    },
-    {
-        "id": "upload.identifier", "question": "How do identifiers work?",
-        "patterns": ("identifier", "identifiers", "duplicate", "duplicates", "编号", "重复"),
-        "answer": "A missing, null or blank identifier is generated automatically using the MiMeDat template's "
-                  "8-character hash. A supplied identifier must be text with no surrounding whitespace. "
-                  "Generated and supplied identifiers must be unique across stored records and the upload "
-                  "batch. A duplicate rejects the entire file; existing data is never overwritten. "
-                  "Remove an already uploaded object, or use a unique identifier for a different object.",
-        "route": "upload_json", "link": "Open Upload",
-    },
-    {
-        "id": "upload.limits", "question": "What are the upload limits?",
-        "patterns": ("limits", "limit", "upload limits", "upload limit", "upload size", "file size", "storage", "quota", "too large", "限制", "大小", "配额"),
-        "answer": "", "route": "upload_json", "link": "Open Upload",
-    },
-    {
-        "id": "upload.interrupted", "question": "What if an upload is interrupted?",
-        "patterns": ("interrupted", "unconfirmed", "connection", "network", "上传中断", "网络", "未确认"),
-        "answer": "Confirmed Uploaded files remain saved. Unconfirmed means the browser did not receive a "
-                  "final result. Check My Data and any available upload progress before submitting again. "
-                  "The platform does not retry automatically. Saving counts alone do not confirm a file commit.",
-        "route": "json_data_list", "link": "Open My Data",
-    },
-    {
-        "id": "search.start", "question": "How do I search for data?",
-        "patterns": ("search", "find", "find data", "search phase", "search public", "search private", "search software", "搜索", "查找", "找数据"),
-        "answer": "Open Search and enter keywords, or use Advanced Search without a keyword. All entered "
-                  "whole words must match; order and case do not matter. Use Phase for copper, Software "
-                  "for Abaqus, or Access for Public. Results include your own, public and explicitly shared "
-                  "objects. This assistant gives search guidance; it does not run a search for you.",
-        "route": "search", "link": "Open Search",
-    },
-    {
-        "id": "search.filters", "question": "How do advanced filters work?",
-        "patterns": ("advanced", "filters", "filter", "search filters", "search filter", "advanced search", "grain", "temperature", "筛选", "晶粒", "温度"),
-        "answer": "Common filters cover Identifier, Access, Owner (uploaded by), Creator, Software, Phase "
-                  "and Title. Data field filters cover preset simulation parameters such as Grain number "
-                  "and Global temperature. All conditions must match the same object. Temperature queries "
-                  "use kelvin. Owner is the platform uploader; Creator comes from the JSON metadata.",
-        "route": "search", "link": "Open Search",
-    },
-    {
-        "id": "sharing.access", "question": "Who can view my data?",
-        "patterns": ("access", "public", "private", "permission", "permissions", "view my", "公开", "私有", "权限"),
-        "answer": "The owner can always view their data. Public objects are available to signed-in platform "
-                  "users. Private objects are visible only to the owner and explicitly shared users. "
-                  "Public does not mean anonymous access or permission to reuse the data under any license. "
-                  "Only the owner can delete an object.",
-        "route": "share", "link": "Open Sharing",
-    },
-    {
-        "id": "sharing.share", "question": "How do I share a private object?",
-        "patterns": ("share", "sharing", "share private", "sharing private", "shared with", "username", "共享", "分享", "用户名"),
-        "answer": 'In shared_with, use {"access_type": "c", "username": "viewer"} with an existing platform '
-                  'username other than your own. With "c" and no username, the object stays private to its '
-                  'owner. For public data use {"access_type": "all"} without username. After upload, owners '
-                  "can manage sharing on the object's detail page. These snippets describe sharing metadata "
-                  "only; a complete upload still needs its required fields.",
-        "route": "share", "link": "Open Sharing",
-    },
-    {
-        "id": "manage.list", "question": "Where are my uploaded objects?",
-        "patterns": ("my uploads", "where data", "uploaded objects", "我的上传"),
-        "answer": "My Data lists your own uploads. Filter by Access, Software, Phase or Creator, then open "
-                  "an object to inspect it. Creator is recorded in the JSON and may differ from the uploader. "
-                  "Use Shared with me for another user's private objects shared with you. Search includes "
-                  "all objects you can access.",
-        "route": "json_data_list", "link": "Open My Data",
-    },
-    {
-        "id": "manage.download", "question": "How do I download data?",
-        "patterns": ("download", "export", "csv", "下载", "导出"),
-        "answer": "Open an accessible object's detail page to download its complete JSON or available curve "
-                  "CSV. Selected objects can also be exported from the lists. One selected object exports "
-                  "curves as CSV; multiple objects produce a ZIP with one CSV per object. Every selected "
-                  "object must be accessible and have exportable curves. JSON downloads preserve stored "
-                  "field names, values and array order.",
-        "route": "json_data_list", "link": "Open My Data",
-    },
-    {
-        "id": "manage.delete", "question": "How do I delete my data?",
-        "patterns": ("delete", "remove", "删除"),
-        "answer": "Use the delete controls in My Data or on an object you own. Only the owner can delete "
-                  "an object; access to a public or shared object does not allow deletion. Check your "
-                  "selection before confirming. This assistant provides instructions and does not delete data.",
-        "route": "json_data_list", "link": "Open My Data",
-    },
-    {
-        "id": "charts.overview", "question": "What does Charts show?",
-        "patterns": ("charts", "statistics", "统计", "图表"),
-        "answer": "Charts summarizes accessible objects. Choose All accessible, My uploads, Public or "
-                  "Shared with me. The stress-strain preview shows one object and matching component. "
-                  "Click category bars or numeric intervals to refine the selection. Counts describe "
-                  "metadata and result availability; they do not establish physical comparability or "
-                  "scientific validity.",
-        "route": "charts", "link": "Open Charts",
-    },
-    {
-        "id": "charts.curves", "question": "How are curve previews prepared?",
-        "patterns": ("equivalent", "curve length", "different lengths", "preview", "等效", "长度不同", "曲线长度"),
-        "answer": "Supplied equivalent arrays take precedence. An equivalent may be calculated only when "
-                  "its field is absent and all six required components are available. Unequal arrays pair "
-                  "by index to the shorter length. Charts previews over 2,400 points may be reduced, with "
-                  "the displayed count stated. Complete object exports keep the full arrays. A length "
-                  "difference alone does not explain why samples are missing.",
-        "route": "charts", "link": "Open Charts",
-    },
-    {
-        "id": "object.summary", "question": "Summarize this data",
-        "patterns": ("summarize", "summary", "overview", "总结", "概述"),
-        "action": "summary",
-    },
-    {
-        "id": "object.phase", "question": "What phase does this object contain?",
-        "patterns": ("phase", "material", "材料", "物相"), "action": "phase",
-    },
-    {
-        "id": "object.software", "question": "Which software produced this object?",
-        "patterns": ("software", "软件"), "action": "software",
-    },
-    {
-        "id": "object.boundary", "question": "Explain mechanical_BC",
-        "patterns": ("mechanical bc", "boundary", "boundaries", "vertex", "loading", "边界", "载荷"),
-        "action": "boundary",
-    },
-    {
-        "id": "object.plots", "question": "What can I plot?",
-        "patterns": ("plot", "curve", "stress", "strain", "绘图", "应力", "应变"), "action": "plots",
-    },
-    {
-        "id": "object.access", "question": "How is access set?",
-        "patterns": ("access this", "view this", "who this", "谁能看这个"), "action": "access",
-    },
-    {
-        "id": "help.support", "question": "Can I talk to a human?",
-        "patterns": ("human", "agent", "live support", "人工", "客服"),
-        "answer": "Live support is not available here. This assistant provides prepared platform help "
-                  "and basic information about the current object. Choose a help topic below.",
-    },
+TOPIC_BY_ID = {topic["id"]: topic for topic in TOPICS}
+CHOICE_LABELS = {"upload.format": "JSON format", "upload.start": "Upload form",
+                 "upload.required": "Required fields", "upload.template": "JSON template"}
+SEMANTIC_EXAMPLES = tuple((topic["id"], topic["question"]) for topic in TOPICS) + tuple(
+    (topic_id, example) for topic_id, examples in EXAMPLES.items() for example in examples
 )
+CONTEXT_SALT = "fair-assistant-conversation-v1"
 
 
 def _normalize(text):
     """
-    Normalize user wording for literal FAQ matching
+    Normalize wording for exact labels and short aliases
 
     Parameters
     ----------
     text : str
-        Question or a known phrase.
+        Question or known phrase.
 
     Returns
     -------
@@ -209,85 +42,129 @@ def _normalize(text):
     return re.sub(r"[\W_]+", " ", unicodedata.normalize("NFKC", text).casefold()).strip()
 
 
-def _score(question, pattern):
+def read_context(token, user_id, object_id):
     """
-    Match complete English words or an explicit Chinese phrase
+    Read short-lived topic state bound to this user and object
 
     Parameters
     ----------
-    question : str
-        Normalized user question.
-    pattern : str
-        One supported wording pattern.
-
-    Returns
-    -------
-    int
-        Number of matched words or Chinese characters, otherwise zero.
-    """
-    if re.search(r"[\u3400-\u9fff]", pattern):
-        return len(pattern) if pattern in question else 0
-    words = pattern.split()
-    return len(words) if set(words).issubset(question.split()) else 0
-
-
-def help_reply(question, has_object=False):
-    """
-    Resolve a menu selection or conservatively match a prepared answer
-
-    Ties offer candidate questions. Unknown wording returns the help menu.
-    Object actions are resolved by the view after its access check.
-
-    Parameters
-    ----------
-    question : str
-        User text or a selected question label.
-    has_object : bool, optional
-        Whether the view has authorized a current data object.
+    token : str
+        Signed token from the previous response.
+    user_id : int
+        Authenticated user identifier.
+    object_id : int or None
+        Independently authorized current object.
 
     Returns
     -------
     dict
-        Answer, topic, suggestions, navigation links and optional object action.
+        Verified topic state or an empty conversation.
     """
-    normalized = _normalize(question)
-    categories = [label for key, label in CATEGORIES.items() if key != "object" or has_object]
-    reply = {"answer": "Choose a help topic below, or enter a short question about the platform.",
-             "suggestions": categories, "links": [], "topic": "menu"}
-    if normalized in ("browse help topics", "help", "hello", "hi", "帮助", "你好"):
-        return reply
-    for category, label in CATEGORIES.items():
-        if normalized == _normalize(label) and (category != "object" or has_object):
-            reply["topic"] = "menu." + category
-            reply["answer"] = "Choose a question about " + label.removesuffix(" help").lower() + "."
-            reply["suggestions"] = [topic["question"] for topic in TOPICS if topic["id"].startswith(category + ".")]
-            return reply
+    if not token:
+        return {}
+    try:
+        state = signing.loads(token, salt=CONTEXT_SALT, max_age=1800)
+    except (signing.BadSignature, ValueError, TypeError):
+        return {}
+    if not isinstance(state, dict) or state.get("user") != user_id or state.get("object") != object_id:
+        return {}
+    return state.get("conversation", {})
 
-    exact = [topic for topic in TOPICS if normalized == _normalize(topic["question"])]
-    candidates = exact
-    if not exact:
-        highest = 0
-        for topic in TOPICS:
-            score = max((_score(normalized, pattern) for pattern in topic["patterns"]), default=0)
-            if score > highest:
-                highest, candidates = score, [topic]
-            elif score and score == highest:
-                candidates.append(topic)
-    if len(candidates) != 1:
-        reply["topic"] = None
-        reply["answer"] = "I couldn't match that to one help topic. Please choose a question below or try a shorter question."
-        if candidates:
-            reply["suggestions"] = [topic["question"] for topic in candidates]
-        return reply
 
-    topic = candidates[0]
-    reply["topic"] = topic["id"]
-    reply["answer"] = topic.get("answer", "")
-    category = topic["id"].split(".")[0]
-    reply["suggestions"] = [entry["question"] for entry in TOPICS
-                            if entry["id"].startswith(category + ".") and entry != topic][:3]
+def sign_context(conversation, user_id, object_id):
+    """
+    Sign only topic identifiers, never questions or object contents
+
+    Parameters
+    ----------
+    conversation : dict
+        Topic and suggested topic identifiers from a prepared reply.
+    user_id : int
+        Authenticated user identifier.
+    object_id : int or None
+        Current authorized object identifier.
+
+    Returns
+    -------
+    str
+        Signed state, or an empty token for a reset conversation.
+    """
+    if not conversation:
+        return ""
+    return signing.dumps({"user": user_id, "object": object_id, "conversation": conversation},
+                         salt=CONTEXT_SALT, compress=True)
+
+
+def _menu(has_object, answer=None):
+    """
+    Offer platform categories and clear any previous topic
+
+    Parameters
+    ----------
+    has_object : bool
+        Whether current object help is available.
+    answer : str, optional
+        Message preceding the categories.
+
+    Returns
+    -------
+    dict
+        Prepared category reply.
+    """
+    return {
+        "answer": answer or "I can help with data files, uploads, search, sharing and plots. What would you like to do?",
+        "suggestions": [label for key, label in CATEGORIES.items() if key != "object" or has_object],
+        "links": [], "topic": None if answer else "menu", "conversation": {},
+    }
+
+
+def _clarify(topic_ids, answer="Which of these would you like help with?"):
+    """
+    Ask a concrete question with ordered choices for the next turn
+
+    Parameters
+    ----------
+    topic_ids : sequence of str
+        Candidate topic identifiers in display order.
+    answer : str, optional
+        Clarifying question.
+
+    Returns
+    -------
+    dict
+        Reply containing candidates and minimal conversation state.
+    """
+    return {"answer": answer, "topic": None, "links": [],
+            "suggestions": [CHOICE_LABELS.get(key, TOPIC_BY_ID[key]["question"]) for key in topic_ids],
+            "conversation": {"topic": None, "choices": list(topic_ids)}}
+
+
+def _answer(topic_id, has_object):
+    """
+    Return a maintained answer or an authorized object action
+
+    Parameters
+    ----------
+    topic_id : str
+        Selected knowledge topic.
+    has_object : bool
+        Whether an object is already authorized.
+
+    Returns
+    -------
+    dict
+        Prepared answer and useful follow-up choices.
+    """
+    topic = TOPIC_BY_ID[topic_id]
+    reply = {"topic": topic_id, "answer": topic.get("answer", ""), "links": []}
+    category = topic_id.split(".")[0]
+    related = [entry["id"] for entry in TOPICS if entry["id"].startswith(category + ".") and entry != topic][:3]
+    if topic_id in ("upload.format", "upload.template", "upload.start"):
+        related = [key for key in ("upload.required", "upload.template", "upload.limits") if key != topic_id]
+    reply["suggestions"] = [CHOICE_LABELS.get(key, TOPIC_BY_ID[key]["question"]) for key in related]
+    reply["conversation"] = {"topic": topic_id, "choices": related}
     if not reply["suggestions"]:
-        reply["suggestions"] = categories
+        reply["suggestions"] = _menu(has_object)["suggestions"]
     if "action" in topic:
         if has_object:
             reply["object_action"] = topic["action"]
@@ -296,7 +173,7 @@ def help_reply(question, has_object=False):
             reply["links"] = [{"label": "Open Search", "url": reverse("search")}]
     if "route" in topic:
         reply["links"] = [{"label": topic["link"], "url": reverse(topic["route"])}]
-    if topic["id"] == "upload.limits":
+    if topic_id == "upload.limits":
         reply["answer"] = (
             f"Each submission allows {settings.PILOT_MAX_UPLOAD_FILES} files, "
             f"{settings.PILOT_MAX_UPLOAD_FILE_BYTES / 1024**2:g} MiB per file, "
@@ -307,3 +184,159 @@ def help_reply(question, has_object=False):
             "A file size or content error rejects that file; other files can still be processed."
         )
     return reply
+
+
+def _correct_typo(text):
+    """
+    Correct at most one near-miss in a short known platform term
+
+    Parameters
+    ----------
+    text : str
+        Normalized question.
+
+    Returns
+    -------
+    str
+        Question with a conservative spelling correction, if any.
+    """
+    words = text.split()
+    if len(words) > 6:
+        return text
+    vocabulary = set()
+    for topic in TOPICS:
+        for alias in topic["patterns"]:
+            vocabulary.update(word for word in alias.split() if word.isascii() and len(word) >= 5)
+    for index, word in enumerate(words):
+        if len(word) < 5 or not word.isascii() or word in vocabulary:
+            continue
+        possible = sorted(candidate for candidate in vocabulary if abs(len(candidate) - len(word)) <= 1)
+        close = get_close_matches(word, possible, n=1, cutoff=0.82)
+        if close:
+            words[index] = close[0]
+            break
+    return " ".join(words)
+
+
+def _follow_up(text, context):
+    """
+    Interpret brief choices only within the verified previous topic
+
+    Parameters
+    ----------
+    text : str
+        Normalized question.
+    context : dict
+        Verified conversation state.
+
+    Returns
+    -------
+    str or None
+        Selected topic when the follow-up is unambiguous.
+    """
+    choices = context.get("choices", [])
+    ordinals = {"1": 0, "first": 0, "the first one": 0, "第一个": 0,
+                "2": 1, "second": 1, "the second one": 1, "第二个": 1,
+                "3": 2, "third": 2, "the third one": 2, "第三个": 2}
+    position = ordinals.get(text)
+    if position is not None and position < len(choices):
+        return choices[position]
+    topic = context.get("topic") or ""
+    if topic.startswith("upload."):
+        if text in ("how big", "how much", "how many", "and the size", "what about size", "多大", "多少", "大小呢"):
+            return "upload.limits"
+        if text in ("which fields", "what fields", "and the fields", "哪些字段", "哪些必填"):
+            return "upload.required"
+        if text in ("csv", "excel", "pdf", "what about csv", "what about excel"):
+            return "upload.format"
+    if topic == "upload.identifier" and text in ("can i leave it blank", "is it required", "能不填吗"):
+        return topic
+    if topic.startswith("sharing.") and text in ("how", "how do i do that", "怎么设置", "怎么做"):
+        return "sharing.share"
+    return None
+
+
+def help_reply(question, has_object=False, context=None):
+    """
+    Match a platform question or clarify it using local sentence embeddings
+
+    Parameters
+    ----------
+    question : str
+        User question or chosen help label.
+    has_object : bool, optional
+        Whether the view has authorized a current object.
+    context : dict, optional
+        Verified state from the previous response.
+
+    Returns
+    -------
+    dict
+        Trusted answer or clarification with minimal conversation state.
+    """
+    text = _correct_typo(_normalize(question))
+    context = context or {}
+    if text in ("browse help topics", "help", "hello", "hi", "what can you do", "thanks", "thank you", "帮助", "你好", "谢谢",
+                "none of these", "none of those", "something else", "neither", "都不是"):
+        return _menu(has_object)
+    for category, label in CATEGORIES.items():
+        if text == _normalize(label) and (category != "object" or has_object):
+            reply = _menu(has_object)
+            reply.update(topic="menu." + category, answer="Choose a question about " + label.removesuffix(" help").lower() + ".",
+                         suggestions=[topic["question"] for topic in TOPICS if topic["id"].startswith(category + ".")])
+            return reply
+    if (text in ("dataform", "form", "表单", "数据表单")
+            or re.search(r"\bdata forms?\b", text)):
+        return _clarify(["upload.format", "upload.start"], "Do you mean the JSON data format or the upload form?")
+    selected = _follow_up(text, context)
+    if selected:
+        return _answer(selected, has_object)
+    for topic in TOPICS:
+        labels = (topic["question"], CHOICE_LABELS.get(topic["id"], ""), *topic["patterns"])
+        if text in {_normalize(label) for label in labels if label}:
+            return _answer(topic["id"], has_object)
+    if re.fullmatch(r"(?:(?:the )?(?:first|second|third)(?: one)?|[123]|第[一二三]个)", text):
+        return _menu(has_object, "Choose a help topic first, then I can follow your selection.")
+    words = set(text.split())
+    if (((words & {"delete", "remove", "erase"} or "get rid" in text)
+            and (words & {"download", "export"} or "a copy" in text))
+            or ("删除" in text and any(word in text for word in ("下载", "导出")))):
+        return _clarify(["manage.download", "manage.delete"], "Would you like to download data or delete data?")
+    try:
+        semantic_text = question if text == _normalize(question) else text
+        ranked = rank_topics(semantic_text, SEMANTIC_EXAMPLES)
+    except ModelUnavailable:
+        return _menu(has_object, "Question matching is temporarily unavailable. You can still choose a help topic below.")
+    scores = dict(ranked)
+    # Specific maintained phrases can separate nearby meanings such as a
+    # rejected upload and a lost connection, without matching broad substrings
+    for topic in TOPICS:
+        for alias in topic["patterns"]:
+            phrase = _normalize(alias)
+            parts = phrase.split()
+            if phrase.isascii():
+                specific = len(parts) >= 2 and not set(parts) & {"my", "this", "the", "who", "with"}
+                matched = " " + phrase + " " in " " + text + " "
+            else:
+                specific = len(phrase) >= 4
+                matched = phrase in text
+            if specific and matched:
+                scores[topic["id"]] += 0.08
+                break
+    if not has_object:
+        scores["sharing.access"] = max(scores["sharing.access"], scores.pop("object.access"))
+    candidates = sorted(((key, value) for key, value in scores.items() if key != "outside"),
+                        key=lambda item: item[1], reverse=True)
+    best, score = candidates[0]
+    if scores.get("outside", 0) >= max(0.48, score - 0.03) or score < 0.38:
+        return _menu(has_object, "I can help with this data platform: file formats, uploads, search, sharing and plots. Choose a topic below.")
+    margin = score - candidates[1][1]
+    short_unknown = len(text.split()) == 1 and text.isascii()
+    if not short_unknown and ((score >= 0.65 and margin >= 0.025) or (score >= 0.55 and margin >= 0.06)
+                              or (score >= 0.50 and margin >= 0.12)):
+        return _answer(best, has_object)
+    if best in ("sharing.access", "sharing.share"):
+        return _clarify(["sharing.access", "sharing.share"],
+                        "Do you want to check who can view data, or change who it is shared with?")
+    close = [key for key, value in candidates[:3] if value >= score - 0.12]
+    return _clarify(close)
