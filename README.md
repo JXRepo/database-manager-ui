@@ -431,6 +431,22 @@ from the home, login, and registration pages. Upload and detail pages retain
 their specific suggestions and data context; questions require authentication
 and data access.
 
+The assistant provides prepared help entirely within this Django application.
+It uses no external model service, API key or training, and has no live support
+handoff. **Browse help topics** opens Upload, Search, Access and sharing, My Data
+and Charts categories, plus Current object on detail pages. Users can select a
+question or type supported wording. English matching uses complete words;
+explicit Chinese phrases are also recognized, with answers in English. Ambiguous
+matches offer candidate questions; unknown questions return help categories.
+
+The catalogue is maintained in [`apps/pages/assistant.py`](apps/pages/assistant.py)
+against these platform rules and the bundled schema profile. Upload allowances
+come from active settings. Answers can link to the relevant platform page.
+Object summaries require the same server access check as details and preserve
+stored JSON. The assistant gives instructions; it does not execute searches,
+modify data or inspect selected upload files. Conversation history lasts only
+on the current page and is cleared by navigation or refresh.
+
 Standard field names follow the
 [MiMeDat schema, version 1.2.0](https://github.com/Ronakshoghi/MiMeDat/blob/511cb98b02270d7f31b55243ff49cfef6c7b240d/microstructure_sensitive_mechanical_metadata_schema.json):
 `phase_name`, `processor_specifications`, and the underscore-separated names

@@ -36,6 +36,8 @@
     bottom: 60px;
     display: none;
     width: min(360px, calc(100vw - 32px));
+    max-height: calc(100vh - 106px);
+    flex-direction: column;
     overflow: hidden;
     border: 1px solid #dbe2ea;
     border-radius: 14px;
@@ -44,7 +46,7 @@
   }
 
   .fair-assistant-widget.is-open .fair-assistant-panel {
-    display: block;
+    display: flex;
   }
 
   .fair-assistant-header {
@@ -55,6 +57,7 @@
     padding: 12px 14px;
     border-bottom: 1px solid #eef2f7;
     background: #f8fafc;
+    flex-shrink: 0;
   }
 
   .fair-assistant-title {
@@ -84,6 +87,8 @@
     display: grid;
     gap: 8px;
     max-height: 310px;
+    min-height: 70px;
+    flex: 1 1 auto;
     overflow-y: auto;
     padding: 12px;
     background: #ffffff;
@@ -96,6 +101,8 @@
     font-size: 0.88rem;
     line-height: 1.45;
     white-space: pre-line;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .fair-assistant-message.assistant {
@@ -115,6 +122,10 @@
     flex-wrap: wrap;
     gap: 6px;
     padding: 0 12px 10px;
+    max-height: 170px;
+    min-height: 0;
+    flex-shrink: 0;
+    overflow-y: auto;
   }
 
   .fair-assistant-suggestion {
@@ -125,6 +136,7 @@
     font-size: 0.78rem;
     font-weight: 600;
     padding: 5px 9px;
+    text-align: left;
   }
 
   .fair-assistant-form {
@@ -132,10 +144,12 @@
     gap: 8px;
     padding: 12px;
     border-top: 1px solid #eef2f7;
+    flex-shrink: 0;
   }
 
   .fair-assistant-input {
-    min-height: 72px;
+    min-height: 54px;
+    max-height: 100px;
     resize: vertical;
     border: 1px solid #dbe2ea;
     border-radius: 10px;
@@ -166,6 +180,36 @@
     opacity: 0.65;
   }
 
+  .fair-assistant-browse {
+    border: 0;
+    border-bottom: 1px solid #eef2f7;
+    padding: 8px 14px;
+    background: #ffffff;
+    color: #1d4ed8;
+    text-align: left;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  .fair-assistant-label {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #475569;
+  }
+
+  .fair-assistant-message a {
+    display: block;
+    margin-top: 8px;
+    color: #1d4ed8;
+    text-decoration: underline;
+  }
+
+  .fair-assistant-widget button:focus-visible,
+  .fair-assistant-widget a:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+
   @media (max-width: 576px) {
     .fair-assistant-widget {
       right: 16px;
@@ -192,8 +236,12 @@
       </button>
     </div>
 
-    <div class="fair-assistant-messages">
-      <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Ask about upload rules, search filters, or the current data object.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
+    {% if request.user.is_authenticated %}
+    <button class="fair-assistant-browse" type="button">Browse help topics</button>
+    {% endif %}
+
+    <div class="fair-assistant-messages" role="log" aria-label="Help conversation" aria-live="polite">
+      <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Choose a help topic or type a short question. I provide prepared platform guidance and basic details about the current object.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
     </div>
 
     {% if request.user.is_authenticated %}
@@ -203,19 +251,20 @@
         <button class="fair-assistant-suggestion" type="button" data-question="Explain mechanical_BC">mechanical_BC</button>
         <button class="fair-assistant-suggestion" type="button" data-question="What can I plot?">Plot</button>
       {% elif assistant_page == "upload" %}
-        <button class="fair-assistant-suggestion" type="button" data-question="How should I write shared_with?">shared_with</button>
-        <button class="fair-assistant-suggestion" type="button" data-question="What if identifier already exists?">identifier</button>
-        <button class="fair-assistant-suggestion" type="button" data-question="Why did upload reject empty values?">empty values</button>
+        <button class="fair-assistant-suggestion" type="button" data-question="How do I upload JSON files?">Upload files</button>
+        <button class="fair-assistant-suggestion" type="button" data-question="Why was my upload rejected?">Upload errors</button>
+        <button class="fair-assistant-suggestion" type="button" data-question="What are the upload limits?">Limits</button>
       {% else %}
-        <button class="fair-assistant-suggestion" type="button" data-question="How do I find copper data?">copper data</button>
-        <button class="fair-assistant-suggestion" type="button" data-question="How do I search by phase?">phase</button>
-        <button class="fair-assistant-suggestion" type="button" data-question="How do I find public data?">public data</button>
+        <button class="fair-assistant-suggestion" type="button" data-question="Search help">Search help</button>
+        <button class="fair-assistant-suggestion" type="button" data-question="My Data help">My Data help</button>
+        <button class="fair-assistant-suggestion" type="button" data-question="Access and sharing help">Access and sharing</button>
       {% endif %}
     </div>
 
     <form class="fair-assistant-form">
       {% csrf_token %}
-      <textarea class="fair-assistant-input" placeholder="Ask a question"></textarea>
+      <label class="fair-assistant-label" for="fair-assistant-question">Ask a question</label>
+      <textarea class="fair-assistant-input" id="fair-assistant-question" placeholder="For example: upload limits" rows="2" maxlength="600" required></textarea>
       <div class="fair-assistant-actions">
         <button class="fair-assistant-send" type="submit">Send</button>
       </div>
@@ -256,11 +305,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function renderSuggestions(container, suggestions, submitQuestion) {
+    container.replaceChildren();
     if (!Array.isArray(suggestions) || !suggestions.length) {
       return;
     }
-
-    container.replaceChildren();
 
     suggestions.forEach(function (suggestion) {
       const button = document.createElement("button");
@@ -274,6 +322,19 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  function renderLinks(message, links) {
+    if (!Array.isArray(links)) return;
+    links.forEach(function (item) {
+      if (!item || typeof item.url !== "string" || typeof item.label !== "string") return;
+      const url = new URL(item.url, location.href);
+      if (url.origin !== location.origin) return;
+      const link = document.createElement("a");
+      link.href = url.href;
+      link.textContent = item.label;
+      message.appendChild(link);
+    });
+  }
+
   document.querySelectorAll(".fair-assistant-widget").forEach(function (widget) {
     const toggle = widget.querySelector(".fair-assistant-toggle");
     const close = widget.querySelector(".fair-assistant-close");
@@ -282,6 +343,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const send = widget.querySelector(".fair-assistant-send");
     const messages = widget.querySelector(".fair-assistant-messages");
     const suggestions = widget.querySelector(".fair-assistant-suggestions");
+    const browse = widget.querySelector(".fair-assistant-browse");
     const endpoint = widget.dataset.endpoint;
     const page = widget.dataset.page || "search";
     const objectId = widget.dataset.objectId || "";
@@ -301,6 +363,12 @@ document.addEventListener("DOMContentLoaded", function () {
       toggle.focus();
     });
 
+    widget.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && widget.classList.contains("is-open")) {
+        close.click();
+      }
+    });
+
     if (!form) {
       return;
     }
@@ -313,10 +381,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
 
       isLoading = true;
-      send.disabled = true;
+      widget.querySelectorAll(".fair-assistant-send, .fair-assistant-suggestion, .fair-assistant-browse")
+        .forEach(function (button) { button.disabled = true; });
       input.value = "";
       appendAssistantMessage(messages, question, "user");
-      const loadingMessage = appendAssistantMessage(messages, "Checking context...", "assistant");
+      const loadingMessage = appendAssistantMessage(messages, "Finding help...", "assistant");
 
       fetch(endpoint, {
         method: "POST",
@@ -333,9 +402,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }),
       })
         .then(function (response) {
+          if (response.redirected) {
+            return {answer: "Your session has ended. Sign in again to use platform help.",
+              links: [{label: "Sign in", url: "{% url 'login' %}"}], suggestions: []};
+          }
           return response.json().then(function (data) {
             if (!response.ok) {
-              throw new Error(data.error || "Assistant request failed");
+              return {answer: data.error || "The help request could not be completed.", suggestions: []};
             }
 
             return data;
@@ -344,19 +417,27 @@ document.addEventListener("DOMContentLoaded", function () {
         .then(function (data) {
           loadingMessage.textContent = data.answer || "No answer was generated.";
           renderSuggestions(suggestions, data.suggestions, submitQuestion);
+          renderLinks(loadingMessage, data.links);
+          messages.scrollTop = messages.scrollHeight;
         })
-        .catch(function (error) {
-          loadingMessage.textContent = error.message || "Assistant request failed.";
+        .catch(function () {
+          loadingMessage.textContent = "The help request could not be completed. Please try again.";
+          if (!input.value) input.value = question;
         })
         .finally(function () {
           isLoading = false;
-          send.disabled = false;
+          widget.querySelectorAll(".fair-assistant-send, .fair-assistant-suggestion, .fair-assistant-browse")
+            .forEach(function (button) { button.disabled = false; });
         });
     }
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       submitQuestion();
+    });
+
+    browse.addEventListener("click", function () {
+      submitQuestion("Browse help topics");
     });
 
     suggestions.querySelectorAll(".fair-assistant-suggestion").forEach(function (button) {

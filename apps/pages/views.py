@@ -33,6 +33,7 @@ from numbers import Number
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
+from .assistant import help_reply
 from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
 from .mechanical_csv import write_mechanical_csv
 from .advanced_search import (
@@ -1792,33 +1793,31 @@ def _assistant_mechanical_bc_summary(data):
         return "I did not find usable mechanical_BC data in this object."
 
     defined_items = [item for item in items if item.get("is_defined") is not False]
-    loaded = []
-    fixed = []
+    lines = [f"Mechanical boundary conditions: {len(defined_items)} supplied condition(s)."]
 
     for item in defined_items:
         vertex = item.get("vertex", "")
+
+        if item.get("is_tensor_load"):
+            lines.append(f"Whole cube {item['loading_type']} tensor ({item.get('loading_mode') or 'mode unspecified'}).")
+            for index, load in enumerate(item.get("tensor_loads", []), start=1):
+                lines.append(f"Entry {index}: {load['summary']}.")
+            continue
+
+        axes = []
 
         for axis in item.get("axes", []):
             direction = axis.get("direction", "")
             status = axis.get("status", "")
 
             if status == "loaded":
-                label = f"{vertex} {direction}"
-                if axis.get("load"):
-                    label = f"{label} ({axis['load']})"
-                loaded.append(label)
+                label = f"{direction} loaded"
+                if axis.get("load_summary"):
+                    label = f"{label} ({axis['load_summary']})"
+                axes.append(label)
             elif status == "fixed":
-                fixed.append(f"{vertex} {direction}")
-
-    lines = [
-        f"Mechanical boundary conditions are defined on {len(defined_items)} vertex/vertices."
-    ]
-
-    if fixed:
-        lines.append(f"Fixed constraints: {', '.join(fixed)}.")
-
-    if loaded:
-        lines.append(f"Loaded directions: {', '.join(loaded)}.")
+                axes.append(f"{direction} fixed")
+        lines.append(f"{vertex}: {'; '.join(axes) or 'No fixed or loaded axes specified'}.")
 
     return "\n".join(lines)
 
@@ -1901,192 +1900,53 @@ def _assistant_object_overview(obj):
     return "\n".join(lines)
 
 
-def _assistant_upload_answer(question):
-    """
-    Return assistant guidance for the upload workflow
-
-    Parameters
-    ----------
-    question : str
-        User question.
-
-    Returns
-    -------
-    str
-        Upload guidance.
-    """
-    normalized_question = question.casefold()
-
-    if "share" in normalized_question or "username" in normalized_question:
-        return (
-            'For sharing, use shared_with with access_type "c" and a username.\n'
-            'If access_type is "c" and username is absent, the object stays private.\n'
-            'If username is present, it must match an existing system username.\n'
-            'Use access_type "all" for public data; public data should not include username.'
-        )
-
-    if "identifier" in normalized_question or "duplicate" in normalized_question:
-        return (
-            "Each uploaded data object must have a unique identifier. If the same "
-            "identifier already exists in the database or appears twice in one upload, "
-            "that object is rejected and the upload message lists the duplicate."
-        )
-
-    if (
-        "empty" in normalized_question
-        or "missing" in normalized_question
-        or "required" in normalized_question
-    ):
-        return (
-            "Upload validation checks required top-level fields and empty top-level values. "
-            "Errors are grouped by category, such as missing required fields, empty values, "
-            "duplicate identifiers, invalid access metadata, and unknown shared users."
-        )
-
-    return (
-        "Upload accepts JSON files with one object, a list of objects, or a dict containing "
-        "a data list. Valid objects are saved; objects with missing fields, empty values, "
-        "invalid sharing metadata, unknown usernames, or duplicate identifiers are rejected."
-    )
-
-
-def _assistant_search_answer(question):
-    """
-    Return assistant guidance for the search workflow
-
-    Parameters
-    ----------
-    question : str
-        User question.
-
-    Returns
-    -------
-    str
-        Search guidance.
-    """
-    normalized_question = question.casefold()
-    suggestions = []
-
-    if "public" in normalized_question:
-        suggestions.append("set Access to Public")
-
-    if "private" in normalized_question:
-        suggestions.append("set Access to My Private")
-
-    for term in ("copper", "goss", "abaqus", "stress", "strain"):
-        if term in normalized_question:
-            suggestions.append(f'use "{term}" as a keyword or field filter')
-
-    if "phase" in normalized_question:
-        suggestions.append("use the Phase field")
-
-    if "software" in normalized_question:
-        suggestions.append("use the Software field")
-
-    if suggestions:
-        return "Suggested search setup: " + "; ".join(suggestions) + "."
-
-    return (
-        "Use the main search box for broad keywords. Use Advanced Search when you know "
-        "a specific identifier, creator, software, phase, owner, or access type."
-    )
-
-
-def _assistant_detail_answer(question, obj):
-    """
-    Return assistant guidance for one detail page object
-
-    Parameters
-    ----------
-    question : str
-        User question.
-    obj : JSONData
-        Accessible data object.
-
-    Returns
-    -------
-    str
-        Detail page answer.
-    """
-    normalized_question = question.casefold()
-    data = metadata_view(obj.data)
-
-    if any(
-        term in normalized_question
-        for term in ("boundary", "mechanical", "bc", "vertex", "fixed", "loaded")
-    ):
-        return _assistant_mechanical_bc_summary(data)
-
-    if any(term in normalized_question for term in ("plot", "curve", "stress", "strain", "variable")):
-        return _assistant_plot_summary(data)
-
-    if any(term in normalized_question for term in ("access", "share", "private", "public")):
-        return _assistant_access_summary(obj)
-
-    if any(term in normalized_question for term in ("phase", "material")):
-        phases = _assistant_phase_names(data)
-
-        if phases:
-            return "Phase information: " + ", ".join(phases) + "."
-
-        return "I did not find phase information in this object."
-
-    if "software" in normalized_question:
-        software = _assistant_text(data.get("software"))
-        version = _assistant_text(data.get("software_version"))
-
-        if software and version:
-            return f"Software: {software} {version}."
-
-        if software:
-            return f"Software: {software}."
-
-        return "I did not find software information in this object."
-
-    return _assistant_object_overview(obj)
-
-
 def _build_assistant_answer(question, page, obj=None):
     """
-    Build a read-only assistant answer for the current page
+    Build a prepared help response using an already authorized object
 
     Parameters
     ----------
     question : str
-        User question.
+        User question or selected help topic.
     page : str
-        Current assistant page context.
+        Current page context retained for request compatibility.
     obj : JSONData, optional
-        Accessible data object for detail answers.
+        Data object authorized by the requesting view.
 
     Returns
     -------
-    tuple
-        Answer text and suggested follow-up prompts.
+    dict
+        Answer, suggested questions and trusted navigation links.
     """
-    if obj is not None:
-        suggestions = [
-            "Summarize this data",
-            "Explain mechanical_BC",
-            "What can I plot?",
-            "How is access set?",
-        ]
-        return _assistant_detail_answer(question, obj), suggestions
+    reply = help_reply(question, has_object=obj is not None)
+    action = reply.pop("object_action", None)
+    if not action:
+        return reply
 
-    if page == "upload":
-        suggestions = [
-            "How should I write shared_with?",
-            "What if identifier already exists?",
-            "Why did upload reject empty values?",
-        ]
-        return _assistant_upload_answer(question), suggestions
-
-    suggestions = [
-        "How do I find copper data?",
-        "How do I search by phase?",
-        "How do I find public data?",
-    ]
-    return _assistant_search_answer(question), suggestions
+    data = metadata_view(obj.data)
+    if action == "summary":
+        reply["answer"] = _assistant_object_overview(obj)
+    elif action == "phase":
+        phases = _assistant_phase_names(data)
+        reply["answer"] = (
+            "Phase information: " + ", ".join(phases) + "."
+            if phases else "I did not find phase information in this object."
+        )
+    elif action == "software":
+        software = _assistant_text(data.get("software"))
+        version = _assistant_text(data.get("software_version"))
+        reply["answer"] = (
+            f"Software: {software}{' ' + version if version else ''}."
+            if software else "Software is not specified in this object."
+        )
+    elif action == "boundary":
+        reply["answer"] = _assistant_mechanical_bc_summary(data)
+    elif action == "plots":
+        reply["answer"] = _assistant_plot_summary(data)
+    elif action == "access":
+        reply["answer"] = _assistant_access_summary(obj)
+    reply["links"] = [{"label": "Open current object", "url": reverse("json_data_detail", args=[obj.pk])}]
+    return reply
 
 
 @login_required
@@ -2107,10 +1967,13 @@ def fair_assistant_ask_view(request):
     """
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({"error": "Invalid assistant request."}, status=400)
 
-    question = str(payload.get("question", "")).strip()
+    if not isinstance(payload, dict) or not isinstance(payload.get("question", ""), str):
+        return JsonResponse({"error": "Enter a text question for the assistant."}, status=400)
+
+    question = payload.get("question", "").strip()
     page = str(payload.get("page", "search")).strip().casefold()
     object_id = payload.get("object_id")
 
@@ -2134,8 +1997,7 @@ def fair_assistant_ask_view(request):
         if not _user_can_access_object(obj, request.user):
             return JsonResponse({"error": "Data object not found."}, status=404)
 
-    answer, suggestions = _build_assistant_answer(question, page, obj=obj)
-    return JsonResponse({"answer": answer, "suggestions": suggestions})
+    return JsonResponse(_build_assistant_answer(question, page, obj=obj))
 
 
 def _build_basic_search_text(obj, access_text):

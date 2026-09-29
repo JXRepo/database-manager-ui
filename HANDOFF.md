@@ -2,86 +2,62 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-29
-code_base: bc1e11a (Charts implementation, pushed to origin/main)
-next_topic: Discuss implementation of the bottom-right FAIR Data Assistant
+code_base: see latest git commit (local FAQ assistant implementation)
+next_topic: Review the local FAQ assistant and refine its prepared questions
 files_modified:
-  - HANDOFF.md (documentation only in this handoff turn)
+  - Local FAQ assistant, tests, README.md and HANDOFF.md
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**下一聊天：和用户认真讨论右下角 FAIR Data Assistant 聊天助手如何实施。先讨论，不直接开始接模型或改功能。**
+**右下角 FAIR Data Assistant 采用网站自身运行的固定问答方案，不接外部大模型，不提供转人工。**
 
-- 用户最新原话：“写个handoff，下面我开个新聊天和你好好讨论一下如何对右下角这个聊天助手功能进行实施。”
-  本轮只更新交接文档，并只读梳理现有助手；没有修改助手、接入模型或确定实施方案。
-  之前“直接做，不用跟我商量”针对 Charts，不能据此跳过新主题的讨论。
-- Charts 已完成第二次调整并推送：`bc1e11a`，标题为 Charts，真实应力–应变曲线位于首屏。
-  上一版 `3924c27` 被用户指出“没看到图”“很乱”，不要退回那版展示，也不要视为用户已认可最终设计。
-  本次交接开始时 `main` 与 `origin/main` 同步、工作区干净；交接提交以 `git log -1` 为准。
-  Render 是否部署完成尚未核实，不能把推送成功说成线上已更新。
-- 用户要中文、白话、简单直接的说明；页面文字仍用英文。明确要求的小改直接做，验证后提交推送。
-  用户在讨论或问问题时，先解释，不擅自修改。桌面布局优先，不主动做移动端改版。
+- 用户讨论过类似 ChatGPT 的平台助手，了解 API 收费后改选本地规则问答：
+  “咱们先做一个没有转人工功能的。”这取代了上次交接中的纯讨论范围。
+- 用户希望从简单版本开始，用中文、白话解释；应用 UI 仍为英文。无需模型账户、API Key 或训练。
+  不要继续要求用户充值，或把规则问答当成模型接入的临时占位。
+- Charts 仍保留 bc1e11a 的首屏真实曲线设计，本轮没有改 Charts、上传处理或权限规则。
+- 用户样例仍在被忽略的 example_json_files/a46fde6c.json；没有修改或上传到外部服务。
+- 用户要求功能完成后验证、提交、推送。推送成功与 Render 完成部署必须分别说明。
 
-### 聊天助手：已核实的现状
+### 助手当前实现
 
-- 用户截图指的是右下角蓝色圆形聊天按钮，名称是 **FAIR Data Assistant**。
-  `templates/includes/footer.html` 在已登录工作区引入 `templates/includes/global_assistant.html`；
-  首页、登录和注册页不显示。搜索、上传、详情、My Data、Charts 和账户页等沿用这个入口。
-- UI、CSS 和浏览器脚本目前都放在 `templates/includes/fair_assistant.html`：
-  展开／关闭面板、欢迎语、建议问题、文本输入、Send 和请求中状态。
-  回复通过 `textContent` 展示。当前只是页面内消息列表，刷新或切页不会保留对话。
-- `templates/includes/global_assistant.html` 只区分三个上下文：
-  详情页传 `page="detail"` 和当前 `object_id`；上传页传 `page="upload"`；
-  其余页面统一传 `page="search"`。Charts、My Data 等尚无专门的助手上下文。
-- 前端 POST `/assistant/ask/`，请求体是 `{question, page, object_id}`，携带登录 cookie 和 CSRF。
-  不传历史消息、当前搜索条件、图表选择或待上传文件；响应是 `{answer, suggestions}`，没有流式输出。
-- 路由：`apps/pages/urls.py` 的 `fair_assistant_ask`。
-  后端：`apps/pages/views.py` 的 `fair_assistant_ask_view`、`_build_assistant_answer` 和 `_assistant_*` 函数。
-  **目前是关键词分支和模板文本，不是大模型对话。** 这条请求链没有调用模型 API，
-  没有检索增强、工具执行、多轮记忆或聊天记录存储。
-- 已有能力：上传／共享／编号／搜索操作提示；对当前可访问对象给出标题、编号、软件、phase、
-  访问权限、边界条件和可绘图变量的简单摘要。搜索回答只是给使用建议，不会实际检索对象或填写筛选器。
-- 接口要求登录和 POST，问题为空返回 400，超过 600 字符会截断；传入对象时调用 `_user_can_access_object`，
-  不存在或不可访问均返回 404。后续扩展仍需在服务器逐次限制为自己、公开或明确共享的数据。
-  当前对象摘要使用 `metadata_view`，继续保留原 JSON、描述兼容和原始导出规则。
+- 保留已登录工作区右下角入口、模板类名和 /assistant/ask/ 路由。
+  首页、登录和注册页不显示，详情页仍附带当前 object_id。
+- 新增 apps/pages/assistant.py 集中维护固定答案、问题标题和明确的匹配词。
+  Browse help topics 提供 Upload、Search、Access and sharing、My Data、Charts 分类；
+  当前对象可访问时增加 Current object 分类。
+- 可以点选分类和问题，也可以输入简短文字。英文按完整词识别，支持明确列出的中文词组，回复为英文。
+  精确问题标题优先；较具体的关键词组合优先；同等匹配提供候选问题，不任意选一个。
+  未匹配到问题时返回分类入口，不再把无关问题都回复成对象摘要。
+- 问答涵盖上传、必填与空值、编号、额度、中断、搜索、筛选、共享、管理、下载和 Charts。
+  当前对象保留摘要、phase、软件、边界条件、绘图和访问范围回答。
+  全 RVE 张量按 tensor 描述并保留提供的载荷条目，普通载荷使用已有格式化文字，不输出内部字典。
+- 上传回答已同步整文件原子保存、嵌套和条件必填规则、缺失编号自动生成；上传额度从当前 settings 读取。
+  不声称完整 JSON Schema 验证，不自动诊断上传表单选中的文件。
+- 答案可带站内导航链接；只提供指导，不执行搜索、分享、删除等操作。
+  没有模型调用、外部知识库或聊天记录数据库，也没有人工转接。
+  页面内会保留消息，切页或刷新会清空；暂未实现多轮语义理解。
+- 仍要求登录、POST、CSRF，逐次检查传入对象的访问权限。错误的请求类型返回 400。
+  回复和上传文本用 textContent 展示，链接限定同源；没有把原 JSON 当作指令执行。
+- 桌面聊天窗口限定视口高度、长文本换行，增加 Escape 关闭、输入标签、请求中防重复提交。
+  请求中断保留问题供手动重试，不自动重试，不提供虚假的成功回复。
 
-### 已知欠缺，留给下一聊天讨论
+### 本轮验证入口
 
-- 现有上传回答已经落后于实际实现：`_assistant_upload_answer` 仍描述“合格对象保存、错误对象拒绝”
-  和只检查顶层必填／空值；实际是**每个文件原子保存**，任何对象失败拒绝整个文件，
-  还检查适用的嵌套／条件必填规则。编号缺失可自动生成也没有解释清楚。
-  新方案的知识来源应以当前代码／规则为准，不能把旧回复直接当权威资料。
-- 关键词主要是英文，任意问题常退回通用提示或对象摘要；没有通用自然语言理解。
-  “页面上有聊天窗口”不等于已有完整 AI 助手。
-- `_assistant_mechanical_bc_summary` 仍以 vertex 和方向载荷组织文字；
-  下一轮需核对它与现有 whole-RVE tensor、精确步骤和分量规则的一致性，不预先声称已支持全部载荷解释。
-- 本轮只是代码阅读，没有重新运行助手测试或实测其全部回答；不要把下面 Charts 的通过记录当成助手验收。
-
-### 下一聊天建议从这里开始
-
-1. 先用简短白话说明当前助手的真实能力，再和用户确定最希望解决的几个问题：平台使用帮助、
-   自然语言找数据、解释当前对象／曲线，或协助执行操作。尚未选定第一期范围。
-2. 明确回答可用的上下文和数据范围、是否需要引用具体字段／对象，以及哪些行为只给建议、哪些可执行。
-   不把“读到上传 JSON 的文字”当成系统指令，不绕过现有访问权限或直接把全库送给模型。
-3. 范围清楚后再讨论规则助手、模型接入及检索／工具方案，模型提供方、本地或远程部署、成本和凭证配置。
-   **目前没有选定提供方、模型、预算或向外部服务传输数据的方案；不要假设凭证已经可用。**
-4. 结合桌面网页讨论面板布局、页面上下文、多轮对话、历史记录、来源展示、失败反馈，
-   再形成可分阶段实施和验收的方案。先讨论，不自动扩大为知识图谱、自治代理或整站重构。
-
-阅读入口与后续验证：
-
-- 先读 `AGENTS.md`、README 的 Local Setup 和助手说明，再读上述三个模板和 views 中的助手函数。
-  项目原来把 LLM／agent 列为后续增强；用户现在开始讨论该主题，这不是禁止讨论或以后实施的规定。
-- 现有测试：`apps/pages/test_assistant_widget.py`（入口、上下文、CSRF）、
-  `apps/pages/tests.py` 中的四个 `test_assistant_*`（共享指引、摘要、越权、空问题）、
-  `apps/pages/test_phase_names.py`（phase 名称优先级）。后续实现按实际改动补验证，不能只测回复非空。
-- 运行 Python 前通过 PyCharm 环境工具解析本机解释器，按 README 使用 `DEBUG=True` 和本地 SQLite。
-  不沿用另一台机器的绝对解释器路径，不使用生产数据库。文档交接本身无需重跑程序测试。
-- 原始示例仍是本机忽略目录中的 `example_json_files/a46fde6c.json`，可在后续讨论中作为真实数据例子；
-  不修改原文件、不为讨论上传到线上。截图附件是临时 `/tmp` 文件，跨会话／电脑未必仍存在；
-  即使图片丢失，目标也明确是上述蓝色聊天入口。Charts 测试截图和日志也只是本机临时材料。
+- 21 项相关 Django 测试通过，包含真实 Chromium 的 9 种桌面布局；
+  117 项现有 JavaScript／Chromium 测试通过，0 跳过。
+  原始 a46fde6c.json 的 5 类对象回答另作本地只读检查，文件 SHA-256 未变，无数据库写入或外部请求。
+- 后端：apps/pages/test_assistant_faq.py、test_assistant_widget.py、test_phase_names.py，
+  以及 apps/pages/tests.py 中原有的四个 test_assistant_*。
+- 真实浏览器：apps/pages/test_assistant_browser.py 调用 tests/browser/assistant.cjs，
+  使用隔离 SQLite，检查真实 HTTP 分类问答、异常重试、长内容转义、键盘操作和空数据。
+  浏览器只验证桌面 1280 / 1440 / 1920，需 Chromium 与支持 WebSocket 的 Node，不接受跳过。
+  该测试阻断外部请求；详情测试记录无曲线，避免依赖既有 Chart.js CDN。
+- Python 命令前用 PyCharm 环境工具解析本机解释器，设置 DEBUG=True；不使用生产数据库。
+- 页面截图保存在本机临时目录 /tmp/assistant-faq-qa，不提交测试数据或截图。
 
 ### Charts 当前实现与统计口径
 
