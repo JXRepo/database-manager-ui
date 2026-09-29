@@ -431,6 +431,10 @@ from the home, login, and registration pages. Upload and detail pages retain
 their specific suggestions and data context; questions require authentication
 and data access.
 
+Press Enter to send a question or Shift+Enter to add a new line. Confirming
+an input-method composition does not send. **Browse help topics** stays below
+the input beside **Send**.
+
 The assistant matches English and Chinese questions to maintained platform
 answers with a small multilingual model running inside Django. It uses no
 external model API, API key, model training or live support handoff. Answers

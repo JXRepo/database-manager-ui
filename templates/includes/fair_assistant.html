@@ -160,7 +160,14 @@
 
   .fair-assistant-actions {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .fair-assistant-shortcuts {
+    color: #64748b;
+    font-size: 0.72rem;
   }
 
   .fair-assistant-send {
@@ -181,13 +188,15 @@
   }
 
   .fair-assistant-browse {
-    border: 0;
-    border-bottom: 1px solid #eef2f7;
-    padding: 8px 14px;
-    background: #ffffff;
+    margin-right: auto;
+    border: 1px solid #dbe2ea;
+    border-radius: 999px;
+    padding: 7px 10px;
+    background: #f8fafc;
     color: #1d4ed8;
     text-align: left;
     font-size: 0.8rem;
+    font-weight: 600;
     flex-shrink: 0;
   }
 
@@ -236,10 +245,6 @@
       </button>
     </div>
 
-    {% if request.user.is_authenticated %}
-    <button class="fair-assistant-browse" type="button">Browse help topics</button>
-    {% endif %}
-
     <div class="fair-assistant-messages" role="log" aria-label="Help conversation" aria-live="polite">
       <div class="fair-assistant-message assistant">{% if request.user.is_authenticated %}Ask me about getting started, data preparation, uploads, search, sharing, exports, plots or your account. You can use your own words or browse the help topics. If a question could mean several things, I'll help you choose.{% else %}Sign in to ask about uploading, searching, and your data.{% endif %}</div>
     </div>
@@ -264,8 +269,10 @@
     <form class="fair-assistant-form">
       {% csrf_token %}
       <label class="fair-assistant-label" for="fair-assistant-question">Ask a question</label>
-      <textarea class="fair-assistant-input" id="fair-assistant-question" placeholder="For example: what format should my file use?" rows="2" maxlength="600" required></textarea>
+      <textarea class="fair-assistant-input" id="fair-assistant-question" aria-describedby="fair-assistant-shortcuts" placeholder="For example: what format should my file use?" rows="2" maxlength="600" required></textarea>
+      <span class="fair-assistant-shortcuts" id="fair-assistant-shortcuts">Enter to send · Shift+Enter for a new line</span>
       <div class="fair-assistant-actions">
+        <button class="fair-assistant-browse" type="button">Browse help topics</button>
         <button class="fair-assistant-send" type="submit">Send</button>
       </div>
     </form>
@@ -437,6 +444,16 @@ document.addEventListener("DOMContentLoaded", function () {
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       submitQuestion();
+    });
+
+    input.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" || event.shiftKey || event.isComposing || event.keyCode === 229) {
+        return;
+      }
+      event.preventDefault();
+      if (!event.repeat) {
+        form.requestSubmit();
+      }
     });
 
     browse.addEventListener("click", function () {

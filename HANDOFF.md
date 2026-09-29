@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-29
-code_base: see latest git commit (expanded task-based assistant help)
+code_base: see latest git commit (assistant Enter-to-send and footer help)
 next_topic: Try the expanded assistant after deployment and collect real platform questions
 files_modified:
-  - Assistant knowledge, category paging, follow-ups, coverage tests and documentation
+  - Assistant composer keyboard behavior, footer help, browser checks and documentation
 ---
 
 # Project handoff
@@ -22,7 +22,19 @@ files_modified:
 - Charts、上传处理、权限和原始 JSON 未改。样例 example_json_files/a46fde6c.json 未修改、未发送到外部。
 - 用户要求完成后验证、提交、推送。Git 推送成功与 Render 部署完成必须分别说明。
 
-### 本轮：按用户任务扩充初版帮助
+### 本轮：回车发送与底部帮助入口
+
+- templates/includes/fair_assistant.html：输入框按 Enter 走原有表单发送，Shift+Enter 换行。
+  输入法组合确认与按键重复不会发送；保留空白内容和请求进行中的防重复检查。
+- Browse help topics 从聊天框顶部移到输入框下方、Send 左侧；加入简短键盘提示。
+  分类导航、会话上下文和回答逻辑不变。
+- 5 项 Django 界面测试通过，其中真实 Chromium 检查原生 Enter／Shift+Enter、
+  模拟输入法组合与重复按键事件，以及长内容、空列表等 18 种桌面布局。
+  新增的回车回归先在旧实现上失败，再在修改后通过；117 项 JavaScript 测试通过，0 跳过。
+- 日志 /tmp/assistant-enter-ui.log、/tmp/assistant-enter-js.log；截图 /tmp/assistant-enter-qa。
+  已查看分类菜单与长答案的桌面截图；未检查 Render 是否完成本轮部署。
+
+### 上轮：按用户任务扩充初版帮助
 
 - 用户确认当前答案是预设知识后，要求尽量想全，按问题大类扩充为真正可用的初版。
   这是明确的实现请求，不再停在方案讨论；也没有要求训练或接入生成式模型。
@@ -40,7 +52,7 @@ files_modified:
   回收站和自助销号。JSON 批量下载可跳过失效对象，CSV 必须整个选择都可导出，不能混淆。
   原来的界面风格、模型、依赖、数据库和权限实现未改；不执行用户请求的数据操作。
 
-### 本轮验证
+### 上轮扩充验证
 
 - 47 项相关 Django 测试通过，包含完整 assistant 模块、原有权限／输入检查和 phase 回归。
   117 项 JavaScript / Chromium 测试通过，0 跳过。真实 Chromium 验证 18 种桌面布局，

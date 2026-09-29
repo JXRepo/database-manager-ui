@@ -74,6 +74,12 @@ const {join} = require('node:path');
       await evaluate(`document.querySelector('.fair-assistant-input').value = ${JSON.stringify(question)}; document.querySelector('.fair-assistant-form').requestSubmit()`);
       await until(`document.querySelectorAll('.fair-assistant-message').length > ${count} && !document.querySelector('.fair-assistant-send').disabled`);
     }
+    async function pressEnter(modifiers = 0) {
+      await command('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter',
+        windowsVirtualKeyCode: 13, text: '\r', unmodifiedText: '\r', modifiers});
+      await command('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter',
+        windowsVirtualKeyCode: 13, modifiers});
+    }
     const lastAnswer = () => evaluate("[...document.querySelectorAll('.fair-assistant-message.assistant')].at(-1).textContent");
     async function layout(label) {
       for (const [width, height] of [[1280, 720], [1440, 900], [1920, 1080]]) {
@@ -82,12 +88,18 @@ const {join} = require('node:path');
           const panel = document.querySelector('.fair-assistant-panel');
           const rect = panel.getBoundingClientRect();
           const send = document.querySelector('.fair-assistant-send').getBoundingClientRect();
+          const browse = document.querySelector('.fair-assistant-browse').getBoundingClientRect();
+          const input = document.querySelector('.fair-assistant-input').getBoundingClientRect();
           return {top: rect.top, bottom: rect.bottom, right: rect.right, width: rect.width,
-            overflow: panel.scrollWidth - panel.clientWidth, sendBottom: send.bottom, sendTop: send.top};
+            overflow: panel.scrollWidth - panel.clientWidth, sendBottom: send.bottom, sendTop: send.top,
+            browseTop: browse.top, browseBottom: browse.bottom, browseRight: browse.right,
+            sendLeft: send.left, inputBottom: input.bottom};
         })()`);
         assert.ok(metrics.top >= 0 && metrics.bottom <= height && metrics.right <= width, `${label}: ${JSON.stringify(metrics)}`);
         assert.ok(metrics.overflow <= 1 && metrics.width <= 420 && metrics.sendTop >= metrics.top && metrics.sendBottom <= metrics.bottom,
           `${label}: ${JSON.stringify(metrics)}`);
+        assert.ok(metrics.browseTop >= metrics.inputBottom && metrics.browseBottom <= metrics.bottom
+          && metrics.browseRight < metrics.sendLeft, `${label}: help button stays below input and beside Send`);
         if (process.env.ASSISTANT_SCREENSHOT_DIR && width === 1440) {
           mkdirSync(process.env.ASSISTANT_SCREENSHOT_DIR, {recursive: true});
           const shot = await command('Page.captureScreenshot', {format: 'png'});
@@ -102,6 +114,27 @@ const {join} = require('node:path');
       url: process.env.ASSISTANT_BASE_URL, path: '/'});
     await command('Emulation.setDeviceMetricsOverride', {width: 1440, height: 900, deviceScaleFactor: 1, mobile: false});
     await navigate('/search/');
+    const beforeTyping = await evaluate("document.querySelectorAll('.fair-assistant-message').length");
+    await evaluate("document.querySelector('.fair-assistant-input').value = '   '");
+    await pressEnter();
+    assert.equal(await evaluate("document.querySelectorAll('.fair-assistant-message').length"), beforeTyping);
+    await evaluate("const input = document.querySelector('.fair-assistant-input'); input.value = 'data'; input.setSelectionRange(4, 4)");
+    await pressEnter(8);
+    assert.equal(await evaluate("document.querySelector('.fair-assistant-input').value"), 'data\n');
+    assert.equal(await evaluate("document.querySelectorAll('.fair-assistant-message').length"), beforeTyping);
+    await command('Input.insertText', {text: 'form'});
+    for (const options of [{isComposing: true}, {keyCode: 229}, {repeat: true}]) {
+      await evaluate(`document.querySelector('.fair-assistant-input').dispatchEvent(new KeyboardEvent('keydown',
+        {key: 'Enter', bubbles: true, cancelable: true, ...${JSON.stringify(options)}}))`);
+      assert.equal(await evaluate("document.querySelectorAll('.fair-assistant-message').length"), beforeTyping);
+      assert.equal(await evaluate("document.querySelector('.fair-assistant-input').value"), 'data\nform');
+    }
+    await pressEnter();
+    await until(`document.querySelectorAll('.fair-assistant-message').length > ${beforeTyping} && !document.querySelector('.fair-assistant-send').disabled`);
+    assert.equal(await evaluate("[...document.querySelectorAll('.fair-assistant-message.user')].at(-1).textContent"), 'data\nform');
+    assert.match(await lastAnswer(), /JSON data format or the upload form/);
+    assert.equal(await evaluate("document.querySelectorAll('.fair-assistant-message').length"), beforeTyping + 2);
+    assert.equal(await evaluate("document.querySelector('.fair-assistant-input').value"), '');
     await choose('Browse help topics');
     await layout('categories');
     await choose('Account help');
@@ -171,7 +204,7 @@ const {join} = require('node:path');
     assert.equal(await evaluate("document.querySelector('.fair-assistant-suggestions').textContent.includes('Current object help')"), false);
     await layout('empty-data');
     assert.deepEqual(exceptions, []);
-    console.log('Assistant browser checks passed: categories, menu pagination, numbered choices, semantic questions, follow-ups, HTTP recovery, access context, safe text, keyboard and 18 desktop layouts.');
+    console.log('Assistant browser checks passed: Enter sends, Shift+Enter wraps, IME and repeat guards, footer help, categories, menu pagination, numbered choices, semantic questions, follow-ups, HTTP recovery, access context, safe text, keyboard and 18 desktop layouts.');
   } finally {
     if (socket) socket.close();
     browser.kill();
