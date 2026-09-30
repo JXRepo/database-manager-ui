@@ -1163,7 +1163,11 @@ class JSONDataSharingTests(TestCase):
         )
         messages = [str(message) for message in get_messages(response.wsgi_request)]
         self.assertFalse(any("partially successful" in message for message in messages))
-        self.assertTrue(any("Object 2 in this file" in message for message in messages))
+        self.assertTrue(any(
+            'class="upload-report-object-position">Object 2</span>' in message
+            for message in messages
+        ))
+        self.assertTrue(any("invalid-object" in message for message in messages))
         self.assertTrue(any('data-upload-category="missing_required"' in message for message in messages))
 
     def test_search_filters_by_phase(self):
@@ -1434,63 +1438,6 @@ class JSONDataSharingTests(TestCase):
             viewer.index("camera.up.set(0, 0, 1);"),
             viewer.index("new OrbitControls(camera"),
         )
-
-    def test_detail_plot_axis_titles_are_placed_beside_axes(self):
-        """
-        Plot axis titles use matching distance from tick labels
-        """
-        template = Path("templates/pages/data_detail.html").read_text(encoding="utf-8")
-
-        self.assertIn("function drawAxisTitle", template)
-        self.assertIn("function drawXAxisTitle", template)
-        self.assertIn("function drawYAxisTitle", template)
-        self.assertIn("function getAxisTitlePrefix", template)
-        self.assertIn("drawXAxisTitle(ctx, xScale.options.title.text", template)
-        self.assertIn("drawYAxisTitle(ctx, yScale.options.title.text", template)
-        self.assertIn('return "Stress";', template)
-        self.assertIn('return "Strain";', template)
-        self.assertIn("const prefixedLabel = prefix ? `${prefix}, ${label}` : label;", template)
-        self.assertIn("const xTickLabelOffset = 20;", template)
-        self.assertIn("const yTickLabelOffset = 14;", template)
-        self.assertIn("const tickLabelFontSize = 15;", template)
-        self.assertIn("const xAxisTitleTickGap = 16;", template)
-        self.assertIn("const yAxisTitleTickGap = 14;", template)
-        self.assertIn("function measureTickLabelWidth", template)
-        self.assertIn("function measureWidestTickLabel", template)
-        self.assertIn(
-            "const titleY = axisY + xTickLabelOffset + tickLabelFontSize + xAxisTitleTickGap;",
-            template,
-        )
-        self.assertIn("const yTickLabelWidth = measureWidestTickLabel(ctx, yScale);", template)
-        self.assertIn(
-            "const titleX = axisX - yTickLabelOffset - yTickLabelWidth - yAxisTitleTickGap;",
-            template,
-        )
-        self.assertIn("const titleY = (chartArea.top + chartArea.bottom) / 2;", template)
-        self.assertIn("ctx.translate(titleX, titleY);", template)
-        self.assertIn("ctx.rotate(-Math.PI / 2);", template)
-        self.assertIn('drawAxisTitle(ctx, text, 0, 0, "center");', template)
-        self.assertIn("drawYAxisTitle(ctx, yScale.options.title.text, chartArea, axisX, yScale);", template)
-        self.assertIn("const isCompactPlot = canvas.clientWidth < 640;", template)
-        self.assertIn("left: isCompactPlot ? 164 : 190,", template)
-        self.assertIn("top: 24,", template)
-        self.assertIn("ctx.font = `400 ${tickLabelFontSize}px sans-serif`;", template)
-        self.assertIn('ctx.font = "400 13px sans-serif";', template)
-        self.assertNotIn("const titleX = axisX - 88;", template)
-        self.assertNotIn("const titleY = axisY + 54;", template)
-        self.assertNotIn("const axisTitleTickGap = 34;", template)
-        self.assertNotIn("const axisTitleTickGap = 18;", template)
-        self.assertNotIn("const axisTitleTickGap = 8;", template)
-        self.assertNotIn('ctx.font = "italic 400 15px sans-serif";', template)
-        self.assertNotIn('ctx.font = "italic 400 10px sans-serif";', template)
-        self.assertNotIn("const titleY = axisY + xTickLabelOffset + tickLabelFontSize + axisTitleTickGap;", template)
-        self.assertNotIn("const titleX = axisX - yTickLabelOffset - axisTitleTickGap;", template)
-        self.assertNotIn("const titleY = chartArea.top + 16;", template)
-        self.assertNotIn("`X, ${xScale.options.title.text}`", template)
-        self.assertNotIn("`Y, ${yScale.options.title.text}`", template)
-        self.assertNotIn("chartArea.right + 14, axisY - 1", template)
-        self.assertNotIn("axisX - 46, chartArea.top - 26", template)
-        self.assertNotIn("left: isCompactPlot ? 206 : 236,", template)
 
     def test_detail_rows_keep_flat_metadata_fields_separate(self):
         """

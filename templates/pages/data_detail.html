@@ -846,19 +846,18 @@ details[open] > .detail-group-summary {
     }
 
 
-        .plot-panel {
+    .plot-panel {
       background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 18px;
+      border: 1px solid #e1e8ef;
+      border-radius: 10px;
       padding: 20px 22px;
-      box-shadow: 0 4px 14px rgba(16, 24, 40, 0.05);
       margin-bottom: 18px;
     }
 
     .plot-panel-title {
-      font-size: 1.12rem;
-      font-weight: 700;
-      color: #1f2937;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #203c55;
       margin-bottom: 14px;
     }
 
@@ -872,10 +871,16 @@ details[open] > .detail-group-summary {
 
     .plot-field label {
       display: block;
-      font-size: 0.92rem;
+      font-size: 0.85rem;
       font-weight: 600;
-      color: #374151;
+      color: #63788a;
       margin-bottom: 6px;
+    }
+
+    .plot-field .form-select {
+      color: #415c75;
+      background-color: #f8fafc;
+      border-color: #e1e8ef;
     }
 
     .plot-empty {
@@ -917,7 +922,7 @@ details[open] > .detail-group-summary {
       border: none;
       border-radius: 0;
       padding: 0;
-      max-width: 780px;
+      max-width: 980px;
       margin: 0 auto;
       transform: none;
     }
@@ -930,14 +935,14 @@ details[open] > .detail-group-summary {
 
     #mechanical-plot {
       width: 100% !important;
-      height: 500px !important;
+      height: 420px !important;
       display: block;
     }
 
     .plot-status {
       margin-top: 12px;
-      color: #6b7280;
-      font-size: 0.92rem;
+      color: #63788a;
+      font-size: 0.8rem;
     }
 
 
@@ -2012,74 +2017,62 @@ function sanitizeFileName(text) {
 }
 
 function cleanScaleNumber(value) {
-  if (Math.abs(value) < 1e-12) {
-    return 0;
-  }
-
   return Number(value.toPrecision(12));
 }
 
-function buildDataRangeTicks(minValue, maxValue) {
-  const values = [];
-  const step = (maxValue - minValue) / 4;
-
-  for (let index = 0; index <= 4; index += 1) {
-    values.push(cleanScaleNumber(minValue + (step * index)));
-  }
-
-  return values;
-}
-
 function buildPlotScale(values) {
-  const numericValues = values
-    .map(value => Number(value))
-    .filter(value => Number.isFinite(value));
+  let minimum = 0;
+  let maximum = 0;
+  values.forEach(value => {
+    const number = Number(value);
+    if (Number.isFinite(number)) {
+      minimum = Math.min(minimum, number);
+      maximum = Math.max(maximum, number);
+    }
+  });
 
-  if (!numericValues.length) {
-    return {
-      chartMin: -1.08,
-      chartMax: 1.08,
-      step: 0.5,
-      labelPrecision: 4,
-      ticks: [-1, -0.5, 0, 0.5, 1],
-    };
+  // Include zero, showing both halves only when this coordinate changes sign.
+  const extent = Math.max(-minimum, maximum) || 1;
+  const bothSigns = minimum < 0 && maximum > 0;
+  const rawStep = extent / (bothSigns ? 2 : 4);
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const multiple = [1, 2, 2.5, 5, 10].find(value => value >= rawStep / magnitude);
+  const step = multiple * magnitude;
+  const intervals = Math.ceil((extent / step) * 1.05);
+  const first = minimum < 0 ? -intervals : 0;
+  const last = maximum > 0 || minimum === 0 ? intervals : 0;
+  const ticks = [];
+  for (let index = first; index <= last; index += 1) {
+    ticks.push(cleanScaleNumber(index * step));
   }
-
-  const minValue = Math.min(...numericValues);
-  const maxValue = Math.max(...numericValues);
-  const span = maxValue - minValue;
-
-  if (minValue === maxValue) {
-    const padding = Math.max(Math.abs(minValue) * 0.08, 1);
-    const tickStep = padding;
-
-    return {
-      chartMin: cleanScaleNumber(minValue - padding),
-      chartMax: cleanScaleNumber(maxValue + padding),
-      step: tickStep,
-      labelPrecision: 4,
-      ticks: [
-        cleanScaleNumber(minValue - padding),
-        cleanScaleNumber(minValue),
-        cleanScaleNumber(maxValue + padding),
-      ],
-    };
-  }
-
-  const padding = Math.max(span * 0.08, Number.EPSILON);
-  const step = span / 4;
 
   return {
-    chartMin: cleanScaleNumber(minValue - padding),
-    chartMax: cleanScaleNumber(maxValue + padding),
+    chartMin: ticks[0],
+    chartMax: ticks[ticks.length - 1],
     step,
     labelPrecision: 4,
-    ticks: buildDataRangeTicks(minValue, maxValue),
+    ticks,
   };
 }
 
 const cornerAxisPlugin = {
   id: "cornerAxisPlugin",
+  beforeDatasetsDraw(chart) {
+    const {ctx, chartArea, scales} = chart;
+    if (!scales.x || !scales.y || !chartArea) return;
+    const axisX = scales.x.getPixelForValue(0);
+    const axisY = scales.y.getPixelForValue(0);
+    ctx.save();
+    ctx.strokeStyle = "#93a7b8";
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.moveTo(chartArea.left, axisY);
+    ctx.lineTo(chartArea.right, axisY);
+    ctx.moveTo(axisX, chartArea.bottom);
+    ctx.lineTo(axisX, chartArea.top);
+    ctx.stroke();
+    ctx.restore();
+  },
   afterDatasetsDraw(chart) {
     const { ctx, chartArea, scales } = chart;
     const xScale = scales.x;
@@ -2089,42 +2082,25 @@ const cornerAxisPlugin = {
       return;
     }
 
-    const axisX = chartArea.left;
-    const axisY = chartArea.bottom;
-    const axisColor = "#0f172a";
-    const arrowSize = 10;
-    const tickLength = 6;
-    const xTickLabelOffset = 20;
-    const yTickLabelOffset = 14;
-    const tickLabelFontSize = 15;
-    const tickExponentFontSize = 11;
-    const xAxisTitleTickGap = 16;
-    const yAxisTitleTickGap = 14;
-
-    function drawArrowHead(x, y, angle) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(
-        x - (Math.cos(angle - Math.PI / 6) * arrowSize),
-        y - (Math.sin(angle - Math.PI / 6) * arrowSize)
-      );
-      ctx.lineTo(
-        x - (Math.cos(angle + Math.PI / 6) * arrowSize),
-        y - (Math.sin(angle + Math.PI / 6) * arrowSize)
-      );
-      ctx.closePath();
-      ctx.fill();
-    }
+    const axisX = xScale.getPixelForValue(0);
+    const axisY = yScale.getPixelForValue(0);
+    const axisColor = "#93a7b8";
+    const labelColor = "#63788a";
+    const tickLength = 4;
+    const xTickLabelOffset = 18;
+    const yTickLabelOffset = 10;
+    const tickLabelFontSize = 13;
+    const tickExponentFontSize = 10;
 
     function formatTickLabel(value, precision) {
-      if (Math.abs(value) < 1e-12) {
+      if (value === 0) {
         return {
           type: "plain",
           text: "0",
         };
       }
 
-      if (Math.abs(value) < 0.001) {
+      if (Math.abs(value) < 0.001 || Math.abs(value) >= 10000) {
         const exponent = Math.floor(Math.log10(Math.abs(value)));
         const mantissa = value / Math.pow(10, exponent);
         return {
@@ -2140,23 +2116,32 @@ const cornerAxisPlugin = {
       };
     }
 
+    function clearTickLabel(x, y, width, align, scientific = false) {
+      const left = align === "center" ? x - width / 2 : align === "right" ? x - width : x;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(left - 2, y - (scientific ? 14 : 9), width + 4, scientific ? 23 : 18);
+      ctx.fillStyle = labelColor;
+    }
+
     function drawTickLabel(x, y, value, align, precision) {
       const label = formatTickLabel(value, precision);
 
       if (label.type === "plain") {
         ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
         ctx.textAlign = align;
+        clearTickLabel(x, y, ctx.measureText(label.text).width, align);
         ctx.fillText(label.text, x, y);
         return;
       }
 
-      const baseText = `${label.mantissa} x 10`;
+      const baseText = `${label.mantissa} × 10`;
       ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
 
       const baseWidth = ctx.measureText(baseText).width;
       ctx.font = `400 ${tickExponentFontSize}px sans-serif`;
       const exponentWidth = ctx.measureText(label.exponent).width;
       const totalWidth = baseWidth + exponentWidth + 1;
+      clearTickLabel(x, y, totalWidth, align, true);
       let baseX = x;
 
       if (align === "center") {
@@ -2171,7 +2156,7 @@ const cornerAxisPlugin = {
 
       ctx.font = `400 ${tickExponentFontSize}px sans-serif`;
       ctx.textAlign = "left";
-      ctx.fillText(label.exponent, baseX + baseWidth + 1, y - 9);
+      ctx.fillText(label.exponent, baseX + baseWidth + 1, y - 7);
     }
 
     function drawTick(x1, y1, x2, y2) {
@@ -2257,23 +2242,15 @@ const cornerAxisPlugin = {
       }
     }
 
-    function drawXAxisTitle(ctx, text, chartArea, axisY) {
+    function drawXAxisTitle(ctx, text, chartArea) {
       const titleX = (chartArea.left + chartArea.right) / 2;
-      const titleY = axisY + xTickLabelOffset + tickLabelFontSize + xAxisTitleTickGap;
+      const titleY = chartArea.bottom + 54;
 
       drawAxisTitle(ctx, text, titleX, titleY, "center");
     }
 
-    function drawYAxisTitle(ctx, text, chartArea, axisX, yScale) {
-      const yTickLabelWidth = measureWidestTickLabel(ctx, yScale);
-      const titleX = axisX - yTickLabelOffset - yTickLabelWidth - yAxisTitleTickGap;
-      const titleY = (chartArea.top + chartArea.bottom) / 2;
-
-      ctx.save();
-      ctx.translate(titleX, titleY);
-      ctx.rotate(-Math.PI / 2);
-      drawAxisTitle(ctx, text, 0, 0, "center");
-      ctx.restore();
+    function drawYAxisTitle(ctx, text, chartArea) {
+      drawAxisTitle(ctx, text, chartArea.left, 22, "left");
     }
 
     function buildAxisTickValues(scale) {
@@ -2298,78 +2275,28 @@ const cornerAxisPlugin = {
       return values;
     }
 
-    function measureTickLabelWidth(ctx, value, precision) {
-      const label = formatTickLabel(value, precision);
-
-      if (label.type === "plain") {
-        ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
-        return ctx.measureText(label.text).width;
-      }
-
-      const baseText = `${label.mantissa} x 10`;
-      ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
-      const baseWidth = ctx.measureText(baseText).width;
-
-      ctx.font = `400 ${tickExponentFontSize}px sans-serif`;
-      return baseWidth + ctx.measureText(label.exponent).width + 1;
-    }
-
-    function measureWidestTickLabel(ctx, scale) {
-      return buildAxisTickValues(scale).reduce((widest, value) => {
-        const numericValue = Number(value);
-
-        if (!Number.isFinite(numericValue)) {
-          return widest;
-        }
-
-        return Math.max(
-          widest,
-          measureTickLabelWidth(
-            ctx,
-            numericValue,
-            Number(scale.options.customLabelPrecision || 4)
-          )
-        );
-      }, 0);
-    }
-
     ctx.save();
     ctx.strokeStyle = axisColor;
-    ctx.fillStyle = axisColor;
-    ctx.lineWidth = 2.25;
+    ctx.fillStyle = labelColor;
     ctx.textBaseline = "middle";
 
-    ctx.beginPath();
-    ctx.moveTo(axisX, axisY);
-    ctx.lineTo(chartArea.right - arrowSize, axisY);
-    ctx.stroke();
-    drawArrowHead(chartArea.right, axisY, 0);
+    const xTickOutsideSign = yScale.max === 0 ? -1 : 1;
+    const yTickOutsideSign = xScale.max === 0 ? 1 : -1;
 
-    ctx.beginPath();
-    ctx.moveTo(axisX, axisY);
-    ctx.lineTo(axisX, chartArea.top + arrowSize);
-    ctx.stroke();
-    drawArrowHead(axisX, chartArea.top, -Math.PI / 2);
-
-    const xTickOutsideSign = 1;
-    const yTickOutsideSign = -1;
-
-    ctx.lineWidth = 1.25;
+    ctx.lineWidth = 1;
     ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
     ctx.textAlign = "center";
 
     buildAxisTickValues(xScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value)) {
+      if (!Number.isFinite(value) || value === 0) {
         return;
       }
 
       const x = xScale.getPixelForValue(value);
 
-      const isZeroTick = Math.abs(value) < 1e-12;
-
-      if (!isZeroTick && (x < chartArea.left - 1 || x > chartArea.right + 1)) {
+      if (x < chartArea.left - 1 || x > chartArea.right + 1) {
         return;
       }
 
@@ -2387,15 +2314,13 @@ const cornerAxisPlugin = {
     buildAxisTickValues(yScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value)) {
+      if (!Number.isFinite(value) || value === 0) {
         return;
       }
 
       const y = yScale.getPixelForValue(value);
 
-      const isZeroTick = Math.abs(value) < 1e-12;
-
-      if (!isZeroTick && (y <= chartArea.top + 16 || y > chartArea.bottom + 1)) {
+      if (y < chartArea.top - 1 || y > chartArea.bottom + 1) {
         return;
       }
 
@@ -2409,9 +2334,12 @@ const cornerAxisPlugin = {
       );
     });
 
-    ctx.fillStyle = axisColor;
-    drawXAxisTitle(ctx, xScale.options.title.text, chartArea, axisY);
-    drawYAxisTitle(ctx, yScale.options.title.text, chartArea, axisX, yScale);
+    drawTickLabel(axisX + (yTickOutsideSign * yTickLabelOffset),
+      axisY + (xTickOutsideSign * xTickLabelOffset), 0,
+      yTickOutsideSign < 0 ? "right" : "left", 4);
+    ctx.fillStyle = "#415c75";
+    drawXAxisTitle(ctx, xScale.options.title.text, chartArea);
+    drawYAxisTitle(ctx, yScale.options.title.text, chartArea);
 
     ctx.restore();
   },
@@ -2521,12 +2449,11 @@ function updateRawValues(xVariable, yVariable, pointCount) {
 
     const xScaleConfig = buildPlotScale(points.map(point => point.x));
     const yScaleConfig = buildPlotScale(points.map(point => point.y));
-    const isCompactPlot = canvas.clientWidth < 640;
     const plotLayoutPadding = {
-      top: 24,
-      right: isCompactPlot ? 96 : 150,
-      bottom: 82,
-      left: isCompactPlot ? 164 : 190,
+      top: yScaleConfig.chartMax === 0 ? 66 : 44,
+      right: xScaleConfig.chartMax === 0 ? 104 : 44,
+      bottom: 66,
+      left: xScaleConfig.chartMin === 0 ? 104 : 44,
     };
 
     if (chartInstance) {
@@ -2540,10 +2467,17 @@ function updateRawValues(xVariable, yVariable, pointCount) {
           {
             label: `${formatPlotPlainLabel(yVariable.display_label || yVariable.short_label)} vs ${formatPlotPlainLabel(xVariable.display_label || xVariable.short_label)}`,
             data: points,
-            borderWidth: 2,
-            backgroundColor: "rgba(66, 153, 225, 0.28)",
-            borderColor: "#3182ce",
-            pointRadius: 0,
+            borderWidth: 2.6,
+            borderColor: "#2874c6",
+            borderCapStyle: "round",
+            borderJoinStyle: "round",
+            pointRadius: context => context.dataIndex === 0 || context.dataIndex === pointCount - 1 ? 3.5 : 0,
+            pointBackgroundColor: context => context.dataIndex === pointCount - 1 ? "#2874c6" : "#ffffff",
+            pointBorderColor: "#2874c6",
+            pointBorderWidth: 1.5,
+            pointHoverRadius: 4,
+            pointHitRadius: 10,
+            clip: 6,
             tension: 0,
           }
         ]
@@ -2555,6 +2489,15 @@ function updateRawValues(xVariable, yVariable, pointCount) {
         plugins: {
           legend: {
             display: false,
+          },
+          tooltip: {
+            backgroundColor: "#ffffff",
+            titleColor: "#203c55",
+            bodyColor: "#415c75",
+            borderColor: "#d7e2ee",
+            borderWidth: 1,
+            padding: 10,
+            displayColors: false,
           },
         },
         layout: {

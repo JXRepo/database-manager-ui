@@ -1,18 +1,45 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-09-29
-code_base: see latest git commit (assistant Enter-to-send and footer help)
-next_topic: Try the expanded assistant after deployment and collect real platform questions
+timestamp: 2026-09-30
+code_base: see latest git commit (detail plot styling and signed quadrants)
+next_topic: Review the deployed detail plot appearance and continue platform usability feedback
 files_modified:
-  - Assistant composer keyboard behavior, footer help, browser checks and documentation
+  - Detail plot appearance, zero axes, quadrant ranges, browser checks and documentation
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**右下角 FAIR Data Assistant 已扩充为 82 个主题的初版平台助手，继续使用本地语义匹配、维护好的答案和简短追问。**
+**数据详情曲线已采用 Charts 的蓝色曲线与简洁外观，并按数据符号显示一个、相邻两个或四个象限。**
+
+### 本轮：详情曲线外观与象限
+
+- 用户明确要求保留详情页整体逻辑，只调整曲线外观：参考 Charts 风格，加上纵轴，
+  去掉象限内部的横线；一个象限显示一个，相邻两个显示两个，对角两个或更多显示四个。
+- templates/pages/data_detail.html：坐标范围包含零；单一符号以零为边界，两种符号以零为中心。
+  横纵零轴随象限移动，保留微小数值的符号；只有零的坐标使用正向范围，不产生退化坐标轴。
+  蓝色折线按原始顺序连接，起点空心、终点实心；细轴线、刻度、单位与留白采用 Charts 配色。
+  图内没有网格线，刻度文字有白底避免被曲线穿过；σ、ε 保持斜体，单位与下标保持正体。
+- 保留原 X/Y 选项及联动、总应变／塑性应变、等效量来源、原值查看、PNG 与 CSV 下载逻辑。
+  Charts 页面、原始数据、权限和数据库未改；example_json_files/a46fde6c.json 未修改或发送到外部。
+- 新增 apps/pages/test_plot_browser.py 与 tests/browser/mechanical-plot.cjs：使用真实 Chart.js
+  和 Chromium 验证 14 种情况 × 3 个桌面宽度，包含四种单象限、四种相邻组合、两种对角组合、
+  三象限、循环顺序、全零与微小正负值。另测空数据、轴线像素、文字边界、字体、选轴联动与下载。
+  本机样例额外核对 33、22、13、23 分量，23 分量仍按原逻辑配对 242 点，CSV 保留完整数组。
+- 90 项相关 Django 测试、121 项 JavaScript 测试通过，0 跳过；已查看桌面截图和实际 PNG。
+  原来检查旧坐标样式源码常量的测试由浏览器真实绘图检查替代。扩展回归还发现一条上传提示
+  断言仍期待旧的 “Object 2 in this file”，在 f31b868 临时副本复现后更新为当前对象编号及标识符；
+  上传实现未改。
+- 浏览器检查需要 Chromium、支持全局 WebSocket 的 Node 及现有 CDN Chart.js；可用
+  CHARTJS_TEST_BUNDLE 指定缓存库进行离线检查，本轮实际使用 Chart.js 4.5.1，未新增运行依赖。
+  日志 /tmp/detail-quadrants-final.log、/tmp/detail-quadrants-js.log；截图与 PNG 在
+  /tmp/detail-quadrants-qa。临时文件不随 Git 同步，Render 部署完成状态未核实。
+
+### 助手既有背景
+
+右下角 FAIR Data Assistant 保留 82 个主题的初版平台助手，继续使用本地语义匹配、维护好的答案和简短追问。
 
 - 用户试用旧版后指出 data form 都无法理解，随后同意推荐的改进方案。
   不要继续把这轮当成纯讨论，也不要回退为只补关键词。
@@ -22,7 +49,7 @@ files_modified:
 - Charts、上传处理、权限和原始 JSON 未改。样例 example_json_files/a46fde6c.json 未修改、未发送到外部。
 - 用户要求完成后验证、提交、推送。Git 推送成功与 Render 部署完成必须分别说明。
 
-### 本轮：回车发送与底部帮助入口
+### 上轮：回车发送与底部帮助入口
 
 - templates/includes/fair_assistant.html：输入框按 Enter 走原有表单发送，Shift+Enter 换行。
   输入法组合确认与按键重复不会发送；保留空白内容和请求进行中的防重复检查。

@@ -546,6 +546,15 @@ be accessible and contain an exportable curve; otherwise the full download is
 rejected with a message instead of silently omitting objects. Existing JSON and
 PNG downloads remain available.
 
+Detail curves use the Charts palette, with a blue line, endpoint markers, visible
+horizontal and vertical zero axes, and no grid lines. The viewport shows one
+quadrant when all points fit there, two adjacent quadrants when possible, and
+all four for diagonal pairs or three or more occupied quadrants. A coordinate
+with both positive and negative values uses equal ranges on either side of zero.
+Axis-only points retain zero; an entirely zero coordinate uses a positive range.
+Small signed values remain signed. This presentation preserves selected variables,
+sample order, raw values and all existing exports.
+
 Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
 scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
@@ -938,6 +947,11 @@ Run the test suite against Django's separate test database:
 ```bash
 .venv/bin/python manage.py test
 ```
+
+The detail plot browser test requires Chromium and Node with global `WebSocket`.
+It uses the page's existing Chart.js CDN library. For offline checks, set
+`CHARTJS_TEST_BUNDLE` to a locally downloaded copy of that library. Optional
+`PLOT_SCREENSHOT_DIR` saves desktop screenshots and a downloaded PNG.
 
 Check migrations and Django configuration:
 
