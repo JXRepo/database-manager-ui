@@ -546,14 +546,16 @@ be accessible and contain an exportable curve; otherwise the full download is
 rejected with a message instead of silently omitting objects. Existing JSON and
 PNG downloads remain available.
 
-Detail curves use the Charts palette, with a blue line, endpoint markers, visible
-horizontal and vertical zero axes, and no grid lines. The viewport shows one
-quadrant when all points fit there, two adjacent quadrants when possible, and
-all four for diagonal pairs or three or more occupied quadrants. A coordinate
-with both positive and negative values uses equal ranges on either side of zero.
-Axis-only points retain zero; an entirely zero coordinate uses a positive range.
-Small signed values remain signed. This presentation preserves selected variables,
-sample order, raw values and all existing exports.
+Detail curves use the Charts palette, with a blue line and no endpoint markers
+or grid lines. Each axis uses the actual minimum and maximum of the paired
+samples, without forcing zero into the range or making signed ranges symmetric.
+Only a constant coordinate needs an expanded range; an entirely zero coordinate
+uses a positive range. Small signed values retain their actual signs and scale.
+The left and bottom axes carry exterior ticks, and zero reference lines appear
+only inside ranges that cross zero. The vertical axis title sits beside its
+ticks; no text backgrounds cover the curve. Narrow ranges at large values use
+an explicitly labelled tick offset. Curves retain original sample order,
+including loops and reversals, selected variables, raw values and all exports.
 
 Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
 scalar symbols sigma and epsilon.

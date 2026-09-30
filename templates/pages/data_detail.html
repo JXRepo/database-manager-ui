@@ -2021,8 +2021,8 @@ function cleanScaleNumber(value) {
 }
 
 function buildPlotScale(values) {
-  let minimum = 0;
-  let maximum = 0;
+  let minimum = Infinity;
+  let maximum = -Infinity;
   values.forEach(value => {
     const number = Number(value);
     if (Number.isFinite(number)) {
@@ -2031,28 +2031,68 @@ function buildPlotScale(values) {
     }
   });
 
-  // Include zero, showing both halves only when this coordinate changes sign.
-  const extent = Math.max(-minimum, maximum) || 1;
-  const bothSigns = minimum < 0 && maximum > 0;
-  const rawStep = extent / (bothSigns ? 2 : 4);
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  const multiple = [1, 2, 2.5, 5, 10].find(value => value >= rawStep / magnitude);
-  const step = multiple * magnitude;
-  const intervals = Math.ceil((extent / step) * 1.05);
-  const first = minimum < 0 ? -intervals : 0;
-  const last = maximum > 0 || minimum === 0 ? intervals : 0;
-  const ticks = [];
-  for (let index = first; index <= last; index += 1) {
-    ticks.push(cleanScaleNumber(index * step));
+  if (!Number.isFinite(minimum)) {
+    minimum = 0;
+    maximum = 1;
+  } else if (minimum === maximum) {
+    const padding = Math.abs(minimum) * 0.05 || 1;
+    minimum = minimum === 0 ? 0 : minimum - padding;
+    maximum += padding;
   }
 
+  // Keep the actual extrema; only a constant coordinate needs an expanded range.
+  const span = maximum - minimum;
+  const rawStep = span / 4;
+  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
+  const multiple = [1, 2, 2.5, 5, 10].find(value => value >= rawStep / magnitude) || 10;
+  const step = multiple * magnitude;
+  const offsetMagnitude = 10 ** (Math.floor(Math.log10(span)) + 1);
+  const offset = Math.abs(minimum) > span * 10000
+    ? Math.trunc(minimum / offsetMagnitude) * offsetMagnitude : 0;
+  const first = Math.ceil((minimum - offset) / step);
+  const last = Math.floor((maximum - offset) / step);
+  const ticks = [];
+  for (let index = first; index <= last; index += 1) {
+    const value = offset + cleanScaleNumber(index * step);
+    if (value >= minimum && value <= maximum && !ticks.includes(value)) ticks.push(value);
+  }
+  const labelMagnitude = Math.max(Math.abs(minimum - offset), Math.abs(maximum - offset));
+  const labelPrecision = Math.min(15, Math.max(4,
+    Math.floor(Math.log10(labelMagnitude)) - Math.floor(Math.log10(step)) + 2));
+
   return {
-    chartMin: ticks[0],
-    chartMax: ticks[ticks.length - 1],
+    chartMin: minimum,
+    chartMax: maximum,
     step,
-    labelPrecision: 4,
+    offset,
+    labelPrecision,
     ticks,
   };
+}
+
+function formatPlotTickLabel(value, precision) {
+  value = Number(value.toPrecision(precision));
+  if (value === 0) return {type: "plain", text: "0"};
+  if (Math.abs(value) < 0.001 || Math.abs(value) >= 10000) {
+    const exponent = Math.floor(Math.log10(Math.abs(value)));
+    const mantissa = value / (10 ** exponent);
+    return {type: "scientific", mantissa: Number(mantissa.toPrecision(precision)).toString(),
+      exponent: exponent.toString()};
+  }
+  return {type: "plain", text: value.toString()};
+}
+
+function measurePlotTickLabel(ctx, value, precision) {
+  const label = formatPlotTickLabel(value, precision);
+  ctx.save();
+  ctx.font = "400 13px sans-serif";
+  let width = ctx.measureText(label.type === "plain" ? label.text : `${label.mantissa} × 10`).width;
+  if (label.type === "scientific") {
+    ctx.font = "400 10px sans-serif";
+    width += ctx.measureText(label.exponent).width + 1;
+  }
+  ctx.restore();
+  return width;
 }
 
 const cornerAxisPlugin = {
@@ -2060,16 +2100,23 @@ const cornerAxisPlugin = {
   beforeDatasetsDraw(chart) {
     const {ctx, chartArea, scales} = chart;
     if (!scales.x || !scales.y || !chartArea) return;
-    const axisX = scales.x.getPixelForValue(0);
-    const axisY = scales.y.getPixelForValue(0);
     ctx.save();
     ctx.strokeStyle = "#93a7b8";
     ctx.lineWidth = 1.25;
     ctx.beginPath();
-    ctx.moveTo(chartArea.left, axisY);
-    ctx.lineTo(chartArea.right, axisY);
-    ctx.moveTo(axisX, chartArea.bottom);
-    ctx.lineTo(axisX, chartArea.top);
+    ctx.moveTo(chartArea.left, chartArea.top);
+    ctx.lineTo(chartArea.left, chartArea.bottom);
+    ctx.lineTo(chartArea.right, chartArea.bottom);
+    if (scales.x.min < 0 && scales.x.max > 0) {
+      const zeroX = scales.x.getPixelForValue(0);
+      ctx.moveTo(zeroX, chartArea.bottom);
+      ctx.lineTo(zeroX, chartArea.top);
+    }
+    if (scales.y.min < 0 && scales.y.max > 0) {
+      const zeroY = scales.y.getPixelForValue(0);
+      ctx.moveTo(chartArea.left, zeroY);
+      ctx.lineTo(chartArea.right, zeroY);
+    }
     ctx.stroke();
     ctx.restore();
   },
@@ -2082,8 +2129,8 @@ const cornerAxisPlugin = {
       return;
     }
 
-    const axisX = xScale.getPixelForValue(0);
-    const axisY = yScale.getPixelForValue(0);
+    const axisX = chartArea.left;
+    const axisY = chartArea.bottom;
     const axisColor = "#93a7b8";
     const labelColor = "#63788a";
     const tickLength = 4;
@@ -2092,44 +2139,12 @@ const cornerAxisPlugin = {
     const tickLabelFontSize = 13;
     const tickExponentFontSize = 10;
 
-    function formatTickLabel(value, precision) {
-      if (value === 0) {
-        return {
-          type: "plain",
-          text: "0",
-        };
-      }
-
-      if (Math.abs(value) < 0.001 || Math.abs(value) >= 10000) {
-        const exponent = Math.floor(Math.log10(Math.abs(value)));
-        const mantissa = value / Math.pow(10, exponent);
-        return {
-          type: "scientific",
-          mantissa: Number(mantissa.toPrecision(3)).toString(),
-          exponent: exponent.toString(),
-        };
-      }
-
-      return {
-        type: "plain",
-        text: Number(value.toPrecision(precision)).toString(),
-      };
-    }
-
-    function clearTickLabel(x, y, width, align, scientific = false) {
-      const left = align === "center" ? x - width / 2 : align === "right" ? x - width : x;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(left - 2, y - (scientific ? 14 : 9), width + 4, scientific ? 23 : 18);
-      ctx.fillStyle = labelColor;
-    }
-
     function drawTickLabel(x, y, value, align, precision) {
-      const label = formatTickLabel(value, precision);
+      const label = formatPlotTickLabel(value, precision);
 
       if (label.type === "plain") {
         ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
         ctx.textAlign = align;
-        clearTickLabel(x, y, ctx.measureText(label.text).width, align);
         ctx.fillText(label.text, x, y);
         return;
       }
@@ -2141,7 +2156,6 @@ const cornerAxisPlugin = {
       ctx.font = `400 ${tickExponentFontSize}px sans-serif`;
       const exponentWidth = ctx.measureText(label.exponent).width;
       const totalWidth = baseWidth + exponentWidth + 1;
-      clearTickLabel(x, y, totalWidth, align, true);
       let baseX = x;
 
       if (align === "center") {
@@ -2250,7 +2264,14 @@ const cornerAxisPlugin = {
     }
 
     function drawYAxisTitle(ctx, text, chartArea) {
-      drawAxisTitle(ctx, text, chartArea.left, 22, "left");
+      const tickWidth = Math.max(0, ...buildAxisTickValues(yScale).map(value =>
+        measurePlotTickLabel(ctx, value - yScale.options.customOffset, yScale.options.customLabelPrecision)));
+      ctx.save();
+      ctx.translate(chartArea.left - yTickLabelOffset - tickWidth - 18,
+        (chartArea.top + chartArea.bottom) / 2);
+      ctx.rotate(-Math.PI / 2);
+      drawAxisTitle(ctx, text, 0, 0, "center");
+      ctx.restore();
     }
 
     function buildAxisTickValues(scale) {
@@ -2280,9 +2301,6 @@ const cornerAxisPlugin = {
     ctx.fillStyle = labelColor;
     ctx.textBaseline = "middle";
 
-    const xTickOutsideSign = yScale.max === 0 ? -1 : 1;
-    const yTickOutsideSign = xScale.max === 0 ? 1 : -1;
-
     ctx.lineWidth = 1;
     ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
     ctx.textAlign = "center";
@@ -2290,7 +2308,7 @@ const cornerAxisPlugin = {
     buildAxisTickValues(xScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value) || value === 0) {
+      if (!Number.isFinite(value)) {
         return;
       }
 
@@ -2300,21 +2318,21 @@ const cornerAxisPlugin = {
         return;
       }
 
-      drawTick(x, axisY, x, axisY + (xTickOutsideSign * tickLength));
+      drawTick(x, axisY, x, axisY + tickLength);
       drawTickLabel(
         x,
-        axisY + (xTickOutsideSign * xTickLabelOffset),
-        value,
+        axisY + xTickLabelOffset,
+        value - xScale.options.customOffset,
         "center",
         Number(xScale.options.customLabelPrecision || 4)
       );
     });
 
-    ctx.textAlign = yTickOutsideSign < 0 ? "right" : "left";
+    ctx.textAlign = "right";
     buildAxisTickValues(yScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value) || value === 0) {
+      if (!Number.isFinite(value)) {
         return;
       }
 
@@ -2324,19 +2342,27 @@ const cornerAxisPlugin = {
         return;
       }
 
-      drawTick(axisX, y, axisX + (yTickOutsideSign * tickLength), y);
+      drawTick(axisX, y, axisX - tickLength, y);
       drawTickLabel(
-        axisX + (yTickOutsideSign * yTickLabelOffset),
+        axisX - yTickLabelOffset,
         y,
-        value,
-        yTickOutsideSign < 0 ? "right" : "left",
+        value - yScale.options.customOffset,
+        "right",
         Number(yScale.options.customLabelPrecision || 4)
       );
     });
 
-    drawTickLabel(axisX + (yTickOutsideSign * yTickLabelOffset),
-      axisY + (xTickOutsideSign * xTickLabelOffset), 0,
-      yTickOutsideSign < 0 ? "right" : "left", 4);
+    ctx.font = "400 11px sans-serif";
+    ctx.textAlign = "left";
+    if (yScale.options.customOffset) {
+      const offset = yScale.options.customOffset;
+      ctx.fillText(`Offset ${offset > 0 ? "+" : ""}${offset}`, chartArea.left, chartArea.top - 16);
+    }
+    ctx.textAlign = "right";
+    if (xScale.options.customOffset) {
+      const offset = xScale.options.customOffset;
+      ctx.fillText(`Offset ${offset > 0 ? "+" : ""}${offset}`, chartArea.right, chartArea.bottom + 54);
+    }
     ctx.fillStyle = "#415c75";
     drawXAxisTitle(ctx, xScale.options.title.text, chartArea);
     drawYAxisTitle(ctx, yScale.options.title.text, chartArea);
@@ -2449,11 +2475,16 @@ function updateRawValues(xVariable, yVariable, pointCount) {
 
     const xScaleConfig = buildPlotScale(points.map(point => point.x));
     const yScaleConfig = buildPlotScale(points.map(point => point.y));
+    const plotContext = canvas.getContext("2d");
+    const xTickWidth = Math.max(0, ...xScaleConfig.ticks.map(value =>
+      measurePlotTickLabel(plotContext, value - xScaleConfig.offset, xScaleConfig.labelPrecision)));
+    const yTickWidth = Math.max(0, ...yScaleConfig.ticks.map(value =>
+      measurePlotTickLabel(plotContext, value - yScaleConfig.offset, yScaleConfig.labelPrecision)));
     const plotLayoutPadding = {
-      top: yScaleConfig.chartMax === 0 ? 66 : 44,
-      right: xScaleConfig.chartMax === 0 ? 104 : 44,
+      top: yScaleConfig.offset ? 34 : 24,
+      right: Math.max(24, xTickWidth / 2 + 8),
       bottom: 66,
-      left: xScaleConfig.chartMin === 0 ? 104 : 44,
+      left: Math.max(84, yTickWidth + 64, xTickWidth / 2 + 8),
     };
 
     if (chartInstance) {
@@ -2471,8 +2502,8 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             borderColor: "#2874c6",
             borderCapStyle: "round",
             borderJoinStyle: "round",
-            pointRadius: context => context.dataIndex === 0 || context.dataIndex === pointCount - 1 ? 3.5 : 0,
-            pointBackgroundColor: context => context.dataIndex === pointCount - 1 ? "#2874c6" : "#ffffff",
+            pointRadius: 0,
+            pointBackgroundColor: "#2874c6",
             pointBorderColor: "#2874c6",
             pointBorderWidth: 1.5,
             pointHoverRadius: 4,
@@ -2485,7 +2516,6 @@ function updateRawValues(xVariable, yVariable, pointCount) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        parsing: false,
         plugins: {
           legend: {
             display: false,
@@ -2511,6 +2541,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             customTickValues: xScaleConfig.ticks,
             customTickStep: xScaleConfig.step,
             customLabelPrecision: xScaleConfig.labelPrecision,
+            customOffset: xScaleConfig.offset,
             border: {
               display: false,
             },
@@ -2533,6 +2564,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             customTickValues: yScaleConfig.ticks,
             customTickStep: yScaleConfig.step,
             customLabelPrecision: yScaleConfig.labelPrecision,
+            customOffset: yScaleConfig.offset,
             border: {
               display: false,
             },

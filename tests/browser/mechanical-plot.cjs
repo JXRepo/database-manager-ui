@@ -91,12 +91,31 @@ const {join} = require('node:path');
           }
           return false;
         }
+        const data = chart.data.datasets[0].data;
+        const gaps = [];
+        for (let i = 1; i < data.length; i++) {
+          const start = data[i - 1], end = data[i];
+          if (start.x === end.x && start.y === end.y) continue;
+          for (const fraction of [0, .25, .5, .75, 1]) {
+            const px = x.getPixelForValue(start.x) * (1 - fraction) + x.getPixelForValue(end.x) * fraction;
+            const py = y.getPixelForValue(start.y) * (1 - fraction) + y.getPixelForValue(end.y) * fraction;
+            const pixels = ctx.getImageData(Math.floor(px) - 2, Math.floor(py) - 2, 5, 5).data;
+            let blue = false;
+            for (let j = 0; j < pixels.length; j += 4) {
+              if (pixels[j + 2] > 120 && pixels[j + 2] - pixels[j] > 55) {blue = true; break;}
+            }
+            if (!blue) gaps.push({i, fraction, px, py});
+          }
+        }
         return {xSigns: sign(x), ySigns: sign(y), width: chart.width, height: chart.height,
-          xZero: x.getPixelForValue(0), yZero: y.getPixelForValue(0), area,
-          horizontal: hasAxis(area.left + area.width * .25, y.getPixelForValue(0)),
-          vertical: hasAxis(x.getPixelForValue(0), area.top + area.height * .25),
+          xMin: x.min, xMax: x.max, yMin: y.min, yMax: y.max, area,
+          horizontal: hasAxis(area.left + area.width * .25, area.bottom),
+          vertical: hasAxis(area.left, area.top + area.height * .25),
+          xZeroVisible: !(x.min < 0 && x.max > 0) || hasAxis(x.getPixelForValue(0), area.top + area.height * .25),
+          yZeroVisible: !(y.min < 0 && y.max > 0) || hasAxis(area.left + area.width * .25, y.getPixelForValue(0)),
+          radii: chart.getDatasetMeta(0).data.map(point => point.options.radius), gaps,
           xGrid: x.options.grid.display, yGrid: y.options.grid.display,
-          data: chart.data.datasets[0].data, texts: window.plotTexts,
+          data, texts: window.plotTexts,
           overflow: document.documentElement.scrollWidth > innerWidth};
       })()`);
       if (expected) {
@@ -104,7 +123,18 @@ const {join} = require('node:path');
         assert.equal(metrics.ySigns, expected.ySigns, `${label}: Y quadrants`);
         assert.deepEqual(metrics.data, expected.x.map((x, i) => ({x, y: expected.y[i]})), `${label}: original point order`);
       }
-      assert.ok(metrics.horizontal && metrics.vertical, `${label}: both zero axes are drawn`);
+      for (const coordinate of ['x', 'y']) {
+        const values = metrics.data.map(point => point[coordinate]);
+        const low = Math.min(...values), high = Math.max(...values);
+        if (low !== high) {
+          assert.equal(metrics[coordinate + 'Min'], low, `${label}: ${coordinate} minimum`);
+          assert.equal(metrics[coordinate + 'Max'], high, `${label}: ${coordinate} maximum`);
+        }
+      }
+      assert.ok(metrics.horizontal && metrics.vertical, `${label}: both frame axes are drawn`);
+      assert.ok(metrics.xZeroVisible && metrics.yZeroVisible, `${label}: visible zero references where needed`);
+      assert.ok(metrics.radii.every(radius => radius === 0), `${label}: no endpoint circles`);
+      assert.deepEqual(metrics.gaps, [], `${label}: labels never erase curve segments`);
       assert.equal(metrics.xGrid, false);
       assert.equal(metrics.yGrid, false);
       assert.equal(metrics.overflow, false, `${label}: desktop width`);
@@ -112,7 +142,12 @@ const {join} = require('node:path');
       for (const text of metrics.texts) {
         assert.ok(text.left >= -1 && text.right <= metrics.width + 1
           && text.top >= -1 && text.bottom <= metrics.height + 1, `${label}: clipped ${JSON.stringify(text)}`);
+        assert.ok(text.right <= metrics.area.left || text.left >= metrics.area.right
+          || text.bottom <= metrics.area.top || text.top >= metrics.area.bottom,
+          `${label}: text stays outside the curve area: ${JSON.stringify(text)}`);
       }
+      assert.ok(metrics.texts.some(item => item.text === 'σ' && Math.abs(item.rotation + Math.PI / 2) < 1e-6),
+        `${label}: stress title is vertical`);
       for (const symbol of ['σ', 'ε']) {
         assert.ok(metrics.texts.some(item => item.text === symbol && item.font.includes('italic')), `${label}: italic ${symbol}`);
       }
@@ -141,9 +176,16 @@ const {join} = require('node:path');
       CanvasRenderingContext2D.prototype.fillText = function(text, x, y, ...args) {
         if (this.canvas.id === 'mechanical-plot') {
           const m = this.measureText(text);
-          window.plotTexts.push({text, font: this.font, left: x - m.actualBoundingBoxLeft,
-            right: x + m.actualBoundingBoxRight, top: y - m.actualBoundingBoxAscent,
-            bottom: y + m.actualBoundingBoxDescent});
+          const matrix = this.getTransform();
+          const corners = [[x - m.actualBoundingBoxLeft, y - m.actualBoundingBoxAscent],
+            [x + m.actualBoundingBoxRight, y - m.actualBoundingBoxAscent],
+            [x - m.actualBoundingBoxLeft, y + m.actualBoundingBoxDescent],
+            [x + m.actualBoundingBoxRight, y + m.actualBoundingBoxDescent]]
+            .map(([px, py]) => ({x: matrix.a * px + matrix.c * py + matrix.e,
+              y: matrix.b * px + matrix.d * py + matrix.f}));
+          window.plotTexts.push({text, font: this.font, rotation: Math.atan2(matrix.b, matrix.a),
+            left: Math.min(...corners.map(point => point.x)), right: Math.max(...corners.map(point => point.x)),
+            top: Math.min(...corners.map(point => point.y)), bottom: Math.max(...corners.map(point => point.y))});
         }
         return drawText.call(this, text, x, y, ...args);
       };`});
@@ -202,7 +244,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log('Mechanical plot browser checks passed: 14 quadrant cases at 3 desktop widths, zero axes, no grid, unclipped labels, original samples, linked selectors, raw values, CSV selection, PNG/CSV downloads and empty data.');
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths, exact extrema, vertical stress title, exterior labels, uninterrupted curves, no endpoint circles, original samples, linked selectors, raw values, PNG/CSV downloads and empty data.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

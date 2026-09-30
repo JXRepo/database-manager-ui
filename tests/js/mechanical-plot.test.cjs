@@ -67,30 +67,53 @@ test('the viewport shows only one quadrant or two adjacent quadrants when possib
   }
 });
 
-test('diagonal pairs and three or four occupied quadrants show all four quadrants', () => {
+test('diagonal pairs and multiple quadrants retain the actual asymmetric bounds', () => {
   for (const points of [
     [[1, 3], [-2, -4]], [[-1, 3], [2, -4]],
     [[1, 3], [-2, 4], [-1, -3]], [[1, 3], [-2, 4], [-1, -3], [2, -4]],
   ]) {
     for (const coordinate of [0, 1]) {
-      const scale = plotScale(points.map(point => point[coordinate]));
+      const values = points.map(point => point[coordinate]);
+      const scale = plotScale(values);
       assert.equal(visibleSigns(scale), '-+');
-      assert.equal(scale.chartMin, -scale.chartMax, 'Both halves remain visible around zero');
+      assert.equal(scale.chartMin, Math.min(...values));
+      assert.equal(scale.chartMax, Math.max(...values));
     }
   }
 });
 
-test('axis-only points and constant curves keep finite scales including zero', () => {
+test('axis-only points and constant curves keep usable scales without adding opposite signs', () => {
   for (const values of [[0], [0, 0, 0], [2, 2], [-2, -2], [0, 2], [-2, 0], []]) {
     const scale = plotScale(values);
     assert.ok(Number.isFinite(scale.chartMin) && Number.isFinite(scale.chartMax));
     assert.ok(scale.chartMin < scale.chartMax);
-    assert.ok(scale.chartMin <= 0 && scale.chartMax >= 0);
-    assert.ok(scale.ticks.includes(0));
+    if (values.includes(0)) assert.ok(scale.chartMin <= 0 && scale.chartMax >= 0);
     assert.equal(new Set(scale.ticks).size, scale.ticks.length);
     for (const value of values) assert.ok(value >= scale.chartMin && value <= scale.chartMax);
   }
   assert.equal(visibleSigns(plotScale([0, 0])), '+');
+  assert.equal(visibleSigns(plotScale([2, 2])), '+');
+  assert.equal(visibleSigns(plotScale([-2, -2])), '-');
+});
+
+test('positive and negative curves use their own extrema instead of extending to the origin', () => {
+  for (const values of [[10, 11, 10.5], [-11, -10, -10.5], [1e8, 1e8 + .002]]) {
+    const scale = plotScale(values);
+    assert.equal(scale.chartMin, Math.min(...values));
+    assert.equal(scale.chartMax, Math.max(...values));
+    assert.equal(new Set(scale.ticks).size, scale.ticks.length);
+    for (const tick of scale.ticks) assert.ok(tick >= scale.chartMin && tick <= scale.chartMax);
+  }
+});
+
+test('near-zero reversals never expand into a large opposite-sign half of the plot', () => {
+  for (const values of [[-1.4e-5, -1e-6, 1.7e-13], [-9.5e-16, .02, .03]]) {
+    const scale = plotScale(values);
+    assert.equal(scale.chartMin, Math.min(...values));
+    assert.equal(scale.chartMax, Math.max(...values));
+    const fraction = Math.min(Math.abs(scale.chartMin), Math.abs(scale.chartMax)) / (scale.chartMax - scale.chartMin);
+    assert.ok(fraction < 1e-6);
+  }
 });
 
 test('small signed values retain their quadrants and distinct ticks without changing data', () => {
@@ -102,4 +125,15 @@ test('small signed values retain their quadrants and distinct ticks without chan
     assert.equal(new Set(scale.ticks).size, scale.ticks.length);
     assert.deepEqual(values, original);
   }
+});
+
+test('narrow ranges use readable, distinct tick labels with an explicit offset', () => {
+  const result = vm.runInNewContext(`${scaling}
+    const scale = buildPlotScale([1e8, 1e8 + .001, 1e8 + .002]);
+    ({offset: scale.offset, labels: scale.ticks.map(value =>
+      formatPlotTickLabel(value - scale.offset, scale.labelPrecision))})`);
+  assert.equal(result.offset, 1e8);
+  assert.equal(new Set(result.labels.map(label => JSON.stringify(label))).size, result.labels.length);
+  assert.ok(result.labels.some(label => label.text === '0.001'));
+  assert.ok(result.labels.some(label => label.text === '0.002'));
 });

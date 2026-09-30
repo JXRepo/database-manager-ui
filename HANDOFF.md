@@ -2,19 +2,41 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-09-30
-code_base: see latest git commit (detail plot styling and signed quadrants)
-next_topic: Review the deployed detail plot appearance and continue platform usability feedback
+code_base: see latest git commit (detail plot extrema and unobstructed labels)
+next_topic: Review the deployed detail curves and continue platform usability feedback
 files_modified:
-  - Detail plot appearance, zero axes, quadrant ranges, browser checks and documentation
+  - Detail plot bounds, vertical Y title, exterior ticks, complete curves and regression checks
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**数据详情曲线已采用 Charts 的蓝色曲线与简洁外观，并按数据符号显示一个、相邻两个或四个象限。**
+**详情曲线现在按实际最小、最大值绘图，纵轴标题竖排，刻度放在图外，起终点圆圈已去掉。**
 
-### 本轮：详情曲线外观与象限
+### 本轮：按数据范围绘图，修正刻度遮挡
+
+- 用户指出强制原点和对称范围会扩出多余象限，明确要求使用横纵坐标真实最小、最大值，
+  去掉起终点圆圈，纵轴标题竖放，并让被刻度挡住的曲线完整显示。
+  本轮要求取代下方历史记录中的“包含零、以零为中心、端点圆圈、刻度白底”。
+- templates/pages/data_detail.html：范围直接取当前配对采样点的最小和最大值，不强制包含零，
+  不对称扩展。只有恒定坐标额外扩展以免坐标轴退化；极小反号值保持原值及其实际比例，
+  不把数值误差猜成零，也不放大为半幅图。
+- 左侧和底部坐标轴保留，零参考线只在相应范围跨零时出现；数值刻度在绘图区外，
+  删除遮挡曲线的白底，纵轴标题旋转为竖排，无网格或固定端点圆圈。
+  大数值、小范围的刻度使用明确的 Offset 标注；σ、ε、单位和下标的字体规则保持不变。
+- 像素检查发现 parsing: false 让 Chart.js 假定横坐标有序，在精确范围下漏画循环曲线末段。
+  移除此设置，由绘图库识别原始顺序；没有排序、插值、改变坐标值或重算已有等效量。
+- 保留选轴联动、原值查看和 PNG／CSV 下载；Charts、权限、数据库和原始 JSON 不变。
+  本机 a46fde6c.json 只在隔离测试库中读取，未修改或发送到外部。
+- 浏览器覆盖 19 种情况 × 1280／1440／1920 桌面宽度：加入远离零点、极小反号值、
+  大数值窄范围和恒定坐标；检查真实范围、旋转文字边界、连续线段像素及零端点标记。
+  另核样例 33、22、13、23 分量、空数据、选轴、原值与下载；23 分量仍配对 242 点。
+- 90 项相关 Django 测试、124 项 JavaScript 测试通过，0 跳过；已查看桌面截图和导出的 PNG。
+- 验证日志 /tmp/detail-extrema-final.log、/tmp/detail-extrema-js.log，桌面截图及实际 PNG
+  位于 /tmp/detail-extrema-qa。临时文件不随 Git 同步；Render 部署状态需另外核实。
+
+### 上轮：详情曲线外观与象限（范围和标记规则已由本轮取代）
 
 - 用户明确要求保留详情页整体逻辑，只调整曲线外观：参考 Charts 风格，加上纵轴，
   去掉象限内部的横线；一个象限显示一个，相邻两个显示两个，对角两个或更多显示四个。
