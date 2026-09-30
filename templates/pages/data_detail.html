@@ -933,9 +933,14 @@ details[open] > .detail-group-summary {
       }
     }
 
+    .plot-canvas-box {
+      position: relative;
+      height: 420px;
+    }
+
     #mechanical-plot {
       width: 100% !important;
-      height: 420px !important;
+      height: 100% !important;
       display: block;
     }
 
@@ -1653,7 +1658,9 @@ details[open] > .detail-group-summary {
         </details>
 
         <div class="plot-canvas-wrap">
-          <canvas id="mechanical-plot"></canvas>
+          <div class="plot-canvas-box">
+            <canvas id="mechanical-plot"></canvas>
+          </div>
           <div id="plot-status" class="plot-status"></div>
         </div>
 
@@ -2095,6 +2102,37 @@ function measurePlotTickLabel(ctx, value, precision) {
   return width;
 }
 
+function findCurveHoverIndex(points, position, radius = 16) {
+  if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) return -1;
+  let nearestIndex = -1;
+  let nearestDistance = radius * radius;
+  const usable = point => point && !point.skip && Number.isFinite(point.x) && Number.isFinite(point.y);
+
+  function consider(x, y, index) {
+    const distance = (position.x - x) ** 2 + (position.y - y) ** 2;
+    if (distance < nearestDistance || (nearestIndex < 0 && distance <= nearestDistance)) {
+      nearestDistance = distance;
+      nearestIndex = index;
+    }
+  }
+
+  points.forEach((point, index) => {
+    if (!usable(point)) return;
+    consider(point.x, point.y, index);
+    const previous = points[index - 1];
+    if (!usable(previous)) return;
+    const dx = point.x - previous.x;
+    const dy = point.y - previous.y;
+    const lengthSquared = dx * dx + dy * dy;
+    if (lengthSquared === 0) return;
+    const fraction = Math.max(0, Math.min(1,
+      ((position.x - previous.x) * dx + (position.y - previous.y) * dy) / lengthSquared));
+    consider(previous.x + fraction * dx, previous.y + fraction * dy,
+      fraction <= 0.5 ? index - 1 : index);
+  });
+  return nearestIndex;
+}
+
 const cornerAxisPlugin = {
   id: "cornerAxisPlugin",
   beforeDraw(chart) {
@@ -2400,6 +2438,16 @@ const canvasBackgroundPlugin = {
   },
 };
 
+const curveHoverPlugin = {
+  id: "curveHoverPlugin",
+  afterEvent(chart, args) {
+    if (args.inChartArea || (!chart.getActiveElements().length && !chart.tooltip.getActiveElements().length)) return;
+    chart.setActiveElements([]);
+    chart.tooltip.setActiveElements([], {x: args.event.x, y: args.event.y});
+    args.changed = true;
+  },
+};
+
 function downloadCurrentPlot() {
   if (!chartInstance) {
     return;
@@ -2525,9 +2573,11 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             pointBackgroundColor: "#2874c6",
             pointBorderColor: "#2874c6",
             pointBorderWidth: 1.5,
-            pointHoverRadius: 4,
-            pointHitRadius: 10,
-            clip: 6,
+            pointHoverRadius: 8,
+            pointHoverBorderColor: "#ffffff",
+            pointHoverBorderWidth: 2.5,
+            pointHitRadius: 16,
+            clip: 10,
             tension: 0,
           }
         ]
@@ -2535,18 +2585,34 @@ function updateRawValues(xVariable, yVariable, pointCount) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          mode: "mechanicalCurve",
+        },
+        transitions: {
+          active: {animation: {duration: 0}},
+        },
         plugins: {
           legend: {
             display: false,
           },
           tooltip: {
+            animation: false,
             backgroundColor: "#ffffff",
             titleColor: "#203c55",
             bodyColor: "#415c75",
-            borderColor: "#d7e2ee",
+            borderColor: "#2874c6",
             borderWidth: 1,
-            padding: 10,
+            padding: 12,
+            titleFont: {size: 14, weight: "600"},
+            bodyFont: {size: 13},
             displayColors: false,
+            callbacks: {
+              title: items => `Sample index ${items[0].dataIndex}`,
+              label: context => [
+                `X: ${formatPlotPlainLabel(getVariableAxisLabel(xVariable))} = ${context.raw.x}`,
+                `Y: ${formatPlotPlainLabel(getVariableAxisLabel(yVariable))} = ${context.raw.y}`,
+              ],
+            },
           },
         },
         layout: {
@@ -2602,7 +2668,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
           }
         }
       },
-      plugins: [canvasBackgroundPlugin, cornerAxisPlugin],
+      plugins: [canvasBackgroundPlugin, cornerAxisPlugin, curveHoverPlugin],
     });
 
 updateRawValues(xVariable, yVariable, pointCount);
@@ -2612,6 +2678,13 @@ plotStatus.textContent = `${pointCount} points plotted.`;
 
 
     if (plotVariables.length > 0 && xSelect && ySelect && canvas) {
+      Chart.Interaction.modes.mechanicalCurve = function (chart, event, options, useFinalPosition) {
+        if (!chart.isDatasetVisible(0)) return [];
+        const meta = chart.getDatasetMeta(0);
+        const points = meta.data.map(point => ({...point.getCenterPoint(useFinalPosition), skip: point.skip}));
+        const index = findCurveHoverIndex(points, Chart.helpers.getRelativePosition(event, chart));
+        return index < 0 ? [] : [{element: meta.data[index], datasetIndex: 0, index}];
+      };
       const xPlotVariables = getXPlotVariables();
       const yPlotVariables = getYPlotVariables();
 

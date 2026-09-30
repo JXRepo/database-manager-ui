@@ -83,6 +83,7 @@ const {join} = require('node:path');
         chart.update('none');
         const {x, y} = chart.scales;
         const area = chart.chartArea;
+        const rect = chart.canvas.getBoundingClientRect();
         const sign = scale => (scale.min < 0 ? '-' : '') + (scale.max > 0 ? '+' : '');
         const ctx = chart.ctx;
         function hasAxis(px, py) {
@@ -122,6 +123,7 @@ const {join} = require('node:path');
           }
         }
         return {xSigns: sign(x), ySigns: sign(y), width: chart.width, height: chart.height,
+          displayWidth: rect.width, displayHeight: rect.height,
           xMin: x.min, xMax: x.max, yMin: y.min, yMax: y.max, area,
           originX, originY, framePixels,
           horizontal: hasAxis(area.left + area.width * .25, originY),
@@ -147,6 +149,9 @@ const {join} = require('node:path');
         }
       }
       assert.ok(metrics.horizontal && metrics.vertical, `${label}: two axes through the true origin`);
+      assert.ok(Math.abs(metrics.displayWidth - metrics.width) < 1
+        && Math.abs(metrics.displayHeight - metrics.height) < 1,
+        `${label}: displayed canvas and pointer coordinates share the same size`);
       assert.ok(metrics.xArrow && metrics.yArrow, `${label}: positive-direction arrowheads`);
       assert.deepEqual(metrics.framePixels, [], `${label}: no additional rectangular frame`);
       assert.ok(metrics.radii.every(radius => radius === 0), `${label}: no endpoint circles`);
@@ -187,6 +192,54 @@ const {join} = require('node:path');
       }
       return metrics;
     }
+    async function hover(label, segment, fraction, expectedIndex, offset = 0) {
+      await evaluate(`document.querySelector('.plot-panel').scrollIntoView({block: 'start', behavior: 'instant'});
+        scrollBy({top: -88, behavior: 'instant'});
+        new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+      const position = await evaluate(`(() => {
+        const chart = Chart.getChart('mechanical-plot'), points = chart.getDatasetMeta(0).data;
+        const a = points[${segment}].getCenterPoint(true), b = (points[${segment + 1}] || points[${segment}]).getCenterPoint(true);
+        const dx = b.x - a.x, dy = b.y - a.y, length = Math.hypot(dx, dy) || 1;
+        const x = a.x + dx * ${fraction} - dy / length * ${offset};
+        const y = a.y + dy * ${fraction} + dx / length * ${offset};
+        const rect = chart.canvas.getBoundingClientRect();
+        return {x: rect.left + x * rect.width / chart.width, y: rect.top + y * rect.height / chart.height};
+      })()`);
+      await command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: position.x, y: position.y});
+      try {
+        await until(`(() => {const chart = Chart.getChart('mechanical-plot');
+          return chart.getActiveElements().length === 1 && chart.getActiveElements()[0].index === ${expectedIndex}
+            && chart.tooltip.opacity > .99;})()`);
+      } catch (error) {
+        throw new Error(`${label}: pointer on segment ${segment} at ${fraction}, expected sample ${expectedIndex}. ${error.message}`);
+      }
+      const state = await evaluate(`(() => {
+        const chart = Chart.getChart('mechanical-plot'), active = chart.getActiveElements()[0];
+        const point = active.element, center = point.getCenterPoint(true);
+        const pixels = chart.ctx.getImageData(Math.floor(center.x) - 8, Math.floor(center.y) - 8, 17, 17).data;
+        let bluePixels = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (pixels[i + 2] > 120 && pixels[i + 2] - pixels[i] > 55) bluePixels++;
+        }
+        return {radius: point.options.radius, border: point.options.borderColor, bluePixels,
+          title: chart.tooltip.title, body: chart.tooltip.body.flatMap(row => row.lines),
+          raw: chart.data.datasets[0].data[active.index], tooltipIndex: chart.tooltip.getActiveElements()[0].index};
+      })()`);
+      assert.ok(state.radius >= 7 && state.bluePixels > 80, `${label}: visibly enlarged hover dot`);
+      assert.equal(state.border, '#ffffff', `${label}: contrasting hover edge`);
+      assert.equal(state.tooltipIndex, expectedIndex, `${label}: marker and tooltip show the same sample`);
+      assert.deepEqual(state.title, [`Sample index ${expectedIndex}`]);
+      assert.ok(state.body.some(line => line.startsWith('X: ') && line.endsWith(String(state.raw.x))), `${label}: exact X value`);
+      assert.ok(state.body.some(line => line.startsWith('Y: ') && line.endsWith(String(state.raw.y))), `${label}: exact Y value`);
+      assert.ok(state.body.some(line => line.includes('MPa')) && state.body.some(line => line.includes('(-)')),
+        `${label}: selected units`);
+      return position;
+    }
+    async function clearHover() {
+      await command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: 300, y: 35});
+      await until(`(() => {const chart = Chart.getChart('mechanical-plot');
+        return chart.getActiveElements().length === 0 && chart.tooltip.opacity === 0;})()`);
+    }
     await command('Page.enable');
     await command('Runtime.enable');
     await command('Network.enable');
@@ -220,6 +273,42 @@ const {join} = require('node:path');
       await select('plot-x-select', 'total_strain.strain_11');
       for (const width of [1280, 1440, 1920]) await layout(item.name, width, item);
     }
+    for (const width of [1280, 1440, 1920]) {
+      await navigate(cases[0].path);
+      await select('plot-x-select', 'total_strain.strain_11');
+      await layout('hover-sparse', width, cases[0]);
+      for (const fraction of [.1, .3, .49, .51, .7, .9]) {
+        await hover('sparse segment', 0, fraction, fraction < .5 ? 0 : 1, 7);
+      }
+      const nearLine = await hover('line proximity', 0, .3, 0, 7);
+      await command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: nearLine.x, y: nearLine.y - 48});
+      await until(`(() => {const chart = Chart.getChart('mechanical-plot');
+        return chart.getActiveElements().length === 0 && chart.tooltip.opacity === 0;})()`);
+      await hover('line re-entry', 0, .3, 0);
+      const margin = await evaluate(`(() => {const rect = canvas.getBoundingClientRect();
+        return {x: rect.left + 5, y: rect.top + 5};})()`);
+      await command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: margin.x, y: margin.y});
+      await until(`(() => {const chart = Chart.getChart('mechanical-plot');
+        return chart.getActiveElements().length === 0 && chart.tooltip.opacity === 0;})()`);
+      await hover('leave canvas', 0, .3, 0);
+      await clearHover();
+    }
+    for (const name of ['small', 'zero']) {
+      await navigate(cases.find(item => item.name === name).path);
+      await select('plot-x-select', 'total_strain.strain_11');
+      await layout(`hover-${name}`, 1440);
+      await hover(name, 0, name === 'small' ? .7 : 0, name === 'small' ? 1 : 0);
+      await clearHover();
+    }
+    await navigate(cases.find(item => item.name === 'cycle').path);
+    await select('plot-x-select', 'total_strain.strain_11');
+    await layout('hover-cycle', 1440);
+    await hover('cycle reversal', 3, .7, 4);
+    if (process.env.PLOT_SCREENSHOT_DIR) {
+      const shot = await command('Page.captureScreenshot', {format: 'png'});
+      writeFileSync(join(process.env.PLOT_SCREENSHOT_DIR, 'hover-tooltip.png'), Buffer.from(shot.data, 'base64'));
+    }
+    await clearHover();
     await navigate(cases[0].path);
     await select('plot-x-select', 'total_strain.strain_22');
     assert.equal(await evaluate('ySelect.value'), 'stress.stress_22');
@@ -266,7 +355,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths, two Cartesian axes, arrowheads, separate origin labels, no frame, asymmetric data ranges including zero, vertical stress title, uninterrupted curves, original samples, linked selectors, raw values, PNG/CSV downloads and empty data.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths, consistent canvas sizing, continuous sparse-line hover, enlarged sample markers, precise X/Y readouts, tiny values, a single point, reversals and hover clearing; two Cartesian axes, arrowheads, separate origin labels, no frame, asymmetric data ranges including zero, vertical stress title, uninterrupted curves, original samples, linked selectors, raw values, PNG/CSV downloads and empty data.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

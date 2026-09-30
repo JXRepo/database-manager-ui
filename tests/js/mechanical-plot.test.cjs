@@ -139,3 +139,34 @@ test('large nonzero samples retain an actual zero tick and distinguishable label
   assert.equal(new Set(result.labels.map(label => JSON.stringify(label))).size, result.labels.length);
   assert.ok(result.labels.some(label => label.text === '0'));
 });
+
+function hoverIndex(points, position, radius = 16) {
+  return vm.runInNewContext(`${scaling}\nfindCurveHoverIndex(points, position, radius)`, {points, position, radius});
+}
+
+test('hover reaches the whole sparse segment and selects an actual nearby sample', () => {
+  const points = [{x: 0, y: 0}, {x: 200, y: 0}];
+  assert.equal(hoverIndex(points, {x: 75, y: 8}), 0);
+  assert.equal(hoverIndex(points, {x: 125, y: 8}), 1);
+  assert.equal(hoverIndex(points, {x: 75, y: 17}), -1);
+  assert.equal(hoverIndex(points, {x: 75, y: 16}), 0);
+});
+
+test('hover preserves supplied loop order and remains deterministic at crossings', () => {
+  const points = [{x: -100, y: -100}, {x: 100, y: 100}, {x: -100, y: 100}, {x: 100, y: -100}];
+  const original = JSON.stringify(points);
+  assert.equal(hoverIndex(points, {x: 0, y: 0}), 0);
+  assert.equal(hoverIndex(points, {x: -75, y: 75}), 2);
+  assert.equal(hoverIndex(points, {x: 75, y: -75}), 3);
+  assert.equal(JSON.stringify(points), original);
+});
+
+test('hover handles single and repeated points without connecting skipped or invalid samples', () => {
+  assert.equal(hoverIndex([{x: 30, y: 40}], {x: 35, y: 40}), 0);
+  assert.equal(hoverIndex([{x: 30, y: 40}, {x: 30, y: 40}], {x: 35, y: 40}), 0);
+  for (const middle of [{x: 100, y: 100, skip: true}, {x: 100, y: NaN}]) {
+    assert.equal(hoverIndex([{x: 0, y: 0}, middle, {x: 200, y: 0}], {x: 100, y: 0}), -1);
+  }
+  assert.equal(hoverIndex([], {x: 0, y: 0}), -1);
+  assert.equal(hoverIndex([{x: 0, y: 0}], {x: NaN, y: 0}), -1);
+});

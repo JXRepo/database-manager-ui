@@ -558,6 +558,13 @@ is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
 all exports.
 
+Moving within 16 pixels of a detail curve highlights the nearest recorded
+sample on that segment with a larger blue dot and white border. The tooltip
+shows its zero-based sample index and exact X/Y numbers with variable names and
+units. It also works between sparse samples and on loops without sorting the
+curve or creating interpolated values. Moving away from the curve, into the
+canvas margins, or outside the canvas clears the highlight and tooltip.
+
 Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
 scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.

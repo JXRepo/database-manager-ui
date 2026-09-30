@@ -2,19 +2,41 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-01
-code_base: see latest git commit (detail Cartesian axes, arrows and origin labels)
+code_base: see latest git commit (stable detail curve hover and precise sample readouts)
 next_topic: Review the deployed detail curves and continue platform usability feedback
 files_modified:
-  - Detail Cartesian axes, arrows, separate origin labels and desktop regression checks
+  - Detail curve hover detection, enlarged active dot, precise X/Y tooltip and browser checks
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**详情曲线使用两条在真实零点相交的 X/Y 轴，正方向有箭头，各自标出 0，不再画矩形框。**
+**详情曲线靠近整段蓝线即可显示真实采样点的大蓝点、白边，以及精确的 X/Y 数值提示。**
 
-### 本轮：两条坐标轴、箭头和原点零标签
+### 本轮：稳定的曲线悬停和明显的选中点
+
+- 用户反馈鼠标在蓝线上有时显示提示、有时不显示，要求突出显示一个大点并展示信息。
+  根因是 Chart.js 默认 nearest + intersect=true，仅命中不可见采样点的 10px 范围，
+  稀疏采样点之间的长线段不能稳定触发。
+- 真实鼠标检查还发现原画布父容器包含状态文字：Chart.js 内部高度 451.2px，而 CSS 强制
+  显示为 420px，造成鼠标位置偏差。新增独立的 420px plot-canvas-box，仅包含画布，
+  状态文字仍在其下方；浏览器核对内部尺寸和显示尺寸一致。
+- templates/pages/data_detail.html：findCurveHoverIndex 按屏幕像素检测完整折线的 16px 邻域，
+  mechanicalCurve interaction mode 供悬停和提示共用，命中后选择最近线段上的真实端点。
+  保留原始顺序；交叉处按原顺序稳定选择，重复点不除零，跳过点和无效点之间不连假线。
+- 活动点半径 8px、白边 2.5px，平时仍无固定端点圆圈。提示显示 Sample index（从零起）、
+  当前变量和单位，以及真实 X/Y 数值，不用默认数值格式把微小值舍入，也不生成插值数据。
+  活动点和提示即时更新；移出蓝线邻域、进入画布留白或离开画布时清除两者。
+- JavaScript 回归新增稀疏线段、循环交叉、单点、重复点与无效断点。
+  浏览器检查使用真实鼠标事件，覆盖三个桌面宽度的线段连续移动、离线、重新进入、
+  画布边缘和离开，以及回折曲线、微小值和单点；同时核对大点像素、白边、真实值和单位。
+- 30 项相关 Django 测试、127 项 JavaScript 测试通过，0 跳过；真实 Chromium 检查
+  19 种曲线 × 3 个桌面宽度以及新增悬停行为，已查看悬停截图和导出的 PNG。
+  日志 /tmp/detail-hover-final.log、/tmp/detail-hover-js.log；截图和实际 PNG 位于 /tmp/detail-hover-qa。
+  临时文件不随 Git 同步；Render 部署状态需要另外核实。
+
+### 上轮：两条坐标轴、箭头和原点零标签
 
 - 用户要求删除象限矩形框，只保留正常 X/Y 轴，在末端加箭头，并分别标出两轴原点的 0。
   为显示真实原点，本轮范围覆盖当前配对样本的极值和 0，取代上轮严格只取极值的规则；
