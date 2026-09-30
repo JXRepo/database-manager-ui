@@ -2034,13 +2034,13 @@ function buildPlotScale(values) {
   if (!Number.isFinite(minimum)) {
     minimum = 0;
     maximum = 1;
-  } else if (minimum === maximum) {
-    const padding = Math.abs(minimum) * 0.05 || 1;
-    minimum = minimum === 0 ? 0 : minimum - padding;
-    maximum += padding;
+  } else {
+    minimum = Math.min(0, minimum);
+    maximum = Math.max(0, maximum);
+    if (minimum === maximum) maximum = 1;
   }
 
-  // Keep the actual extrema; only a constant coordinate needs an expanded range.
+  // Include the true origin without making the signed ranges symmetric.
   const span = maximum - minimum;
   const rawStep = span / 4;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
@@ -2097,30 +2097,37 @@ function measurePlotTickLabel(ctx, value, precision) {
 
 const cornerAxisPlugin = {
   id: "cornerAxisPlugin",
-  beforeDatasetsDraw(chart) {
+  beforeDraw(chart) {
     const {ctx, chartArea, scales} = chart;
     if (!scales.x || !scales.y || !chartArea) return;
+    const axisX = scales.x.getPixelForValue(0);
+    const axisY = scales.y.getPixelForValue(0);
+    const arrowLength = 12;
     ctx.save();
     ctx.strokeStyle = "#93a7b8";
+    ctx.fillStyle = "#93a7b8";
     ctx.lineWidth = 1.25;
     ctx.beginPath();
-    ctx.moveTo(chartArea.left, chartArea.top);
-    ctx.lineTo(chartArea.left, chartArea.bottom);
-    ctx.lineTo(chartArea.right, chartArea.bottom);
-    if (scales.x.min < 0 && scales.x.max > 0) {
-      const zeroX = scales.x.getPixelForValue(0);
-      ctx.moveTo(zeroX, chartArea.bottom);
-      ctx.lineTo(zeroX, chartArea.top);
-    }
-    if (scales.y.min < 0 && scales.y.max > 0) {
-      const zeroY = scales.y.getPixelForValue(0);
-      ctx.moveTo(chartArea.left, zeroY);
-      ctx.lineTo(chartArea.right, zeroY);
-    }
+    ctx.moveTo(chartArea.left, axisY);
+    ctx.lineTo(chartArea.right + arrowLength, axisY);
+    ctx.moveTo(axisX, chartArea.bottom);
+    ctx.lineTo(axisX, chartArea.top - arrowLength);
     ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(chartArea.right + arrowLength, axisY);
+    ctx.lineTo(chartArea.right + 4, axisY - 4);
+    ctx.lineTo(chartArea.right + 4, axisY + 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(axisX, chartArea.top - arrowLength);
+    ctx.lineTo(axisX - 4, chartArea.top - 4);
+    ctx.lineTo(axisX + 4, chartArea.top - 4);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   },
-  afterDatasetsDraw(chart) {
+  beforeDatasetsDraw(chart) {
     const { ctx, chartArea, scales } = chart;
     const xScale = scales.x;
     const yScale = scales.y;
@@ -2129,8 +2136,11 @@ const cornerAxisPlugin = {
       return;
     }
 
-    const axisX = chartArea.left;
-    const axisY = chartArea.bottom;
+    const axisX = xScale.getPixelForValue(0);
+    const axisY = yScale.getPixelForValue(0);
+    const xLabelSide = axisY < (chartArea.top + chartArea.bottom) / 2 ? -1 : 1;
+    const yLabelSide = axisX > (chartArea.left + chartArea.right) / 2 ? 1 : -1;
+    const yLabelX = yLabelSide < 0 ? chartArea.left : chartArea.right;
     const axisColor = "#93a7b8";
     const labelColor = "#63788a";
     const tickLength = 4;
@@ -2258,7 +2268,7 @@ const cornerAxisPlugin = {
 
     function drawXAxisTitle(ctx, text, chartArea) {
       const titleX = (chartArea.left + chartArea.right) / 2;
-      const titleY = chartArea.bottom + 54;
+      const titleY = xLabelSide < 0 ? chartArea.top - 44 : chartArea.bottom + 54;
 
       drawAxisTitle(ctx, text, titleX, titleY, "center");
     }
@@ -2267,7 +2277,7 @@ const cornerAxisPlugin = {
       const tickWidth = Math.max(0, ...buildAxisTickValues(yScale).map(value =>
         measurePlotTickLabel(ctx, value - yScale.options.customOffset, yScale.options.customLabelPrecision)));
       ctx.save();
-      ctx.translate(chartArea.left - yTickLabelOffset - tickWidth - 18,
+      ctx.translate(yLabelX + yLabelSide * (yTickLabelOffset + tickWidth + 18),
         (chartArea.top + chartArea.bottom) / 2);
       ctx.rotate(-Math.PI / 2);
       drawAxisTitle(ctx, text, 0, 0, "center");
@@ -2308,7 +2318,7 @@ const cornerAxisPlugin = {
     buildAxisTickValues(xScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value)) {
+      if (!Number.isFinite(value) || value === 0) {
         return;
       }
 
@@ -2318,21 +2328,21 @@ const cornerAxisPlugin = {
         return;
       }
 
-      drawTick(x, axisY, x, axisY + tickLength);
+      drawTick(x, axisY, x, axisY + xLabelSide * tickLength);
       drawTickLabel(
         x,
-        axisY + xTickLabelOffset,
+        axisY + xLabelSide * xTickLabelOffset,
         value - xScale.options.customOffset,
         "center",
         Number(xScale.options.customLabelPrecision || 4)
       );
     });
 
-    ctx.textAlign = "right";
+    ctx.textAlign = yLabelSide < 0 ? "right" : "left";
     buildAxisTickValues(yScale).forEach(value => {
       value = Number(value);
 
-      if (!Number.isFinite(value)) {
+      if (!Number.isFinite(value) || value === 0) {
         return;
       }
 
@@ -2342,15 +2352,21 @@ const cornerAxisPlugin = {
         return;
       }
 
-      drawTick(axisX, y, axisX - tickLength, y);
+      drawTick(axisX, y, axisX + yLabelSide * tickLength, y);
       drawTickLabel(
-        axisX - yTickLabelOffset,
+        axisX + yLabelSide * yTickLabelOffset,
         y,
         value - yScale.options.customOffset,
-        "right",
+        yLabelSide < 0 ? "right" : "left",
         Number(yScale.options.customLabelPrecision || 4)
       );
     });
+
+    drawTickLabel(axisX - yLabelSide * 8, axisY + xLabelSide * xTickLabelOffset, 0, "center", 4);
+    const zeroYSide = axisY <= chartArea.top + 1 || axisY >= chartArea.bottom - 1
+      ? xLabelSide : -xLabelSide;
+    drawTickLabel(axisX + yLabelSide * yTickLabelOffset, axisY + zeroYSide * 8, 0,
+      yLabelSide < 0 ? "right" : "left", 4);
 
     ctx.font = "400 11px sans-serif";
     ctx.textAlign = "left";
@@ -2480,11 +2496,14 @@ function updateRawValues(xVariable, yVariable, pointCount) {
       measurePlotTickLabel(plotContext, value - xScaleConfig.offset, xScaleConfig.labelPrecision)));
     const yTickWidth = Math.max(0, ...yScaleConfig.ticks.map(value =>
       measurePlotTickLabel(plotContext, value - yScaleConfig.offset, yScaleConfig.labelPrecision)));
+    const xLabelsAbove = yScaleConfig.chartMax < -yScaleConfig.chartMin;
+    const yLabelsRight = -xScaleConfig.chartMin > xScaleConfig.chartMax;
+    const sidePadding = Math.max(84, yTickWidth + 64, xTickWidth / 2 + 16);
     const plotLayoutPadding = {
-      top: yScaleConfig.offset ? 34 : 24,
-      right: Math.max(24, xTickWidth / 2 + 8),
-      bottom: 66,
-      left: Math.max(84, yTickWidth + 64, xTickWidth / 2 + 8),
+      top: xLabelsAbove ? 68 : 24,
+      right: yLabelsRight ? sidePadding : Math.max(24, xTickWidth / 2 + 16),
+      bottom: xLabelsAbove ? 24 : 66,
+      left: yLabelsRight ? Math.max(24, xTickWidth / 2 + 16) : sidePadding,
     };
 
     if (chartInstance) {

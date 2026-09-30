@@ -82,12 +82,13 @@ test('diagonal pairs and multiple quadrants retain the actual asymmetric bounds'
   }
 });
 
-test('axis-only points and constant curves keep usable scales without adding opposite signs', () => {
+test('axis-only points and constant curves keep usable scales including their true origin', () => {
   for (const values of [[0], [0, 0, 0], [2, 2], [-2, -2], [0, 2], [-2, 0], []]) {
     const scale = plotScale(values);
     assert.ok(Number.isFinite(scale.chartMin) && Number.isFinite(scale.chartMax));
     assert.ok(scale.chartMin < scale.chartMax);
-    if (values.includes(0)) assert.ok(scale.chartMin <= 0 && scale.chartMax >= 0);
+    assert.ok(scale.chartMin <= 0 && scale.chartMax >= 0);
+    assert.ok(scale.ticks.includes(0));
     assert.equal(new Set(scale.ticks).size, scale.ticks.length);
     for (const value of values) assert.ok(value >= scale.chartMin && value <= scale.chartMax);
   }
@@ -96,11 +97,11 @@ test('axis-only points and constant curves keep usable scales without adding opp
   assert.equal(visibleSigns(plotScale([-2, -2])), '-');
 });
 
-test('positive and negative curves use their own extrema instead of extending to the origin', () => {
+test('single-sign curves include zero without extending beyond their data extrema', () => {
   for (const values of [[10, 11, 10.5], [-11, -10, -10.5], [1e8, 1e8 + .002]]) {
     const scale = plotScale(values);
-    assert.equal(scale.chartMin, Math.min(...values));
-    assert.equal(scale.chartMax, Math.max(...values));
+    assert.equal(scale.chartMin, Math.min(0, ...values));
+    assert.equal(scale.chartMax, Math.max(0, ...values));
     assert.equal(new Set(scale.ticks).size, scale.ticks.length);
     for (const tick of scale.ticks) assert.ok(tick >= scale.chartMin && tick <= scale.chartMax);
   }
@@ -127,13 +128,14 @@ test('small signed values retain their quadrants and distinct ticks without chan
   }
 });
 
-test('narrow ranges use readable, distinct tick labels with an explicit offset', () => {
+test('large nonzero samples retain an actual zero tick and distinguishable labels', () => {
   const result = vm.runInNewContext(`${scaling}
     const scale = buildPlotScale([1e8, 1e8 + .001, 1e8 + .002]);
-    ({offset: scale.offset, labels: scale.ticks.map(value =>
+    ({minimum: scale.chartMin, maximum: scale.chartMax, offset: scale.offset, labels: scale.ticks.map(value =>
       formatPlotTickLabel(value - scale.offset, scale.labelPrecision))})`);
-  assert.equal(result.offset, 1e8);
+  assert.equal(result.minimum, 0);
+  assert.equal(result.maximum, 1e8 + .002);
+  assert.equal(result.offset, 0);
   assert.equal(new Set(result.labels.map(label => JSON.stringify(label))).size, result.labels.length);
-  assert.ok(result.labels.some(label => label.text === '0.001'));
-  assert.ok(result.labels.some(label => label.text === '0.002'));
+  assert.ok(result.labels.some(label => label.text === '0'));
 });

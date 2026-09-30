@@ -1,20 +1,42 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-09-30
-code_base: see latest git commit (detail plot extrema and unobstructed labels)
+timestamp: 2026-10-01
+code_base: see latest git commit (detail Cartesian axes, arrows and origin labels)
 next_topic: Review the deployed detail curves and continue platform usability feedback
 files_modified:
-  - Detail plot bounds, vertical Y title, exterior ticks, complete curves and regression checks
+  - Detail Cartesian axes, arrows, separate origin labels and desktop regression checks
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**详情曲线现在按实际最小、最大值绘图，纵轴标题竖排，刻度放在图外，起终点圆圈已去掉。**
+**详情曲线使用两条在真实零点相交的 X/Y 轴，正方向有箭头，各自标出 0，不再画矩形框。**
 
-### 本轮：按数据范围绘图，修正刻度遮挡
+### 本轮：两条坐标轴、箭头和原点零标签
+
+- 用户要求删除象限矩形框，只保留正常 X/Y 轴，在末端加箭头，并分别标出两轴原点的 0。
+  为显示真实原点，本轮范围覆盖当前配对样本的极值和 0，取代上轮严格只取极值的规则；
+  已向用户说明这一必要调整，正负范围仍不对称扩展，极小反号值保持真实比例。
+- templates/pages/data_detail.html：删除左下框架和额外零参考线，仅画 y=0 横轴、x=0 纵轴。
+  X 轴正方向向右、Y 轴正方向向上，各有箭头；绘图区之外预留箭头空间。
+  常规刻度跳过零，交点附近单独绘制两个 0，略错开以避免重叠。
+- 刻度数字贴近实际轴线，朝原点较近的外侧放置；标题保留在图外，Y 标题继续竖排。
+  负 X 为主时文字放右侧，负 Y 为主时放上侧；文字在曲线之前绘制，没有遮挡白底，
+  曲线像素仍完整可见。四象限的刻度数字不会留在无轴的图边缘。
+- 保留原始样本顺序、微小数值、选轴联动、原值查看和 PNG／CSV 下载。
+  大数值窄范围在包含真实原点的线性坐标中会被压缩，刻度重新按最终范围计算，
+  不把偏移刻度冒充真实的 0；全零坐标使用正向范围避免退化。
+- 浏览器仍检查 19 种情况 × 3 个桌面宽度，新增两条零轴、正向箭头、两个独立零标签、
+  无额外边框的像素检查，并保留曲线连续性、样本、字体、下载和空状态回归。
+- 30 项相关 Django 测试、124 项 JavaScript 测试通过，0 跳过；最后调整边界零标签后，
+  重新通过全部浏览器检查，样例 22 的零标签已移到曲线外侧。
+  日志 /tmp/detail-cartesian-final.log、/tmp/detail-cartesian-js.log、/tmp/detail-cartesian-browser.log；
+  截图及实际 PNG 位于 /tmp/detail-cartesian-qa。
+  临时文件不随 Git 同步；Render 部署状态需要另外核实。
+
+### 上轮：按数据范围绘图，修正刻度遮挡（范围和外框已由本轮取代）
 
 - 用户指出强制原点和对称范围会扩出多余象限，明确要求使用横纵坐标真实最小、最大值，
   去掉起终点圆圈，纵轴标题竖放，并让被刻度挡住的曲线完整显示。

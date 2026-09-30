@@ -78,8 +78,9 @@ const {join} = require('node:path');
       await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
       const metrics = await evaluate(`(() => {
         const chart = Chart.getChart('mechanical-plot');
+        chart.resize();
         window.plotTexts = [];
-        chart.resize(); chart.update('none');
+        chart.update('none');
         const {x, y} = chart.scales;
         const area = chart.chartArea;
         const sign = scale => (scale.min < 0 ? '-' : '') + (scale.max > 0 ? '+' : '');
@@ -87,11 +88,24 @@ const {join} = require('node:path');
         function hasAxis(px, py) {
           const pixels = ctx.getImageData(Math.floor(px) - 2, Math.floor(py) - 2, 5, 5).data;
           for (let i = 0; i < pixels.length; i += 4) {
-            if (pixels[i] < 225 && pixels[i + 2] - pixels[i] > 8) return true;
+            const coverage = (255 - pixels[i]) / 108;
+            if (coverage > .1 && Math.abs(pixels[i + 1] - (255 - coverage * 88)) < 4
+              && Math.abs(pixels[i + 2] - (255 - coverage * 71)) < 4) return true;
           }
           return false;
         }
         const data = chart.data.datasets[0].data;
+        const originX = x.getPixelForValue(0), originY = y.getPixelForValue(0);
+        const framePixels = [];
+        for (const fraction of [.25, .5, .75]) {
+          const px = area.left + area.width * fraction, py = area.top + area.height * fraction;
+          for (const edge of [area.top, area.bottom]) {
+            if (Math.abs(edge - originY) > 5 && Math.abs(px - originX) > 5 && hasAxis(px, edge)) framePixels.push({px, py: edge});
+          }
+          for (const edge of [area.left, area.right]) {
+            if (Math.abs(edge - originX) > 5 && Math.abs(py - originY) > 5 && hasAxis(edge, py)) framePixels.push({px: edge, py});
+          }
+        }
         const gaps = [];
         for (let i = 1; i < data.length; i++) {
           const start = data[i - 1], end = data[i];
@@ -109,10 +123,11 @@ const {join} = require('node:path');
         }
         return {xSigns: sign(x), ySigns: sign(y), width: chart.width, height: chart.height,
           xMin: x.min, xMax: x.max, yMin: y.min, yMax: y.max, area,
-          horizontal: hasAxis(area.left + area.width * .25, area.bottom),
-          vertical: hasAxis(area.left, area.top + area.height * .25),
-          xZeroVisible: !(x.min < 0 && x.max > 0) || hasAxis(x.getPixelForValue(0), area.top + area.height * .25),
-          yZeroVisible: !(y.min < 0 && y.max > 0) || hasAxis(area.left + area.width * .25, y.getPixelForValue(0)),
+          originX, originY, framePixels,
+          horizontal: hasAxis(area.left + area.width * .25, originY),
+          vertical: hasAxis(originX, area.top + area.height * .25),
+          xArrow: hasAxis(area.right + 8, originY + 2),
+          yArrow: hasAxis(originX + 2, area.top - 8),
           radii: chart.getDatasetMeta(0).data.map(point => point.options.radius), gaps,
           xGrid: x.options.grid.display, yGrid: y.options.grid.display,
           data, texts: window.plotTexts,
@@ -127,24 +142,31 @@ const {join} = require('node:path');
         const values = metrics.data.map(point => point[coordinate]);
         const low = Math.min(...values), high = Math.max(...values);
         if (low !== high) {
-          assert.equal(metrics[coordinate + 'Min'], low, `${label}: ${coordinate} minimum`);
-          assert.equal(metrics[coordinate + 'Max'], high, `${label}: ${coordinate} maximum`);
+          assert.equal(metrics[coordinate + 'Min'], Math.min(0, low), `${label}: ${coordinate} minimum includes zero`);
+          assert.equal(metrics[coordinate + 'Max'], Math.max(0, high), `${label}: ${coordinate} maximum includes zero`);
         }
       }
-      assert.ok(metrics.horizontal && metrics.vertical, `${label}: both frame axes are drawn`);
-      assert.ok(metrics.xZeroVisible && metrics.yZeroVisible, `${label}: visible zero references where needed`);
+      assert.ok(metrics.horizontal && metrics.vertical, `${label}: two axes through the true origin`);
+      assert.ok(metrics.xArrow && metrics.yArrow, `${label}: positive-direction arrowheads`);
+      assert.deepEqual(metrics.framePixels, [], `${label}: no additional rectangular frame`);
       assert.ok(metrics.radii.every(radius => radius === 0), `${label}: no endpoint circles`);
       assert.deepEqual(metrics.gaps, [], `${label}: labels never erase curve segments`);
       assert.equal(metrics.xGrid, false);
       assert.equal(metrics.yGrid, false);
       assert.equal(metrics.overflow, false, `${label}: desktop width`);
       assert.ok(metrics.texts.length > 5, `${label}: visible ticks and titles`);
+      const zeros = metrics.texts.filter(text => text.text === '0');
+      assert.equal(zeros.length, 2, `${label}: separate zero labels for X and Y`);
+      assert.ok(zeros.every(text => Math.abs((text.left + text.right) / 2 - metrics.originX) < 25
+        && Math.abs((text.top + text.bottom) / 2 - metrics.originY) < 30), `${label}: zeros sit beside the origin`);
       for (const text of metrics.texts) {
         assert.ok(text.left >= -1 && text.right <= metrics.width + 1
           && text.top >= -1 && text.bottom <= metrics.height + 1, `${label}: clipped ${JSON.stringify(text)}`);
-        assert.ok(text.right <= metrics.area.left || text.left >= metrics.area.right
-          || text.bottom <= metrics.area.top || text.top >= metrics.area.bottom,
-          `${label}: text stays outside the curve area: ${JSON.stringify(text)}`);
+        const outside = text.right <= metrics.area.left || text.left >= metrics.area.right
+          || text.bottom <= metrics.area.top || text.top >= metrics.area.bottom;
+        const besideAxis = Math.abs((text.left + text.right) / 2 - metrics.originX) < 96
+          || Math.abs((text.top + text.bottom) / 2 - metrics.originY) < 30;
+        assert.ok(outside || besideAxis, `${label}: labels sit beside the axes: ${JSON.stringify(text)}`);
       }
       assert.ok(metrics.texts.some(item => item.text === 'σ' && Math.abs(item.rotation + Math.PI / 2) < 1e-6),
         `${label}: stress title is vertical`);
@@ -244,7 +266,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths, exact extrema, vertical stress title, exterior labels, uninterrupted curves, no endpoint circles, original samples, linked selectors, raw values, PNG/CSV downloads and empty data.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths, two Cartesian axes, arrowheads, separate origin labels, no frame, asymmetric data ranges including zero, vertical stress title, uninterrupted curves, original samples, linked selectors, raw values, PNG/CSV downloads and empty data.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {
