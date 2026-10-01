@@ -46,7 +46,14 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
                 mechanical_BC=[{"loading_type": "force", "loading_mode": "static" if index % 2 else "cyclic"}],
                 plastic_strain={"equivalent_plastic_strain": [0, .005]} if index % 2 else {},
             )
-            JSONData.objects.create(owner=viewer, data=data, access_type="c")
+            if index % 4 == 0:
+                data["stress"] = {"stress_11": [0, 1]}
+                data["total_strain"] = {"strain_33": [0, .01]}
+            if index == 22:
+                data.pop("global_temperature")
+            if index in (8, 20):
+                data["discretization_count"] = 10 ** 50 + (1 if index == 20 else 0)
+            JSONData.objects.create(owner=viewer, data=data, access_type="all" if index % 2 == 0 else "c")
         long_data = valid_upload_object(
             identifier="long-identifier-" * 25,
             title="A detailed simulation title with long metadata " * 15,

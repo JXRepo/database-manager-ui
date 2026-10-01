@@ -17,14 +17,16 @@
 .charts-page h2 { color: var(--charts-ink); font-size: 16px; font-weight: 650; line-height: 1.5; }
 .charts-page h3 { color: var(--charts-ink); font-size: 13px; }
 .charts-page a { color: var(--charts-blue); }
-.charts-page a:focus-visible, .charts-page button:focus-visible, .charts-page select:focus-visible, .charts-page summary:focus-visible { outline: 3px solid #84ace0; outline-offset: 3px; }
+.charts-page a:focus-visible, .charts-page button:focus-visible, .charts-page select:focus-visible, .charts-page input:focus-visible, .charts-page summary:focus-visible { outline: 3px solid #84ace0; outline-offset: 3px; }
 .charts-page [data-feather], .charts-page svg.feather { width: 15px; height: 15px; flex-shrink: 0; }
 .charts-heading, .charts-heading-actions, .charts-scope-form { display: flex; align-items: center; }
 .charts-heading { justify-content: space-between; gap: 24px; }
 .charts-heading p { margin-top: 5px; color: var(--charts-muted); font-size: 12px; }
-.charts-heading-actions { gap: 12px; }
+.charts-heading-actions { gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .charts-scope-form { gap: 9px; }
 .charts-scope-form label { color: var(--charts-muted); font-size: 11px; }
+.charts-scope-form .charts-private-option { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; color: #34516b; }
+.charts-private-option input { width: 14px; height: 14px; accent-color: var(--charts-blue); }
 .charts-page select { max-width: 100%; border: 1px solid #d7e1eb; border-radius: 6px; padding: 8px 28px 8px 10px; background: #fff; color: #34516b; font: inherit; font-size: 12px; min-height: 35px; text-overflow: ellipsis; }
 .charts-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 35px; border: 1px solid #d7e1eb; border-radius: 6px; padding: 8px 12px; background: white; font-size: 12px; white-space: nowrap; }
 .charts-button:hover { background: #edf4fc; }
@@ -65,20 +67,37 @@
 .charts-bar:focus-visible { outline: none !important; }
 .charts-bar:focus-visible > rect:first-of-type { stroke: #659ad3; stroke-width: 1.5; }
 .charts-composition .charts-bar-svg, .charts-materials .charts-bar-svg { min-height: 132px; }
-.charts-results .charts-bar-mark { fill: #429695; }
-.charts-results .charts-bar:hover .charts-bar-mark { fill: #1b7474; }
 .charts-page .charts-coverage { color: #657b8f; font-size: 11px; margin-top: 17px; }
 .charts-chart-data { margin-top: 13px; padding-top: 13px; border-top: 1px solid #edf1f5; }
 .charts-chart-data summary { font-size: 11px; color: #56799b; cursor: pointer; }
-.charts-category-table { margin-top: 12px; max-height: 245px; overflow: auto; }
-.charts-category-table a { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 2px; border-bottom: 1px solid #f0f3f6; font-size: 11px; }
-.charts-category-table a span { overflow-wrap: anywhere; }
-.charts-category-table strong { color: #315675; font-variant-numeric: tabular-nums; }
+.charts-statistics-wrap { margin-top: 15px; }
+.charts-statistics-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 11px; }
+.charts-statistics-table caption { caption-side: top; text-align: left; color: #345571; font-size: 12px; font-weight: 600; padding: 0 0 9px; }
+.charts-statistics-table caption span { display: block; color: var(--charts-muted); font-size: 10px; font-weight: 400; margin-top: 3px; }
+.charts-statistics-table th, .charts-statistics-table td { padding: 8px 5px; border-bottom: 1px solid #edf1f5; vertical-align: middle; line-height: 1.5; }
+.charts-statistics-table th:first-child { width: 56%; text-align: left; overflow-wrap: anywhere; }
+.charts-statistics-table thead th { color: var(--charts-muted); font-size: 10px; font-weight: 500; }
+.charts-statistics-table tbody th { font-weight: 400; }
+.charts-statistics-table th:not(:first-child), .charts-statistics-table td { width: 22%; text-align: right; font-variant-numeric: tabular-nums; }
+.charts-statistics-table a:hover { text-decoration: underline; }
+.charts-chart-data .charts-statistics-wrap { max-height: 270px; overflow: auto; }
+.charts-pie-layout { display: flex; align-items: center; gap: 14px; margin: 6px 0 14px; }
+.charts-pie-svg { display: block; width: 47%; max-width: 250px; flex-shrink: 0; height: auto; }
+.charts-pie-slice path { stroke: #fff; stroke-width: 1.5px; }
+.charts-pie-slice:hover path { opacity: .8; }
+.charts-pie-slice:focus-visible { outline: none !important; }
+.charts-pie-slice:focus-visible path { stroke: #183e65; stroke-width: 4px; }
+.charts-coverage-table { flex: 1; }
+.charts-coverage-table th:first-child { width: 48%; }
+.charts-coverage-table th:not(:first-child), .charts-coverage-table td { width: 26%; }
+.charts-coverage-link { display: inline-flex; align-items: center; gap: 6px; }
+.charts-pie-key { display: inline-block; width: 10px; height: 10px; flex-shrink: 0; border: 1px solid #a9bcd0; border-radius: 2px; }
 .charts-page .charts-subtle-note { font-size: 11px; color: #657b8f; line-height: 1.7; margin-top: 13px; }
 .charts-distributions .charts-panel-heading { margin-bottom: 10px; }
 .charts-measure-form { display: flex; gap: 6px; }
 .charts-measure-form select { font-size: 11px; }
-.charts-distribution-summary { display: flex; gap: 25px; font-size: 10px; color: #7a8d9e; margin: 0 0 6px; }
+.charts-distribution-summary { display: flex; flex-wrap: wrap; gap: 8px 25px; font-size: 10px; color: #7a8d9e; margin: 0 0 6px; }
+.charts-distribution-summary > span { max-width: 100%; overflow-wrap: anywhere; }
 .charts-distribution-summary strong { font-size: 12px; font-weight: 600; color: #3e5d76; margin-left: 5px; }
 .charts-histogram-svg { display: block; width: 100%; max-width: 660px; height: auto; }
 .charts-histogram-svg .charts-axis-text, .charts-histogram-svg .charts-bin-count { font-size: 18px; }
@@ -86,7 +105,6 @@
 .charts-bin:hover .charts-bin-mark, .charts-bin:focus .charts-bin-mark { fill: #3377b8; }
 .charts-bin-label { font: 15px Arial, sans-serif; fill: #60758a; }
 .charts-distribution-caption { display: flex; justify-content: space-between; gap: 15px; font-size: 10px; color: #7c8d9c; margin-top: 8px; }
-.charts-equivalent-data { margin-top: 20px; }
 .charts-plot-empty { min-height: 258px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; padding: 25px; }
 .charts-plot-empty svg { width: 30px !important; height: 30px !important; color: #9bb0c2; }
 .charts-plot-empty strong { font-size: 13px; color: #678096; font-weight: 500; }
@@ -101,6 +119,7 @@
 .charts-summary-action::after { content: '+'; margin-left: 14px; font-size: 15px; }
 [open] > summary .charts-summary-action::after { content: '−'; }
 .charts-note-list { border-top: 1px solid var(--charts-rule); padding: 0 20px; }
+.charts-page .charts-section-help { margin: 14px 0 8px; color: var(--charts-muted); font-size: 11px; line-height: 1.7; }
 .charts-note-row { display: flex; align-items: center; justify-content: space-between; gap: 22px; padding: 15px 0; }
 .charts-note-row + .charts-note-row { border-top: 1px solid #edf1f5; }
 .charts-note-row p { margin-top: 5px; color: #7a8d9d; font-size: 11px; line-height: 1.6; }
@@ -143,6 +162,6 @@
   .charts-primary-grid, .charts-secondary-grid { gap: 16px; }
   .charts-metric { padding-left: 18px; gap: 10px; }
   .charts-heading-actions { gap: 9px; }
-  .charts-scope-form label { display: none; }
+  .charts-scope-form > label:first-of-type { display: none; }
   .charts-bar-label { font-size: 13px; }
 }

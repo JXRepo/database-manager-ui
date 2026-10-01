@@ -4,7 +4,7 @@ Summarize accessible simulations without retaining their raw curves
 
 import math
 from collections import Counter
-from decimal import Decimal, InvalidOperation, localcontext
+from decimal import Decimal, InvalidOperation, ROUND_FLOOR, localcontext
 
 from apps.dyn_api.metadata_compat import field_name, field_value, metadata_view, unwrap_single_value
 from apps.pages.advanced_search import _temperature_in_kelvin
@@ -25,6 +25,10 @@ RESULT_TITLES = {
     "calculated_equivalent": "Calculated equivalent results",
     "paired": "Stress and total strain",
     "matching_response": "Matching stress–strain components",
+}
+COVERAGE_TITLES = {
+    "matching": "With matching stress–strain components",
+    "without_matching": "Without matching stress–strain components",
 }
 NOTE_DETAILS = {
     "unequal_lengths": ("Different curve lengths", "The available series contain different numbers of points. Check the selected series on the detail page before comparing results."),
@@ -133,7 +137,9 @@ def format_number(value, precision=6):
         return "Not available"
     if value == value.to_integral_value() and abs(value) < Decimal("1e12"):
         return f"{int(value):,}"
-    return format(value.normalize(), f".{precision}g")
+    with localcontext() as context:
+        context.prec = max(context.prec, len(value.as_tuple().digits))
+        return format(value.normalize(), f".{precision}g")
 
 
 def curve_summary(data):
@@ -381,27 +387,49 @@ def distribution(records, measure):
     result = {
         "key": measure, "title": title, "unit": unit, "observation_unit": observation_unit,
         "observation_count": len(values), "object_count": object_count,
-        "excluded_objects": len(records) - object_count, "bins": [],
+        "excluded_objects": len(records) - object_count, "bins": [], "constant": False, "offset": "",
         "minimum": "Not available", "maximum": "Not available", "median": "Not available",
     }
     if not values:
         return result
     middle = len(values) // 2
-    median = values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2
+    calculation_precision = max(28, max(len(value.as_tuple().digits) for value in values) + 12,
+                                values[-1].adjusted() - min(value.as_tuple().exponent for value in values) + 12)
+    with localcontext() as context:
+        context.prec = calculation_precision
+        median = values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2
     unique = sorted(set(values))
     intervals = []
-    if len(unique) <= 8:
-        intervals = [(value, value, True) for value in unique]
+    if len(unique) == 1:
+        result["constant"] = True
+        intervals = [(unique[0], unique[0], True)]
     else:
+        bin_count = min(8, len(unique))
         with localcontext() as context:
-            context.prec = max(context.prec, max(len(value.as_tuple().digits) for value in values) + 10)
-            width = (values[-1] - values[0]) / 8
-            boundaries = [values[0], *(values[0] + width * index for index in range(1, 8)), values[-1]]
-        intervals = [(boundaries[index], boundaries[index + 1], index == 7) for index in range(8)]
+            context.prec = calculation_precision
+            width = (values[-1] - values[0]) / bin_count
+            boundaries = [values[0], *(values[0] + width * index for index in range(1, bin_count)), values[-1]]
+        intervals = [(boundaries[index], boundaries[index + 1], index == bin_count - 1)
+                     for index in range(bin_count)]
     endpoints = {value for low, high, _inclusive in intervals for value in (low, high)}
     precision = 6
-    while precision < 18 and len({format_number(value, precision) for value in endpoints}) < len(endpoints):
+    while len({format_number(value, precision) for value in endpoints}) < len(endpoints):
         precision += 3
+    precision = max(precision, len(values[0].as_tuple().digits), len(values[-1].as_tuple().digits),
+                    len(median.as_tuple().digits))
+    offset = Decimal(0)
+    with localcontext() as context:
+        context.prec = calculation_precision
+        span = values[-1] - values[0]
+        if span and abs(values[0]) > span * 10000:
+            offset_step = Decimal(10) ** (span.adjusted() + 1)
+            offset = (values[0] / offset_step).to_integral_value(rounding=ROUND_FLOOR) * offset_step
+        if offset:
+            result["offset"] = f"{'+' if offset > 0 else ''}{format_number(offset, calculation_precision)}"
+        display_endpoints = {value - offset for value in endpoints}
+    display_precision = 6
+    while len({format_number(value, display_precision) for value in display_endpoints}) < len(display_endpoints):
+        display_precision += 3
     result.update(minimum=format_number(values[0], precision), maximum=format_number(values[-1], precision),
                   median=format_number(median, precision))
     for low, high, inclusive in intervals:
@@ -410,9 +438,14 @@ def distribution(records, measure):
             label = format_number(low, precision)
         else:
             label = f"{format_number(low, precision)} – {'< ' if not inclusive else ''}{format_number(high, precision)}"
+        with localcontext() as context:
+            context.prec = calculation_precision
+            display_low = format_number(low - offset, display_precision)
+            display_high = format_number(high - offset, display_precision)
         result["bins"].append({
             "label": label, "count": len(matches), "object_count": len(set(matches)),
             "low": str(low), "high": str(high), "inclusive": inclusive,
+            "display_low": display_low, "display_high": display_high,
         })
     maximum_count = max(item["count"] for item in result["bins"])
     for item in result["bins"]:

@@ -1,4 +1,5 @@
 import copy
+from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth.models import User
@@ -27,7 +28,7 @@ class ChartsTests(TestCase):
         """
         self.client.force_login(self.viewer)
 
-    def create_object(self, identifier="example", owner=None, access="c", **changes):
+    def create_object(self, identifier="example", owner=None, access="all", **changes):
         """
         Store a small fixture with independently known statistical values
 
@@ -89,23 +90,28 @@ class ChartsTests(TestCase):
         self.assertIn("distributions", response.context)
         return response
 
-    def test_all_scopes_and_drillthrough_exclude_inaccessible_records(self):
+    def test_public_and_own_scopes_exclude_received_private_records(self):
         """
-        Private records cannot leak through any scope or category selection
+        Private uploads require an explicit opt-in and shared data stays outside statistics
         """
-        own = self.create_object("own", software="Own solver")
+        own = self.create_object("own", access="c", software="Own solver")
+        own_public = self.create_object("own-public", software="Own public solver")
         public = self.create_object("public", owner=self.other, access="all", software="Public solver")
-        shared = self.create_object("shared", owner=self.other, software="Shared solver")
+        shared = self.create_object("shared", owner=self.other, access="c", software="Shared solver")
         shared.shared_users.add(self.viewer, self.other)
-        self.create_object("hidden", owner=self.other, software="Secret solver")
-        expected = {"all": {own.pk, public.pk, shared.pk}, "mine": {own.pk},
-                    "public": {public.pk}, "shared": {shared.pk}}
-        for scope, ids in expected.items():
-            with self.subTest(scope=scope):
-                response = self.dashboard(scope=scope)
+        self.create_object("hidden", owner=self.other, access="c", software="Secret solver")
+        cases = [({}, {own_public.pk, public.pk}),
+                 ({"scope": "public", "include_private": "1"}, {own_public.pk, public.pk}),
+                 ({"scope": "mine"}, {own_public.pk}),
+                 ({"scope": "mine", "include_private": "0"}, {own_public.pk}),
+                 ({"scope": "mine", "include_private": "1"}, {own.pk, own_public.pk})]
+        for query, ids in cases:
+            with self.subTest(query=query):
+                response = self.dashboard(**query)
                 self.assertEqual(response.context["total_objects"], len(ids))
                 self.assertEqual({row["id"] for row in response.context["objects_page"]}, ids)
                 self.assertNotContains(response, "Secret solver")
+                self.assertNotContains(response, "Shared solver")
                 matching = self.client.get(response.context["matching_url"])
                 self.assertEqual(matching.context["total_objects"], response.context["matching_count"])
                 self.assertEqual({row["id"] for row in matching.context["objects_page"]}, ids)
@@ -114,6 +120,8 @@ class ChartsTests(TestCase):
                     self.assertEqual(selected.context["total_objects"], row["count"])
                     self.assertTrue({item["id"] for item in selected.context["objects_page"]} <= ids)
         self.assertEqual(self.dashboard(software="Secret solver").context["total_objects"], 0)
+        self.assertEqual(self.dashboard(software="Own solver").context["total_objects"], 0)
+        self.assertEqual(self.dashboard(scope="mine", include_private="1", software="Shared solver").context["total_objects"], 0)
         self.client.logout()
         self.assertEqual(self.client.get(reverse("charts")).status_code, 302)
 
@@ -130,6 +138,8 @@ class ChartsTests(TestCase):
         phases = {row["label"]: row["count"] for row in response.context["categories"]["phase"]["rows"]}
         software = {row["label"].casefold(): row["count"] for row in response.context["categories"]["software"]["rows"]}
         self.assertEqual(phases, {"Copper": 2, "Nickel": 1})
+        self.assertEqual({row["label"]: row["percent"] for row in response.context["categories"]["phase"]["rows"]},
+                         {"Copper": 100, "Nickel": 50})
         self.assertEqual(software, {"abaqus cae": 2, "damask": 1})
         self.assertEqual(response.context["phase_count"], 2)
 
@@ -225,6 +235,7 @@ class ChartsTests(TestCase):
         self.assertEqual(grains["observation_count"], 3)
         self.assertEqual(grains["object_count"], 1)
         self.assertEqual(grains["median"], "10")
+        self.assertFalse(grains["constant"])
         self.assertEqual(grains["bins"][0]["count"], 2)
         self.assertEqual(grains["bins"][0]["object_count"], 1)
         selected = self.client.get(grains["bins"][0]["url"])
@@ -261,6 +272,8 @@ class ChartsTests(TestCase):
                  {"measure": "temperature", "lo": "1", "hi": "2", "inclusive": "maybe"},
                  {"range": ""}, {"range": "bad"}, {"range": "temperature:1:2:maybe"},
                  {"scope": ["mine", "all"]}, {"group": "unknown"}, {"component": "fake"},
+                 {"include_private": "yes"}, {"include_private": ""}, {"include_private": ["0", "1"]},
+                 {"coverage": "unknown"}, {"coverage": ""},
                  {"material_group": "software"}, {"material_group": ["phase", "texture"]},
                  {"group": ["software", "loading_mode"]},
                  {"curve": "-1"}, {"curve": "1e2"}, {"curve": "1" * 5000}]
@@ -304,7 +317,8 @@ class ChartsTests(TestCase):
         response = self.dashboard(measure="temperature", lo="298", hi="298")
         for value in ("10", "30"):
             grains = response.context["distributions"][1]
-            bucket = next(item for item in grains["bins"] if item["low"] == value)
+            bucket = next(item for item in grains["bins"]
+                          if Decimal(item["low"]) <= Decimal(value) <= Decimal(item["high"]))
             response = self.client.get(bucket["url"])
             self.assertEqual(response.context["total_objects"], bucket["object_count"])
             self.assertEqual([row["id"] for row in response.context["objects_page"]], [wanted.pk])
@@ -524,22 +538,25 @@ class ChartsTests(TestCase):
         """
         self.create_object(software=["Abaqus CAE", "DAMASK"])
         query = {
-            "scope": "mine", "phase": "Copper", "software": ["Abaqus CAE", "DAMASK"],
+            "scope": "mine", "include_private": "1", "phase": "Copper", "software": ["Abaqus CAE", "DAMASK"],
             "result": ["stress", "matching_response"], "range": ["temperature:298:298:1", "grain_count:343:343:1"],
+            "coverage": "matching",
             "material_group": "texture", "group": "loading_mode", "measure": "grain_count",
             "curve": "999", "component": "33", "show": "objects", "page": "2",
         }
         response = self.dashboard(**query)
         self.assertEqual(response.context["total_objects"], 1)
-        self.assertEqual(len(response.context["active_filters"]), 7)
+        self.assertEqual(len(response.context["active_filters"]), 8)
         for control in ("material_group", "group", "measure"):
             params = response.context["control_params"][control]
-            for key in ("scope", "phase", "software", "result", "range"):
+            for key in ("scope", "include_private", "phase", "software", "result", "range", "coverage"):
                 expected = query[key] if isinstance(query[key], list) else [query[key]]
                 self.assertEqual([value for name, value in params if name == key], expected)
             for key in {"material_group", "group", "measure"} - {control}:
                 self.assertIn((key, query[key]), params)
             self.assertFalse({control, "curve", "component", "show", "page"} & {key for key, _value in params})
+        self.assertEqual(dict(response.context["control_params"]["scope"]),
+                         {"material_group": "texture", "group": "loading_mode", "measure": "grain_count"})
 
     def test_matching_components_count_real_pairs_and_preserve_legacy_groups(self):
         """
@@ -557,8 +574,8 @@ class ChartsTests(TestCase):
                            total_strain={"equivalent_strain": [0, .01]})
         response = self.dashboard()
         self.assertEqual(response.context["matching_count"], 4)
-        self.assertEqual({row["key"] for row in response.context["equivalent_rows"]},
-                         {"supplied_equivalent", "calculated_equivalent"})
+        self.assertEqual({row["key"] for row in response.context["output_rows"]},
+                         {"stress", "total_strain", "plastic_strain", "supplied_equivalent", "calculated_equivalent"})
         row = next(item for item in response.context["result_rows"] if item["key"] == "matching_response")
         self.assertEqual(row["count"], 4)
         selected = self.client.get(response.context["matching_url"])
@@ -579,7 +596,7 @@ class ChartsTests(TestCase):
         copper = self.create_object(stress={"stress_33": [0, 100, 40, -60]},
                                      total_strain={"strain_33": [0, .03, .01, -.02]})
         nickel = self.create_object("nickel", phase=[{"phase_name": "Nickel"}])
-        hidden = self.create_object("hidden-curve", owner=self.other, stress={"stress_33": [0, 9876543]})
+        hidden = self.create_object("hidden-curve", owner=self.other, access="c", stress={"stress_33": [0, 9876543]})
         for curve in (copper.pk, hidden.pk):
             response = self.dashboard(phase="Nickel", curve=str(curve), component="33")
             self.assertEqual([row["id"] for row in response.context["objects_page"]], [nickel.pk])
@@ -608,3 +625,185 @@ class ChartsTests(TestCase):
         self.assertEqual(notes["unequal_lengths"], 1)
         obj.refresh_from_db()
         self.assertEqual(obj.data, original)
+
+    def test_legacy_scopes_redirect_to_public_without_private_flag(self):
+        """
+        Old broad scopes cannot reintroduce owned or received private data
+        """
+        public = self.create_object("public")
+        self.create_object("private", access="c")
+        for scope in ("all", "shared"):
+            response = self.client.get(reverse("charts"), {
+                "scope": scope, "include_private": "1", "phase": "Copper", "result": "stress",
+                "coverage": "matching", "group": "loading_mode", "material_group": "texture",
+                "measure": "grain_count", "range": ["temperature:298:298:1", "grain_count:343:343:1"],
+            })
+            self.assertEqual(response.status_code, 302)
+            query = parse_qs(urlsplit(response["Location"]).query)
+            self.assertEqual(query["scope"], ["public"])
+            self.assertNotIn("include_private", query)
+            self.assertEqual(query["coverage"], ["matching"])
+            self.assertEqual(query["range"], ["temperature:298:298:1", "grain_count:343:343:1"])
+            self.assertEqual(query["phase"], ["Copper"])
+            self.assertEqual(query["material_group"], ["texture"])
+            self.assertEqual(query["group"], ["loading_mode"])
+            selected = self.client.get(response["Location"])
+            self.assertEqual([row["id"] for row in selected.context["objects_page"]], [public.pk])
+        for query in ({"scope": "all", "include_private": "yes"},
+                      {"scope": "shared", "result": "unknown"}, {"scope": ["all", "shared"]}):
+            response = self.dashboard(**query)
+            self.assertTrue(response.context["filter_errors"])
+            self.assertEqual(response.context["total_objects"], 0)
+
+    def test_private_opt_in_survives_filter_links_clear_and_pagination(self):
+        """
+        Own private statistics stay explicitly scoped throughout chart navigation
+        """
+        for index in range(12):
+            self.create_object(str(index), access="c")
+        self.create_object("other-public", owner=self.other)
+        query = {"scope": "mine", "include_private": "1", "phase": "Copper"}
+        response = self.dashboard(**query)
+        self.assertEqual(response.context["total_objects"], 12)
+        self.assertTrue(response.context["include_private"])
+        self.assertEqual(response.context["base_count"], 12)
+        self.assertEqual(parse_qs(urlsplit(response.context["clear_url"]).query),
+                         {"scope": ["mine"], "include_private": ["1"]})
+        urls = [response.context["next_url"], response.context["matching_url"],
+                response.context["material_category"]["rows"][0]["url"],
+                response.context["coverage_rows"][0]["url"]]
+        for url in urls:
+            params = parse_qs(urlsplit(url).query)
+            self.assertEqual(params["scope"], ["mine"])
+            self.assertEqual(params["include_private"], ["1"])
+            selected = self.client.get(url)
+            self.assertEqual(selected.context["total_objects"], 12)
+            self.assertTrue(all(row["identifier"] != "other-public" for row in selected.context["objects_page"]))
+        self.assertEqual(self.dashboard(scope="mine").context["total_objects"], 0)
+
+    def test_coverage_pie_is_exhaustive_and_links_preserve_the_selection(self):
+        """
+        Every selected object belongs to exactly one stress–strain coverage slice
+        """
+        matched = self.create_object("matched")
+        equivalent = self.create_object("equivalent", stress={"equivalent_stress": [0, 1]},
+                                         total_strain={"equivalent_strain": [0, .1]})
+        unmatched = self.create_object("unmatched", stress={"stress_11": [0, 1]},
+                                        total_strain={"strain_33": [0, .1]})
+        absent = self.create_object("absent", stress={}, total_strain={}, plastic_strain={})
+        conflict = self.create_object("conflict", **{"Global Temperature": 400})
+        originals = {obj.pk: copy.deepcopy(obj.data) for obj in (matched, equivalent, unmatched, absent, conflict)}
+        response = self.dashboard(scope="mine", software="Abaqus CAE", material_group="texture")
+        rows = {row["key"]: row for row in response.context["coverage_rows"]}
+        self.assertEqual((rows["matching"]["count"], rows["without_matching"]["count"]), (2, 2))
+        self.assertEqual(sum(row["count"] for row in rows.values()), response.context["total_objects"])
+        self.assertEqual(sum(row["percent"] for row in rows.values()), 100)
+        for key, ids in (("matching", {matched.pk, equivalent.pk}), ("without_matching", {unmatched.pk, absent.pk})):
+            row = rows[key]
+            selected = self.client.get(row["url"])
+            self.assertEqual(selected.context["total_objects"], row["count"])
+            self.assertEqual({item["id"] for item in selected.context["objects_page"]}, ids)
+            params = parse_qs(urlsplit(row["url"]).query)
+            self.assertEqual(params["software"], ["Abaqus CAE"])
+            self.assertEqual(params["material_group"], ["texture"])
+            self.assertEqual(params["scope"], ["mine"])
+            self.assertEqual(len(selected.context["coverage_plot"]["slices"]), 1)
+            self.assertTrue(selected.context["coverage_plot"]["slices"][0]["full_circle"])
+        self.assertEqual(len(response.context["coverage_plot"]["slices"]), 2)
+        self.assertTrue(all(not item["full_circle"] for item in response.context["coverage_plot"]["slices"]))
+        self.assertEqual(self.dashboard().context["total_objects"], 5)
+        self.assertEqual(self.dashboard().context["coverage_rows"][1]["count"], 3)
+        empty = self.dashboard(coverage=["matching", "without_matching"])
+        self.assertFalse(empty.context["filter_errors"])
+        self.assertEqual(empty.context["total_objects"], 0)
+        self.assertEqual(empty.context["coverage_plot"]["slices"], [])
+        self.assertEqual(empty.context["coverage_plot"]["total"], 0)
+        for obj in (matched, equivalent, unmatched, absent, conflict):
+            obj.refresh_from_db()
+            self.assertEqual(obj.data, originals[obj.pk])
+        without = self.dashboard(coverage="without_matching")
+        absent_row = next(row for row in without.context["objects_page"] if row["id"] == absent.pk)
+        self.assertEqual(absent_row["result_label"], "No mechanical results")
+
+    def test_histogram_uses_equal_width_intervals_and_retains_empty_bins(self):
+        """
+        Widely separated values occupy numeric intervals rather than category slots
+        """
+        for value in (1, 2, 100):
+            self.create_object(str(value), global_temperature=value)
+        response = self.dashboard()
+        distribution = response.context["distributions"][0]
+        self.assertFalse(distribution["constant"])
+        self.assertEqual([bucket["count"] for bucket in distribution["bins"]], [2, 0, 1])
+        self.assertEqual({Decimal(bucket["high"]) - Decimal(bucket["low"]) for bucket in distribution["bins"]},
+                         {Decimal(33)})
+        self.assertEqual([bucket["inclusive"] for bucket in distribution["bins"]], [False, False, True])
+        columns = response.context["histogram"]["columns"]
+        self.assertAlmostEqual(columns[0]["width"], 574 / 3 - 1, places=2)
+        self.assertEqual(columns[1]["plot_height"], 0)
+        for bucket in distribution["bins"]:
+            selected = self.client.get(bucket["url"])
+            self.assertEqual(selected.context["total_objects"], bucket["object_count"])
+
+    def test_constant_histogram_and_empty_pie_never_invent_observations(self):
+        """
+        Empty and identical values remain factual special cases for statistical charts
+        """
+        empty = self.dashboard()
+        self.assertEqual(empty.context["coverage_plot"]["total"], 0)
+        self.assertEqual(empty.context["coverage_plot"]["slices"], [])
+        self.create_object()
+        self.create_object("same-temperature")
+        response = self.dashboard()
+        distribution = response.context["distributions"][0]
+        self.assertTrue(distribution["constant"])
+        self.assertEqual(len(distribution["bins"]), 1)
+        self.assertEqual(distribution["bins"][0]["low"], "298")
+        self.assertEqual(distribution["bins"][0]["high"], "298")
+        self.assertEqual(distribution["bins"][0]["count"], 2)
+        self.assertEqual(response.context["histogram"]["columns"][0]["width"], 108)
+        self.assertEqual(len(response.context["coverage_plot"]["slices"]), 1)
+        self.assertTrue(response.context["coverage_plot"]["slices"][0]["full_circle"])
+
+    def test_large_neighboring_counts_keep_exact_extrema_and_readable_offsets(self):
+        """
+        Large integer baselines never erase small differences in histogram tables
+        """
+        baseline = 10 ** 50
+        objects = [self.create_object(str(index), discretization_count=baseline + index) for index in range(3)]
+        response = self.dashboard(measure="discretization_count")
+        item = response.context["selected_distribution"]
+        self.assertEqual(tuple(Decimal(item[key]) for key in ("minimum", "maximum", "median")),
+                         (baseline, baseline + 2, baseline + 1))
+        self.assertEqual(item["offset"], "+1e+50")
+        self.assertEqual(len({bucket["label"] for bucket in item["bins"]}), 3)
+        self.assertEqual(Decimal(item["bins"][0]["low"]), baseline)
+        self.assertEqual(Decimal(item["bins"][-1]["high"]), baseline + 2)
+        self.assertEqual(sum(bucket["count"] for bucket in item["bins"]), 3)
+        columns = response.context["histogram"]["columns"]
+        self.assertEqual(columns[0]["low_label"], "0")
+        self.assertEqual(columns[-1]["high_label"], "2")
+        self.assertEqual(len({(column["low_label"], column["high_label"]) for column in columns}), 3)
+        self.assertTrue(all(len(column["low_label"]) < 20 for column in columns))
+        for bucket in item["bins"]:
+            selected = self.client.get(bucket["url"])
+            self.assertEqual(selected.context["total_objects"], bucket["object_count"])
+        for index, obj in enumerate(objects):
+            obj.refresh_from_db()
+            self.assertEqual(obj.data["discretization_count"], baseline + index)
+
+    def test_even_median_preserves_half_steps_above_large_integer_baselines(self):
+        """
+        Decimal averaging retains fractional medians beyond the default precision
+        """
+        baseline = 10 ** 50
+        self.create_object("first", discretization_count=baseline)
+        self.create_object("second", discretization_count=baseline + 1)
+        response = self.dashboard(measure="discretization_count")
+        item = response.context["selected_distribution"]
+        self.assertEqual(item["median"], f"{baseline}.5")
+        self.assertEqual(Decimal(item["minimum"]), baseline)
+        self.assertEqual(Decimal(item["maximum"]), baseline + 1)
+        self.assertEqual(item["offset"], "+1e+50")
+        self.assertEqual(response.context["histogram"]["columns"][0]["high_label"], "0.5")
+        self.assertEqual(sum(bucket["count"] for bucket in item["bins"]), 2)

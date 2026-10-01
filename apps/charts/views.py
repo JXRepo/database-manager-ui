@@ -6,20 +6,20 @@ from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 
 from apps.pages.models import JSONData
 from .analytics import (
-    CATEGORY_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
+    CATEGORY_TITLES, COVERAGE_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
     distribution, format_number, in_bin, number, summarize_object,
 )
-from .plots import bar_plot, histogram_plot
+from .plots import bar_plot, histogram_plot, pie_plot
 
-SCOPES = {"all": "All accessible", "mine": "My uploads", "public": "Public", "shared": "Shared with me"}
-MULTIPLE_FILTERS = (*CATEGORY_TITLES, "result", "note", "range")
+SCOPES = {"public": "Public database", "mine": "My data"}
+LEGACY_SCOPES = {"all", "shared"}
+MULTIPLE_FILTERS = (*CATEGORY_TITLES, "result", "note", "range", "coverage")
 FILTER_KEYS = (*MULTIPLE_FILTERS, "measure", "lo", "hi", "inclusive")
 MATERIAL_GROUPS = ("phase", "texture")
 SETUP_GROUPS = ("software", "plastic_model", "elastic_model", "loading_type", "loading_mode")
@@ -96,7 +96,7 @@ def parse_filters(params):
     tuple
         Known parameters, errors and required numeric intervals.
     """
-    keys = ("scope", *FILTER_KEYS, *VIEW_KEYS, "page", "show")
+    keys = ("scope", "include_private", *FILTER_KEYS, *VIEW_KEYS, "page", "show")
     query = {}
     errors = []
     for key in keys:
@@ -104,13 +104,17 @@ def parse_filters(params):
             continue
         values = [value.strip() for value in params.getlist(key)]
         if key in MULTIPLE_FILTERS:
-            query[key] = list(dict.fromkeys(value for value in values if value or key == "range"))
+            query[key] = list(dict.fromkeys(value for value in values if value or key in {"range", "coverage"}))
         else:
             query[key] = values[0]
         if key not in MULTIPLE_FILTERS and len(values) > 1:
             errors.append(f"Choose one value for {key.replace('_', ' ')}.")
-    if query.get("scope", "all") not in SCOPES:
+    if query.get("scope", "public") not in {*SCOPES, *LEGACY_SCOPES}:
         errors.append("Choose an available data scope.")
+    if "include_private" in query and query["include_private"] not in {"0", "1"}:
+        errors.append("Choose whether to include private data using 0 or 1.")
+    if any(value not in COVERAGE_TITLES for value in query.get("coverage", [])):
+        errors.append("Choose an available stress–strain coverage category.")
     if any(value not in RESULT_TITLES for value in query.get("result", [])):
         errors.append("Choose an available result type.")
     if any(value not in NOTE_DETAILS for value in query.get("note", [])):
@@ -174,6 +178,10 @@ def matches_filters(record, query, intervals):
         return False
     if not set(query.get("note", [])).issubset(record["notes"]):
         return False
+    matching = bool(record["curve_components"])
+    for selected in query.get("coverage", []):
+        if matching != (selected == "matching"):
+            return False
     for _index, measure, low, high, inclusive in intervals:
         if not any(in_bin(value, low, high, inclusive) for value in record["numeric"][measure]):
             return False
@@ -197,21 +205,24 @@ def index(request):
         Rendered statistical workspace with ordinary GET navigation.
     """
     query, errors, intervals = parse_filters(request.GET)
+    if not errors and query.get("scope") in LEGACY_SCOPES:
+        return redirect(chart_url(query, {"scope": "public", "include_private": None}))
     group = query.get("group") or "software"
     if group in MATERIAL_GROUPS:
         query.setdefault("material_group", group)
         group = query["group"] = "software"
     material_group = query.get("material_group") or "phase"
-    scope = query.get("scope", "all")
-    objects = JSONData.objects.filter(
-        Q(owner=request.user) | Q(access_type="all") | Q(shared_users=request.user, access_type="c")
-    ).distinct()
+    scope = query.get("scope", "public")
+    include_private = scope == "mine" and query.get("include_private") == "1"
+    if scope == "public" and not errors:
+        query.pop("include_private", None)
+    objects = JSONData.objects.all()
     if scope == "mine":
         objects = objects.filter(owner=request.user)
-    elif scope == "public":
+        if not include_private:
+            objects = objects.filter(access_type="all")
+    else:
         objects = objects.filter(access_type="all")
-    elif scope == "shared":
-        objects = objects.filter(shared_users=request.user, access_type="c").exclude(owner=request.user)
     records = []
     base_count = 0
     if not errors:
@@ -222,6 +233,13 @@ def index(request):
                 records.append(record)
             del obj
     total = len(records)
+    coverage_rows = []
+    for key, label in COVERAGE_TITLES.items():
+        count = sum(bool(record["curve_components"]) == (key == "matching") for record in records)
+        coverage_rows.append({"key": key, "label": label, "count": count,
+                              "color": "#2874c6" if key == "matching" else "#d9e3ee",
+                              "percent": round(count * 100 / total, 1) if total else 0,
+                              "url": refine_url(query, "coverage", key)})
     categories = {}
     for key in CATEGORY_TITLES:
         category = category_rows(records, key)
@@ -250,13 +268,15 @@ def index(request):
             note_rows.append({"key": key, "title": title, "description": description, "count": count,
                               "url": refine_url(query, "note", key)})
     active_filters = []
-    for key, title in {**CATEGORY_TITLES, "result": "Results", "note": "Data note"}.items():
+    for key, title in {**CATEGORY_TITLES, "result": "Results", "note": "Data note", "coverage": "Coverage"}.items():
         for index, selected in enumerate(query.get(key, [])):
             value = selected
             if key == "result":
                 value = RESULT_TITLES.get(value, value)
             if key == "note":
                 value = NOTE_DETAILS.get(value, (value, ""))[0]
+            if key == "coverage":
+                value = COVERAGE_TITLES.get(value, value)
             remaining = query[key][:index] + query[key][index + 1:]
             active_filters.append({"label": f"{title}: {value}", "url": chart_url(query, {key: remaining})})
     for index, measure, low, high, inclusive in intervals:
@@ -265,7 +285,10 @@ def index(request):
         active_filters.append({"label": f"{title}: {value} {unit}".strip(),
                                "url": chart_url(query, {"range": query["range"][:index] + query["range"][index + 1:]})})
     page = Paginator(records, 10).get_page(query.get("page"))
-    clear_url = chart_url({"scope": scope if scope in SCOPES else "all"})
+    clear_params = {"scope": scope if scope in SCOPES else "public"}
+    if include_private:
+        clear_params["include_private"] = "1"
+    clear_url = chart_url(clear_params)
     selected_category = categories.get(group, categories["software"])
     material_category = categories.get(material_group, categories["phase"])
     measure = query.get("measure") or "temperature"
@@ -275,8 +298,11 @@ def index(request):
         excluded = {name, "curve", "component", "show", "page"}
         controls[name] = [(key, value) for key, values in query.items() if key not in excluded
                           for value in (values if isinstance(values, list) else [values])]
+    controls["scope"] = [(key, value) for key in ("material_group", "group", "measure")
+                         if (value := query.get(key))]
     context = {
-        "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "All accessible"),
+        "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "Public database"),
+        "include_private": include_private,
         "scope_options": SCOPES.items(), "base_count": base_count, "total_objects": total,
         "phase_count": len(categories["phase"]["rows"]),
         "matching_count": sum("matching_response" in record["results"] for record in records),
@@ -284,8 +310,9 @@ def index(request):
         "matching_url": refine_url(query, "result", "matching_response"),
         "plastic_url": refine_url(query, "result", "plastic_strain"),
         "categories": categories, "distributions": distributions,
+        "coverage_rows": coverage_rows, "coverage_plot": pie_plot(coverage_rows),
         "active_measure": query.get("measure", "temperature"), "result_rows": result_rows,
-        "equivalent_rows": [row for row in result_rows if row["key"] in {"supplied_equivalent", "calculated_equivalent"}],
+        "output_rows": [row for row in result_rows if row["key"] != "matching_response"],
         "note_rows": note_rows, "noted_objects": sum(bool(record["notes"]) for record in records),
         "active_filters": active_filters, "filter_errors": errors, "clear_url": clear_url,
         "objects_page": page, "objects_url": chart_url(query, objects=True),
@@ -299,7 +326,6 @@ def index(request):
         "selected_category": selected_category,
         "category_plot": bar_plot(selected_category["rows"]), "group": group,
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
-        "results_plot": bar_plot([{**row, "label": row["title"]} for row in result_rows[:3]]),
         "control_params": controls,
     }
     return render(request, "charts/index.html", context)

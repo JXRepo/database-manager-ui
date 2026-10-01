@@ -2,6 +2,7 @@
 Prepare labelled SVG charts from statistical counts and distributions
 """
 
+import math
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, localcontext
 
 from .analytics import format_number
@@ -102,13 +103,50 @@ def histogram_plot(distribution):
     slot = 574 / max(len(bins), 1)
     columns = []
     for index, bucket in enumerate(bins):
-        low_label, _separator, high_label = bucket["label"].partition(" – ")
         height = float(Decimal(bucket["count"]) / scale["maximum"]) * 146
-        width = min(slot * .66, 108)
+        width = min(slot * .66, 108) if distribution["constant"] else slot - 1
         center = 62 + slot * (index + .5)
         columns.append({**bucket, "x": round(center - width / 2, 2), "center": round(center, 2),
                         "y": round(174 - height, 2), "width": round(width, 2),
                         "plot_height": round(height, 2), "count_y": round(167 - height, 2),
-                        "low_label": low_label, "high_label": high_label.removeprefix("< ")})
+                        "low_label": bucket["display_low"], "high_label": bucket["display_high"]})
     return {"columns": columns, "ticks": [{**tick, "y": round(174 - tick["position"] * 146, 2)}
                                           for tick in scale["ticks"]]}
+
+
+def pie_plot(rows):
+    """
+    Draw disjoint object coverage slices without altering their counts
+
+    Parameters
+    ----------
+    rows : list of dict
+        Exhaustive coverage categories with counts, colors and filter links.
+
+    Returns
+    -------
+    dict
+        SVG sector paths and full-circle metadata for the current selection.
+    """
+    total = sum(row["count"] for row in rows)
+    center_x, center_y, radius = 130, 130, 96
+    slices = []
+    start = -math.pi / 2
+    for row in rows:
+        if not row["count"] or not total:
+            continue
+        angle = math.tau * row["count"] / total
+        end = start + angle
+        x_start, y_start = center_x + radius * math.cos(start), center_y + radius * math.sin(start)
+        x_end, y_end = center_x + radius * math.cos(end), center_y + radius * math.sin(end)
+        full_circle = row["count"] == total
+        if full_circle:
+            path = (f"M{center_x},{center_y - radius} "
+                    f"A{radius},{radius} 0 1 1 {center_x},{center_y + radius} "
+                    f"A{radius},{radius} 0 1 1 {center_x},{center_y - radius} Z")
+        else:
+            path = (f"M{center_x},{center_y} L{x_start:.3f},{y_start:.3f} "
+                    f"A{radius},{radius} 0 {int(angle > math.pi)} 1 {x_end:.3f},{y_end:.3f} Z")
+        slices.append({**row, "path": path, "full_circle": full_circle})
+        start = end
+    return {"slices": slices, "total": total, "center_x": center_x, "center_y": center_y, "radius": radius}

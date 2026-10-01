@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-01
-code_base: see latest git commit (Charts dataset coverage and discovery)
-next_topic: Review the deployed Charts dataset discovery flow and continue platform usability feedback
+code_base: see latest git commit (Charts statistical tables and simplified scopes)
+next_topic: Review Charts statistics and continue platform usability feedback
 files_modified:
-  - Charts aggregate panels, matching-result availability, assistant guidance and desktop checks
+  - Charts statistical charts/tables, public and own-upload scopes, assistant guidance and desktop checks
 ---
 
 # Project handoff
@@ -14,7 +14,42 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：Charts 数据覆盖与发现
+### 本轮：Charts 标准统计图、汇总表与简化范围
+
+- Charts 的中文意思是图表；用户要求看得懂的饼图、直方图和真正的汇总表，并指出
+  Data notes／Data objects 的含义不清楚。用户的新范围要求取代以前的四种 accessible scopes。
+- 默认 Public database，查询全库 access_type="all"；My data 只查询当前 owner 的公开上传，
+  勾选 Include private data（include_private=1）才加入自己的私有上传。
+  他人分享的私有对象不纳入这两个范围，普通 Search 和详情权限不变。
+  include_private 严格接受单个 0／1，错误参数返回零记录；旧 all／shared 范围链接
+  显式跳转到 Public database，保留有效图表条件和偏好，不继续统计原先的私有对象。
+- 首屏 Materials & microstructure 条形图与 Results coverage 饼图并列；第二行
+  Simulation setup 条形图与 Simulation conditions 直方图并列。
+  饼图仅将对象划分为“有／无匹配应力–应变分量”两类，互斥且总和等于当前对象数；
+  切片和表格使用 coverage=matching／without_matching 继续按同一对象做 AND 筛选。
+  多相、多软件、模型和输出类别可能重叠，不能拿它们冒充总和为 100% 的饼图。
+- 每个类别图直接显示真实 HTML 统计表：类别、Objects、% of selection，前六行可见，
+  其余可展开；输出表区分 supplied／calculated equivalents。
+  非恒定数值使用最多八个等宽 Decimal 区间，空箱保留，末箱包含最大值；恒定值
+  只画一个真实频数柱。数值表分别标出 Observations 和不同对象数量，不混淆多相观测。
+  相邻大整数与窄范围保留精确极值、中位数和筛选边界，SVG 用短的相对刻度并明确标出
+  Interval offset，表格仍显示绝对区间；避免 Decimal 默认精度抹掉大整数末位及半步中位数。
+- Statistics notes 说明单位缺失、排除值、数组差异，明确不等于验证结论；
+  Source records 是当前统计背后的具体记录列表，点标题进入详情看曲线、下载。
+  scope／私有开关改动清掉筛选和分页，保留三个图表显示偏好；图表链接、移除条件、
+  清空、分页保留有效的私有开关，JavaScript 禁用时仍可用普通 GET 表单。
+- 原始 JSON、详情曲线与完整导出保持不变；没有新依赖、迁移或外部数据发送。
+- 验证：77 项相关 Django 测试、127 项 JavaScript 测试通过，0 跳过。
+  Chromium 覆盖 1280／1440／1920 的多记录、长名称、空范围、相邻大整数和本地样例，
+  共 15 种 Charts 桌面布局；核对范围权限、私有开关、饼图互斥数量、真实统计表、
+  键盘链接、组合筛选、分页、旧范围跳转与无 JavaScript 的普通 GET。
+  样例 Copper／Abaqus CAE／Goss、298 K、343 grains、2744 cells 及详情入口一致，
+  断言样例文件字节与隔离 SQLite 的 JSON 未变；详情 19 种曲线场景、悬停与下载回归通过。
+  已查看多记录、长名称、样例与相邻大整数的实际截图。
+  日志 /tmp/charts-statistics-final.log、/tmp/charts-statistics-js.log；截图 /tmp/charts-statistics-qa。
+  推送成功不代表 Render 已完成部署，尚未确认部署完成。
+
+### 上轮：Charts 数据覆盖与发现
 
 - 用户明确批评 Charts 重复详情页的单条曲线，要求重新考虑真正有用的内容。
   本轮围绕研究人员的“库里有什么、条件覆盖在哪里、哪批数据可以进一步查看”调整现有页，

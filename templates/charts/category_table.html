@@ -1,0 +1,6 @@
+{% include 'charts/statistics_table.html' with rows=category.rows|slice:':6' caption=category.title %}
+{% if category.rows|length > 6 %}
+  <details class="charts-chart-data"><summary>View {{ category.rows|length|add:'-6' }} more categor{{ category.rows|length|add:'-6'|pluralize:'y,ies' }}</summary>
+    {% include 'charts/statistics_table.html' with rows=category.rows|slice:'6:' caption='More categories' continuation=True %}
+  </details>
+{% endif %}

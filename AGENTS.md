@@ -139,7 +139,8 @@ Current priority:
 
 ## Charts rules
 
-- Charts defaults to all accessible objects; offer My uploads, Public and Shared with me scopes using the same server-side permissions as detail pages
+- Charts defaults to Public database (all access_type="all" objects); My data includes only the current user's public uploads unless Include private data is selected, which adds their own private uploads; received private shares are excluded from these two scopes
+- Validate a single include_private=0/1 value, reset filters and pagination on scope changes while preserving chart preferences, and preserve valid private inclusion in drillthrough and clearing; valid old all/shared scope links redirect to Public database
 - Use the shared metadata compatibility view, keep raw JSON out of retained statistical summaries, and never change stored data or exports while computing statistics
 - Count each object once per case-insensitive category label; multiple phases, models, descriptions or loading conditions may contribute to multiple labels
 - Every chart link refines the current selection with AND conditions on the same object, including repeated labels and numeric intervals; counts must equal the linked result count
@@ -150,6 +151,8 @@ Current priority:
 - Charts is a dataset coverage and discovery page: show separate materials/microstructure and simulation setup category charts, condition distributions and output availability; each selection narrows the same accessible objects and leads to their detail pages
 - Keep individual stress–strain plots and curve downloads on the detail page; do not duplicate a single object's response or infer scientific comparability from aggregate metadata
 - Count matching stress–strain availability only when the same component is available in both groups, including supplied or eligible calculated equivalents; keep the legacy result=paired filter's both-groups meaning
+- Use a disjoint, exhaustive matching/without_matching stress–strain coverage pie chart; overlapping phase, software, model and output counts use bars or tables with percentages of selected objects, never misleading pie proportions
+- Show real aggregate HTML statistics tables; use equal-width numeric histogram intervals with empty bins and an inclusive final maximum, and a single frequency column for constant values; distinguish observations from distinct objects
 - Render aggregate charts as server-side SVG that remains visible without JavaScript; retain units, distinguishable ticks and exact numerical interval links, with each category's coverage and observation denominator visible
 - Do not infer physical comparability, combine mixed-unit mechanical extrema, or describe metadata and array availability as a validation pass
 - Preserve active filters and permissions in the object list and pagination; invalid filters show errors and no records, never a broader selection

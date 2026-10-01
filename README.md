@@ -371,10 +371,14 @@ in the application; this is not an indexed search designed for large datasets.
 
 ## Charts
 
-`/charts/` summarizes the signed-in user's accessible data. Choose **All
-accessible**, **My uploads**, **Public**, or **Shared with me** to change the
-scope. Public still requires a platform account; another user's unshared private
-records never contribute to counts or linked object lists.
+`/charts/` provides statistical charts and tables for two data scopes.
+**Public database** is the default and includes every public object in the
+database. **My data** includes only the signed-in user's public uploads;
+check **Include private data** to include their private uploads as well.
+Received private shares are outside these two scopes. Public still requires a
+platform account; other users' private records never contribute to statistics
+or linked lists. Old `scope=all` and `scope=shared` URLs redirect to Public
+database, preserving valid chart filters and display preferences.
 
 Charts answers which data are available and how their simulation metadata are
 distributed. Individual stress–strain curves and PNG/CSV downloads belong to
@@ -388,13 +392,28 @@ the data detail page, reached by opening an object in the filtered list.
   ignoring case and
   surrounding whitespace. Multiple phases or descriptions can place one object
   in several categories, so category counts need not sum to the object total.
+  Each bar chart has a real statistics table with object counts and percentages
+  of the currently selected objects. The first six categories are visible;
+  remaining categories are expandable. Overlapping category percentages can
+  sum to more than 100%.
 - **Simulation conditions:** temperature, grain number and discretization
   distributions, with median, range, observation count and coverage. Explicit
   Kelvin, Celsius and Fahrenheit values are converted to Kelvin before
   aggregation. Unknown units and invalid values are excluded, never counted as
   zero. Grain observations belong to individual phases; links count distinct
-  objects. A single reported value still has a column and labelled count axis.
-- **Available results:** objects with numeric stress, total strain and plastic
+  objects. Histograms use equal-width Decimal intervals, retain empty bins,
+  and include the maximum in the final interval. When all observations have
+  one value, a single frequency column is shown instead. The accompanying
+  table distinguishes observations from distinct objects in each interval.
+  Narrow ranges use short relative SVG labels with an explicit interval
+  offset; the table retains absolute bounds and links use exact Decimal
+  comparisons. Large neighboring integers and fractional medians retain
+  their source precision.
+- **Results coverage:** a pie chart divides the selected objects into two
+  exhaustive, nonoverlapping classes: with or without matching stress–strain
+  components. Slice and table links use `coverage=matching` or
+  `coverage=without_matching` and refine the same selection. A separate
+  output table counts objects with numeric stress, total strain and plastic
   strain arrays, plus supplied and calculated equivalent availability. Any
   supported component can contribute, including equivalent-only results.
   Calculation follows the detail page's six-component rules and only applies
@@ -405,16 +424,20 @@ the data detail page, reached by opening an object in the filtered list.
   equivalent results. The matching-response count links to those objects;
   stress and strain in different components alone do not qualify. The older
   `result=paired` filter keeps its existing meaning of both result groups.
-- **Data notes:** inspect unequal curve lengths, missing result units,
+- **Statistics notes:** inspect unequal curve lengths, missing result units,
   uncharted temperatures, unreadable arrays and conflicting metadata. Original
-  records remain accessible. Notes and the object list start collapsed so the
+  records remain accessible. These are notes affecting statistics, not upload
+  validation results. **Source records** lists the actual objects behind the
+  charts, with links to their details. Notes and source records start collapsed so the
   aggregate charts stay prominent; choosing a chart filter opens the matching objects.
 
-Select a bar, numeric interval or availability count to refine the current
+Select a bar, pie slice, numeric interval or table category to refine the current
 selection and open its paginated object list. All conditions must match the
 same object, including successive selections within one category or across
 numeric measures. Remove a filter individually or clear the selection; changing
-the data scope resets filters. Malformed filters show an error without broadening
+the data scope or private-data checkbox resets filters and pagination but
+preserves chart display preferences. Valid private-data inclusion is retained
+in drillthrough, filter removal, clearing and pagination. Malformed filters show an error without broadening
 the selection. Long category lists are expandable, and the charts and filtering
 remain usable without JavaScript. Plots are server-rendered SVG with explicit
 axes and units, without a chart-library network dependency. All charts describe

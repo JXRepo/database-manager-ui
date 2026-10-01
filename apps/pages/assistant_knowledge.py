@@ -185,13 +185,15 @@ TOPICS = (
     },
     {
         "id": "charts.overview", "question": "What does Charts show?",
-        "patterns": ("charts", "statistics", "统计", "图表"),
-        "answer": "Charts summarizes accessible objects. Choose All accessible, My uploads, Public or "
-                  "Shared with me to explore materials, microstructure, simulation setup, conditions "
-                  "and available results across the selected data. Click category bars, numeric intervals "
-                  "or result counts to refine the selection, then open an object to inspect its curves. Counts describe "
-                  "metadata and result availability; they do not establish physical comparability or "
-                  "scientific validity.",
+        "patterns": ("charts", "statistics", "source records", "pie chart", "histogram", "统计", "图表", "饼图", "直方图"),
+        "answer": "Charts starts with Public database, containing all public platform records. Choose "
+                  "My data to chart your own public uploads; Include private data also includes your "
+                  "own private uploads. Private records shared with you do not enter these statistics. "
+                  "Category bars, a condition histogram, a stress-strain coverage pie and statistical "
+                  "tables describe the selected dataset. Select a bar, interval or coverage category "
+                  "to narrow it. Source records lists the records behind the statistics; open one for "
+                  "its curves and downloads. Statistics notes explains missing or excluded values and "
+                  "other limitations. Counts do not establish physical comparability or scientific validity.",
         "route": "charts", "link": "Open Charts",
     },
     {
@@ -899,7 +901,9 @@ TOPICS += (
         "answer": "Each object counts once per category label, but an object with several phases or "
                   "descriptions can appear under several labels. Those category counts can add up to "
                   "more than the object total. Grain distributions count phase observations; their links "
-                  "list distinct objects. Read the displayed denominator and coverage for each chart. "
+                  "list distinct objects. The stress-strain coverage pie divides objects into matching "
+                  "and without matching components; those two counts add up to the selected total. "
+                  "Read the displayed denominator and coverage for each chart. "
                   "Matching labels alone do not prove that simulation results are physically comparable.",
         "route": "charts", "link": "Open Charts",
         "related": ("charts.filters", "charts.quality", "prepare.phase"),
@@ -908,11 +912,14 @@ TOPICS += (
     {
         "id": "charts.filters", "question": "How do Charts selections and scopes work?",
         "patterns": ("chart filters", "chart scope", "图表筛选", "统计范围"),
-        "answer": "Choose All accessible, My uploads, Public or Shared with me as the scope. Clicking "
-                  "a bar, numeric interval or availability count refines the current selection and opens "
-                  "its object list. Successive conditions must match the same object, including two "
+        "answer": "Choose Public database for all public platform records, or My data for your own "
+                  "public uploads. In My data, Include private data also includes your own private "
+                  "uploads. Received private shares remain available through Search, outside these "
+                  "statistics. Clicking a bar, numeric interval or coverage count refines the current "
+                  "selection and opens Source records. Successive conditions must match the same object, including two "
                   "labels in one category. Remove individual filters or clear them; changing scope resets "
-                  "the filters. Invalid filters show an error instead of broadening the selection.",
+                  "the filters while retaining your chart grouping and measure. Invalid filters show an "
+                  "error instead of broadening the selection.",
         "route": "charts", "link": "Open Charts",
         "related": ("charts.overview", "charts.counts", "sharing.access"),
         "examples": ("Can statistics include only my own uploads?", "What happens if I click a second category bar?", "统计图里连续点两个筛选条件是怎么组合的？"),
@@ -922,7 +929,7 @@ TOPICS += (
         "patterns": ("temperature distribution", "uncharted temperature", "温度统计"),
         "answer": "Temperature statistics convert explicit supported Kelvin, Celsius and Fahrenheit "
                   "values to Kelvin. Missing, invalid, unknown-unit and below-zero Kelvin observations "
-                  "are excluded, not counted as zero. Check Data notes and the coverage count, then open "
+                  "are excluded, not counted as zero. Check Statistics notes and the coverage count, then open "
                   "the relevant objects to inspect their supplied values and units. Stored JSON and "
                   "exports keep the original units and values.",
         "route": "charts", "link": "Open Charts",
@@ -931,10 +938,10 @@ TOPICS += (
     },
     {
         "id": "charts.quality", "question": "Do Charts or upload success prove the data is correct?",
-        "patterns": ("data notes", "data quality", "scientific validation", "数据质量", "科学正确性"),
+        "patterns": ("statistics notes", "data notes", "data quality", "scientific validation", "数据质量", "科学正确性"),
         "answer": "Upload success means the platform's required-field, identifier, sharing and resource "
                   "checks passed. It does not certify the physics or every original schema constraint. "
-                  "Charts counts describe metadata and available arrays. Expand Data notes for unequal "
+                  "Charts counts describe metadata and available arrays. Expand Statistics notes for unequal "
                   "lengths, missing units, unreadable arrays or conflicting metadata. Check units, loading "
                   "conditions and the simulation method before scientific comparison or reuse.",
         "route": "charts", "link": "Open Charts",
