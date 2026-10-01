@@ -7,7 +7,7 @@
 <main class="pc-container charts-page">
   <div class="pc-content charts-content">
     <header class="charts-heading">
-      <div><h1>Charts</h1><p>Materials, simulation conditions and mechanical response.</p></div>
+      <div><h1>Charts</h1><p>Explore dataset coverage and find simulations for your research.</p></div>
       <div class="charts-heading-actions">
         <form method="get" class="charts-scope-form" data-auto-submit>
           <label for="charts-scope">Data scope</label>
@@ -27,50 +27,31 @@
     {% if total_objects %}
       <section class="charts-metrics" aria-label="Selection overview">
         <div class="charts-metric charts-metric-total"><strong>{{ total_objects }}</strong><span>Data objects{% if active_filters %}<small>of {{ base_count }} in this scope</small>{% endif %}</span></div>
-        <div class="charts-metric"><strong>{{ phase_count }}</strong><span>Phases</span></div>
-        <a class="charts-metric" href="{{ paired_url }}"><strong>{{ paired_count }}</strong><span>With stress &amp; strain</span></a>
+        <div class="charts-metric"><strong>{{ phase_count }}</strong><span>Distinct phase names</span></div>
+        <a class="charts-metric" href="{{ matching_url }}"><strong>{{ matching_count }}</strong><span>With matching stress &amp; strain</span></a>
         <a class="charts-metric" href="{{ plastic_url }}"><strong>{{ plastic_count }}</strong><span>With plastic strain</span></a>
       </section>
+      <p class="charts-selection-help">Select a bar or interval to narrow the dataset selection. Open a data object for its curves and downloads.</p>
 
       <div class="charts-primary-grid">
-        <section class="charts-panel charts-response" aria-labelledby="response-heading">
-          <div class="charts-panel-heading"><h2 id="response-heading">Stress–strain response</h2><span class="charts-context-label">Single object</span></div>
-          <div class="charts-response-controls">
-            {% if curve_objects %}
-              <form method="get" class="charts-object-form" data-auto-submit>
-                {% for key, value in control_params.curve %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-                <label class="visually-hidden" for="curve-object">Data object</label>
-                <select id="curve-object" name="curve" title="Choose a data object">{% for object in curve_objects %}<option value="{{ object.id }}"{% if object.id == curve_record.id %} selected{% endif %}>{{ object.title|truncatechars:92 }} · {{ object.identifier|truncatechars:24 }}</option>{% endfor %}</select>
-                <button type="submit" class="charts-apply">Apply</button>
-              </form>
-              {% if component_choices %}<form method="get" class="charts-component-form" data-auto-submit>
-                {% for key, value in control_params.curve %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-                <input type="hidden" name="curve" value="{{ curve_record.id }}">
-                <label class="visually-hidden" for="curve-component">Response component</label>
-                <select id="curve-component" name="component">{% for key, label in component_choices %}<option value="{{ key }}"{% if key == selected_component %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-                <button type="submit" class="charts-apply">Apply</button>
-              </form>{% endif %}
-            {% endif %}
-          </div>
-          {% if curve %}
-            <div class="charts-curve-frame" data-curve-chart>
-              {% include 'charts/curve.html' %}
-              <output class="charts-point-tooltip" id="curve-tooltip" aria-live="polite" hidden></output>
-            </div>
-            <div class="charts-curve-caption">
-              <span><span class="charts-line-key" aria-hidden="true"></span>{{ curve.count }} paired points <span class="charts-origin">{% if curve.calculated %}Calculated equivalent{% else %}Supplied results{% endif %}</span></span>
-              <div><button type="button" id="download-curve" class="charts-text-button" hidden>Save SVG</button><a href="{% url 'json_data_detail' curve.record.id %}">Open object <i data-feather="external-link" aria-hidden="true"></i></a></div>
-            </div>
-            {% if curve.x_count != curve.y_count %}<p class="charts-curve-notice">Strain: {{ curve.x_count }} points; stress: {{ curve.y_count }}. Paired by index up to the shorter series.</p>{% endif %}
-            {% if curve.shown_count != curve.count %}<p class="charts-curve-notice">Preview shows {{ curve.shown_count }} points, retaining local extrema. Open the object for full arrays and exports.</p>{% endif %}
-            {{ curve.points|json_script:"curve-points" }}
-          {% else %}
-            <div class="charts-plot-empty"><i data-feather="activity" aria-hidden="true"></i><strong>No matching stress–strain pair</strong><p>{% if curve_objects %}Choose another object or response component.{% else %}Objects need numeric stress and total-strain series to show a response.{% endif %}</p></div>
-          {% endif %}
+        <section class="charts-panel charts-materials" aria-labelledby="materials-heading">
+          <div class="charts-panel-heading"><h2 id="materials-heading">Materials &amp; microstructure</h2></div>
+          <p class="charts-panel-purpose">Find the phases and textures represented in this selection.</p>
+          <form method="get" class="charts-chart-control" data-auto-submit>
+            {% for key, value in control_params.material_group %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+            <label for="charts-material-group">Group by</label><select id="charts-material-group" name="material_group">{% for key, title in material_options %}<option value="{{ key }}"{% if key == material_group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
+          </form>
+          {% if material_category.rows %}
+            {% include 'charts/category.html' with plot=material_plot category=material_category %}
+            <p class="charts-coverage">{{ material_category.available }} of {{ total_objects }} object{{ total_objects|pluralize }} represented</p>
+            <details class="charts-chart-data"><summary>View all {{ material_category.rows|length }} categor{{ material_category.rows|length|pluralize:"y,ies" }}</summary><div class="charts-category-table">{% for row in material_category.rows %}<a href="{{ row.url }}"><span>{{ row.label }}</span><strong>{{ row.count }}</strong></a>{% endfor %}</div></details>
+          {% else %}<div class="charts-plot-empty charts-small-empty"><strong>No {{ material_category.title|lower }} reported</strong><p>Choose another category.</p></div>{% endif %}
+          <p class="charts-subtle-note">Counts are data objects. An object can contain multiple phases or textures.</p>
         </section>
 
         <section class="charts-panel charts-composition" aria-labelledby="composition-heading">
-          <div class="charts-panel-heading"><h2 id="composition-heading">Data composition</h2></div>
+          <div class="charts-panel-heading"><h2 id="composition-heading">Simulation setup</h2></div>
+          <p class="charts-panel-purpose">Explore software, constitutive models and loading conditions.</p>
           <form method="get" class="charts-chart-control" data-auto-submit>
             {% for key, value in control_params.group %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
             <label for="charts-group">Group by</label><select id="charts-group" name="group">{% for key, title in group_options %}<option value="{{ key }}"{% if key == group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
@@ -78,9 +59,9 @@
           {% if selected_category.rows %}
             {% include 'charts/category.html' with plot=category_plot category=selected_category %}
             <p class="charts-coverage">{{ selected_category.available }} of {{ total_objects }} object{{ total_objects|pluralize }} represented</p>
-            <details class="charts-chart-data"><summary>View {{ selected_category.rows|length }} categor{{ selected_category.rows|length|pluralize:"y,ies" }}</summary><div class="charts-category-table">{% for row in selected_category.rows %}<a href="{{ row.url }}"><span>{{ row.label }}</span><strong>{{ row.count }}</strong></a>{% endfor %}</div></details>
+            <details class="charts-chart-data"><summary>View all {{ selected_category.rows|length }} categor{{ selected_category.rows|length|pluralize:"y,ies" }}</summary><div class="charts-category-table">{% for row in selected_category.rows %}<a href="{{ row.url }}"><span>{{ row.label }}</span><strong>{{ row.count }}</strong></a>{% endfor %}</div></details>
           {% else %}<div class="charts-plot-empty charts-small-empty"><strong>No {{ selected_category.title|lower }} reported</strong><p>Choose another category.</p></div>{% endif %}
-          <p class="charts-subtle-note">An object may appear in more than one category.</p>
+          <p class="charts-subtle-note">Counts are data objects. An object can report more than one model or loading condition.</p>
         </section>
       </div>
 
@@ -100,7 +81,9 @@
         <section class="charts-panel charts-results" aria-labelledby="results-heading">
           <div class="charts-panel-heading"><h2 id="results-heading">Available results</h2><span class="charts-context-label">{{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           {% include 'charts/category.html' with plot=results_plot category=None %}
-          <details class="charts-chart-data charts-equivalent-data"><summary>Equivalent results</summary><div class="charts-category-table">{% for row in result_rows|slice:'3:' %}<a href="{{ row.url }}"><span>{{ row.title }}</span><strong>{{ row.count }}</strong></a>{% endfor %}</div><p class="charts-subtle-note">Supplied and calculated results can overlap across result groups.</p></details>
+          <p class="charts-coverage">Object counts out of {{ total_objects }}. Select the output you need.</p>
+          <details class="charts-chart-data charts-equivalent-data"><summary>Equivalent results</summary><div class="charts-category-table">{% for row in equivalent_rows %}<a href="{{ row.url }}"><span>{{ row.title }}</span><strong>{{ row.count }}</strong></a>{% endfor %}</div><p class="charts-subtle-note">Supplied and calculated results can overlap across result groups.</p></details>
+          <p class="charts-subtle-note">Availability describes the reported outputs. It does not establish physical comparability.</p>
         </section>
       </div>
 
@@ -112,7 +95,7 @@
         </table></div><nav class="charts-pagination" aria-label="Data object pages"><span>{{ objects_page.start_index }}–{{ objects_page.end_index }} of {{ total_objects }} object{{ total_objects|pluralize }}</span><div>{% if previous_url %}<a href="{{ previous_url }}" rel="prev">Previous</a>{% endif %}<span>Page {{ objects_page.number }} of {{ objects_page.paginator.num_pages }}</span>{% if next_url %}<a href="{{ next_url }}" rel="next">Next</a>{% endif %}</div></nav></div>
       </details>
     {% else %}
-      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if active_filters or filter_errors %}No objects match this selection{% else %}Your data overview starts here{% endif %}</h2><p>{% if active_filters or filter_errors %}Remove a filter or change the data scope.{% else %}Choose another scope or upload simulation data to explore its materials and response.{% endif %}</p><div>{% if active_filters or filter_errors %}<a class="charts-button charts-button-primary" href="{{ clear_url }}">Clear filters</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
+      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if active_filters or filter_errors %}No objects match this selection{% else %}Your data overview starts here{% endif %}</h2><p>{% if active_filters or filter_errors %}Remove a filter or change the data scope.{% else %}Choose another scope or upload simulation data to explore available materials, simulation conditions and results.{% endif %}</p><div>{% if active_filters or filter_errors %}<a class="charts-button charts-button-primary" href="{{ clear_url }}">Clear filters</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
     {% endif %}
     <p class="charts-page-footnote"><i data-feather="lock" aria-hidden="true"></i>Only data you can access.</p>
   </div>

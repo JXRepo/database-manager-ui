@@ -187,8 +187,9 @@ TOPICS = (
         "id": "charts.overview", "question": "What does Charts show?",
         "patterns": ("charts", "statistics", "统计", "图表"),
         "answer": "Charts summarizes accessible objects. Choose All accessible, My uploads, Public or "
-                  "Shared with me. The stress-strain preview shows one object and matching component. "
-                  "Click category bars or numeric intervals to refine the selection. Counts describe "
+                  "Shared with me to explore materials, microstructure, simulation setup, conditions "
+                  "and available results across the selected data. Click category bars, numeric intervals "
+                  "or result counts to refine the selection, then open an object to inspect its curves. Counts describe "
                   "metadata and result availability; they do not establish physical comparability or "
                   "scientific validity.",
         "route": "charts", "link": "Open Charts",
@@ -197,10 +198,12 @@ TOPICS = (
         "id": "charts.curves", "question": "How are curve previews prepared?",
         "related": ("manage.formats", "detail.no_plot", "charts.save"),
         "patterns": ("equivalent", "curve length", "different lengths", "preview", "等效", "长度不同", "曲线长度"),
-        "answer": "Supplied equivalent arrays take precedence. An equivalent may be calculated only when "
+        "answer": "Curves are shown on each data object's detail page. Use Charts bars or intervals to "
+                  "find relevant objects, then open an object from the matching list. Supplied equivalent "
+                  "arrays take precedence. An equivalent may be calculated only when "
                   "its field is absent and all six required components are available. Unequal arrays pair "
-                  "by index to the shorter length. Charts previews over 2,400 points may be reduced, with "
-                  "the displayed count stated. Curve CSV keeps each full series with blank cells after "
+                  "by index to the shorter length, keeping the original sample order. Curve CSV keeps "
+                  "each full series with blank cells after "
                   "a shorter column ends; no values are dropped or interpolated to equalize columns. "
                   "Calculated equivalent columns are labelled and do not overwrite supplied arrays. "
                   "The CSV index starts at zero and means array position, not time. "
@@ -941,10 +944,10 @@ TOPICS += (
     {
         "id": "charts.save", "question": "How do I save a chart image or its full data?",
         "patterns": ("save svg", "chart image", "保存图像", "导出图片"),
-        "answer": "Use Save SVG on the Charts stress-strain response for a labelled image of the "
-                  "selected object and component. A reduced preview states its displayed point count "
-                  "in the SVG. Detail plots also offer PNG images. For the full numeric series use "
-                  "curve CSV, and for complete metadata and arrays use JSON. Saving an image does not "
+        "answer": "Charts explores dataset coverage with counts and distributions. Select a bar or "
+                  "interval and open an object from the matching list. Its detail plot offers Download "
+                  "PNG for the selected X/Y curve. For the full numeric series use curve CSV, and for "
+                  "complete metadata and arrays use JSON. Charts has no Save SVG control. Saving an image does not "
                   "create a new simulation or change the original data.",
         "route": "charts", "link": "Open Charts",
         "related": ("manage.formats", "manage.download", "charts.curves"),

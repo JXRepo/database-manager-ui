@@ -376,18 +376,16 @@ accessible**, **My uploads**, **Public**, or **Shared with me** to change the
 scope. Public still requires a platform account; another user's unshared private
 records never contribute to counts or linked object lists.
 
-- **Stress–strain response:** a prominent plot of one selected accessible
-  object's matching stress and total-strain component, with equivalent results
-  preferred when available. Switch objects or components, inspect points with
-  the pointer or arrow keys, and save a labelled SVG. The default object must
-  have a matching pair; simply supplying two different components does not count.
-  Original sample order is preserved, including cyclic paths. Unequal arrays
-  pair by index to the shorter length and show both lengths. Previews above
-  2,400 points retain endpoints and local extrema, with the reduced count stated
-  on the page and in the SVG; the object's full arrays and exports are unchanged.
-- **Data composition:** switch one horizontal chart between phase, software,
-  elastic/plastic model, loading type/mode and texture counts. Each object
-  counts once per label, ignoring case and
+Charts answers which data are available and how their simulation metadata are
+distributed. Individual stress–strain curves and PNG/CSV downloads belong to
+the data detail page, reached by opening an object in the filtered list.
+
+- **Materials & microstructure:** phase and texture counts show the materials
+  and microstructure descriptions represented by the selected objects.
+- **Simulation setup:** a separate chart shows software, elastic/plastic
+  models and loading type/mode counts. Both category selectors preserve the
+  other selection and all active filters. Each object counts once per label,
+  ignoring case and
   surrounding whitespace. Multiple phases or descriptions can place one object
   in several categories, so category counts need not sum to the object total.
 - **Simulation conditions:** temperature, grain number and discretization
@@ -402,10 +400,15 @@ records never contribute to counts or linked object lists.
   Calculation follows the detail page's six-component rules and only applies
   when the equivalent field is absent. These counts describe availability, not
   physical comparability or a validation pass.
+- **Selection overview:** totals include distinct phase names and objects with
+  at least one matching stress and total-strain component, including available
+  equivalent results. The matching-response count links to those objects;
+  stress and strain in different components alone do not qualify. The older
+  `result=paired` filter keeps its existing meaning of both result groups.
 - **Data notes:** inspect unequal curve lengths, missing result units,
   uncharted temperatures, unreadable arrays and conflicting metadata. Original
   records remain accessible. Notes and the object list start collapsed so the
-  charts stay prominent; choosing a chart filter opens the matching objects.
+  aggregate charts stay prominent; choosing a chart filter opens the matching objects.
 
 Select a bar, numeric interval or availability count to refine the current
 selection and open its paginated object list. All conditions must match the
@@ -414,9 +417,9 @@ numeric measures. Remove a filter individually or clear the selection; changing
 the data scope resets filters. Malformed filters show an error without broadening
 the selection. Long category lists are expandable, and the charts and filtering
 remain usable without JavaScript. Plots are server-rendered SVG with explicit
-axes and units, without a chart-library network dependency. Point readouts keep
-source precision; narrow ranges around large values use labelled axis offsets.
-Supplied and calculated curve origins remain visible, including in SVG downloads.
+axes and units, without a chart-library network dependency. All charts describe
+the same currently selected objects; applying more conditions narrows that
+selection. Original data, detail curves and complete exports are unchanged.
 
 Statistics use the shared metadata compatibility view without changing stored
 JSON, detail plots or exports. Functional conflicts never choose a value

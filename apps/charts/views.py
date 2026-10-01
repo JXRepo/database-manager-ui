@@ -16,12 +16,14 @@ from .analytics import (
     CATEGORY_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
     distribution, format_number, in_bin, number, summarize_object,
 )
-from .plots import bar_plot, curve_preview, histogram_plot
+from .plots import bar_plot, histogram_plot
 
 SCOPES = {"all": "All accessible", "mine": "My uploads", "public": "Public", "shared": "Shared with me"}
 MULTIPLE_FILTERS = (*CATEGORY_TITLES, "result", "note", "range")
 FILTER_KEYS = (*MULTIPLE_FILTERS, "measure", "lo", "hi", "inclusive")
-VIEW_KEYS = ("group", "curve", "component")
+MATERIAL_GROUPS = ("phase", "texture")
+SETUP_GROUPS = ("software", "plastic_model", "elastic_model", "loading_type", "loading_mode")
+VIEW_KEYS = ("material_group", "group", "curve", "component")
 
 
 def chart_url(query, changes=None, objects=False):
@@ -117,6 +119,8 @@ def parse_filters(params):
         errors.append("Choose temperature, grain number or discretization count.")
     if query.get("group") and query["group"] not in CATEGORY_TITLES:
         errors.append("Choose an available category.")
+    if query.get("material_group") and query["material_group"] not in MATERIAL_GROUPS:
+        errors.append("Choose phase or texture for materials and microstructure.")
     if query.get("component") and query["component"] not in {"equivalent", "11", "22", "33", "12", "13", "23"}:
         errors.append("Choose an available response component.")
     if query.get("curve") and (len(query["curve"]) > 20 or not query["curve"].isascii()
@@ -193,6 +197,11 @@ def index(request):
         Rendered statistical workspace with ordinary GET navigation.
     """
     query, errors, intervals = parse_filters(request.GET)
+    group = query.get("group") or "software"
+    if group in MATERIAL_GROUPS:
+        query.setdefault("material_group", group)
+        group = query["group"] = "software"
+    material_group = query.get("material_group") or "phase"
     scope = query.get("scope", "all")
     objects = JSONData.objects.filter(
         Q(owner=request.user) | Q(access_type="all") | Q(shared_users=request.user, access_type="c")
@@ -257,49 +266,40 @@ def index(request):
                                "url": chart_url(query, {"range": query["range"][:index] + query["range"][index + 1:]})})
     page = Paginator(records, 10).get_page(query.get("page"))
     clear_url = chart_url({"scope": scope if scope in SCOPES else "all"})
-    group = query.get("group") or "phase"
-    selected_category = categories.get(group, categories["phase"])
+    selected_category = categories.get(group, categories["software"])
+    material_category = categories.get(material_group, categories["phase"])
     measure = query.get("measure") or "temperature"
     selected_distribution = next((item for item in distributions if item["key"] == measure), distributions[0])
-    curve_objects = [record for record in records if record["curve_components"]]
-    selected_record = next((record for record in curve_objects if str(record["id"]) == query.get("curve")), None)
-    if not query.get("curve"):
-        selected_record = next(iter(curve_objects), None)
-    curve, component_choices = None, []
-    if selected_record:
-        source = objects.filter(pk=selected_record["id"]).only("data").first()
-        if source:
-            curve, component_choices = curve_preview(source.data, query.get("component", ""))
-            if curve:
-                curve["record"] = selected_record
-            del source
     controls = {}
-    for name, excluded in {"curve": {"curve", "component", "show", "page"},
-                           "group": {"group", "show", "page"}, "measure": {"measure", "show", "page"}}.items():
+    for name in ("material_group", "group", "measure"):
+        excluded = {name, "curve", "component", "show", "page"}
         controls[name] = [(key, value) for key, values in query.items() if key not in excluded
                           for value in (values if isinstance(values, list) else [values])]
     context = {
         "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "All accessible"),
         "scope_options": SCOPES.items(), "base_count": base_count, "total_objects": total,
         "phase_count": len(categories["phase"]["rows"]),
-        "paired_count": sum("paired" in record["results"] for record in records),
+        "matching_count": sum("matching_response" in record["results"] for record in records),
         "plastic_count": sum("plastic_strain" in record["results"] for record in records),
-        "paired_url": refine_url(query, "result", "paired"),
+        "matching_url": refine_url(query, "result", "matching_response"),
         "plastic_url": refine_url(query, "result", "plastic_strain"),
         "categories": categories, "distributions": distributions,
         "active_measure": query.get("measure", "temperature"), "result_rows": result_rows,
+        "equivalent_rows": [row for row in result_rows if row["key"] in {"supplied_equivalent", "calculated_equivalent"}],
         "note_rows": note_rows, "noted_objects": sum(bool(record["notes"]) for record in records),
         "active_filters": active_filters, "filter_errors": errors, "clear_url": clear_url,
         "objects_page": page, "objects_url": chart_url(query, objects=True),
         "objects_open": bool(active_filters or query.get("show") == "objects"),
         "previous_url": chart_url(query, {"page": page.previous_page_number()}, objects=True) if page.has_previous() else "",
         "next_url": chart_url(query, {"page": page.next_page_number()}, objects=True) if page.has_next() else "",
-        "group_options": CATEGORY_TITLES.items(), "selected_category": selected_category,
+        "material_options": [(key, CATEGORY_TITLES[key]) for key in MATERIAL_GROUPS],
+        "material_group": material_group, "material_category": material_category,
+        "material_plot": bar_plot(material_category["rows"]),
+        "group_options": [(key, CATEGORY_TITLES[key]) for key in SETUP_GROUPS],
+        "selected_category": selected_category,
         "category_plot": bar_plot(selected_category["rows"]), "group": group,
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
         "results_plot": bar_plot([{**row, "label": row["title"]} for row in result_rows[:3]]),
-        "curve": curve, "curve_objects": curve_objects, "curve_record": selected_record,
-        "component_choices": component_choices, "selected_component": query.get("component") or (curve or {}).get("component", ""),
         "control_params": controls,
     }
     return render(request, "charts/index.html", context)

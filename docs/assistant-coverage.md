@@ -17,7 +17,7 @@ or train on questions or uploaded data.
 | Access and sharing | 8 | Public/private access, adding and removing recipients, received objects, history, visibility changes, reuse rights, unavailable links | `apps/pages/views.py`, `apps/pages/models.py`, detail and Share templates |
 | My Data | 10 | Own uploads, filters, selection, downloads, deletion, editing limits, export formats, choosing CSV columns, CSV failures, recovery limits | `apps/pages/views.py`, `apps/pages/mechanical_csv.py`, My Data/detail templates |
 | Reading data and plots | 6 | Metadata display, tensor arrows, strain illustration, missing curves, units, analysis limits | Detail template, metadata compatibility and mechanical curve helpers, README detail rules |
-| Charts | 7 | Overview, preview provenance, counting, combined filters, temperature coverage, quality notes, image/data exports | `apps/charts/analytics.py`, `apps/charts/plots.py`, `apps/charts/views.py`, Charts templates |
+| Charts | 7 | Dataset coverage, counting, combined filters, temperature coverage, quality notes, opening detail curves and their image/data exports | `apps/charts/analytics.py`, `apps/charts/plots.py`, `apps/charts/views.py`, Charts and detail templates |
 | Account | 13 | Registration, password change/recovery, ORCID connection/setup/profile/disconnection/failure, sessions, settings, notifications, deletion limits, login failures | `apps/pages/forms.py`, `apps/pages/auth_views.py`, `apps/pages/orcid_auth.py`, `apps/pages/orcid_profile.py`, `apps/pages/session_policy.py`, account views/templates |
 | Current object | 6 | Summary, phase, software, mechanical boundaries, available curves, access | Authorized assistant branches in `apps/pages/views.py` and shared metadata helpers |
 
@@ -64,6 +64,8 @@ work without the model; natural-language coverage is not guaranteed.
   exportable curves. CSV is not a native XLSX workbook.
 - Upload success and Charts availability do not establish scientific correctness.
   Missing results, units and intermediate tensor steps are not invented.
+- Charts summarizes the accessible dataset. Individual curves and PNG/CSV
+  controls are on data detail pages; Charts does not offer Save SVG.
 - The assistant does not inspect selected files, execute searches or data
   operations, run simulations, fit material properties, contact administrators
   or transfer to a human. Upload allowances and quota guidance read active settings.

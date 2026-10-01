@@ -24,6 +24,7 @@ RESULT_TITLES = {
     "supplied_equivalent": "Supplied equivalent results",
     "calculated_equivalent": "Calculated equivalent results",
     "paired": "Stress and total strain",
+    "matching_response": "Matching stress–strain components",
 }
 NOTE_DETAILS = {
     "unequal_lengths": ("Different curve lengths", "The available series contain different numbers of points. Check the selected series on the detail page before comparing results."),
@@ -201,6 +202,8 @@ def curve_summary(data):
     if len(lengths) > 1:
         notes.add("unequal_lengths")
     paired_components = components.get("stress", set()) & components.get("total_strain", set())
+    if paired_components:
+        available.add("matching_response")
     return available, lengths, notes, paired_components
 
 
@@ -279,7 +282,9 @@ def summarize_object(obj):
     points = "No numeric series"
     if lengths:
         points = f"{min(lengths):,} points" if len(lengths) == 1 else f"{min(lengths):,}–{max(lengths):,} points"
-    result_label = "Stress + strain" if "paired" in available else "Results supplied" if available else "No mechanical results"
+    result_label = ("Stress + strain" if "matching_response" in available else
+                    "Both groups supplied" if "paired" in available else
+                    "Results supplied" if available else "No mechanical results")
     return {
         "id": obj.pk, "title": title, "identifier": identifier or f"Object {obj.pk}",
         "categories": categories, "numeric": numeric, "results": available, "notes": notes,

@@ -1,5 +1,5 @@
 <svg class="charts-histogram-svg" viewBox="0 0 660 240" role="group" aria-label="{{ item.title }} distribution{% if item.unit %} in {{ item.unit }}{% endif %}; counts are {{ item.observation_unit }}" xmlns="http://www.w3.org/2000/svg">
-  <text x="62" y="12" class="charts-axis-text">{{ item.observation_unit|capfirst }}</text>
+  <text x="62" y="18" class="charts-axis-text">{{ item.observation_unit|capfirst }}</text>
   {% for tick in histogram.ticks %}<line x1="62" x2="636" y1="{{ tick.y }}" y2="{{ tick.y }}" class="charts-grid-line"/><text x="49" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
   {% for bin in histogram.columns %}
     {% if bin.count %}<a class="charts-bin" href="{{ bin.url }}" aria-label="{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }}. View {{ bin.object_count }} objects."><title>{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }} from {{ bin.object_count }} objects</title>{% else %}<g>{% endif %}

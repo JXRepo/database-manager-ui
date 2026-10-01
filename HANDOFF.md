@@ -2,19 +2,51 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-01
-code_base: see latest git commit (stable detail curve hover and precise sample readouts)
-next_topic: Review the deployed detail curves and continue platform usability feedback
+code_base: see latest git commit (Charts dataset coverage and discovery)
+next_topic: Review the deployed Charts dataset discovery flow and continue platform usability feedback
 files_modified:
-  - Detail curve hover detection, enlarged active dot, precise X/Y tooltip and browser checks
+  - Charts aggregate panels, matching-result availability, assistant guidance and desktop checks
 ---
 
 # Project handoff
 
 ## 当前状态
 
-**详情曲线靠近整段蓝线即可显示真实采样点的大蓝点、白边，以及精确的 X/Y 数值提示。**
+**Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：稳定的曲线悬停和明显的选中点
+### 本轮：Charts 数据覆盖与发现
+
+- 用户明确批评 Charts 重复详情页的单条曲线，要求重新考虑真正有用的内容。
+  本轮围绕研究人员的“库里有什么、条件覆盖在哪里、哪批数据可以进一步查看”调整现有页，
+  不再把随机一个对象的应力–应变预览作为首屏主图。
+- 首屏并列 Materials & microstructure（Phase／Texture）和 Simulation setup
+  （Software／Elastic model／Plastic model／Loading type／Loading mode），
+  下面保留 Simulation conditions（温度、晶粒数、离散数）和 Available results。
+  每个图的对象数、覆盖分母或观测单位可见；柱形、区间与结果数可点击，打开匹配对象列表。
+- 类别、范围、结果与备注条件继续在同一对象上逐项收紧；三种图表选择器独立保留偏好及
+  全部活跃条件。旧 group=phase／texture 书签映射到材料图；旧 curve/component 参数只做
+  既有输入检查，不读出单对象曲线，也不会绕过权限或已选过滤。
+- 新增 result=matching_response，仅计应力与总应变的同一分量可用的对象，
+  包括供应的或符合既有规则的可计算等效量。顶部对应计数可点击；
+  旧 result=paired 的“两组都有数据”语义保留，不把它冒称为匹配曲线。
+  Phases 标签改为 Distinct phase names，避免与多相晶粒观测数量混淆。
+- templates/charts/index.html、charts.css、charts.js 和 apps/charts/views.py 移除单对象曲线
+  控件、交互及额外读取；删除只供该预览使用的 curve.html 和 plots.py 函数。
+  详情绘图、原始 JSON、完整导出、访问控制、数据库和依赖不变。
+- 助手 charts.overview／charts.curves／charts.save 保留主题 ID，答案改为
+  通过 Charts 查找对象，再到详情查看曲线或下载 PNG／CSV／JSON；不再宣传 Charts Save SVG。
+- 70 项相关 Django 测试、127 项 JavaScript 测试通过，0 跳过；最后调整数字字号及标签位置后，
+  再通过全部 31 项 Charts 测试。浏览器覆盖 1280／1440／1920 桌面宽度的多记录、长名称、
+  空状态，以及真实样例共 12 种布局；核对四幅聚合图、数字可读且未裁切、键盘链接、
+  选择器互相保留、连续组合筛选、数量一致、权限、分页、无 JavaScript 普通表单与详情入口。
+  样例只写入隔离 SQLite：Copper／Abaqus CAE／Goss、298 K、343 grains、2744 cells
+  与五项叠加筛选均核对一致；测试断言原文件及存储 JSON 未变。
+  已查看真实样例、多记录和长名称桌面截图，详情页原有曲线、悬停与下载回归也全部通过。
+  日志 /tmp/charts-discovery-final.log、/tmp/charts-discovery-browser-final.log、/tmp/charts-discovery-js.log；
+  桌面截图位于 /tmp/charts-discovery-qa。
+  临时文件不随 Git 同步；推送成功不代表 Render 已完成部署。
+
+### 上轮：稳定的曲线悬停和明显的选中点
 
 - 用户反馈鼠标在蓝线上有时显示提示、有时不显示，要求突出显示一个大点并展示信息。
   根因是 Chart.js 默认 nearest + intersect=true，仅命中不可见采样点的 10px 范围，
@@ -220,7 +252,7 @@ files_modified:
 - Python 命令前用 PyCharm 环境工具解析本机解释器；DEBUG=True、隔离 SQLite；不使用生产凭证。
   后续助手检查需先 prepare_assistant_model，浏览器需 Chromium 与支持 WebSocket 的 Node，不能跳过。
 
-### Charts 当前实现与统计口径
+### Charts 上一版实现与统计口径（单对象预览和首屏布局已由本轮替代）
 
 - `/charts/` 仍用现有路由；`apps/charts/views.py` 管权限、筛选和分页，
   `apps/charts/analytics.py` 从共享 metadata compatibility view 提取精简统计。
@@ -264,7 +296,7 @@ files_modified:
 - 桌面布局用 `.charts-page` 的 padding-top 给导航留空间，不用会塌陷到 body 的 margin-top；
   浏览器验证还检查标题实际未被导航遮挡。
 
-### Charts 本轮验证
+### Charts 上一版验证
 
 - 83 项相关 Django 测试通过，覆盖 Charts、共享字段兼容、上传兼容、详情曲线、CSV 和导航。
   其中包括真实 Chromium 连接隔离 SQLite 的浏览器测试；日志 `/tmp/charts-refined-backend.log`。

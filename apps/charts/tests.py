@@ -106,6 +106,9 @@ class ChartsTests(TestCase):
                 self.assertEqual(response.context["total_objects"], len(ids))
                 self.assertEqual({row["id"] for row in response.context["objects_page"]}, ids)
                 self.assertNotContains(response, "Secret solver")
+                matching = self.client.get(response.context["matching_url"])
+                self.assertEqual(matching.context["total_objects"], response.context["matching_count"])
+                self.assertEqual({row["id"] for row in matching.context["objects_page"]}, ids)
                 for row in response.context["categories"]["software"]["rows"]:
                     selected = self.client.get(row["url"])
                     self.assertEqual(selected.context["total_objects"], row["count"])
@@ -161,7 +164,7 @@ class ChartsTests(TestCase):
         obj.data = raw
         obj.save()
         response = self.dashboard()
-        self.assertEqual(response.context["paired_count"], 1)
+        self.assertEqual(response.context["matching_count"], 1)
         self.assertEqual(response.context["distributions"][0]["median"], "298")
         self.assertEqual(response.context["categories"]["software"]["rows"][0]["count"], 1)
         obj.refresh_from_db()
@@ -258,6 +261,8 @@ class ChartsTests(TestCase):
                  {"measure": "temperature", "lo": "1", "hi": "2", "inclusive": "maybe"},
                  {"range": ""}, {"range": "bad"}, {"range": "temperature:1:2:maybe"},
                  {"scope": ["mine", "all"]}, {"group": "unknown"}, {"component": "fake"},
+                 {"material_group": "software"}, {"material_group": ["phase", "texture"]},
+                 {"group": ["software", "loading_mode"]},
                  {"curve": "-1"}, {"curve": "1e2"}, {"curve": "1" * 5000}]
         for query in cases:
             with self.subTest(query=query):
@@ -375,7 +380,7 @@ class ChartsTests(TestCase):
                            total_strain={"equivalent_strain": [0, 0.1]}, plastic_strain={})
         response = self.dashboard()
         counts = {row["key"]: row["count"] for row in response.context["result_rows"]}
-        self.assertEqual(response.context["paired_count"], 2)
+        self.assertEqual(response.context["matching_count"], 2)
         self.assertEqual(counts["stress"], 2)
         self.assertEqual(counts["plastic_strain"], 1)
         self.assertEqual(counts["supplied_equivalent"], 1)
@@ -401,7 +406,7 @@ class ChartsTests(TestCase):
         counts = {row["key"]: row["count"] for row in response.context["note_rows"]}
         self.assertEqual(counts["unequal_lengths"], 1)
         self.assertEqual(counts["result_units"], 1)
-        self.assertEqual(response.context["paired_count"], 1)
+        self.assertEqual(response.context["matching_count"], 1)
         notes = [row for row in response.context["note_rows"] if row["key"] == "unequal_lengths"]
         selected = self.client.get(notes[0]["url"])
         self.assertEqual(selected.context["objects_page"][0]["id"], obj.pk)
@@ -414,7 +419,7 @@ class ChartsTests(TestCase):
         self.create_object(stress={"stress_11": [False, True], "stress_22": ["NaN", 1]},
                            total_strain={"strain_11": [0, None]}, plastic_strain={})
         response = self.dashboard()
-        self.assertEqual(response.context["paired_count"], 0)
+        self.assertEqual(response.context["matching_count"], 0)
         counts = {row["key"]: row["count"] for row in response.context["result_rows"]}
         self.assertEqual(counts["stress"], 0)
         self.assertEqual(counts["total_strain"], 0)
@@ -473,120 +478,133 @@ class ChartsTests(TestCase):
         self.assertNotContains(response, "0 / 0")
         self.assertTrue(all(not group["rows"] for group in response.context["categories"].values()))
 
-    def test_curve_preview_uses_one_selected_accessible_object_in_original_order(self):
+    def test_material_and_setup_preferences_are_independent(self):
         """
-        A cyclic response preserves sample order without combining objects
+        Materials and simulation setup expose separate aggregate selections
         """
-        obj = self.create_object(stress={"stress_33": [0, 100, 40, -60]},
-                                 total_strain={"strain_33": [0, .03, .01, -.02]})
-        hidden = self.create_object("hidden-curve", owner=self.other,
-                                    stress={"stress_33": [0, 9876543]})
-        response = self.dashboard(curve=str(obj.pk), component="33")
-        curve = response.context["curve"]
-        self.assertEqual(curve["record"]["id"], obj.pk)
-        self.assertEqual([point["x"] for point in curve["points"]], [0, .03, .01, -.02])
-        self.assertEqual([point["y"] for point in curve["points"]], [0, 100, 40, -60])
-        self.assertContains(response, 'class="charts-curve-svg"')
-        self.assertNotContains(response, "9876543")
-        selected = self.dashboard(curve=str(hidden.pk))
-        self.assertIsNone(selected.context["curve"])
-        self.assertNotContains(selected, "hidden-curve")
+        self.create_object()
+        response = self.dashboard()
+        self.assertEqual(response.context["material_group"], "phase")
+        self.assertEqual(response.context["material_category"]["rows"][0]["label"], "Copper")
+        self.assertEqual(response.context["group"], "software")
+        self.assertEqual(response.context["selected_category"]["rows"][0]["label"], "Abaqus CAE")
+        self.assertEqual(dict(response.context["material_options"]), {"phase": "Phase", "texture": "Texture"})
+        self.assertEqual(set(dict(response.context["group_options"])),
+                         {"software", "elastic_model", "plastic_model", "loading_type", "loading_mode"})
+        selected = self.dashboard(material_group="texture", group="loading_mode")
+        self.assertEqual(selected.context["material_category"]["rows"][0]["label"], "Goss")
+        self.assertEqual(selected.context["material_plot"]["rows"][0]["count"], 1)
+        self.assertEqual(selected.context["selected_category"]["rows"][0]["label"], "static")
+        self.assertEqual(selected.context["category_plot"]["rows"][0]["count"], 1)
+        for category in (selected.context["material_category"], selected.context["selected_category"]):
+            row = category["rows"][0]
+            drilled = self.client.get(row["url"])
+            self.assertEqual(drilled.context["total_objects"], row["count"])
+            self.assertEqual(drilled.context["material_group"], "texture")
+            self.assertEqual(drilled.context["group"], "loading_mode")
 
-    def test_curve_equivalents_share_detail_rules_and_report_unpaired_values(self):
+    def test_legacy_category_preferences_map_to_materials(self):
         """
-        Calculated equivalents retain source lengths and never replace supplied arrays
+        Existing phase and texture bookmarks remain usable with the new panels
         """
-        stress = {f"stress_{key}": [0, 0, 0] for key in ("11", "22", "33", "12", "13", "23")}
-        stress["stress_33"] = [0, -100, -150]
-        strain = {f"strain_{key}": [0, 0, 0, 0] for key in ("11", "22", "33", "12", "13", "23")}
-        strain["strain_33"] = [0, -.03, -.06, -.09]
-        obj = self.create_object(stress=stress, total_strain=strain)
-        original = copy.deepcopy(obj.data)
-        curve = self.dashboard().context["curve"]
-        self.assertEqual(curve["component"], "equivalent")
-        self.assertEqual(curve["count"], 3)
-        self.assertEqual((curve["x_count"], curve["y_count"]), (4, 3))
-        self.assertTrue(curve["calculated"])
-        self.assertEqual([point["y"] for point in curve["points"]], [0, 100, 150])
-        obj.refresh_from_db()
-        self.assertEqual(obj.data, original)
-        obj.data["stress"]["equivalent_stress"] = [8, 9]
-        obj.data["total_strain"]["equivalent_strain"] = [1, 2]
-        obj.save()
-        supplied = self.dashboard().context["curve"]
-        self.assertFalse(supplied["calculated"])
-        self.assertEqual([point["y"] for point in supplied["points"]], [8, 9])
+        self.create_object()
+        for group in ("phase", "texture"):
+            with self.subTest(group=group):
+                response = self.dashboard(group=group)
+                self.assertFalse(response.context["filter_errors"])
+                self.assertEqual(response.context["material_group"], group)
+                self.assertEqual(response.context["group"], "software")
+        response = self.dashboard(group="texture", material_group="phase")
+        self.assertEqual(response.context["material_group"], "phase")
+        self.assertEqual(response.context["group"], "software")
 
-    def test_curve_selection_cannot_escape_active_filters_and_empty_fields(self):
+    def test_panel_controls_keep_filters_and_other_preferences(self):
         """
-        A chosen object or component outside the selection never supplies preview data
+        Changing a visible aggregate never drops active conditions or scope
         """
-        copper = self.create_object()
-        self.create_object("nickel", phase=[{"phase_name": "Nickel"}])
-        response = self.dashboard(phase="Nickel", curve=str(copper.pk))
-        self.assertIsNone(response.context["curve"])
+        self.create_object(software=["Abaqus CAE", "DAMASK"])
+        query = {
+            "scope": "mine", "phase": "Copper", "software": ["Abaqus CAE", "DAMASK"],
+            "result": ["stress", "matching_response"], "range": ["temperature:298:298:1", "grain_count:343:343:1"],
+            "material_group": "texture", "group": "loading_mode", "measure": "grain_count",
+            "curve": "999", "component": "33", "show": "objects", "page": "2",
+        }
+        response = self.dashboard(**query)
         self.assertEqual(response.context["total_objects"], 1)
-        response = self.dashboard(curve=str(copper.pk), component="equivalent")
-        self.assertIsNone(response.context["curve"])
-        filtered = self.dashboard(curve=str(copper.pk))
-        row = filtered.context["categories"]["phase"]["rows"][0]
-        self.assertNotIn("curve", parse_qs(urlsplit(row["url"]).query))
+        self.assertEqual(len(response.context["active_filters"]), 7)
+        for control in ("material_group", "group", "measure"):
+            params = response.context["control_params"][control]
+            for key in ("scope", "phase", "software", "result", "range"):
+                expected = query[key] if isinstance(query[key], list) else [query[key]]
+                self.assertEqual([value for name, value in params if name == key], expected)
+            for key in {"material_group", "group", "measure"} - {control}:
+                self.assertIn((key, query[key]), params)
+            self.assertFalse({control, "curve", "component", "show", "page"} & {key for key, _value in params})
 
-    def test_large_curve_preview_preserves_extrema_and_export_source(self):
+    def test_matching_components_count_real_pairs_and_preserve_legacy_groups(self):
         """
-        Bounded display sampling preserves spikes and sample traversal order
+        Availability distinguishes matching components from two unrelated groups
         """
-        values = [0] * 12000
-        values[3456], values[7654] = 1500, -800
+        direct = self.create_object("matching-33")
+        self.create_object("unmatched", stress={"stress_11": [0, 1]}, total_strain={"strain_33": [0, .1]})
+        supplied = self.create_object("supplied", stress={"equivalent_stress": [8, 9]},
+                                      total_strain={"equivalent_strain": [1, 2]})
+        stress = {f"stress_{key}": [0, 1] for key in ("11", "22", "33", "12", "13", "23")}
+        strain = {f"strain_{key}": [0, .01] for key in ("11", "22", "33", "12", "13", "23")}
+        calculated = self.create_object("calculated", stress=stress, total_strain=strain)
+        mixed = self.create_object("mixed", stress=stress, total_strain={"equivalent_strain": [0, .01]})
+        self.create_object("explicit-empty", stress={**stress, "equivalent_stress": []},
+                           total_strain={"equivalent_strain": [0, .01]})
+        response = self.dashboard()
+        self.assertEqual(response.context["matching_count"], 4)
+        self.assertEqual({row["key"] for row in response.context["equivalent_rows"]},
+                         {"supplied_equivalent", "calculated_equivalent"})
+        row = next(item for item in response.context["result_rows"] if item["key"] == "matching_response")
+        self.assertEqual(row["count"], 4)
+        selected = self.client.get(response.context["matching_url"])
+        self.assertEqual({item["id"] for item in selected.context["objects_page"]},
+                         {direct.pk, supplied.pk, calculated.pk, mixed.pk})
+        self.assertEqual(self.dashboard(result="paired").context["total_objects"], 6)
+        legacy = self.dashboard(result=["paired", "matching_response"])
+        self.assertEqual(legacy.context["total_objects"], 4)
+        for obj in (supplied, calculated, mixed):
+            original = copy.deepcopy(obj.data)
+            obj.refresh_from_db()
+            self.assertEqual(obj.data, original)
+
+    def test_legacy_curve_preferences_never_add_preview_or_escape_filters(self):
+        """
+        Old object selectors remain harmless after removing the duplicate curve
+        """
+        copper = self.create_object(stress={"stress_33": [0, 100, 40, -60]},
+                                     total_strain={"strain_33": [0, .03, .01, -.02]})
+        nickel = self.create_object("nickel", phase=[{"phase_name": "Nickel"}])
+        hidden = self.create_object("hidden-curve", owner=self.other, stress={"stress_33": [0, 9876543]})
+        for curve in (copper.pk, hidden.pk):
+            response = self.dashboard(phase="Nickel", curve=str(curve), component="33")
+            self.assertEqual([row["id"] for row in response.context["objects_page"]], [nickel.pk])
+            self.assertNotIn("curve", response.context)
+            self.assertNotIn("curve_objects", response.context)
+            self.assertNotContains(response, "charts-curve-svg")
+            self.assertNotContains(response, "9876543")
+            self.assertNotContains(response, "hidden-curve")
+            row = response.context["material_category"]["rows"][0]
+            self.assertNotIn("curve", parse_qs(urlsplit(row["url"]).query))
+
+    def test_result_coverage_preserves_large_arrays_and_original_precision(self):
+        """
+        Statistical summaries never reduce or rewrite source mechanical arrays
+        """
+        values = [10 ** 50 + index for index in range(12000)]
         obj = self.create_object(stress={"stress_33": values},
                                  total_strain={"strain_33": list(range(12002))})
-        response = self.dashboard()
-        curve = response.context["curve"]
-        self.assertEqual(curve["count"], 12000)
-        self.assertLessEqual(len(curve["points"]), 2400)
-        self.assertIn(1500, [point["y"] for point in curve["points"]])
-        self.assertIn(-800, [point["y"] for point in curve["points"]])
-        indices = [point["index"] for point in curve["points"]]
-        self.assertEqual(indices, sorted(set(indices)))
-        self.assertEqual((indices[0], indices[-1]), (0, 11999))
-        self.assertContains(response, f'{curve["shown_count"]} plotted points from 12000 paired samples')
-        self.assertContains(response, 'Strain: 12002; stress: 12000')
+        original = copy.deepcopy(obj.data)
+        response = self.dashboard(result="matching_response")
+        self.assertEqual(response.context["matching_count"], 1)
+        self.assertEqual(response.context["objects_page"][0]["points"], "3–12,002 points")
+        self.assertNotIn("curve", response.context)
+        self.assertNotContains(response, str(values[0]))
+        notes = {row["key"]: row["count"] for row in response.context["note_rows"]}
+        self.assertEqual(notes["unequal_lengths"], 1)
         obj.refresh_from_db()
-        self.assertEqual(obj.data["stress"]["stress_33"], values)
-
-    def test_default_curve_skips_objects_without_matching_components(self):
-        """
-        Separate stress and strain groups alone cannot mask an available response
-        """
-        paired = self.create_object("matching-components")
-        self.create_object("unmatched-components", stress={"stress_11": [0, 1]},
-                           total_strain={"strain_33": [0, .1]})
-        response = self.dashboard()
-        self.assertEqual(response.context["paired_count"], 2)
-        self.assertEqual(response.context["curve"]["record"]["id"], paired.pk)
-        self.assertEqual([row["id"] for row in response.context["curve_objects"]], [paired.pk])
-
-    def test_large_finite_curve_values_keep_distinct_positions_and_readouts(self):
-        """
-        Exact integer offsets must neither crash the page nor collapse samples
-        """
-        values = [10 ** 50 + index for index in range(3)]
-        self.create_object(stress={"stress_33": values}, total_strain={"strain_33": [0, 1, 2]})
-        curve = self.dashboard().context["curve"]
-        self.assertEqual([point["y_text"] for point in curve["points"]], list(map(str, values)))
-        self.assertEqual(len({point["py"] for point in curve["points"]}), 3)
-        self.assertEqual(len({tick["label"] for tick in curve["y_ticks"]}), len(curve["y_ticks"]))
-        self.assertTrue(curve["y_offset"])
-
-    def test_close_curve_values_have_distinct_ticks_and_exact_readouts(self):
-        """
-        Small changes around a large baseline stay visible with a labelled offset
-        """
-        values = [100, 100.0000000001, 100.0000000002]
-        self.create_object(stress={"stress_33": values})
-        response = self.dashboard()
-        curve = response.context["curve"]
-        self.assertEqual([point["y_text"] for point in curve["points"]], list(map(str, values)))
-        self.assertEqual(len({tick["label"] for tick in curve["y_ticks"]}), len(curve["y_ticks"]))
-        self.assertTrue(curve["y_offset"])
-        self.assertContains(response, "Offset +100")
+        self.assertEqual(obj.data, original)
