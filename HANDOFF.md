@@ -1,11 +1,11 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-10-01
-code_base: see latest git commit (Charts statistical tables and simplified scopes)
-next_topic: Review Charts statistics and continue platform usability feedback
+timestamp: 2026-10-05
+code_base: see latest git commit (Fixed desktop detail curve size)
+next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts statistical charts/tables, public and own-upload scopes, assistant guidance and desktop checks
+  - Detail curve dimensions, browser size checks and documentation
 ---
 
 # Project handoff
@@ -14,7 +14,22 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：Charts 标准统计图、汇总表与简化范围
+### 本轮：详情曲线固定尺寸
+
+- 用户转述 Ronak 认为详情曲线横向太长，要求选择合适的固定尺寸。
+  将 .plot-canvas-wrap 设为宽 720px、max-width:100%，.plot-canvas-box 高 480px，
+  桌面按 3:2 居中显示；可用空间不足时仅收缩宽度，避免横向溢出。
+- 仍由 Chart.js 按实际容器尺寸绘制；状态文字保持在独立画布父容器之外。
+  保留既有坐标范围、顺序、悬停、选轴和导出逻辑，原始 JSON 未修改。
+- 14 项相关 Django 测试通过，包含真实 Chromium 的 19 类曲线、三个桌面宽度和用户样例。
+  浏览器确认实际绘图尺寸为 720×480、显示与鼠标坐标一致，轴标题／刻度未裁切，
+  循环、微小值、悬停提示、原值查看、PNG 和 CSV 下载正常。
+  已查看样例、悬停和 PNG 实际截图；日志 /tmp/detail-fixed-size-tests.log，
+  截图 /tmp/detail-fixed-size-qa；尚未确认 Render 部署完成。
+- 此前已完成两项 Charts 小调整：删除 Select a bar… 说明；标题复用 My Data／Share
+  的公共大小与字重，添加 Home › Charts 导航，保留右侧范围选择。
+
+### 上轮：Charts 标准统计图、汇总表与简化范围
 
 - Charts 的中文意思是图表；用户要求看得懂的饼图、直方图和真正的汇总表，并指出
   Data notes／Data objects 的含义不清楚。用户的新范围要求取代以前的四种 accessible scopes。

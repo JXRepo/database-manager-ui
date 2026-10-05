@@ -573,7 +573,9 @@ rejected with a message instead of silently omitting objects. Existing JSON and
 PNG downloads remain available.
 
 Detail curves use the Charts palette, with a blue line and no endpoint markers
-or grid lines. Two Cartesian axes intersect at the actual origin, with arrows
+or grid lines. Their canvas is centered at a fixed 720 × 480 CSS pixels on
+desktop, with width capped by the available panel space to prevent overflow.
+Two Cartesian axes intersect at the actual origin, with arrows
 pointing right and up and a separate zero label for each axis; no rectangular
 frame is drawn. Each range covers the paired data extrema and zero independently,
 without making signed ranges symmetric. An entirely zero coordinate uses a

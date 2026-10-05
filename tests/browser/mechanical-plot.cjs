@@ -149,6 +149,8 @@ const {join} = require('node:path');
         }
       }
       assert.ok(metrics.horizontal && metrics.vertical, `${label}: two axes through the true origin`);
+      assert.equal(metrics.width, 720, `${label}: fixed desktop chart width`);
+      assert.equal(metrics.height, 480, `${label}: fixed desktop chart height`);
       assert.ok(Math.abs(metrics.displayWidth - metrics.width) < 1
         && Math.abs(metrics.displayHeight - metrics.height) < 1,
         `${label}: displayed canvas and pointer coordinates share the same size`);
