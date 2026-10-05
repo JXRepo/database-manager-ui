@@ -324,7 +324,7 @@ def index(request):
         "output_rows": [row for row in result_rows if row["key"] != "matching_response"],
         "note_rows": note_rows, "noted_objects": sum(bool(record["notes"]) for record in records),
         "active_filters": active_filters, "filter_errors": errors, "clear_url": clear_url,
-        "objects_page": page, "objects_url": chart_url(query, objects=True),
+        "objects_page": page,
         "objects_open": bool(active_filters or query.get("show") == "objects"),
         "previous_url": chart_url(query, {"page": page.previous_page_number()}, objects=True) if page.has_previous() else "",
         "next_url": chart_url(query, {"page": page.next_page_number()}, objects=True) if page.has_next() else "",

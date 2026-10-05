@@ -394,7 +394,8 @@ come from the current data scope and remain available after filtering; active
 bookmarked values remain selected even when unavailable or invalid.
 Applying filters preserves the scope, private inclusion and chart preferences,
 and starts the record list on its first page. **Clear filters** clears conditions
-within the current scope; **View records** opens the matching list below.
+within the current scope. Open **Source records** below the charts to inspect
+the matching objects.
 **Chart category** selects how a bar chart groups the data and does not itself
 filter the objects. The filter form works through ordinary GET navigation
 without JavaScript.

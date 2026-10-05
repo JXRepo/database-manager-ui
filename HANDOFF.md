@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Make Charts filtering visible)
+code_base: see latest git commit (Remove record navigation from Charts filters)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts filter choices, visible form, desktop interaction checks and documentation
+  - Charts filter actions and documentation
 ---
 
 # Project handoff
@@ -14,7 +14,18 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：明确的 Charts 筛选区
+### 本轮：从筛选区移除记录入口
+
+- 用户指出 View records 放在 Filters 中显得奇怪；已移除该链接和仅供它使用的
+  objects_url 模板上下文。筛选操作只保留 Apply filters 与 Clear filters。
+- 查看具体对象继续使用图表下方的 Source records；图表筛选跳转、应用条件后自动展开
+  当前记录、分页和权限逻辑保持不变。README 已同步入口说明。
+- 41 项 Charts 测试通过，无跳过；真实 Chromium 检查三个桌面宽度、长名称、空结果、
+  筛选、记录跳转和无 JavaScript 操作，已查看首屏与零结果截图。
+  日志 /tmp/charts-filter-actions.log，截图 /tmp/charts-filter-actions-qa；
+  尚未确认 Render 部署完成。
+
+### 上轮：明确的 Charts 筛选区
 
 - 用户指出现有筛选隐藏在图表链接里，作为用户不知道在哪里筛选。
   在标题与统计之间常驻 Filters：Phase、Software、Stress–strain coverage 直接可选；
