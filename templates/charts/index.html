@@ -40,9 +40,7 @@
     {% if total_objects %}
       <section class="charts-metrics" aria-label="Selection overview">
         <a class="charts-metric charts-metric-total" href="{{ records_url }}"><strong>{{ total_objects }}</strong><span>Data objects{% if active_filters %}<small>of {{ base_count }} in this scope</small>{% endif %}</span></a>
-        <div class="charts-metric"><strong>{{ phase_count }}</strong><span>Phase names</span></div>
-        <div class="charts-metric"><strong>{{ software_count }}</strong><span>Software names</span></div>
-        <a class="charts-metric" href="{{ matching_url }}"><strong>{{ matching_count }}</strong><span>Stress–strain available</span></a>
+        <a class="charts-metric" href="{{ matching_url }}"><strong>{{ matching_count }}</strong><span>Objects with stress–strain data</span></a>
       </section>
 
       <div class="charts-dashboard-grid">

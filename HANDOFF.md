@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Rebuild Charts as a focused statistics dashboard)
+code_base: see latest git commit (Simplify Charts overview to two useful totals)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts dashboard, SVG axes, chart selections, browser checks and documentation
+  - Charts overview labels, compact spacing, browser checks and documentation
 ---
 
 # Project handoff
@@ -13,6 +13,18 @@ files_modified:
 ## 当前状态
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
+
+### 本轮：精简 Charts 顶部概览
+
+- 用户询问四项数字的意义后要求调整。删除顶部 Phase names 和 Software names，
+  材料相和软件分类继续由下方图表展示。顶部只保留 Data objects 与
+  Objects with stress–strain data，明确后者计数据对象而非曲线数量。
+- 四列概览缩为内容自然宽度的一行，数字由 26px 缩为 22px；保留当前选择及总范围提示，
+  两个数字继续通过普通 GET 查看对应来源记录。统计、范围和权限逻辑未改变。
+- 48 项 Charts 测试通过，无跳过；真实 Chromium 核对两个标签、可配对应力–应变计数，
+  1280／1440／1920 桌面的同行布局和原有跳转、私有范围、键盘及无 JavaScript 导航。
+  已查看公共概览和用户 Copper 样例截图。日志 /tmp/charts-overview-tests.log，
+  截图 /tmp/charts-overview-qa；尚未确认 Render 部署完成。
 
 ### 本轮：Charts 改为统计图优先的概览页
 

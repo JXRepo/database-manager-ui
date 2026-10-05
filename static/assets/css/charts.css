@@ -36,11 +36,11 @@
 .charts-selection-clear { margin-left: 5px; }
 .charts-errors { margin: 15px 0; font-size: 12px; }
 .charts-errors p + p { margin-top: 5px; }
-.charts-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; padding: 18px 0; margin: 12px 0 4px; border-top: 1px solid var(--charts-rule); }
+.charts-metrics { display: flex; align-items: center; gap: 24px; padding: 16px 0; margin: 12px 0 4px; border-top: 1px solid var(--charts-rule); }
 .charts-metric { display: flex; align-items: center; gap: 12px; border-left: 1px solid var(--charts-rule); padding-left: 20px; }
 .charts-metric:first-child { padding-left: 0; border-left: 0; }
 .charts-page a.charts-metric { color: var(--charts-ink); }
-.charts-metric strong { font-size: 26px; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--charts-ink); }
+.charts-metric strong { font-size: 22px; line-height: 1.1; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--charts-ink); }
 .charts-metric-total strong { color: var(--charts-blue); }
 .charts-metric > span { color: var(--charts-muted); font-size: 12px; line-height: 1.5; }
 .charts-metric small { display: block; font-size: 11px; }

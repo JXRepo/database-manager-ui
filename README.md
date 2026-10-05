@@ -379,8 +379,9 @@ still requires a platform account. Other users' private records never contribute
 to statistics or linked lists. Old scope=all and scope=shared bookmarks redirect
 to Public database while preserving valid selections.
 
-The default page starts with four totals: data objects, distinct phase names,
-distinct software names and objects with matching stress–strain components.
+The default page starts with a compact row of two totals: data objects and
+objects with matching stress–strain components. Both link to their source
+records. Phase and software categories appear in their distribution charts.
 Six charts are visible directly, in three pairs:
 
 - **Phase** counts objects for each phase name with horizontal bars.

@@ -224,6 +224,10 @@ function exactEighths(value) {
       assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 0);
     }
     async function assertFixedDashboard() {
+      assert.deepEqual(await evaluate('[...document.querySelectorAll(".charts-metric > span")].map(label => label.firstChild.textContent)'),
+        ['Data objects', 'Objects with stress–strain data']);
+      assert.equal(await evaluate('Number(document.querySelector(".charts-metric:last-child strong").textContent)'),
+        (await coverageLink('matching')).count);
       assert.equal(await evaluate('document.querySelectorAll("#charts-filters, #charts-filter-form, .charts-more-filters, [data-filter-key]").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll("#charts-material-group, #charts-group, #charts-measure, .charts-chart-control").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-panel-purpose, .charts-section-help, .charts-page-footnote, .charts-subtle-note").length'), 0);
@@ -272,12 +276,24 @@ function exactEighths(value) {
             const chip = document.querySelector('.charts-filter');
             return chip ? {top: chip.getBoundingClientRect().top, height: chip.parentElement.getBoundingClientRect().height} : null;
           })(),
+          overview: [...document.querySelectorAll('.charts-metric')].map(metric => {
+            const rect = metric.getBoundingClientRect();
+            return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
+          }),
         };
       })()`);
       assert.ok(metrics.documentWidth <= width, `${label} overflows at ${width}: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.mainLeft >= metrics.sidebarRight - 1, `${label} under sidebar: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.titleVisible && metrics.titleTop >= metrics.headerBottom, `${label} title under navigation: ${JSON.stringify(metrics)}`);
       assert.equal(metrics.graphCount, expectedGraphs, `${label}: main dashboard chart count at ${width}`);
+      if (metrics.overview.length) {
+        assert.equal(metrics.overview.length, 2);
+        const [total, matching] = metrics.overview;
+        assert.ok(total.right <= matching.left && matching.right <= width,
+          `${label}: overview counts overlap or overflow at ${width}`);
+        assert.ok(Math.max(total.top, matching.top) < Math.min(total.bottom, matching.bottom),
+          `${label}: overview counts must share one row at ${width}`);
+      }
       if (metrics.cards.length) {
         assert.equal(metrics.cards.length, 6);
         for (const card of metrics.cards) {
@@ -591,6 +607,7 @@ function exactEighths(value) {
       assert.ok(await evaluate('!!document.querySelector(".charts-empty")'));
       await setPrivate(true);
       assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
+      await assertFixedDashboard();
       assert.equal((await categoryLink('phase', 'Copper')).count, 1);
       assert.equal((await categoryLink('software', 'Abaqus CAE')).count, 1);
       assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Median\s+298/);
