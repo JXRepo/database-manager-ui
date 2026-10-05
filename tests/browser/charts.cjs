@@ -242,6 +242,8 @@ function exactEighths(value) {
       assert.ok(totals.every(value => /^\d+$/.test(value)));
       assert.equal(Number(totals[1]), await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-statistics-table tbody tr").length'));
       assert.equal(Number(totals[3]), (await coverageLink('matching')).count);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-lollipop-svg").length'), 1);
+      assert.equal(await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-bar-mark").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-additional-statistics, .charts-objects, .charts-records").length'), 0);
       assert.equal(await evaluate('/Additional statistics|Source records/.test(document.querySelector(".charts-page").textContent)'), false);
       assert.ok(await evaluate('[...document.querySelectorAll(".charts-bar, .charts-pie-slice, .charts-bin")].every(link => link.getAttribute("aria-label").includes("Filter statistics"))'));
@@ -280,9 +282,20 @@ function exactEighths(value) {
           primary: graphs.filter(svg => ['phase', 'results'].includes(svg.closest('[data-statistic]').dataset.statistic))
             .map(svg => ({top: svg.getBoundingClientRect().top, bottom: svg.getBoundingClientRect().bottom})),
           graphCount: graphs.length,
-          graphTypes: {bar: graphs.filter(svg => svg.classList.contains('charts-bar-svg')).length,
+          graphTypes: {bar: graphs.filter(svg => svg.classList.contains('charts-bar-svg') && !svg.classList.contains('charts-lollipop-svg')).length,
+            lollipop: graphs.filter(svg => svg.classList.contains('charts-lollipop-svg')).length,
             pie: graphs.filter(svg => svg.classList.contains('charts-pie-svg')).length,
             histogram: graphs.filter(svg => svg.classList.contains('charts-histogram-svg')).length},
+          lollipops: [...document.querySelectorAll('.charts-lollipop-dot')].map(dot => {
+            const link = dot.closest('a'), stem = link.querySelector('.charts-lollipop-stem');
+            const svg = dot.ownerSVGElement, bounds = svg.getBoundingClientRect();
+            const dotRect = dot.getBoundingClientRect(), count = link.querySelector('.charts-bar-count');
+            const countRect = count.getBoundingClientRect();
+            return {label: link.dataset.label, dotPosition: dot.cx.baseVal.value, stemEnd: stem.x2.baseVal.value,
+              count: count.textContent, dotRight: dotRect.right, countLeft: countRect.left,
+              clipped: dotRect.left < bounds.left || dotRect.right > bounds.right || countRect.right > bounds.right,
+              fontSize: parseFloat(getComputedStyle(count).fontSize) * svg.getScreenCTM().a};
+          }),
           numericLabels: [...document.querySelectorAll('.charts-histogram-svg text')]
             .filter(text => text.ownerSVGElement.checkVisibility()).map(text => {
               const svg = text.ownerSVGElement, box = text.getBBox(), bounds = svg.viewBox.baseVal;
@@ -319,7 +332,12 @@ function exactEighths(value) {
           assert.ok(card.left >= metrics.mainLeft && card.right <= width, `${label}: card outside desktop ${JSON.stringify(card)}`);
         }
       }
-      if (expectedGraphs === 6) assert.deepEqual(metrics.graphTypes, {bar: 3, pie: 1, histogram: 2});
+      if (expectedGraphs === 6) assert.deepEqual(metrics.graphTypes, {bar: 2, lollipop: 1, pie: 1, histogram: 2});
+      for (const mark of metrics.lollipops) {
+        assert.equal(mark.dotPosition, mark.stemEnd, `${label}: the dot must mark its count position`);
+        assert.ok(!mark.clipped && mark.countLeft > mark.dotRight && mark.fontSize >= 9.5,
+          `${label}: readable lollipop count at ${width}: ${JSON.stringify(mark)}`);
+      }
       for (const text of metrics.numericLabels) {
         assert.ok(text.fontSize >= 9.5 && !text.clipped, `${label}: readable numeric label at ${width}: ${JSON.stringify(text)}`);
       }
@@ -382,6 +400,20 @@ function exactEighths(value) {
     await evaluate('document.querySelector("[data-statistic=phase] .charts-chart-data > summary").focus()');
     await pressKey('Enter', 'Enter', 13);
     assert.equal(await evaluate('document.querySelector("[data-statistic=phase] .charts-chart-data").open'), true);
+    const dotLink = await evaluate(`(() => {
+      const dot = document.querySelector('.charts-lollipop-dot'), rect = dot.getBoundingClientRect();
+      const link = dot.closest('a');
+      return {x: rect.left + rect.width / 2, y: rect.top + rect.height / 2,
+        path: link.getAttribute('href'), count: Number(link.querySelector('.charts-bar-count').textContent)};
+    })()`);
+    await command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: dotLink.x, y: dotLink.y});
+    assert.equal(await evaluate('getComputedStyle(document.querySelector(".charts-lollipop-dot")).fill'), 'rgb(32, 95, 154)');
+    await command('Input.dispatchMouseEvent', {type: 'mousePressed', x: dotLink.x, y: dotLink.y, button: 'left', clickCount: 1});
+    await command('Input.dispatchMouseEvent', {type: 'mouseReleased', x: dotLink.x, y: dotLink.y, button: 'left', clickCount: 1});
+    await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + dotLink.path)}
+      && document.readyState === 'complete' && document.querySelector('.charts-page')?.classList.contains('charts-js')`);
+    assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), dotLink.count);
+    await clearSelection();
     await assertLinkedCount({path: '/charts/?texture=Goss', count: 12});
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".charts-metric dd")].map(value => Number(value.textContent))'), [12, 3, 1, 6]);
     for (const width of [1280, 1440, 1920]) await layout('selected-statistics', width);
@@ -563,6 +595,12 @@ function exactEighths(value) {
       && document.readyState === 'complete' && !!document.querySelector('.charts-records')`);
     assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
     await navigate('/charts/?scope=mine', false);
+    const keyboardPhase = await categoryLink('phase', 'Copper');
+    await evaluate('document.querySelector("[data-statistic=phase] .charts-bar").focus()');
+    await pressKey('Enter', 'Enter', 13);
+    await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + keyboardPhase.path)}
+      && document.readyState === 'complete' && !!document.querySelector('.charts-lollipop-svg')`);
+    assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), keyboardPhase.count);
     await assertLinkedCount(await categoryLink('phase', 'Copper'), false);
     await assertLinkedCount(await categoryLink('software', 'Software 7'), false);
     await assertLinkedCount(await coverageLink('matching'), false);
@@ -658,7 +696,7 @@ function exactEighths(value) {
       console.log('Charts local sample checks passed: Copper, Abaqus CAE, Goss, 298 K, 343 grains, 2,744 cells, exact combined links, detail navigation, and 3 desktop layouts.');
     }
     assert.deepEqual(exceptions, []);
-    console.log('Charts browser checks passed: simple statistics totals, fixed six-chart dashboard, public/private scopes, coverage pie and real tables, precise intervals, separate record navigation, pagination, keyboard operation, no JavaScript GET navigation, missing metadata and desktop layouts.');
+    console.log('Charts browser checks passed: phase lollipops, exact counts, dot hover and clicks, keyboard activation without JavaScript, simple totals, public/private scopes, precise intervals, record navigation and desktop layouts.');
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

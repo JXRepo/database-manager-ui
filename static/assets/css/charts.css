@@ -58,6 +58,10 @@
 .charts-bar-count, .charts-bin-count { font: 600 12px Arial, sans-serif; fill: #284664; }
 .charts-bar-mark { fill: #2c78bf; }
 .charts-bar:hover .charts-bar-mark, .charts-bar:focus .charts-bar-mark { fill: #205f9a; }
+.charts-lollipop-stem { stroke: #96badc; stroke-width: 2; stroke-linecap: round; }
+.charts-lollipop-dot { fill: #2c78bf; stroke: #fff; stroke-width: 2; }
+.charts-bar:hover .charts-lollipop-stem, .charts-bar:focus .charts-lollipop-stem { stroke: #2c78bf; }
+.charts-bar:hover .charts-lollipop-dot, .charts-bar:focus .charts-lollipop-dot { fill: #205f9a; }
 .charts-bar:focus-visible { outline: none !important; }
 .charts-bar:focus-visible > rect:first-of-type { stroke: #659ad3; stroke-width: 1.5; }
 .charts-chart-data { margin-top: 12px; padding-top: 10px; border-top: 1px solid #edf1f5; }

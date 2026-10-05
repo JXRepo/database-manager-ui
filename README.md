@@ -388,7 +388,8 @@ accessible selection; missing names contribute no category. **View data** beside
 Data scope links to a separate page of matching objects.
 Six charts are visible directly, in three pairs:
 
-- **Phase** counts objects for each phase name with horizontal bars.
+- **Phase** counts objects for each phase name with a horizontal lollipop chart:
+  thin lines end in dots, with exact counts beside them.
 - **Stress–strain coverage** uses a pie chart for the exhaustive, disjoint
   classes with and without matching components.
 - **Software** counts objects for each software name with horizontal bars.
@@ -398,8 +399,8 @@ Six charts are visible directly, in three pairs:
 - **Grain number** shows a histogram of phase observations.
 
 There is no independent Filters form or chart-category selector. Clicking a
-bar, pie slice, numeric interval or statistics-table entry narrows the same
-selection and updates all statistics. Active conditions appear only
+line, dot, bar, pie slice, numeric interval or statistics-table entry narrows
+the same selection and updates all statistics. Active conditions appear only
 when selected, with individual removal links and **Clear selection**. Conditions
 combine with AND on the same accessible object, including successive selections
 within one category and across numeric measures. All charts update together.
@@ -423,8 +424,8 @@ chart cards instead of a fabricated value.
 
 Category counts deduplicate each object per case-insensitive label. Multiple
 phases, software descriptions, models or loading conditions can contribute to
-several labels, so their percentages can sum to more than 100%; they are bars
-or tables, never a misleading composition pie. Output availability includes all
+several labels, so their percentages can sum to more than 100%; they use bars,
+lollipops or tables, never a misleading composition pie. Output availability includes all
 supported components and supplied equivalent arrays. Calculated equivalents
 require an absent equivalent field and all six components, following the detail
 page. Matching stress–strain requires a common component in both groups; the

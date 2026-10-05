@@ -1,11 +1,11 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-10-05
-code_base: see latest git commit (Show four clear statistical totals on Charts)
+timestamp: 2026-10-06
+code_base: see latest git commit (Use a lollipop chart for material phase counts)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts statistical totals, browser checks and documentation
+  - Charts phase lollipop appearance, browser checks and documentation
 ---
 
 # Project handoff
@@ -14,7 +14,21 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：顶部回归简单统计数字
+### 本轮：第一个 Phase 卡片改为棒棒糖图
+
+- 用户要求采用推荐的棒棒糖图。Phase 卡片用细线＋蓝色圆点代替粗条，数量紧挨圆点。
+  复用原来的分类计数、坐标、排序和 GET 链接，保留 Data table、完整名称和筛选口径；
+  只有第一个卡片启用此样式，其他卡片与顶部数字保持原有显示。
+- 圆点与细线有悬停／键盘高亮，整行保留点击区域；无 JavaScript 也可见、可筛选。
+  为圆点与数字留出间距，继续使用服务端 SVG，无新依赖、后端算法改动或数据库迁移。
+- 50 项 Charts 测试通过，无跳过；真实 Chromium 验证 1280／1440／1920 桌面排版、
+  圆点与线末端对齐、数字清晰无重叠、悬停与实际鼠标点击、无 JavaScript 回车筛选，
+  以及原有范围／私有权限、组合条件、精确区间、列表分页、缺失／空数据和样例详情。
+  已查看公共数据和 Copper 样例截图；上传样例和隔离库 JSON 未改变。JavaScript
+  语法与 git diff --check 通过；日志 /tmp/charts-phase-lollipop.log，
+  截图 /tmp/charts-phase-lollipop-qa。尚未确认 Render 部署完成。
+
+### 上轮：顶部回归简单统计数字
 
 - 用户认为上一版越来越偏，明确要求这一行放简单统计数字。改为四项数字＋短标签：
   Data objects、Material phases、Texture types、Objects with stress–strain data。

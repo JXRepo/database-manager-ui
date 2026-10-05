@@ -60,7 +60,7 @@
         <section class="charts-panel" data-statistic="phase" aria-labelledby="phase-heading">
           <div class="charts-panel-heading"><h2 id="phase-heading">Phase</h2><span class="charts-context-label">{{ phase_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">
-            {% if phase_category.rows %}{% include 'charts/category.html' with plot=phase_plot category=phase_category %}{% else %}<div class="charts-plot-empty"><strong>No phase reported</strong></div>{% endif %}
+            {% if phase_category.rows %}{% include 'charts/category.html' with plot=phase_plot category=phase_category lollipop=True %}{% else %}<div class="charts-plot-empty"><strong>No phase reported</strong></div>{% endif %}
           </div>
           {% if phase_category.rows %}{% include 'charts/category_table.html' with category=phase_category %}{% endif %}
         </section>
