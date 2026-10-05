@@ -30,15 +30,9 @@
           {% if scope == 'mine' %}<label class="charts-private-option" for="charts-include-private"><input type="checkbox" id="charts-include-private" name="include_private" value="1"{% if include_private %} checked{% endif %}>Include private data</label>{% endif %}
           <button type="submit" class="charts-apply">Apply</button>
         </form>
-        {% if total_objects %}<a class="charts-button" href="{{ objects_url }}"><i data-feather="list" aria-hidden="true"></i>View source records</a>{% endif %}
       </div>
     </header>
-    {% if active_filters or filter_errors %}
-      <div class="charts-filter-strip" aria-label="Active filters">
-        {% for item in active_filters %}<a class="charts-filter" href="{{ item.url }}" title="Remove {{ item.label }}"><span>{{ item.label }}</span><span aria-hidden="true">×</span><span class="visually-hidden">Remove filter</span></a>{% endfor %}
-        <a class="charts-clear" href="{{ clear_url }}">Clear filters</a>
-      </div>
-    {% endif %}
+    {% include 'charts/filters.html' %}
     {% if filter_errors %}<div class="alert alert-warning charts-errors" role="alert">{% for error in filter_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
     {% if total_objects %}
       <section class="charts-metrics" aria-label="Selection overview">
@@ -53,7 +47,7 @@
           <p class="charts-panel-purpose">Find the phases and textures represented in this selection.</p>
           <form method="get" class="charts-chart-control" data-auto-submit>
             {% for key, value in control_params.material_group %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-            <label for="charts-material-group">Group by</label><select id="charts-material-group" name="material_group">{% for key, title in material_options %}<option value="{{ key }}"{% if key == material_group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
+            <label for="charts-material-group">Chart category</label><select id="charts-material-group" name="material_group">{% for key, title in material_options %}<option value="{{ key }}"{% if key == material_group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
           </form>
           {% if material_category.rows %}
             {% include 'charts/category.html' with plot=material_plot category=material_category %}
@@ -78,7 +72,7 @@
           <p class="charts-panel-purpose">Explore software, constitutive models and loading conditions.</p>
           <form method="get" class="charts-chart-control" data-auto-submit>
             {% for key, value in control_params.group %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-            <label for="charts-group">Group by</label><select id="charts-group" name="group">{% for key, title in group_options %}<option value="{{ key }}"{% if key == group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
+            <label for="charts-group">Chart category</label><select id="charts-group" name="group">{% for key, title in group_options %}<option value="{{ key }}"{% if key == group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
           </form>
           {% if selected_category.rows %}
             {% include 'charts/category.html' with plot=category_plot category=selected_category %}

@@ -31,6 +31,36 @@
 .charts-page .charts-button-primary { background: var(--charts-blue); color: white; border-color: var(--charts-blue); }
 .charts-apply { border: 1px solid #cddae6; border-radius: 5px; background: #f5f8fb; color: #365572; padding: 7px 10px; font-size: 12px; }
 .charts-js .charts-apply { display: none; }
+.charts-filters { margin-top: 12px; padding: 14px 18px; border: 1px solid var(--charts-rule); border-radius: 8px; background: white; }
+.charts-filters-heading, .charts-filters-heading > div { display: flex; align-items: center; gap: 12px; }
+.charts-filters-heading { justify-content: space-between; margin-bottom: 12px; }
+.charts-filters-heading h2 { display: flex; align-items: center; gap: 7px; font-size: 14px; }
+.charts-filters-heading > div > span, .charts-filter-count { font-size: 11px; color: var(--charts-muted); }
+.charts-filter-count { font-variant-numeric: tabular-nums; }
+.charts-filters-primary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: 14px; }
+.charts-filter-field { margin: 0; padding: 0; border: 0; }
+.charts-filter-field legend { float: none; width: auto; margin: 0 0 5px; padding: 0; font-size: 12px; font-weight: 500; }
+.charts-filter-menu { position: relative; }
+.charts-filter-menu[open] { z-index: 2; }
+.charts-filter-menu > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 35px; padding: 7px 10px; border: 1px solid #c5d3e1; border-radius: 5px; cursor: pointer; font-size: 12px; list-style: none; }
+.charts-filter-menu > summary::-webkit-details-marker { display: none; }
+.charts-filter-menu > summary > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.charts-filter-menu[open] > summary { border-color: var(--charts-blue); }
+.charts-filter-menu.has-selection > summary { background: #eff5fb; border-color: #8eb0d4; color: #245d93; }
+.charts-filter-options { position: absolute; top: calc(100% + 4px); left: 0; width: 100%; min-width: 240px; max-height: 260px; overflow-y: auto; padding: 6px; background: white; border: 1px solid #c5d3e1; border-radius: 5px; box-shadow: 0 5px 16px #203c551a; }
+.charts-filter-options label { display: flex; align-items: start; gap: 8px; padding: 7px 8px; font-size: 12px; cursor: pointer; }
+.charts-filter-options label:hover { background: #eff5fb; }
+.charts-filter-options input { flex-shrink: 0; margin-top: 3px; accent-color: var(--charts-blue); }
+.charts-filter-options label > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.charts-filter-options-numeric label > span { display: block; overflow: visible; }
+.charts-filter-options p { padding: 7px; color: var(--charts-muted); font-size: 12px; }
+.charts-filter-actions { display: flex; align-items: center; gap: 12px; min-height: 35px; white-space: nowrap; font-size: 12px; }
+.charts-filter-submit { min-height: 35px; padding: 7px 12px; border: 1px solid var(--charts-blue); border-radius: 5px; background: var(--charts-blue); color: white; font-size: 12px; font-weight: 600; }
+.charts-more-filters { margin-top: 12px; }
+.charts-more-filters > summary { width: fit-content; cursor: pointer; color: #42607b; font-size: 12px; }
+.charts-more-filters > summary > span { margin-left: 8px; color: var(--charts-blue); }
+.charts-filters-extra { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding-top: 14px; }
+.charts-filter-label { color: var(--charts-muted); font-weight: 600; }
 .charts-metrics { display: grid; grid-template-columns: .85fr .6fr 1.15fr 1fr; padding: 23px 0 22px; margin-top: 17px; border-top: 1px solid var(--charts-rule); }
 .charts-metric { display: flex; align-items: center; gap: 13px; border-left: 1px solid #dbe4ed; padding-left: 25px; }
 .charts-metric:first-child { padding-left: 0; border-left: 0; }
@@ -43,7 +73,7 @@
 .charts-filter-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 17px 0 4px; font-size: 11px; }
 .charts-filter { display: inline-flex; align-items: center; gap: 12px; max-width: 370px; padding: 5px 8px; border: 1px solid #c8daf0; background: #eef5fd; border-radius: 4px; }
 .charts-filter > span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.charts-clear { text-decoration: underline; margin-left: 5px; }
+.charts-clear { text-decoration: underline; }
 .charts-errors { margin: 15px 0; font-size: 12px; }
 .charts-primary-grid, .charts-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
 .charts-secondary-grid { margin-top: 20px; }

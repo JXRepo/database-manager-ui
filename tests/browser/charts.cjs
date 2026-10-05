@@ -68,7 +68,11 @@ function exactEighths(value) {
         if (await evaluate(expression)) return;
         await new Promise(resolve => setTimeout(resolve, 50));
       }
-      throw new Error(`Timed out: ${expression}`);
+      const state = await evaluate(`({url: location.href, ready: document.readyState,
+        filterCount: document.querySelector('.charts-filter-count')?.textContent,
+        focused: document.activeElement?.outerHTML?.slice(0, 300),
+        errors: document.querySelector('.charts-errors')?.textContent})`);
+      throw new Error(`Timed out: ${expression}\n${JSON.stringify(state)}`);
     }
     async function navigate(path = '/charts/', enhanced = true, expectedPath = path) {
       stage = `navigate ${path}${enhanced ? '' : ' without JavaScript'}`;
@@ -176,6 +180,71 @@ function exactEighths(value) {
       const pagination = await evaluate('document.querySelector(".charts-pagination").textContent');
       assert.match(pagination, new RegExp(`of ${link.count} objects?`));
     }
+    async function pressKey(key, code, virtualKey) {
+      const text = key === 'Enter' ? '\r' : '';
+      await command('Input.dispatchKeyEvent', {type: 'keyDown', key, code, windowsVirtualKeyCode: virtualKey,
+        text, unmodifiedText: text});
+      await command('Input.dispatchKeyEvent', {type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKey});
+    }
+    async function filterPopup(width) {
+      stage = `filter menus at ${width}`;
+      await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
+      await settleLayout();
+      await evaluate('document.querySelector("[data-filter-key=software] summary").focus()');
+      await pressKey('Enter', 'Enter', 13);
+      await until('document.querySelector("[data-filter-key=software] details").open');
+      const bounds = await evaluate(`(() => {
+        const rect = document.querySelector('[data-filter-key=software] .charts-filter-options').getBoundingClientRect();
+        return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
+      })()`);
+      assert.ok(bounds.left >= 264 && bounds.right <= width && bounds.top >= 74 && bounds.bottom <= 1000,
+        `Filter options must fit the desktop viewport: ${JSON.stringify(bounds)}`);
+      if (process.env.CHARTS_SCREENSHOT_DIR && width === 1440) {
+        const shot = await command('Page.captureScreenshot', {format: 'png'});
+        writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, 'filters-menu.png'), Buffer.from(shot.data, 'base64'));
+      }
+      await pressKey('Escape', 'Escape', 27);
+      assert.equal(await evaluate('document.querySelector("[data-filter-key=software] details").open'), false);
+      assert.ok(await evaluate('document.activeElement.matches("[data-filter-key=software] summary")'));
+    }
+    async function setFilter(field, value, checked = true) {
+      stage = `filter ${field} = ${value}, checked ${checked}`;
+      const state = await evaluate(`(() => {
+        const field = document.querySelector('[data-filter-key="' + ${JSON.stringify(field)} + '"]');
+        const more = field.closest('.charts-more-filters');
+        if (more && !more.open) {
+          more.open = true;
+        }
+        const menu = field.querySelector('.charts-filter-menu');
+        menu.open = true;
+        const input = [...field.querySelectorAll('input')].find(input => input.value === ${JSON.stringify(value)});
+        if (!input) throw new Error('Missing filter option: ' + ${JSON.stringify(value)});
+        input.focus();
+        return input.checked;
+      })()`);
+      if (state !== checked) await pressKey(' ', 'Space', 32);
+      assert.equal(await evaluate(`(() => {
+        const field = document.querySelector('[data-filter-key="' + ${JSON.stringify(field)} + '"]');
+        return [...field.querySelectorAll('input')].find(input => input.value === ${JSON.stringify(value)}).checked;
+      })()`), checked);
+      await pressKey('Escape', 'Escape', 27);
+      await evaluate(`document.querySelector('[data-filter-key="' + ${JSON.stringify(field)} + '"] .charts-filter-menu').open = false`);
+    }
+    async function submitFilters(count, enhanced = true) {
+      stage = `apply visible filters, expecting ${count} records`;
+      const path = await evaluate(`(() => {
+        const form = document.getElementById('charts-filter-form');
+        const path = new URL(form.action).pathname + '?' + new URLSearchParams(new FormData(form)).toString();
+        form.querySelector('button[type="submit"]').focus();
+        return path;
+      })()`);
+      await pressKey('Enter', 'Enter', 13);
+      await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL)} + ${JSON.stringify(path)}
+        && document.readyState === 'complete' && document.querySelector('.charts-filter-count')?.textContent.trim().startsWith(${JSON.stringify(count + ' matching record')})`);
+      if (enhanced) await until('document.querySelector(".charts-page").classList.contains("charts-js")');
+      assert.equal(await evaluate('document.querySelectorAll(".charts-filter-submit").length'), 1);
+      return path;
+    }
     async function layout(label, width) {
       stage = `layout ${label} at ${width}`;
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
@@ -194,6 +263,12 @@ function exactEighths(value) {
         })(),
         titleLeft: document.querySelector('.charts-heading h1').getBoundingClientRect().left,
         height: document.documentElement.scrollHeight,
+        filters: (() => {
+          const filters = document.getElementById('charts-filters'), rect = filters.getBoundingClientRect();
+          const button = filters.querySelector('.charts-filter-submit'), buttonRect = button.getBoundingClientRect();
+          return {top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right,
+            submitVisible: button.contains(document.elementFromPoint(buttonRect.left + 5, buttonRect.top + 5))};
+        })(),
         primary: [...document.querySelectorAll('.charts-primary-grid .charts-bar-svg, .charts-primary-grid .charts-pie-svg')]
           .map(svg => ({top: svg.getBoundingClientRect().top, bottom: svg.getBoundingClientRect().bottom})),
         graphCount: document.querySelectorAll('.charts-bar-svg, .charts-histogram-svg, .charts-pie-svg').length,
@@ -206,13 +281,16 @@ function exactEighths(value) {
       assert.ok(metrics.documentWidth <= width, `${label} overflows at ${width}: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.mainLeft >= metrics.sidebarRight - 1, `${label} under sidebar: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.titleVisible && metrics.titleTop >= metrics.headerBottom, `${label} title under navigation: ${JSON.stringify(metrics)}`);
+      assert.ok(metrics.filters.top >= metrics.titleTop && metrics.filters.bottom < 500 && metrics.filters.submitVisible,
+        `${label}: filters must be visible above the charts at ${width}: ${JSON.stringify(metrics)}`);
       for (const text of metrics.numericLabels) {
         assert.ok(text.fontSize >= 9.5 && !text.clipped, `${label}: readable numeric label at ${width}: ${JSON.stringify(text)}`);
       }
       if (metrics.primary.length) {
         assert.equal(metrics.primary.length, 2);
         for (const chart of metrics.primary) {
-          assert.ok(chart.top < 500 && chart.bottom < 1000, `Primary aggregate chart must be visible on the first screen: ${JSON.stringify(metrics)}`);
+          assert.ok(chart.top >= metrics.filters.bottom && chart.bottom < 1000,
+            `Primary aggregate chart must remain visible below the filters on the first screen: ${JSON.stringify(metrics)}`);
         }
         assert.equal(metrics.graphCount, 4);
       }
@@ -262,10 +340,50 @@ function exactEighths(value) {
     assert.ok(tableHeaders.includes('Observations'));
     assert.ok(tableHeaders.some(header => /%|share|percentage/i.test(header)));
     assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, #curve-object, #curve-component, #download-curve").length'), 0);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-heading .charts-button").length'), 0);
     for (const width of [1280, 1440, 1920]) {
       await layout('varied-data', width);
       await comparePageHeadings(width);
+      await filterPopup(width);
     }
+
+    await setFilter('phase', 'Copper');
+    await setFilter('software', 'Software 7');
+    await setFilter('coverage', 'matching');
+    await submitFilters(2);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 3);
+    assert.deepEqual(await evaluate('[...document.querySelectorAll("#charts-filter-form input:checked")].map(input => [input.name, input.value])'),
+      [['phase', 'Copper'], ['software', 'Software 7'], ['coverage', 'matching']]);
+    assert.ok(await evaluate('[...document.querySelectorAll(".charts-table tbody tr")].every(row => row.textContent.includes("Copper") && row.textContent.includes("Software 7"))'));
+    for (const width of [1280, 1440, 1920]) await layout('visible-filters-applied', width);
+    await setFilter('coverage', 'matching', false);
+    await setFilter('coverage', 'without_matching');
+    await submitFilters(0);
+    assert.ok(await evaluate('!!document.querySelector(".charts-empty")'));
+    assert.ok(await evaluate('[...document.querySelectorAll("[data-filter-key=software] input")].some(input => input.value === "Software 9")'));
+    for (const width of [1280, 1440, 1920]) await layout('visible-filters-empty', width);
+    await navigate(await evaluate('document.querySelector(".charts-clear").getAttribute("href")'));
+    assert.equal(await evaluate('document.querySelectorAll("#charts-filter-form input:checked").length'), 0);
+    await setFilter('phase', 'Copper');
+    await setFilter('phase', 'Nickel');
+    await submitFilters(0);
+    assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("phase")'), ['Copper', 'Nickel']);
+    assert.equal(await evaluate('document.querySelector("[data-filter-key=phase] [data-filter-summary]").textContent'), '2 selected');
+    await navigate(await evaluate('document.querySelector(".charts-clear").getAttribute("href")'));
+    const temperatureInterval = await evaluate('document.querySelector("[data-filter-key=temperature_range] input").value');
+    await setFilter('temperature_range', temperatureInterval);
+    await submitFilters(3);
+    assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("range")'), [temperatureInterval]);
+    assert.ok(await evaluate('document.querySelector(".charts-filter").textContent.includes("Temperature")'));
+    await navigate('/charts/?scope=mine&include_private=1&material_group=texture&group=loading_mode&measure=grain_count');
+    await setFilter('phase', 'Steel');
+    await setFilter('software', 'Software 6');
+    await setFilter('coverage', 'matching');
+    await submitFilters(2);
+    await assertPrivate();
+    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
+    assert.ok(await evaluate('[...document.querySelectorAll(".charts-table tbody tr")].every(row => row.textContent.includes("Private") && row.textContent.includes("Steel") && row.textContent.includes("Software 6"))'));
+    await navigate();
 
     await evaluate(`(() => {
       const link = [...document.querySelectorAll('.charts-coverage-link')]
@@ -433,6 +551,13 @@ function exactEighths(value) {
     })()`);
     assert.ok(visible, 'The server-rendered bar and pie remain visible without JavaScript');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
+    await setFilter('phase', 'Copper');
+    await setFilter('software', 'Software 7');
+    await setFilter('coverage', 'matching');
+    await submitFilters(2, false);
+    assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
+    assert.equal(await evaluate('document.querySelector(".charts-objects").open'), true);
+    await navigate('/charts/?scope=mine', false);
     await setPrivate(true, false);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '24');
     await setPrivate(false, false);
@@ -521,7 +646,7 @@ function exactEighths(value) {
       console.log('Charts local sample checks passed: Copper, Abaqus CAE, Goss, 298 K, 343 grains, 2,744 cells, exact combined links, detail navigation, and 3 desktop layouts.');
     }
     assert.deepEqual(exceptions, []);
-    console.log('Charts browser checks passed: public/My data scopes, private checkbox, coverage pie and real statistics tables, exact large neighboring counts, keyboard links, combined drillthrough, pagination, legacy scope redirects, no JavaScript GET controls, and 12 desktop layouts.');
+    console.log('Charts browser checks passed: visible filters, native checkbox and Apply keyboard controls, scoped choices, empty selections, exact interval submissions, private scope and preferences, coverage pie and statistics tables, combined drillthrough, pagination, no JavaScript GET filters, and 18 desktop layouts.');
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

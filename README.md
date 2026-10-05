@@ -384,6 +384,21 @@ Charts answers which data are available and how their simulation metadata are
 distributed. Individual stress–strain curves and PNG/CSV downloads belong to
 the data detail page, reached by opening an object in the filtered list.
 
+The **Filters** panel stays visible above the charts, including for empty
+selections. Phase, Software and Stress–strain coverage are available directly;
+**More filters** includes texture, material models, loading, reported outputs,
+numeric intervals and statistics notes. Select values and click **Apply filters**
+to update the charts and their records together. All checked conditions must
+match the same object, including multiple values within one field. Choices
+come from the current data scope and remain available after filtering; active
+bookmarked values remain selected even when unavailable or invalid.
+Applying filters preserves the scope, private inclusion and chart preferences,
+and starts the record list on its first page. **Clear filters** clears conditions
+within the current scope; **View records** opens the matching list below.
+**Chart category** selects how a bar chart groups the data and does not itself
+filter the objects. The filter form works through ordinary GET navigation
+without JavaScript.
+
 - **Materials & microstructure:** phase and texture counts show the materials
   and microstructure descriptions represented by the selected objects.
 - **Simulation setup:** a separate chart shows software, elastic/plastic

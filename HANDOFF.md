@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Remove Charts heading description)
+code_base: see latest git commit (Make Charts filtering visible)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts heading description, unused paragraph style and handoff
+  - Charts filter choices, visible form, desktop interaction checks and documentation
 ---
 
 # Project handoff
@@ -14,7 +14,32 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：删除 Charts 顶部说明，解释记录入口
+### 本轮：明确的 Charts 筛选区
+
+- 用户指出现有筛选隐藏在图表链接里，作为用户不知道在哪里筛选。
+  在标题与统计之间常驻 Filters：Phase、Software、Stress–strain coverage 直接可选；
+  More filters 包含 Texture、材料模型、加载类型／模式、输出、数字区间和统计备注。
+  勾选后点 Apply filters，通过普通 GET 同时更新统计与记录，多个值继续按同一对象 AND。
+- 已选菜单突出显示，Applied filters 集中展示已提交的条件及逐项移除入口；
+  Clear filters 始终可用。空范围和零匹配也保留筛选区，选项来自完整的当前数据范围，
+  避免筛完之后无从改选；他人私有数据和收到的私有分享不进入选项。
+- 图内 Group by 改为 Chart category，明确它只是统计分类选择；原顶部
+  View source records 移到筛选区，改为 View records，仍跳转并展开底部的当前记录。
+  Apply 保留范围、私有开关和图表偏好，重置记录分页；既有图表快捷筛选保持可用。
+- 选项用精简统计摘要生成，不保留原始 JSON 或数组。分类选项忽略大小写去重，
+  功能枚举保持严格匹配；未知／无效书签值及旧参数继续保留，避免提交时静默放宽条件。
+  数字区间沿用现有 Decimal 分箱与比较，保存和导出未改。
+- 菜单支持键盘、Escape 返回及点击外部关闭；无 JavaScript 时依靠原生 details、
+  checkbox 和 GET 正常筛选。长分类名称最多显示两行，完整标签和数值仍保留；
+  数字区间完整显示。桌面不改公共标题位置，不做全页重设计。
+- 41 项 Charts 测试通过，无跳过；Chromium 覆盖 18 种合成数据布局及 3 种样例布局，
+  另外核对三个桌面宽度的菜单、公共标题对齐、多条件／重复条件、零结果、精确数字提交、
+  私有范围和偏好保留、清除、键盘 Apply 与无 JavaScript 筛选。
+  已查看首屏、菜单、应用条件和零结果截图；样例文件及隔离库 JSON 仍未改。
+  日志 /tmp/charts-visible-filters.log，截图 /tmp/charts-visible-filters-qa；
+  尚未确认 Render 部署完成。
+
+### 上轮：删除 Charts 顶部说明，解释记录入口
 
 - 用户逐项检查 Charts，认为 Explore statistical charts and tables, then open the records
   behind them. 多余；已删除这段说明及仅供它使用的 .charts-heading p 样式。

@@ -1,0 +1,27 @@
+<section class="charts-filters" id="charts-filters" aria-labelledby="filters-heading">
+  <form method="get" action="{% url 'charts' %}" id="charts-filter-form">
+    {% for key, value in control_params.filters %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    <div class="charts-filters-heading">
+      <div><h2 id="filters-heading"><i data-feather="filter" aria-hidden="true"></i>Filters</h2><span>Match all selected values</span></div>
+      <span class="charts-filter-count">{{ total_objects }} matching record{{ total_objects|pluralize }}{% if active_filters %} of {{ base_count }}{% endif %}</span>
+    </div>
+    <div class="charts-filters-primary">
+      {% for field in primary_filters %}{% include 'charts/filter_field.html' %}{% endfor %}
+      <div class="charts-filter-actions">
+        <button type="submit" class="charts-filter-submit">Apply filters</button>
+        <a href="{{ clear_url }}" class="charts-clear">Clear filters</a>
+        {% if total_objects %}<a class="charts-filter-records" href="{{ objects_url }}">View records</a>{% endif %}
+      </div>
+    </div>
+    <details class="charts-more-filters">
+      <summary>More filters{% if more_filter_count %}<span>{{ more_filter_count }} selected</span>{% endif %}</summary>
+      <div class="charts-filters-extra">{% for field in more_filters %}{% include 'charts/filter_field.html' %}{% endfor %}</div>
+    </details>
+    {% if active_filters %}
+      <div class="charts-filter-strip" aria-label="Active filters">
+        <span class="charts-filter-label">Applied filters</span>
+        {% for item in active_filters %}<a class="charts-filter" href="{{ item.url }}" title="Remove {{ item.label }}"><span>{{ item.label }}</span><span aria-hidden="true">×</span><span class="visually-hidden">Remove filter</span></a>{% endfor %}
+      </div>
+    {% endif %}
+  </form>
+</section>

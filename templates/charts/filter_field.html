@@ -1,0 +1,11 @@
+<fieldset class="charts-filter-field" data-filter-key="{{ field.key }}">
+  <legend>{{ field.label }}</legend>
+  <details class="charts-filter-menu{% if field.selected_count %} has-selection{% endif %}">
+    <summary title="{{ field.summary }}"><span data-filter-summary>{{ field.summary }}</span><i data-feather="chevron-down" aria-hidden="true"></i></summary>
+    <div class="charts-filter-options{% if field.name == 'range' %} charts-filter-options-numeric{% endif %}">
+      {% for option in field.options %}
+        <label><input type="checkbox" name="{{ field.name }}" value="{{ option.value }}"{% if option.selected %} checked{% endif %}><span title="{{ option.label }}">{{ option.label }}</span></label>
+      {% empty %}<p>No values reported in this scope.</p>{% endfor %}
+    </div>
+  </details>
+</fieldset>

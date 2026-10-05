@@ -16,6 +16,7 @@ from .analytics import (
     distribution, format_number, in_bin, number, summarize_object,
 )
 from .plots import bar_plot, histogram_plot, pie_plot
+from .filters import build_filter_fields
 
 SCOPES = {"public": "Public database", "mine": "My data"}
 LEGACY_SCOPES = {"all", "shared"}
@@ -224,11 +225,13 @@ def index(request):
     else:
         objects = objects.filter(access_type="all")
     records = []
+    scope_records = []
     base_count = 0
     if not errors:
         for obj in objects.only("pk", "data", "access_type").order_by("-uploaded_at", "-pk").iterator(chunk_size=1):
             base_count += 1
             record = summarize_object(obj)
+            scope_records.append(record)
             if matches_filters(record, query, intervals):
                 records.append(record)
             del obj
@@ -300,6 +303,12 @@ def index(request):
                           for value in (values if isinstance(values, list) else [values])]
     controls["scope"] = [(key, value) for key in ("material_group", "group", "measure")
                          if (value := query.get(key))]
+    filter_fields = build_filter_fields(scope_records, query)
+    excluded = {*CATEGORY_TITLES, "coverage", "result", "note", "range", "page", "show"}
+    controls["filters"] = [(key, value) for key, values in query.items() if key not in excluded
+                           for value in (values if isinstance(values, list) else [values])]
+    controls["filters"].extend(("range", value) for value in query.get("range", [])
+                              if value.partition(":")[0] not in MEASURES)
     context = {
         "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "Public database"),
         "include_private": include_private,
@@ -327,5 +336,7 @@ def index(request):
         "category_plot": bar_plot(selected_category["rows"]), "group": group,
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
         "control_params": controls,
+        "filter_fields": filter_fields, "primary_filters": filter_fields[:3], "more_filters": filter_fields[3:],
+        "more_filter_count": sum(field["selected_count"] for field in filter_fields[3:]),
     }
     return render(request, "charts/index.html", context)

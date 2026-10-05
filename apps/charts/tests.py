@@ -90,6 +90,80 @@ class ChartsTests(TestCase):
         self.assertIn("distributions", response.context)
         return response
 
+    def test_filter_choices_respect_scope_and_remain_available_after_selection(self):
+        """
+        Filtering statistics retains alternative choices without exposing private metadata
+        """
+        self.create_object("own-public")
+        self.create_object("other-public", owner=self.other, software="Public solver",
+                           phase=[{"phase_name": "Nickel"}])
+        self.create_object("own-private", access="c", software="Private solver",
+                           phase=[{"phase_name": "Iron"}])
+        shared = self.create_object("shared-private", owner=self.other, access="c", software="Shared secret")
+        shared.shared_users.add(self.viewer)
+        self.create_object("hidden-private", owner=self.other, access="c", software="Hidden secret")
+        cases = [({}, {"Abaqus CAE", "Public solver"}),
+                 ({"phase": "Copper"}, {"Abaqus CAE", "Public solver"}),
+                 ({"scope": "mine"}, {"Abaqus CAE"}),
+                 ({"scope": "mine", "include_private": "1"}, {"Abaqus CAE", "Private solver"})]
+        for query, expected in cases:
+            with self.subTest(query=query):
+                response = self.dashboard(**query)
+                self.assertIn("filter_fields", response.context)
+                fields = {field["key"]: field for field in response.context["filter_fields"]}
+                self.assertEqual({option["value"] for option in fields["software"]["options"]}, expected)
+                self.assertContains(response, 'id="charts-filters"')
+                self.assertContains(response, "Apply filters")
+                self.assertNotContains(response, "Shared secret")
+                self.assertNotContains(response, "Hidden secret")
+        self.assertEqual(self.dashboard(phase="Copper").context["total_objects"], 1)
+
+    def test_filter_form_retains_repeated_values_numeric_intervals_and_preferences(self):
+        """
+        The visible form edits existing AND conditions while keeping the selected scope
+        """
+        self.create_object(software=["Abaqus CAE", "DAMASK"],
+                           phase=[{"phase_name": "Copper"}, {"phase_name": "Nickel"}])
+        query = {"scope": "mine", "include_private": "1", "phase": ["Copper", "Nickel"],
+                 "software": ["Abaqus CAE", "DAMASK"], "coverage": "matching", "result": ["stress", "paired"],
+                 "range": ["temperature:298:298:1", "grain_count:340:350:1"], "note": "temperature_excluded",
+                 "material_group": "texture", "group": "loading_mode", "measure": "grain_count",
+                 "page": "3", "show": "objects"}
+        response = self.dashboard(**query)
+        self.assertIn("filter_fields", response.context)
+        fields = {field["key"]: field for field in response.context["filter_fields"]}
+        for key in ("phase", "software", "coverage", "result"):
+            selected = query[key] if isinstance(query[key], list) else [query[key]]
+            self.assertEqual({option["value"] for option in fields[key]["options"] if option["selected"]},
+                             set(selected))
+        for key, value in zip(("temperature_range", "grain_count_range"), query["range"]):
+            self.assertEqual([option["value"] for option in fields[key]["options"] if option["selected"]], [value])
+        params = dict(response.context["control_params"]["filters"])
+        for key in ("scope", "include_private", "material_group", "group", "measure"):
+            self.assertEqual(params[key], query[key])
+        self.assertFalse({"phase", "software", "coverage", "result", "range", "note", "page", "show"} & params.keys())
+
+    def test_invalid_filter_values_remain_visible_and_do_not_broaden_the_selection(self):
+        """
+        Unrecognized bookmarked conditions stay checked so applying cannot silently discard them
+        """
+        self.create_object()
+        label = 'Unknown"><script>alert(1)</script>'
+        response = self.dashboard(software=label, coverage="invalid", range="temperature:broken")
+        self.assertEqual(response.context["total_objects"], 0)
+        self.assertTrue(response.context["filter_errors"])
+        self.assertIn("filter_fields", response.context)
+        fields = {field["key"]: field for field in response.context["filter_fields"]}
+        for key, value in (("software", label), ("coverage", "invalid"), ("temperature_range", "temperature:broken")):
+            self.assertIn(value, [option["value"] for option in fields[key]["options"] if option["selected"]])
+        self.assertNotContains(response, "<script>alert(1)</script>")
+        response = self.dashboard(coverage=["matching", "MATCHING"], component="invalid", curve="invalid")
+        fields = {field["key"]: field for field in response.context["filter_fields"]}
+        self.assertEqual({option["value"] for option in fields["coverage"]["options"] if option["selected"]},
+                         {"matching", "MATCHING"})
+        self.assertEqual(dict(response.context["control_params"]["filters"]),
+                         {"component": "invalid", "curve": "invalid"})
+
     def test_public_and_own_scopes_exclude_received_private_records(self):
         """
         Private uploads require an explicit opt-in and shared data stays outside statistics
