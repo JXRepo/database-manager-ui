@@ -20,7 +20,6 @@
 .charts-page [data-feather], .charts-page svg.feather { width: 15px; height: 15px; flex-shrink: 0; }
 .charts-heading, .charts-heading-actions, .charts-scope-form { display: flex; align-items: center; }
 .charts-heading { justify-content: space-between; gap: 24px; }
-.charts-heading p { margin-top: 5px; color: var(--charts-muted); font-size: 12px; }
 .charts-heading-actions { gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .charts-scope-form { gap: 9px; }
 .charts-scope-form label { color: var(--charts-muted); font-size: 11px; }

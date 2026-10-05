@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Charts heading alignment)
+code_base: see latest git commit (Remove Charts heading description)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts heading layout, desktop comparison checks and handoff
+  - Charts heading description, unused paragraph style and handoff
 ---
 
 # Project handoff
@@ -14,7 +14,18 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：Charts 标题位置与公共页面对齐
+### 本轮：删除 Charts 顶部说明，解释记录入口
+
+- 用户逐项检查 Charts，认为 Explore statistical charts and tables, then open the records
+  behind them. 多余；已删除这段说明及仅供它使用的 .charts-heading p 样式。
+- View source records 是底部 Source records 的快捷入口：保留当前范围与筛选，
+  通过 show=objects#objects 跳转并展开参与统计的具体记录，可点标题进入详情。
+  用户本轮询问用途，尚未要求删除这个按钮。
+- 38 项 Charts 测试通过，无跳过；三个桌面宽度的标题对比及既有真实浏览器检查通过。
+  已查看删文案后的截图；日志 /tmp/charts-heading-copy.log，
+  截图 /tmp/charts-heading-copy-qa；尚未确认 Render 部署完成。
+
+### 上轮：Charts 标题位置与公共页面对齐
 
 - 用户指出前次调整后 Charts 标题的位置和大小仍不一致。真实浏览器对比发现：
   1280px 下比 My Data 向左偏 18px、向下偏 6px，字号和字重本身已相同。
