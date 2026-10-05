@@ -4,7 +4,7 @@
   <g transform="translate(0,24)">
   {% for tick in histogram.ticks %}<line x1="62" x2="636" y1="{{ tick.y }}" y2="{{ tick.y }}" class="charts-grid-line"/><text x="49" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
   {% for bin in histogram.columns %}
-    {% if bin.count %}<a class="charts-bin" href="{{ bin.url }}" data-object-count="{{ bin.object_count }}" data-observation-count="{{ bin.count }}" aria-label="{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }}. View {{ bin.object_count }} objects."><title>{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }} from {{ bin.object_count }} objects</title>{% else %}<g>{% endif %}
+    {% if bin.count %}<a class="charts-bin" href="{{ bin.url }}" data-object-count="{{ bin.object_count }}" data-observation-count="{{ bin.count }}" aria-label="{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }}. Filter statistics to {{ bin.object_count }} object{{ bin.object_count|pluralize }}."><title>{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }} from {{ bin.object_count }} objects</title>{% else %}<g>{% endif %}
       <rect x="{{ bin.x }}" y="{{ bin.y }}" width="{{ bin.width }}" height="{{ bin.plot_height }}" rx="3" class="charts-bin-mark"/>
       <text x="{{ bin.center }}" y="{{ bin.count_y }}" text-anchor="middle" class="charts-bin-count">{{ bin.count }}</text>
     {% if bin.count %}</a>{% else %}</g>{% endif %}

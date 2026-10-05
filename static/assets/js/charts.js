@@ -11,19 +11,17 @@
   });
   page.classList.add('charts-js');
 
-  const openRecords = () => {
-    const summary = document.getElementById('objects');
-    const details = summary?.closest('details');
-    if (details) {
-      details.open = true;
-      summary.scrollIntoView({block: 'start'});
-    }
-  };
   page.addEventListener('click', event => {
-    if (event.target.closest('a[href="#objects"]')) openRecords();
+    page.querySelectorAll('.charts-metrics details[open]').forEach(details => {
+      if (!details.contains(event.target)) details.open = false;
+    });
   });
-  window.addEventListener('hashchange', () => {
-    if (window.location.hash === '#objects') openRecords();
+  page.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const details = event.target.closest('.charts-metrics details[open]');
+    if (!details) return;
+    details.open = false;
+    details.querySelector('summary').focus();
+    event.preventDefault();
   });
-  if (window.location.hash === '#objects') openRecords();
 })();

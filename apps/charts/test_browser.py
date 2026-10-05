@@ -54,6 +54,7 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
                 data.pop("global_temperature")
             if index in (8, 20):
                 data["discretization_count"] = 10 ** 50 + (1 if index == 20 else 0)
+                data["phase"][0]["orientation"]["grain_count"] = data["discretization_count"]
             JSONData.objects.create(owner=viewer, data=data, access_type="all" if index % 2 == 0 else "c")
         long_data = valid_upload_object(
             identifier="long-identifier-" * 25,

@@ -11,15 +11,17 @@
         <div class="page-block">
           <div class="row align-items-center">
             <div class="col-md-12">
-              <div class="page-header-title"><h1 class="h5 m-b-10">Charts</h1></div>
-              <ul class="breadcrumb" aria-label="Breadcrumb">
+              <div class="page-header-title"><h1 class="h5 m-b-10">{% block charts_page_title %}Charts{% endblock %}</h1></div>
+              <ul class="breadcrumb" aria-label="Breadcrumb">{% block charts_breadcrumb %}
                 <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
                 <li class="breadcrumb-item" aria-current="page">Charts</li>
-              </ul>
+              {% endblock %}</ul>
             </div>
           </div>
         </div>
       </div>
+      {% block charts_scope_controls %}<div class="charts-heading-actions">
+      <a class="charts-record-link charts-metric-total" href="{{ records_url }}"><strong>{{ total_objects }}</strong> data object{{ total_objects|pluralize }}</a>
       <form method="get" action="{% url 'charts' %}" class="charts-scope-form" data-auto-submit>
         {% for key, value in control_params.scope %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
         <label for="charts-scope">Data scope</label>
@@ -27,6 +29,7 @@
         {% if scope == 'mine' %}<label class="charts-private-option" for="charts-include-private"><input type="checkbox" id="charts-include-private" name="include_private" value="1"{% if include_private %} checked{% endif %}>Include private data</label>{% endif %}
         <button type="submit" class="charts-apply">Apply</button>
       </form>
+      </div>{% endblock %}
     </header>
 
     {% if active_filters %}
@@ -37,11 +40,33 @@
     {% endif %}
     {% if filter_errors %}<div class="alert alert-warning charts-errors" role="alert">{% for error in filter_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
 
-    {% if total_objects %}
-      <section class="charts-metrics" aria-label="Selection overview">
-        <a class="charts-metric charts-metric-total" href="{{ records_url }}"><strong>{{ total_objects }}</strong><span>Data objects{% if active_filters %}<small>of {{ base_count }} in this scope</small>{% endif %}</span></a>
-        <a class="charts-metric" href="{{ matching_url }}"><strong>{{ matching_count }}</strong><span>Objects with stress–strain data</span></a>
-      </section>
+    {% block charts_workspace %}{% if total_objects %}
+      <dl class="charts-metrics" aria-label="Material and microstructure overview">
+        {% for category in overview_categories %}
+          <div class="charts-metric" data-overview="{{ category.key }}">
+            <dt>{% if category.key == 'phase' %}Material phases{% else %}Textures{% endif %}</dt>
+            <dd>{% if category.rows %}
+              <details class="charts-overview-labels">
+                <summary><span class="charts-overview-preview">{{ category.preview }}</span>{% if category.more_count %}<small>+{{ category.more_count }} more</small>{% endif %}</summary>
+                <ul>{% for row in category.rows %}<li><a href="{{ row.url }}"><span>{{ row.label }}</span><small>{{ row.count }} object{{ row.count|pluralize }}</small></a></li>{% endfor %}</ul>
+              </details>
+            {% else %}<span class="charts-overview-empty">Not available</span>{% endif %}</dd>
+            <small>{{ category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</small>
+          </div>
+        {% endfor %}
+        {% for item in primary_distributions %}
+          <div class="charts-metric" data-overview="{{ item.key }}">
+            <dt>{% if item.key == 'temperature' %}Temperature range{% else %}Grain number range{% endif %}</dt>
+            <dd>{% if item.observation_count %}
+              {% if item.expand_range %}<details class="charts-overview-range">
+                <summary>{% if item.constant %}View value{% else %}View range{% endif %}{% if item.unit %} ({{ item.unit }}){% endif %}</summary>
+                <div class="charts-overview-values"><dl><dt>Minimum{% if item.unit %} ({{ item.unit }}){% endif %}</dt><dd>{{ item.minimum }}</dd>{% if not item.constant %}<dt>Maximum{% if item.unit %} ({{ item.unit }}){% endif %}</dt><dd>{{ item.maximum }}</dd>{% endif %}</dl></div>
+              </details>{% else %}<span>{{ item.minimum }}{% if item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}{% if item.unit %} {{ item.unit }}{% endif %}</span>{% endif %}
+            {% else %}<span class="charts-overview-empty">Not available</span>{% endif %}</dd>
+            <small>{% if item.observation_unit == 'phases' %}{{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}{% else %}{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}{% endif %}</small>
+          </div>
+        {% endfor %}
+      </dl>
 
       <div class="charts-dashboard-grid">
         <section class="charts-panel" data-statistic="phase" aria-labelledby="phase-heading">
@@ -84,47 +109,9 @@
         {% endfor %}
       </div>
 
-      <details class="charts-additional-statistics">
-        <summary><span>Additional statistics</span><span class="charts-summary-action" aria-hidden="true"></span></summary>
-        <div class="charts-additional-body">
-          <div class="charts-additional-grid">
-            {% for category in additional_categories %}
-              <section class="charts-additional-section" data-category="{{ category.key }}">
-                <div class="charts-panel-heading"><h3>{{ category.title }}</h3><span class="charts-context-label">{{ category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
-                {% if category.rows %}{% include 'charts/statistics_table.html' with rows=category.rows caption=category.title %}{% else %}<p class="charts-additional-empty">Not reported</p>{% endif %}
-              </section>
-            {% endfor %}
-            {% with item=discretization_distribution %}
-              <section class="charts-additional-section" data-statistic="{{ item.key }}">
-                <div class="charts-panel-heading"><h3>{{ item.title }}</h3><span class="charts-context-label">{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
-                {% if item.observation_count %}
-                  <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}</strong></span><span>Range <strong>{{ item.minimum }}{% if item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}</strong></span></div>
-                  {% include 'charts/histogram.html' with histogram=item.plot %}
-                  <details class="charts-chart-data"><summary>Data table</summary>{% include 'charts/distribution_table.html' %}</details>
-                {% else %}<p class="charts-additional-empty">Not reported</p>{% endif %}
-              </section>
-            {% endwith %}
-            <section class="charts-additional-section">
-              <h3>Equivalent results</h3>
-              {% include 'charts/statistics_table.html' with rows=extra_output_rows caption='Equivalent results' label_heading='Output' %}
-            </section>
-            {% if note_rows %}<section class="charts-additional-section charts-statistics-notes">
-              <h3>Statistics notes</h3>
-              <div class="charts-statistics-wrap"><table class="charts-statistics-table"><thead><tr><th scope="col">Note</th><th scope="col">Objects</th></tr></thead><tbody>{% for note in note_rows %}<tr><th scope="row"><a href="{{ note.url }}">{{ note.title }}</a></th><td>{{ note.count }}</td></tr>{% endfor %}</tbody></table></div>
-            </section>{% endif %}
-          </div>
-        </div>
-      </details>
-
-      <details class="charts-objects"{% if objects_open %} open{% endif %}>
-        <summary id="objects"><span>Source records <span class="charts-object-count">{{ total_objects }}</span></span><span class="charts-summary-action">{{ scope_label }}</span></summary>
-        <div class="charts-object-body"><div class="charts-table-wrap"><table class="charts-table"><thead><tr><th scope="col">Data object</th><th scope="col">Phase</th><th scope="col">Software</th><th scope="col">Mechanical results</th><th scope="col">Access</th></tr></thead>
-          <tbody>{% for row in objects_page %}<tr><td><a class="charts-object-title" href="{% url 'json_data_detail' row.id %}" title="{{ row.title }}">{{ row.title }}</a><span class="charts-object-id">{{ row.identifier }}</span></td><td><span class="charts-cell-label" title="{{ row.phase_label }}">{{ row.phase_label }}</span></td><td><span class="charts-cell-label" title="{{ row.software_label }}">{{ row.software_label }}</span></td><td><span>{{ row.result_label }}</span><small>{{ row.points }}</small></td><td><span class="charts-access{% if row.access == 'Public' %} charts-access-public{% endif %}">{{ row.access }}</span></td></tr>{% endfor %}</tbody>
-        </table></div><nav class="charts-pagination" aria-label="Data object pages"><span>{{ objects_page.start_index }}–{{ objects_page.end_index }} of {{ total_objects }} object{{ total_objects|pluralize }}</span><div>{% if previous_url %}<a href="{{ previous_url }}" rel="prev">Previous</a>{% endif %}<span>Page {{ objects_page.number }} of {{ objects_page.paginator.num_pages }}</span>{% if next_url %}<a href="{{ next_url }}" rel="next">Next</a>{% endif %}</div></nav></div>
-      </details>
     {% else %}
       <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if filter_errors %}Correct the selection to view statistics{% elif active_filters %}No objects match this selection{% else %}No data in this scope{% endif %}</h2><p>{% if filter_errors %}Clear the selection or choose a valid data scope.{% elif active_filters %}Remove a selection or change the data scope.{% elif scope == 'mine' and not include_private %}Include private data to see all your uploads.{% else %}Choose another scope or upload data.{% endif %}</p><div>{% if active_filters or filter_errors %}<a class="charts-button charts-button-primary charts-clear charts-selection-clear" href="{{ clear_url }}">Clear selection</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
-    {% endif %}
+    {% endif %}{% endblock charts_workspace %}
   </div>
 </main>
 {% endblock content %}

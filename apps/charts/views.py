@@ -37,7 +37,7 @@ def chart_url(query, changes=None, objects=False):
     changes : dict, optional
         Values to replace, or None to remove.
     objects : bool, optional
-        Expand and target the matching-object list.
+        Open the separate page of matching objects.
 
     Returns
     -------
@@ -74,12 +74,12 @@ def refine_url(query, key, value, **changes):
     Returns
     -------
     str
-        Link to objects satisfying both the current and new conditions.
+        Statistics URL requiring both the current and new conditions.
     """
     selected = query.get(key, [])
     if value.casefold() not in {item.casefold() for item in selected}:
         selected = [*selected, value]
-    return chart_url(query, {"curve": None, "component": None, **changes, key: selected}, objects=True)
+    return chart_url(query, {"curve": None, "component": None, "show": None, **changes, key: selected})
 
 
 def parse_filters(params):
@@ -261,6 +261,10 @@ def index(request):
             bounds = ":".join([measure, bucket["low"], bucket["high"], "1" if bucket["inclusive"] else "0"])
             bucket["url"] = refine_url(query, "range", bounds, measure=measure)
         item["plot"] = histogram_plot(item)
+        range_length = len(item["minimum"]) + len(item["unit"])
+        if item["minimum"] != item["maximum"]:
+            range_length += len(item["maximum"]) + 1
+        item["expand_range"] = range_length > 32
         distributions.append(item)
     result_rows = []
     for key, title in RESULT_TITLES.items():
@@ -319,6 +323,10 @@ def index(request):
                           (("material_group", MATERIAL_GROUPS), ("group", SETUP_GROUPS), ("measure", MEASURES))
                           if query.get(key) in choices]}
     output_rows = [row for row in result_rows if row["key"] in {"stress", "total_strain", "plastic_strain"}]
+    overview_categories = [categories["phase"], categories["texture"]]
+    for category in overview_categories:
+        category["preview"] = ", ".join(row["label"] for row in category["rows"][:2])
+        category["more_count"] = max(0, len(category["rows"]) - 2)
     context = {
         "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "Public database"),
         "include_private": include_private, "scope_valid": scope_valid,
@@ -337,8 +345,9 @@ def index(request):
         "note_rows": note_rows, "noted_objects": sum(bool(record["notes"]) for record in records),
         "active_filters": active_filters, "filter_errors": errors, "clear_url": clear_url,
         "objects_page": page,
-        "records_url": chart_url(query, objects=True),
-        "objects_open": bool(active_filters or query.get("show") == "objects"),
+        "records_url": chart_url(retained_query, objects=True),
+        "overview_url": chart_url(retained_query, {"show": None}),
+        "overview_categories": overview_categories,
         "previous_url": chart_url(query, {"page": page.previous_page_number()}, objects=True) if page.has_previous() else "",
         "next_url": chart_url(query, {"page": page.next_page_number()}, objects=True) if page.has_next() else "",
         "material_options": [(key, CATEGORY_TITLES[key]) for key in MATERIAL_GROUPS],
@@ -350,8 +359,8 @@ def index(request):
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
         "phase_category": categories["phase"], "phase_plot": bar_plot(categories["phase"]["rows"]),
         "software_category": categories["software"], "software_plot": bar_plot(categories["software"]["rows"]),
-        "primary_distributions": distributions[:2], "discretization_distribution": distributions[2],
-        "additional_categories": [categories[key] for key in ("texture", "elastic_model", "plastic_model", "loading_type", "loading_mode")],
+        "primary_distributions": distributions[:2],
         "control_params": controls,
     }
-    return render(request, "charts/index.html", context)
+    template = "charts/records.html" if query.get("show") == "objects" else "charts/index.html"
+    return render(request, template, context)

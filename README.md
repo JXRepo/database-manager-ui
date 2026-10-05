@@ -379,9 +379,14 @@ still requires a platform account. Other users' private records never contribute
 to statistics or linked lists. Old scope=all and scope=shared bookmarks redirect
 to Public database while preserving valid selections.
 
-The default page starts with a compact row of two totals: data objects and
-objects with matching stress–strain components. Both link to their source
-records. Phase and software categories appear in their distribution charts.
+The default page starts with a material and microstructure overview: supplied
+**Material phases**, **Textures**, **Temperature range** in kelvin and
+**Grain number range**. It shows actual names and numeric ranges for the current
+selection. Phase and texture disclosures retain all names and exact category
+links; very long numerical ranges expand to their full minimum and maximum.
+Grain numbers refer to phase observations, not physical grain sizes. Missing
+values are marked unavailable, while genuine zeros remain visible. The compact
+object count beside Data scope links to a separate page of matching objects.
 Six charts are visible directly, in three pairs:
 
 - **Phase** counts objects for each phase name with horizontal bars.
@@ -395,7 +400,7 @@ Six charts are visible directly, in three pairs:
 
 There is no independent Filters form or chart-category selector. Clicking a
 bar, pie slice, numeric interval or statistics-table entry narrows the same
-selection and opens the matching source records. Active conditions appear only
+selection and updates all statistics. Active conditions appear only
 when selected, with individual removal links and **Clear selection**. Conditions
 combine with AND on the same accessible object, including successive selections
 within one category and across numeric measures. All charts update together.
@@ -408,12 +413,13 @@ private-inclusion parameters stay invalid when removing another condition.
 
 Each chart retains its denominator and units. Full HTML statistics tables are
 available under **Data table**, including complete names and categories beyond
-the first six bars. **Additional statistics** contains texture, elastic and
-plastic models, loading type and mode, the discretization distribution,
-equivalent-output availability and notes affecting statistics. **Source records**
-contains paginated links to the actual data objects. These disclosures start
-collapsed so the main charts remain prominent; selecting a chart opens source
-records. Data with no usable temperature or grain number retain explicit empty
+the first six bars. The dashboard has no Additional statistics or Source records
+sections. The object-count link opens **Data objects**, with the same exact
+selection, scope, private inclusion and pagination; object titles open detail
+pages, and **Back to Charts** returns to the selected statistics. Existing
+show=objects links use this page. Historical model, loading, discretization,
+equivalent-output and note filters remain valid in bookmarked URLs. Data with
+no usable temperature or grain number retain explicit empty
 chart cards instead of a fabricated value.
 
 Category counts deduplicate each object per case-insensitive label. Multiple

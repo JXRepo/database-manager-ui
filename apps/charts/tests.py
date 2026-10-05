@@ -107,6 +107,65 @@ class ChartsTests(TestCase):
         self.assertNotContains(response, "More filters")
         self.assertNotContains(response, "Chart category")
         self.assertNotContains(response, 'aria-label="Selected statistics"')
+        self.assertNotContains(response, "Additional statistics")
+        self.assertNotContains(response, "Source records")
+        self.assertNotContains(response, 'class="charts-records"')
+
+    def test_material_overview_reports_names_and_true_numeric_ranges(self):
+        """
+        The overview describes supplied phases and organization without inventing material properties
+        """
+        self.create_object("multi-phase", global_temperature=25, units={"Temperature": "C"},
+                           phase=[{"phase_name": "Copper", "orientation": {"grain_count": 0, "texture_type": "Goss"}},
+                                  {"phase_name": "Nickel", "orientation": {"grain_count": 200, "texture_type": "Random"}}])
+        self.create_object("nickel", global_temperature=100, units={"Temperature": "C"},
+                           phase=[{"phase_name": "Nickel", "orientation": {"grain_count": 343, "texture_type": "Random"}}])
+        self.create_object("private", access="c", global_temperature=1500,
+                           phase=[{"phase_name": "Private phase", "orientation": {"grain_count": 500}}])
+        response = self.dashboard()
+        phases, textures = response.context["overview_categories"]
+        self.assertEqual({row["label"] for row in phases["rows"]}, {"Copper", "Nickel"})
+        self.assertEqual({row["label"] for row in textures["rows"]}, {"Goss", "Random"})
+        temperature, grains = response.context["primary_distributions"]
+        self.assertEqual((temperature["minimum"], temperature["maximum"]), ("298.15", "373.15"))
+        self.assertEqual((grains["minimum"], grains["maximum"], grains["observation_count"]), ("0", "343", 3))
+        self.assertNotContains(response, "Private phase")
+        selected = self.dashboard(phase="Copper")
+        temperature, grains = selected.context["primary_distributions"]
+        self.assertEqual((temperature["minimum"], temperature["maximum"]), ("298.15", "298.15"))
+        self.assertEqual((grains["minimum"], grains["maximum"]), ("0", "200"))
+        self.assertEqual(selected.context["total_objects"], 1)
+
+    def test_separate_records_page_retains_exact_selection_and_invalid_scopes(self):
+        """
+        Moving the object list out of Charts preserves permissions and every active condition
+        """
+        wanted = self.create_object("selected", access="c")
+        self.create_object("unselected", access="c", software="Other software")
+        self.create_object("public-other", owner=self.other)
+        shared = self.create_object("shared", owner=self.other, access="c")
+        shared.shared_users.add(self.viewer)
+        response = self.dashboard(scope="mine", include_private="1", software="Abaqus CAE",
+                                  range="temperature:298:298:1", result="matching_response")
+        records = self.client.get(response.context["records_url"])
+        self.assertTemplateUsed(records, "charts/records.html")
+        self.assertEqual([row["id"] for row in records.context["objects_page"]], [wanted.pk])
+        self.assertContains(records, 'class="charts-records"')
+        self.assertNotContains(records, 'class="charts-dashboard-grid"')
+        self.assertNotContains(records, "Source records")
+        overview = self.client.get(records.context["overview_url"])
+        self.assertTemplateUsed(overview, "charts/index.html")
+        self.assertEqual(overview.context["total_objects"], 1)
+        self.assertEqual(overview.context["active_filters"], response.context["active_filters"])
+        for query in ({"scope": ["mine", "public"]}, {"scope": ""},
+                      {"scope": "mine", "include_private": ["1", "0"]},
+                      {"scope": "mine", "include_private": ""}):
+            with self.subTest(query=query):
+                invalid = self.dashboard(**query)
+                records = self.client.get(invalid.context["records_url"])
+                self.assertTrue(records.context["filter_errors"])
+                self.assertEqual(records.context["total_objects"], 0)
+                self.assertEqual(self.client.get(records.context["overview_url"]).context["total_objects"], 0)
 
     def test_fixed_statistics_respect_scope_and_chart_selection(self):
         """

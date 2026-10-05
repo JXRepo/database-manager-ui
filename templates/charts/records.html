@@ -1,0 +1,23 @@
+{% extends "charts/index.html" %}
+{% block title %}Data objects{% endblock %}
+{% block charts_page_title %}Data objects{% endblock %}
+{% block charts_breadcrumb %}
+  <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+  <li class="breadcrumb-item"><a href="{{ overview_url }}">Charts</a></li>
+  <li class="breadcrumb-item" aria-current="page">Data objects</li>
+{% endblock %}
+{% block charts_scope_controls %}
+  <div class="charts-heading-actions"><span class="charts-metric-total"><strong>{{ total_objects }}</strong> data object{{ total_objects|pluralize }}</span><a class="charts-button" href="{{ overview_url }}">Back to Charts</a></div>
+{% endblock %}
+{% block charts_workspace %}
+  {% if total_objects %}
+    <section class="charts-records" id="objects" aria-label="Matching data objects">
+      <div class="charts-table-wrap"><table class="charts-table"><thead><tr><th scope="col">Data object</th><th scope="col">Phase</th><th scope="col">Software</th><th scope="col">Mechanical results</th><th scope="col">Access</th></tr></thead>
+        <tbody>{% for row in objects_page %}<tr><td><a class="charts-object-title" href="{% url 'json_data_detail' row.id %}" title="{{ row.title }}">{{ row.title }}</a><span class="charts-object-id">{{ row.identifier }}</span></td><td><span class="charts-cell-label" title="{{ row.phase_label }}">{{ row.phase_label }}</span></td><td><span class="charts-cell-label" title="{{ row.software_label }}">{{ row.software_label }}</span></td><td><span>{{ row.result_label }}</span><small>{{ row.points }}</small></td><td><span class="charts-access{% if row.access == 'Public' %} charts-access-public{% endif %}">{{ row.access }}</span></td></tr>{% endfor %}</tbody>
+      </table></div>
+      <nav class="charts-pagination" aria-label="Data object pages"><span>{{ objects_page.start_index }}–{{ objects_page.end_index }} of {{ total_objects }} object{{ total_objects|pluralize }}</span><div>{% if previous_url %}<a href="{{ previous_url }}" rel="prev">Previous</a>{% endif %}<span>Page {{ objects_page.number }} of {{ objects_page.paginator.num_pages }}</span>{% if next_url %}<a href="{{ next_url }}" rel="next">Next</a>{% endif %}</div></nav>
+    </section>
+  {% else %}
+    <section class="charts-empty"><h2>{% if filter_errors %}Correct the selection to view data{% else %}No data objects match{% endif %}</h2><a class="charts-button" href="{{ overview_url }}">Back to Charts</a></section>
+  {% endif %}
+{% endblock %}

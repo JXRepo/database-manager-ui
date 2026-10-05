@@ -1,6 +1,6 @@
 <div class="charts-pie-layout">
   <svg class="charts-pie-svg" viewBox="0 0 280 260" role="group" aria-label="Stress–strain coverage pie chart for {{ total_objects }} object{{ total_objects|pluralize }}" xmlns="http://www.w3.org/2000/svg">
-    {% for slice in coverage_plot.slices %}<a class="charts-pie-slice" href="{{ slice.url }}" aria-label="{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }}, {{ slice.percent|floatformat:'1u' }}%. View objects."><title>{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }} ({{ slice.percent|floatformat:'1u' }}%)</title><path d="{{ slice.path }}" fill="{{ slice.color }}"/></a>{% endfor %}
+    {% for slice in coverage_plot.slices %}<a class="charts-pie-slice" href="{{ slice.url }}" aria-label="{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }}, {{ slice.percent|floatformat:'1u' }}%. Filter statistics to these objects."><title>{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }} ({{ slice.percent|floatformat:'1u' }}%)</title><path d="{{ slice.path }}" fill="{{ slice.color }}"/></a>{% endfor %}
   </svg>
   <table class="charts-statistics-table charts-coverage-table">
     <caption class="visually-hidden">Stress–strain coverage: {{ total_objects }} object{{ total_objects|pluralize }}</caption>

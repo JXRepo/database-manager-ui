@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Simplify Charts overview to two useful totals)
+code_base: see latest git commit (Focus Charts overview on materials and microstructure)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts overview labels, compact spacing, browser checks and documentation
+  - Charts material overview, separate matching-object page, browser checks and documentation
 ---
 
 # Project handoff
@@ -13,6 +13,27 @@ files_modified:
 ## 当前状态
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
+
+### 本轮：材料信息概览，移除两个折叠区
+
+- 用户明确不要 Additional statistics 和 Source records，要求认真考虑顶部一行的用途。
+  删除这两个区及旧展开脚本／样式；六个主要统计图和各自 Data table 保留。
+- 顶部一行改为 Material phases、Textures、Temperature range、Grain number range：
+  展示实际名称和当前选择的范围，用户样例为 Copper／Goss／298 K／343。
+  类别可展开查看完整名称并按同一对象 AND 筛选；长数值范围用原生 View range／
+  View value 展示完整极值，不截断或重算数字。支持回车、Escape 和点击外部收起。
+  保留覆盖分母／相观测数量、缺失状态与有效零；晶粒数不当作晶粒尺寸或推导材料性能。
+- 总对象数移到 Data scope 旁的紧凑入口，匹配列表在独立 Data objects 页面查看，
+  不再占 Charts 页面底部。沿用 show=objects 和同一个权限／筛选查询、分页和详情链接；
+  图表选择留在 Charts，Back to Charts 保留条件；旧数值、模型、加载及 note 书签仍可用。
+  列表和返回链接保留空值／重复的无效范围参数，避免错误选择静默扩大数据范围。
+- 50 项 Charts 测试通过，无跳过；真实 Chromium 检查三个桌面宽度、完整／缺失／
+  长名称／大数／空数据、相与织构选择、准确数字区间、私有权限、独立列表分页及返回、
+  键盘、无 JavaScript GET 和样例详情。样例文件与隔离 SQLite 的 JSON 未改变。
+  已查看公共概览、样例、缺失字段、大数和独立列表截图；独立代码复查发现图表的
+  aria-label 仍声称 View objects，已改为筛选统计的实际行为。日志
+  /tmp/charts-material-overview-final.log，截图 /tmp/charts-material-overview-final-qa。
+  尚未确认 Render 部署完成。
 
 ### 本轮：精简 Charts 顶部概览
 
