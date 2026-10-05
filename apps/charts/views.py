@@ -261,10 +261,6 @@ def index(request):
             bounds = ":".join([measure, bucket["low"], bucket["high"], "1" if bucket["inclusive"] else "0"])
             bucket["url"] = refine_url(query, "range", bounds, measure=measure)
         item["plot"] = histogram_plot(item)
-        range_length = len(item["minimum"]) + len(item["unit"])
-        if item["minimum"] != item["maximum"]:
-            range_length += len(item["maximum"]) + 1
-        item["expand_range"] = range_length > 32
         distributions.append(item)
     result_rows = []
     for key, title in RESULT_TITLES.items():
@@ -323,15 +319,12 @@ def index(request):
                           (("material_group", MATERIAL_GROUPS), ("group", SETUP_GROUPS), ("measure", MEASURES))
                           if query.get(key) in choices]}
     output_rows = [row for row in result_rows if row["key"] in {"stress", "total_strain", "plastic_strain"}]
-    overview_categories = [categories["phase"], categories["texture"]]
-    for category in overview_categories:
-        category["preview"] = ", ".join(row["label"] for row in category["rows"][:2])
-        category["more_count"] = max(0, len(category["rows"]) - 2)
     context = {
         "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "Public database"),
         "include_private": include_private, "scope_valid": scope_valid,
         "scope_options": SCOPES.items(), "base_count": base_count, "total_objects": total,
         "phase_count": len(categories["phase"]["rows"]),
+        "texture_count": len(categories["texture"]["rows"]),
         "software_count": len(categories["software"]["rows"]),
         "matching_count": sum("matching_response" in record["results"] for record in records),
         "plastic_count": sum("plastic_strain" in record["results"] for record in records),
@@ -347,7 +340,6 @@ def index(request):
         "objects_page": page,
         "records_url": chart_url(retained_query, objects=True),
         "overview_url": chart_url(retained_query, {"show": None}),
-        "overview_categories": overview_categories,
         "previous_url": chart_url(query, {"page": page.previous_page_number()}, objects=True) if page.has_previous() else "",
         "next_url": chart_url(query, {"page": page.next_page_number()}, objects=True) if page.has_next() else "",
         "material_options": [(key, CATEGORY_TITLES[key]) for key in MATERIAL_GROUPS],

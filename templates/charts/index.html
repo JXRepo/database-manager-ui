@@ -21,7 +21,7 @@
         </div>
       </div>
       {% block charts_scope_controls %}<div class="charts-heading-actions">
-      <a class="charts-record-link charts-metric-total" href="{{ records_url }}"><strong>{{ total_objects }}</strong> data object{{ total_objects|pluralize }}</a>
+      <a class="charts-record-link" href="{{ records_url }}">View data</a>
       <form method="get" action="{% url 'charts' %}" class="charts-scope-form" data-auto-submit>
         {% for key, value in control_params.scope %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
         <label for="charts-scope">Data scope</label>
@@ -41,31 +41,19 @@
     {% if filter_errors %}<div class="alert alert-warning charts-errors" role="alert">{% for error in filter_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
 
     {% block charts_workspace %}{% if total_objects %}
-      <dl class="charts-metrics" aria-label="Material and microstructure overview">
-        {% for category in overview_categories %}
-          <div class="charts-metric" data-overview="{{ category.key }}">
-            <dt>{% if category.key == 'phase' %}Material phases{% else %}Textures{% endif %}</dt>
-            <dd>{% if category.rows %}
-              <details class="charts-overview-labels">
-                <summary><span class="charts-overview-preview">{{ category.preview }}</span>{% if category.more_count %}<small>+{{ category.more_count }} more</small>{% endif %}</summary>
-                <ul>{% for row in category.rows %}<li><a href="{{ row.url }}"><span>{{ row.label }}</span><small>{{ row.count }} object{{ row.count|pluralize }}</small></a></li>{% endfor %}</ul>
-              </details>
-            {% else %}<span class="charts-overview-empty">Not available</span>{% endif %}</dd>
-            <small>{{ category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</small>
-          </div>
-        {% endfor %}
-        {% for item in primary_distributions %}
-          <div class="charts-metric" data-overview="{{ item.key }}">
-            <dt>{% if item.key == 'temperature' %}Temperature range{% else %}Grain number range{% endif %}</dt>
-            <dd>{% if item.observation_count %}
-              {% if item.expand_range %}<details class="charts-overview-range">
-                <summary>{% if item.constant %}View value{% else %}View range{% endif %}{% if item.unit %} ({{ item.unit }}){% endif %}</summary>
-                <div class="charts-overview-values"><dl><dt>Minimum{% if item.unit %} ({{ item.unit }}){% endif %}</dt><dd>{{ item.minimum }}</dd>{% if not item.constant %}<dt>Maximum{% if item.unit %} ({{ item.unit }}){% endif %}</dt><dd>{{ item.maximum }}</dd>{% endif %}</dl></div>
-              </details>{% else %}<span>{{ item.minimum }}{% if item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}{% if item.unit %} {{ item.unit }}{% endif %}</span>{% endif %}
-            {% else %}<span class="charts-overview-empty">Not available</span>{% endif %}</dd>
-            <small>{% if item.observation_unit == 'phases' %}{{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}{% else %}{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}{% endif %}</small>
-          </div>
-        {% endfor %}
+      <dl class="charts-metrics" aria-label="Dataset statistics">
+        <div class="charts-metric charts-metric-total" data-overview="objects">
+          <dt>Data objects</dt><dd><strong>{{ total_objects }}</strong></dd>
+        </div>
+        <div class="charts-metric" data-overview="phase">
+          <dt title="Distinct reported phase names">Material phases</dt><dd><strong>{{ phase_count }}</strong></dd>
+        </div>
+        <div class="charts-metric" data-overview="texture">
+          <dt title="Distinct reported texture types">Texture types</dt><dd><strong>{{ texture_count }}</strong></dd>
+        </div>
+        <div class="charts-metric" data-overview="matching">
+          <dt>Objects with stress–strain data</dt><dd><strong>{{ matching_count }}</strong></dd>
+        </div>
       </dl>
 
       <div class="charts-dashboard-grid">

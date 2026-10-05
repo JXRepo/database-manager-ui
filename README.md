@@ -379,14 +379,13 @@ still requires a platform account. Other users' private records never contribute
 to statistics or linked lists. Old scope=all and scope=shared bookmarks redirect
 to Public database while preserving valid selections.
 
-The default page starts with a material and microstructure overview: supplied
-**Material phases**, **Textures**, **Temperature range** in kelvin and
-**Grain number range**. It shows actual names and numeric ranges for the current
-selection. Phase and texture disclosures retain all names and exact category
-links; very long numerical ranges expand to their full minimum and maximum.
-Grain numbers refer to phase observations, not physical grain sizes. Missing
-values are marked unavailable, while genuine zeros remain visible. The compact
-object count beside Data scope links to a separate page of matching objects.
+The default page starts with four simple totals: **Data objects**,
+**Material phases**, **Texture types** and **Objects with stress–strain data**.
+Phase and texture totals count distinct reported names, ignoring case, rather
+than phase observations. Stress–strain availability counts objects with matching
+components, not individual curves. All four totals describe the current
+accessible selection; missing names contribute no category. **View data** beside
+Data scope links to a separate page of matching objects.
 Six charts are visible directly, in three pairs:
 
 - **Phase** counts objects for each phase name with horizontal bars.
@@ -414,7 +413,7 @@ private-inclusion parameters stay invalid when removing another condition.
 Each chart retains its denominator and units. Full HTML statistics tables are
 available under **Data table**, including complete names and categories beyond
 the first six bars. The dashboard has no Additional statistics or Source records
-sections. The object-count link opens **Data objects**, with the same exact
+sections. **View data** opens **Data objects**, with the same exact
 selection, scope, private inclusion and pagination; object titles open detail
 pages, and **Back to Charts** returns to the selected statistics. Existing
 show=objects links use this page. Historical model, loading, discretization,

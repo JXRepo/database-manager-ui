@@ -111,21 +111,25 @@ class ChartsTests(TestCase):
         self.assertNotContains(response, "Source records")
         self.assertNotContains(response, 'class="charts-records"')
 
-    def test_material_overview_reports_names_and_true_numeric_ranges(self):
+    def test_statistics_totals_count_distinct_categories_and_selected_objects(self):
         """
-        The overview describes supplied phases and organization without inventing material properties
+        Totals deduplicate names and count accessible objects while ranges retain phase observations
         """
         self.create_object("multi-phase", global_temperature=25, units={"Temperature": "C"},
                            phase=[{"phase_name": "Copper", "orientation": {"grain_count": 0, "texture_type": "Goss"}},
-                                  {"phase_name": "Nickel", "orientation": {"grain_count": 200, "texture_type": "Random"}}])
+                                  {"phase_name": "Nickel", "orientation": {"grain_count": 200, "texture_type": "Random"}},
+                                  {"phase_name": "copper", "orientation": {"texture_type": "goss"}}])
         self.create_object("nickel", global_temperature=100, units={"Temperature": "C"},
                            phase=[{"phase_name": "Nickel", "orientation": {"grain_count": 343, "texture_type": "Random"}}])
         self.create_object("private", access="c", global_temperature=1500,
                            phase=[{"phase_name": "Private phase", "orientation": {"grain_count": 500}}])
         response = self.dashboard()
-        phases, textures = response.context["overview_categories"]
+        phases = response.context["categories"]["phase"]
+        textures = response.context["categories"]["texture"]
         self.assertEqual({row["label"] for row in phases["rows"]}, {"Copper", "Nickel"})
         self.assertEqual({row["label"] for row in textures["rows"]}, {"Goss", "Random"})
+        self.assertEqual([response.context[key] for key in
+                          ("total_objects", "phase_count", "texture_count", "matching_count")], [2, 2, 2, 2])
         temperature, grains = response.context["primary_distributions"]
         self.assertEqual((temperature["minimum"], temperature["maximum"]), ("298.15", "373.15"))
         self.assertEqual((grains["minimum"], grains["maximum"], grains["observation_count"]), ("0", "343", 3))
@@ -135,6 +139,8 @@ class ChartsTests(TestCase):
         self.assertEqual((temperature["minimum"], temperature["maximum"]), ("298.15", "298.15"))
         self.assertEqual((grains["minimum"], grains["maximum"]), ("0", "200"))
         self.assertEqual(selected.context["total_objects"], 1)
+        self.assertEqual([selected.context[key] for key in
+                          ("phase_count", "texture_count", "matching_count")], [2, 2, 1])
 
     def test_separate_records_page_retains_exact_selection_and_invalid_scopes(self):
         """
@@ -270,6 +276,7 @@ class ChartsTests(TestCase):
         """
         self.create_object(phase=[{"phase_name": "Copper"}], global_temperature=None, mechanical_BC=[])
         response = self.dashboard()
+        self.assertEqual(response.context["texture_count"], 0)
         for item in response.context["primary_distributions"]:
             self.assertEqual(item["object_count"], 0)
             self.assertEqual(item["plot"]["columns"], [])

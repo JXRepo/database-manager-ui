@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Focus Charts overview on materials and microstructure)
+code_base: see latest git commit (Show four clear statistical totals on Charts)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts material overview, separate matching-object page, browser checks and documentation
+  - Charts statistical totals, browser checks and documentation
 ---
 
 # Project handoff
@@ -14,7 +14,25 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：材料信息概览，移除两个折叠区
+### 本轮：顶部回归简单统计数字
+
+- 用户认为上一版越来越偏，明确要求这一行放简单统计数字。改为四项数字＋短标签：
+  Data objects、Material phases、Texture types、Objects with stress–strain data。
+  材料相和织构按当前选择内忽略大小写的不同名称计数，最后一项按具备匹配分量的
+  数据对象计数，不计曲线条数；缺少名称不增加类别，其他对象统计仍保留。
+- 移除顶部名称列表、数值范围、展开菜单和覆盖副标题，以及仅供菜单使用的后端
+  预览字段／脚本／样式。四个数字在桌面同行显示，保留温度和晶粒直方图中的精确范围。
+  Data scope 旁入口改为 View data，沿用独立 Data objects 页面及原来的筛选／权限。
+  Additional statistics 和内联 Source records 继续移除；六个主要图表及 Data table 保留。
+- 50 项 Charts 测试通过，无跳过；真实 Chromium 检查 1280／1440／1920 桌面排版、
+  公共／自己的公开和私有范围、类别去重、匹配分量计数、缺失／空数据、精确大数区间、
+  组合筛选、旧织构书签、独立列表与分页、键盘和无 JavaScript 导航。
+  已查看公共概览、用户样例和缺失字段截图；样例文件与隔离 SQLite 的 JSON 未改变。
+  JavaScript 语法与 git diff --check 通过，无新依赖或迁移。日志
+  /tmp/charts-simple-statistics.log，截图 /tmp/charts-simple-statistics-qa。
+  尚未确认 Render 部署完成。
+
+### 上轮：材料信息概览，移除两个折叠区
 
 - 用户明确不要 Additional statistics 和 Source records，要求认真考虑顶部一行的用途。
   删除这两个区及旧展开脚本／样式；六个主要统计图和各自 Data table 保留。
