@@ -13,7 +13,6 @@
 .charts-page * { min-width: 0; }
 .charts-page [hidden] { display: none !important; }
 .charts-page h1, .charts-page h2, .charts-page h3, .charts-page p { margin: 0; }
-.charts-page h1 { color: var(--charts-ink); font-size: 28px; font-weight: 700; letter-spacing: -.6px; }
 .charts-page h2 { color: var(--charts-ink); font-size: 16px; font-weight: 650; line-height: 1.5; }
 .charts-page h3 { color: var(--charts-ink); font-size: 13px; }
 .charts-page a { color: var(--charts-blue); }
