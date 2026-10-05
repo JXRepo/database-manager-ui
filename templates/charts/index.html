@@ -7,108 +7,126 @@
 <main class="pc-container charts-page">
   <div class="pc-content charts-content">
     <header class="charts-heading">
-      <div>
-        <div class="page-header">
-          <div class="page-block">
-            <div class="row align-items-center">
-              <div class="col-md-12">
-                <div class="page-header-title"><h1 class="h5 m-b-10">Charts</h1></div>
-                <ul class="breadcrumb" aria-label="Breadcrumb">
-                  <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
-                  <li class="breadcrumb-item" aria-current="page">Charts</li>
-                </ul>
-              </div>
+      <div class="page-header">
+        <div class="page-block">
+          <div class="row align-items-center">
+            <div class="col-md-12">
+              <div class="page-header-title"><h1 class="h5 m-b-10">Charts</h1></div>
+              <ul class="breadcrumb" aria-label="Breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+                <li class="breadcrumb-item" aria-current="page">Charts</li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
-      <div class="charts-heading-actions">
-        <form method="get" class="charts-scope-form" data-auto-submit>
-          {% for key, value in control_params.scope %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-          <label for="charts-scope">Data scope</label>
-          <select name="scope" id="charts-scope">{% for value, label in scope_options %}<option value="{{ value }}"{% if scope == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
-          {% if scope == 'mine' %}<label class="charts-private-option" for="charts-include-private"><input type="checkbox" id="charts-include-private" name="include_private" value="1"{% if include_private %} checked{% endif %}>Include private data</label>{% endif %}
-          <button type="submit" class="charts-apply">Apply</button>
-        </form>
-      </div>
+      <form method="get" action="{% url 'charts' %}" class="charts-scope-form" data-auto-submit>
+        {% for key, value in control_params.scope %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+        <label for="charts-scope">Data scope</label>
+        <select name="scope" id="charts-scope">{% for value, label in scope_options %}<option value="{{ value }}"{% if scope == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        {% if scope == 'mine' %}<label class="charts-private-option" for="charts-include-private"><input type="checkbox" id="charts-include-private" name="include_private" value="1"{% if include_private %} checked{% endif %}>Include private data</label>{% endif %}
+        <button type="submit" class="charts-apply">Apply</button>
+      </form>
     </header>
-    {% include 'charts/filters.html' %}
+
+    {% if active_filters %}
+      <nav class="charts-filter-strip" aria-label="Selected statistics">
+        {% for item in active_filters %}<a class="charts-filter" href="{{ item.url }}" title="Remove {{ item.label }}"><span>{{ item.label }}</span><span aria-hidden="true">×</span><span class="visually-hidden">Remove filter</span></a>{% endfor %}
+        <a href="{{ clear_url }}" class="charts-clear charts-selection-clear">Clear</a>
+      </nav>
+    {% endif %}
     {% if filter_errors %}<div class="alert alert-warning charts-errors" role="alert">{% for error in filter_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
+
     {% if total_objects %}
       <section class="charts-metrics" aria-label="Selection overview">
-        <div class="charts-metric charts-metric-total"><strong>{{ total_objects }}</strong><span>Data objects{% if active_filters %}<small>of {{ base_count }} in this scope</small>{% endif %}</span></div>
-        <div class="charts-metric"><strong>{{ phase_count }}</strong><span>Distinct phase names</span></div>
-        <a class="charts-metric" href="{{ matching_url }}"><strong>{{ matching_count }}</strong><span>With matching stress &amp; strain</span></a>
-        <a class="charts-metric" href="{{ plastic_url }}"><strong>{{ plastic_count }}</strong><span>With plastic strain</span></a>
+        <a class="charts-metric charts-metric-total" href="{{ records_url }}"><strong>{{ total_objects }}</strong><span>Data objects{% if active_filters %}<small>of {{ base_count }} in this scope</small>{% endif %}</span></a>
+        <div class="charts-metric"><strong>{{ phase_count }}</strong><span>Phase names</span></div>
+        <div class="charts-metric"><strong>{{ software_count }}</strong><span>Software names</span></div>
+        <a class="charts-metric" href="{{ matching_url }}"><strong>{{ matching_count }}</strong><span>Stress–strain available</span></a>
       </section>
-      <div class="charts-primary-grid">
-        <section class="charts-panel charts-materials" aria-labelledby="materials-heading">
-          <div class="charts-panel-heading"><h2 id="materials-heading">Materials &amp; microstructure</h2><span class="charts-context-label">Bar chart</span></div>
-          <p class="charts-panel-purpose">Find the phases and textures represented in this selection.</p>
-          <form method="get" class="charts-chart-control" data-auto-submit>
-            {% for key, value in control_params.material_group %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-            <label for="charts-material-group">Chart category</label><select id="charts-material-group" name="material_group">{% for key, title in material_options %}<option value="{{ key }}"{% if key == material_group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
-          </form>
-          {% if material_category.rows %}
-            {% include 'charts/category.html' with plot=material_plot category=material_category %}
-            <p class="charts-coverage">{{ material_category.available }} of {{ total_objects }} object{{ total_objects|pluralize }} represented</p>
-            {% include 'charts/category_table.html' with category=material_category %}
-          {% else %}<div class="charts-plot-empty charts-small-empty"><strong>No {{ material_category.title|lower }} reported</strong><p>Choose another category.</p></div>{% endif %}
-          <p class="charts-subtle-note">Each category counts an object once. Multiple phases or textures can make percentages sum to more than 100%.</p>
-        </section>
 
-        <section class="charts-panel charts-results" aria-labelledby="results-heading">
-          <div class="charts-panel-heading"><h2 id="results-heading">Results coverage</h2><span class="charts-context-label">Pie chart</span></div>
-          <p class="charts-panel-purpose">How many objects report stress and strain for the same component?</p>
-          {% include 'charts/pie.html' %}
-          {% include 'charts/statistics_table.html' with rows=output_rows caption='Reported outputs' label_heading='Output' %}
-          <p class="charts-subtle-note">Output categories can overlap. Availability does not establish physical comparability; open a record to inspect its curves.</p>
-        </section>
-      </div>
-
-      <div class="charts-secondary-grid">
-        <section class="charts-panel charts-composition" aria-labelledby="composition-heading">
-          <div class="charts-panel-heading"><h2 id="composition-heading">Simulation setup</h2><span class="charts-context-label">Bar chart</span></div>
-          <p class="charts-panel-purpose">Explore software, constitutive models and loading conditions.</p>
-          <form method="get" class="charts-chart-control" data-auto-submit>
-            {% for key, value in control_params.group %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
-            <label for="charts-group">Chart category</label><select id="charts-group" name="group">{% for key, title in group_options %}<option value="{{ key }}"{% if key == group %} selected{% endif %}>{{ title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button>
-          </form>
-          {% if selected_category.rows %}
-            {% include 'charts/category.html' with plot=category_plot category=selected_category %}
-            <p class="charts-coverage">{{ selected_category.available }} of {{ total_objects }} object{{ total_objects|pluralize }} represented</p>
-            {% include 'charts/category_table.html' with category=selected_category %}
-          {% else %}<div class="charts-plot-empty charts-small-empty"><strong>No {{ selected_category.title|lower }} reported</strong><p>Choose another category.</p></div>{% endif %}
-          <p class="charts-subtle-note">Each category counts an object once. Multiple software, models or loading conditions can make percentages sum to more than 100%.</p>
-        </section>
-
-        <section class="charts-panel charts-distributions" aria-labelledby="conditions-heading">
-          <div class="charts-panel-heading"><h2 id="conditions-heading">Simulation conditions</h2>
-            <form method="get" class="charts-measure-form" data-auto-submit>{% for key, value in control_params.measure %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}<label class="visually-hidden" for="charts-measure">Measure</label><select id="charts-measure" name="measure">{% for item in distributions %}<option value="{{ item.key }}"{% if item.key == selected_distribution.key %} selected{% endif %}>{{ item.title }}</option>{% endfor %}</select><button type="submit" class="charts-apply">Apply</button></form>
+      <div class="charts-dashboard-grid">
+        <section class="charts-panel" data-statistic="phase" aria-labelledby="phase-heading">
+          <div class="charts-panel-heading"><h2 id="phase-heading">Phase</h2><span class="charts-context-label">{{ phase_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-plot-stage">
+            {% if phase_category.rows %}{% include 'charts/category.html' with plot=phase_plot category=phase_category %}{% else %}<div class="charts-plot-empty"><strong>No phase reported</strong></div>{% endif %}
           </div>
-          {% with item=selected_distribution %}
-            <p class="charts-panel-purpose">{% if item.constant %}Frequency chart · All usable observations have one value.{% else %}Histogram · Equal-width intervals of {{ item.title|lower }}{% if item.unit %} in {{ item.unit }}{% endif %}.{% endif %}</p>
-            {% if item.observation_count %}
-              <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}{% if item.unit %} {{ item.unit }}{% endif %}</strong></span><span>Range <strong>{{ item.minimum }}{% if item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}{% if item.unit %} {{ item.unit }}{% endif %}</strong></span></div>
-              {% include 'charts/histogram.html' %}
-              <div class="charts-distribution-caption"><span>{{ item.observation_count }} {{ item.observation_unit|slice:":-1" }}{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</span><span>{% if item.excluded_objects %}{{ item.excluded_objects }} without usable values{% elif item.key == 'temperature' %}Temperatures in kelvin{% elif item.key == 'grain_count' %}One observation per phase{% else %}Reported integer counts{% endif %}</span></div>
-              {% include 'charts/distribution_table.html' %}
-            {% else %}<div class="charts-plot-empty"><i data-feather="bar-chart-2" aria-hidden="true"></i><strong>No usable {{ item.title|lower }} values</strong><p>{% if item.key == 'temperature' %}Temperature needs an explicit K, Celsius or Fahrenheit unit.{% else %}Choose another measure or data scope.{% endif %}</p></div>{% endif %}
-          {% endwith %}
+          {% if phase_category.rows %}{% include 'charts/category_table.html' with category=phase_category %}{% endif %}
         </section>
+
+        <section class="charts-panel charts-results" data-statistic="results" aria-labelledby="results-heading">
+          <div class="charts-panel-heading"><h2 id="results-heading">Stress–strain coverage</h2><span class="charts-context-label">{{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-plot-stage">{% include 'charts/pie.html' %}</div>
+        </section>
+
+        <section class="charts-panel" data-statistic="software" aria-labelledby="software-heading">
+          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label">{{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-plot-stage">
+            {% if software_category.rows %}{% include 'charts/category.html' with plot=software_plot category=software_category %}{% else %}<div class="charts-plot-empty"><strong>No software reported</strong></div>{% endif %}
+          </div>
+          {% if software_category.rows %}{% include 'charts/category_table.html' with category=software_category %}{% endif %}
+        </section>
+
+        <section class="charts-panel" data-statistic="outputs" aria-labelledby="outputs-heading">
+          <div class="charts-panel-heading"><h2 id="outputs-heading">Reported outputs</h2><span class="charts-context-label">{{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-plot-stage">{% include 'charts/category.html' with plot=output_plot category=False %}</div>
+          <details class="charts-chart-data"><summary>Data table</summary>{% include 'charts/statistics_table.html' with rows=output_rows caption='Reported outputs' label_heading='Output' %}</details>
+        </section>
+
+        {% for item in primary_distributions %}
+          <section class="charts-panel charts-distributions" data-statistic="{{ item.key }}" aria-labelledby="{{ item.key }}-heading">
+            <div class="charts-panel-heading"><h2 id="{{ item.key }}-heading">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</h2><span class="charts-context-label">{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+            {% if item.observation_count %}
+              <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}</strong></span><span>Range <strong>{{ item.minimum }}{% if item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}</strong></span></div>
+              <div class="charts-plot-stage">{% include 'charts/histogram.html' with histogram=item.plot %}</div>
+              {% if item.observation_unit == 'phases' %}<p class="charts-distribution-caption">{{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</p>{% endif %}
+              <details class="charts-chart-data"><summary>Data table</summary>{% include 'charts/distribution_table.html' %}</details>
+            {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>{% if item.key == 'temperature' %}No usable temperature{% else %}No usable grain number{% endif %}</strong></div></div>{% endif %}
+          </section>
+        {% endfor %}
       </div>
 
-      {% if note_rows %}<details class="charts-data-notes"><summary><span><i data-feather="info" aria-hidden="true"></i>Statistics notes <span class="charts-note-badge">{{ noted_objects }} object{{ noted_objects|pluralize }}</span></span><span class="charts-summary-action">View notes</span></summary><div class="charts-note-list"><p class="charts-section-help">Missing units, excluded values and array differences affecting these statistics. These notes are not a validation result.</p>{% for note in note_rows %}<div class="charts-note-row"><div><h3>{{ note.title }}</h3><p>{{ note.description }}</p></div><a href="{{ note.url }}">View {{ note.count }} object{{ note.count|pluralize }}</a></div>{% endfor %}</div></details>{% endif %}
+      <details class="charts-additional-statistics">
+        <summary><span>Additional statistics</span><span class="charts-summary-action" aria-hidden="true"></span></summary>
+        <div class="charts-additional-body">
+          <div class="charts-additional-grid">
+            {% for category in additional_categories %}
+              <section class="charts-additional-section" data-category="{{ category.key }}">
+                <div class="charts-panel-heading"><h3>{{ category.title }}</h3><span class="charts-context-label">{{ category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+                {% if category.rows %}{% include 'charts/statistics_table.html' with rows=category.rows caption=category.title %}{% else %}<p class="charts-additional-empty">Not reported</p>{% endif %}
+              </section>
+            {% endfor %}
+            {% with item=discretization_distribution %}
+              <section class="charts-additional-section" data-statistic="{{ item.key }}">
+                <div class="charts-panel-heading"><h3>{{ item.title }}</h3><span class="charts-context-label">{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+                {% if item.observation_count %}
+                  <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}</strong></span><span>Range <strong>{{ item.minimum }}{% if item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}</strong></span></div>
+                  {% include 'charts/histogram.html' with histogram=item.plot %}
+                  <details class="charts-chart-data"><summary>Data table</summary>{% include 'charts/distribution_table.html' %}</details>
+                {% else %}<p class="charts-additional-empty">Not reported</p>{% endif %}
+              </section>
+            {% endwith %}
+            <section class="charts-additional-section">
+              <h3>Equivalent results</h3>
+              {% include 'charts/statistics_table.html' with rows=extra_output_rows caption='Equivalent results' label_heading='Output' %}
+            </section>
+            {% if note_rows %}<section class="charts-additional-section charts-statistics-notes">
+              <h3>Statistics notes</h3>
+              <div class="charts-statistics-wrap"><table class="charts-statistics-table"><thead><tr><th scope="col">Note</th><th scope="col">Objects</th></tr></thead><tbody>{% for note in note_rows %}<tr><th scope="row"><a href="{{ note.url }}">{{ note.title }}</a></th><td>{{ note.count }}</td></tr>{% endfor %}</tbody></table></div>
+            </section>{% endif %}
+          </div>
+        </div>
+      </details>
+
       <details class="charts-objects"{% if objects_open %} open{% endif %}>
         <summary id="objects"><span>Source records <span class="charts-object-count">{{ total_objects }}</span></span><span class="charts-summary-action">{{ scope_label }}</span></summary>
-        <div class="charts-object-body"><p class="charts-section-help">The data objects used in this selection. Open a title to inspect the metadata, curves and downloads.</p><div class="charts-table-wrap"><table class="charts-table"><thead><tr><th scope="col">Data object</th><th scope="col">Phase</th><th scope="col">Software</th><th scope="col">Mechanical results</th><th scope="col">Access</th></tr></thead>
+        <div class="charts-object-body"><div class="charts-table-wrap"><table class="charts-table"><thead><tr><th scope="col">Data object</th><th scope="col">Phase</th><th scope="col">Software</th><th scope="col">Mechanical results</th><th scope="col">Access</th></tr></thead>
           <tbody>{% for row in objects_page %}<tr><td><a class="charts-object-title" href="{% url 'json_data_detail' row.id %}" title="{{ row.title }}">{{ row.title }}</a><span class="charts-object-id">{{ row.identifier }}</span></td><td><span class="charts-cell-label" title="{{ row.phase_label }}">{{ row.phase_label }}</span></td><td><span class="charts-cell-label" title="{{ row.software_label }}">{{ row.software_label }}</span></td><td><span>{{ row.result_label }}</span><small>{{ row.points }}</small></td><td><span class="charts-access{% if row.access == 'Public' %} charts-access-public{% endif %}">{{ row.access }}</span></td></tr>{% endfor %}</tbody>
         </table></div><nav class="charts-pagination" aria-label="Data object pages"><span>{{ objects_page.start_index }}–{{ objects_page.end_index }} of {{ total_objects }} object{{ total_objects|pluralize }}</span><div>{% if previous_url %}<a href="{{ previous_url }}" rel="prev">Previous</a>{% endif %}<span>Page {{ objects_page.number }} of {{ objects_page.paginator.num_pages }}</span>{% if next_url %}<a href="{{ next_url }}" rel="next">Next</a>{% endif %}</div></nav></div>
       </details>
     {% else %}
-      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if filter_errors %}Correct the filters to view statistics{% elif active_filters %}No objects match this selection{% else %}No data in this scope{% endif %}</h2><p>{% if filter_errors %}Review the messages above, change your choices or clear the filters.{% elif active_filters %}Remove a filter or change the data scope.{% elif scope == 'mine' and not include_private %}Your public uploads appear here. Include private data to see all your uploads, or choose Public database.{% else %}Choose another scope or upload simulation data to view its statistics.{% endif %}</p><div>{% if active_filters or filter_errors %}<a class="charts-button charts-button-primary" href="{{ clear_url }}">Clear filters</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
+      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if filter_errors %}Correct the selection to view statistics{% elif active_filters %}No objects match this selection{% else %}No data in this scope{% endif %}</h2><p>{% if filter_errors %}Clear the selection or choose a valid data scope.{% elif active_filters %}Remove a selection or change the data scope.{% elif scope == 'mine' and not include_private %}Include private data to see all your uploads.{% else %}Choose another scope or upload data.{% endif %}</p><div>{% if active_filters or filter_errors %}<a class="charts-button charts-button-primary charts-clear charts-selection-clear" href="{{ clear_url }}">Clear selection</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
     {% endif %}
-    <p class="charts-page-footnote"><i data-feather="lock" aria-hidden="true"></i>{% if scope == 'mine' %}Your uploads only{% if include_private %}, including private data{% else %}, public data only{% endif %}.{% else %}Public database: all public objects available to signed-in users.{% endif %}</p>
   </div>
 </main>
 {% endblock content %}

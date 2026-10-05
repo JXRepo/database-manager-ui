@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Streamline Charts filters and show record coverage)
+code_base: see latest git commit (Rebuild Charts as a focused statistics dashboard)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts filter choices, coverage counts, grouped controls, browser checks and documentation
+  - Charts dashboard, SVG axes, chart selections, browser checks and documentation
 ---
 
 # Project handoff
@@ -14,7 +14,34 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：面向上线精简 Charts 筛选
+### 本轮：Charts 改为统计图优先的概览页
+
+- 用户明确拒绝上一版大块 Filters 和解释文字，要求重新设计可交付的统计页。
+  保留 Public database／My data＋Include private data；删除独立筛选表单、
+  图表分类选择器及重复目的说明，默认不出现任何筛选区。
+- 顶部四指标为 Data objects、Phase names、Software names、Stress–strain available。
+  两列固定六图：Phase 柱状图＋匹配应力–应变覆盖饼图，Software＋Reported outputs
+  柱状图，Temperature (K)＋Grain number 直方图；详细 HTML 表默认收在 Data table。
+  多相、软件和输出可能重叠，保留柱状图及对象占比；饼图只有互斥且穷尽的 matching／
+  without_matching 两类。晶粒柱高为相观测，导航计不同对象；缺失或不可用值不伪造零。
+- Texture、弹塑性模型、加载类型／模式、离散数量、equivalent availability 和统计备注
+  统一放 Additional statistics；来源记录和分页保留在 Source records。
+  图表点击继续对同一对象按 AND 精确收窄，只有选择后显示紧凑条件标签和 Clear。
+  所有历史 category／result／note／range 条件继续可用，无效数字区间也可逐项移除。
+- 复用元数据摘要、权限和 Decimal 分箱；不修改 JSON、详情曲线或导出，也无新依赖／迁移。
+  去掉废弃筛选模块和模板，不再为菜单保留完整 scope 的摘要；总范围数量由权限查询计数。
+  修正移除其他条件时丢失空 scope／include_private 的边界问题，保留错误及零结果。
+- 直方图使用标准连续坐标刻度，长科学计数最多三个边界刻度，普通数值最多五个，
+  常量一个；完整精确区间仍在悬停和 HTML 表，数值和链接没有截断或重算。
+  Data objects 指标用原生 GET 展开记录；范围表单明确 action，切换范围不继承 #objects。
+- 48 项 Charts 测试通过，无跳过；真实 Chromium 覆盖 22 种合成数据桌面布局和
+  3 种用户样例布局，三个桌面宽度、长名称、空结果、缺失字段、饼图／表格计数、
+  精确大数边界、组合钻取、私有范围、分页、键盘及无 JavaScript 导航。
+  已查看常规、样例、缺失字段和补充统计截图，独立复查发现的问题已修正并复查通过。
+  日志 /tmp/charts-dashboard-release.log，截图 /tmp/charts-dashboard-release-qa。
+  尚未确认 Render 部署完成。
+
+### 上轮：面向上线精简 Charts 筛选
 
 - 用户要求认真调整到友好的可用版本，项目预计本周或下周上线。首行只保留 Phase、
   Software 和 Results；Results 合并匹配应力–应变分量的 All／Available／Not available

@@ -69,7 +69,7 @@ function exactEighths(value) {
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       const state = await evaluate(`({url: location.href, ready: document.readyState,
-        filterCount: document.querySelector('.charts-filter-count')?.textContent,
+        recordCount: document.querySelector('.charts-metric-total strong')?.textContent,
         focused: document.activeElement?.outerHTML?.slice(0, 300),
         errors: document.querySelector('.charts-errors')?.textContent})`);
       throw new Error(`Timed out: ${expression}\n${JSON.stringify(state)}`);
@@ -77,16 +77,20 @@ function exactEighths(value) {
     async function navigate(path = '/charts/', enhanced = true, expectedPath = path) {
       stage = `navigate ${path}${enhanced ? '' : ' without JavaScript'}`;
       const url = process.env.CHARTS_BASE_URL + path;
+      await evaluate(`document.querySelector('.charts-page')?.setAttribute('data-browser-navigation', 'pending')`);
       await command('Page.navigate', {url});
-      await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + expectedPath)} && document.readyState === "complete" && !!document.querySelector(".charts-page")`);
+      await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + expectedPath)} && document.readyState === "complete"
+        && !!document.querySelector(".charts-page") && !document.querySelector('.charts-page').hasAttribute('data-browser-navigation')`);
       if (enhanced) await until('document.querySelector(".charts-page").classList.contains("charts-js")');
     }
     async function settleLayout() {
       await evaluate(`(async () => {
-        window.scrollTo(0, 0);
+        window.scrollTo({top: 0, left: 0, behavior: 'instant'});
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         await Promise.all(document.getAnimations().filter(animation => animation.effect.getComputedTiming().endTime !== Infinity)
           .map(animation => animation.finished.catch(() => {})));
+        window.scrollTo({top: 0, left: 0, behavior: 'instant'});
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       })()`);
     }
     async function headingMetrics() {
@@ -124,32 +128,35 @@ function exactEighths(value) {
       }
       await navigate();
     }
-    async function choose(id, value, parameter) {
-      stage = `choose ${id} = ${value}`;
-      await evaluate(`(() => {
-        const select = document.getElementById(${JSON.stringify(id)});
+    async function chooseScope(value, enhanced = true) {
+      stage = `choose scope = ${value}${enhanced ? '' : ' without JavaScript'}`;
+      const path = await evaluate(`(() => {
+        const select = document.getElementById('charts-scope');
         select.value = ${JSON.stringify(value)};
-        select.dispatchEvent(new Event('change', {bubbles: true}));
+        const form = select.closest('form');
+        form.dataset.browserSubmitting = 'true';
+        ${enhanced ? "select.dispatchEvent(new Event('change', {bubbles: true}));" : ""}
+        const action = new URL(form.action);
+        const path = action.pathname + '?' + new URLSearchParams(new FormData(form)).toString() + action.hash;
+        ${enhanced ? "" : "form.requestSubmit();"}
+        return path;
       })()`);
-      await until(`document.readyState === 'complete' && document.querySelector('.charts-page').classList.contains('charts-js')
-        && new URLSearchParams(location.search).get(${JSON.stringify(parameter)}) === ${JSON.stringify(value)}
-        && document.getElementById(${JSON.stringify(id)}).value === ${JSON.stringify(value)}`);
-    }
-    async function selections() {
-      return evaluate(`({
-        material: document.getElementById('charts-material-group').value,
-        setup: document.getElementById('charts-group').value,
-        measure: document.getElementById('charts-measure').value,
-      })`);
+      assert.equal(new URL(process.env.CHARTS_BASE_URL + path).hash, '', 'Changing scope returns to the overview');
+      await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL)} + ${JSON.stringify(path)}
+        && document.readyState === 'complete' && document.querySelector('.charts-scope-form')?.dataset.browserSubmitting !== 'true'
+        && document.getElementById('charts-scope').value === ${JSON.stringify(value)}`);
+      if (enhanced) await until('document.querySelector(".charts-page").classList.contains("charts-js")');
     }
     async function setPrivate(checked, enhanced = true) {
       stage = `include private = ${checked}${enhanced ? '' : ' without JavaScript'}`;
       await evaluate(`(() => {
         const checkbox = document.getElementById('charts-include-private');
         checkbox.checked = ${checked};
+        checkbox.closest('form').dataset.browserSubmitting = 'true';
         ${enhanced ? "checkbox.dispatchEvent(new Event('change', {bubbles: true}));" : "checkbox.closest('form').requestSubmit();"}
       })()`);
       await until(`document.readyState === 'complete' && !!document.querySelector('.charts-page')
+        && document.querySelector('.charts-scope-form')?.dataset.browserSubmitting !== 'true'
         && new URLSearchParams(location.search).get('scope') === 'mine'
         && new URLSearchParams(location.search).get('include_private') === ${checked ? "'1'" : 'null'}
         && document.getElementById('charts-include-private').checked === ${checked}`);
@@ -166,19 +173,37 @@ function exactEighths(value) {
       assert.equal(await evaluate('new URLSearchParams(location.search).get("include_private")'), '1');
       assert.equal(await evaluate('document.getElementById("charts-include-private").checked'), true);
     }
-    async function categoryLink(panel, label) {
+    async function categoryLink(key, label) {
       return evaluate(`(() => {
-        const link = [...document.querySelectorAll(${JSON.stringify(panel + ' .charts-bar')})]
-          .find(element => element.getAttribute('data-label') === ${JSON.stringify(label)});
-        return {path: link.getAttribute('href'), count: Number(link.querySelector('.charts-bar-count').textContent)};
+        const panel = document.querySelector('[data-statistic="' + ${JSON.stringify(key)} + '"]')
+          || document.querySelector('.charts-additional-statistics [data-category="' + ${JSON.stringify(key)} + '"]');
+        const bar = [...panel.querySelectorAll('.charts-bar')]
+          .find(element => element.dataset.label === ${JSON.stringify(label)});
+        if (bar) return {path: bar.getAttribute('href'), count: Number(bar.querySelector('.charts-bar-count').textContent)};
+        const link = [...panel.querySelectorAll('.charts-statistics-table tbody th a')]
+          .find(element => element.textContent.trim() === ${JSON.stringify(label)});
+        if (!link) throw new Error('Missing chart category: ' + ${JSON.stringify(key + ': ' + label)});
+        return {path: link.getAttribute('href'), count: Number(link.closest('tr').querySelector('td').textContent)};
       })()`);
     }
-    async function assertLinkedCount(link) {
-      await navigate(link.path);
+    async function histogramLink(measure) {
+      return evaluate(`(() => {
+        const link = document.querySelector('svg[data-measure="' + ${JSON.stringify(measure)} + '"] .charts-bin[href]');
+        return {path: link.getAttribute('href'), count: Number(link.dataset.objectCount)};
+      })()`);
+    }
+    async function assertLinkedCount(link, enhanced = true) {
+      await navigate(link.path, enhanced);
+      if (!link.count) {
+        assert.ok(await evaluate('!!document.querySelector(".charts-empty")'));
+        assert.equal(await evaluate('document.querySelectorAll(".charts-object-id").length'), 0);
+        return;
+      }
       assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), link.count);
       assert.equal(await evaluate('document.querySelector(".charts-objects").open'), true);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-table tbody tr").length'), Math.min(link.count, 10));
       const pagination = await evaluate('document.querySelector(".charts-pagination").textContent');
-      assert.match(pagination, new RegExp(`of ${link.count} objects?`));
+      assert.match(pagination, new RegExp(`of ${link.count} (objects?|records?)`));
     }
     async function pressKey(key, code, virtualKey) {
       const text = key === 'Enter' ? '\r' : '';
@@ -186,138 +211,91 @@ function exactEighths(value) {
         text, unmodifiedText: text});
       await command('Input.dispatchKeyEvent', {type: 'keyUp', key, code, windowsVirtualKeyCode: virtualKey});
     }
-    async function filterPopup(width, key = 'software') {
-      stage = `${key} filter menu at ${width}`;
-      await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
-      await settleLayout();
-      await evaluate(`document.querySelector('[data-filter-key="${key}"] summary').focus()`);
-      await pressKey('Enter', 'Enter', 13);
-      await until(`document.querySelector('[data-filter-key="${key}"] details').open`);
-      const bounds = await evaluate(`(() => {
-        const rect = document.querySelector('[data-filter-key="${key}"] .charts-filter-options').getBoundingClientRect();
-        return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
-      })()`);
-      assert.ok(bounds.left >= 264 && bounds.right <= width && bounds.top >= 74 && bounds.bottom <= 1000,
-        `Filter options must fit the desktop viewport: ${JSON.stringify(bounds)}`);
-      if (process.env.CHARTS_SCREENSHOT_DIR && width === 1440) {
-        const shot = await command('Page.captureScreenshot', {format: 'png'});
-        writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, `filters-${key}-menu.png`), Buffer.from(shot.data, 'base64'));
+    async function openAdditional() {
+      const open = await evaluate('document.querySelector(".charts-additional-statistics").open');
+      if (!open) {
+        await evaluate('document.querySelector(".charts-additional-statistics > summary").focus()');
+        await pressKey('Enter', 'Enter', 13);
+        await until('document.querySelector(".charts-additional-statistics").open');
       }
-      await pressKey('Escape', 'Escape', 27);
-      assert.equal(await evaluate(`document.querySelector('[data-filter-key="${key}"] details').open`), false);
-      assert.ok(await evaluate(`document.activeElement.matches('[data-filter-key="${key}"] summary')`));
     }
-    async function moreFiltersLayout(width) {
-      stage = `grouped filters at ${width}`;
-      await evaluate('document.querySelector(".charts-more-filters").open = true');
-      await settleLayout();
-      const groups = await evaluate(`[...document.querySelectorAll('.charts-filter-group')].map(group => ({
-        heading: group.querySelector('h3').textContent,
-        fields: [...group.querySelectorAll('fieldset')].map(field => ({
-          key: field.dataset.filterKey, left: field.getBoundingClientRect().left,
-          right: field.getBoundingClientRect().right, coverage: field.querySelector('.charts-filter-coverage').textContent,
-        })),
-      }))`);
-      assert.deepEqual(groups.map(group => group.heading), ['Simulation conditions', 'Microstructure & models']);
-      for (const group of groups) for (const field of group.fields) {
-        assert.ok(field.left >= 264 && field.right <= width, `Filter field must fit the desktop: ${JSON.stringify(field)}`);
-        assert.match(field.coverage, /Available in \d+ of 13 records/);
-      }
-      if (process.env.CHARTS_SCREENSHOT_DIR && width === 1440) {
-        const shot = await command('Page.captureScreenshot', {format: 'png'});
-        writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, 'grouped-filters.png'), Buffer.from(shot.data, 'base64'));
-      }
-      await evaluate('document.querySelector(".charts-more-filters").open = false');
+    async function clearSelection(enhanced = true) {
+      await navigate(await evaluate('document.querySelector(".charts-clear").getAttribute("href")'), enhanced);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 0);
     }
-    async function setFilter(field, value, checked = true) {
-      stage = `filter ${field} = ${value}, checked ${checked}`;
-      const state = await evaluate(`(() => {
-        const field = document.querySelector('[data-filter-key="' + ${JSON.stringify(field)} + '"]');
-        const more = field.closest('.charts-more-filters');
-        if (more && !more.open) {
-          more.open = true;
-        }
-        const menu = field.querySelector('.charts-filter-menu');
-        menu.open = true;
-        const input = [...field.querySelectorAll('input')].find(input => input.value === ${JSON.stringify(value)});
-        if (!input) throw new Error('Missing filter option: ' + ${JSON.stringify(value)});
-        input.focus();
-        return input.checked;
-      })()`);
-      if (state !== checked) await pressKey(' ', 'Space', 32);
-      assert.equal(await evaluate(`(() => {
-        const field = document.querySelector('[data-filter-key="' + ${JSON.stringify(field)} + '"]');
-        return [...field.querySelectorAll('input')].find(input => input.value === ${JSON.stringify(value)}).checked;
-      })()`), checked);
-      await pressKey('Escape', 'Escape', 27);
-      await evaluate(`document.querySelector('[data-filter-key="' + ${JSON.stringify(field)} + '"] .charts-filter-menu').open = false`);
+    async function assertFixedDashboard() {
+      assert.equal(await evaluate('document.querySelectorAll("#charts-filters, #charts-filter-form, .charts-more-filters, [data-filter-key]").length'), 0);
+      assert.equal(await evaluate('document.querySelectorAll("#charts-material-group, #charts-group, #charts-measure, .charts-chart-control").length'), 0);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-panel-purpose, .charts-section-help, .charts-page-footnote, .charts-subtle-note").length'), 0);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, #curve-object, #curve-component, #download-curve").length'), 0);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-data-notes").length'), 0);
+      assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-statistic]')]
+        .map(panel => panel.dataset.statistic).filter(key => ['phase', 'results', 'software', 'outputs', 'temperature', 'grain_count'].includes(key))`),
+        ['phase', 'results', 'software', 'outputs', 'temperature', 'grain_count']);
     }
-    async function submitFilters(count, enhanced = true) {
-      stage = `apply visible filters, expecting ${count} records`;
-      const path = await evaluate(`(() => {
-        const form = document.getElementById('charts-filter-form');
-        const path = new URL(form.action).pathname + '?' + new URLSearchParams(new FormData(form)).toString();
-        form.dataset.browserSubmitting = 'true';
-        form.querySelector('button[type="submit"]').focus();
-        return path;
-      })()`);
-      await pressKey('Enter', 'Enter', 13);
-      await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL)} + ${JSON.stringify(path)}
-        && document.readyState === 'complete' && document.getElementById('charts-filter-form')?.dataset.browserSubmitting !== 'true'
-        && document.querySelector('.charts-filter-count')?.textContent.trim().startsWith(${JSON.stringify(count + ' matching record')})`);
-      if (enhanced) await until('document.querySelector(".charts-page").classList.contains("charts-js")');
-      assert.equal(await evaluate('document.querySelectorAll(".charts-filter-submit").length'), 1);
-      return path;
-    }
-    async function layout(label, width, expectedGraphs = 4) {
+    async function layout(label, width, expectedGraphs = 6) {
       stage = `layout ${label} at ${width}`;
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
       await settleLayout();
-      const metrics = await evaluate(`({
-        documentWidth: document.documentElement.scrollWidth,
-        viewport: innerWidth,
-        mainLeft: document.querySelector('.charts-page').getBoundingClientRect().left,
-        sidebarRight: document.querySelector('.pc-sidebar').getBoundingClientRect().right,
-        titleTop: document.querySelector('.charts-heading h1').getBoundingClientRect().top,
-        headerBottom: document.querySelector('.pc-header').getBoundingClientRect().bottom,
-        titleVisible: (() => {
-          const title = document.querySelector('.charts-heading h1');
-          const rect = title.getBoundingClientRect();
-          return title.contains(document.elementFromPoint(rect.left + 10, rect.top + 10));
-        })(),
-        titleLeft: document.querySelector('.charts-heading h1').getBoundingClientRect().left,
-        height: document.documentElement.scrollHeight,
-        filters: (() => {
-          const filters = document.getElementById('charts-filters'), rect = filters.getBoundingClientRect();
-          const button = filters.querySelector('.charts-filter-submit'), buttonRect = button.getBoundingClientRect();
-          return {top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right,
-            submitVisible: button.contains(document.elementFromPoint(buttonRect.left + 5, buttonRect.top + 5))};
-        })(),
-        primary: [...document.querySelectorAll('.charts-primary-grid .charts-bar-svg, .charts-primary-grid .charts-pie-svg')]
-          .map(svg => ({top: svg.getBoundingClientRect().top, bottom: svg.getBoundingClientRect().bottom})),
-        graphCount: document.querySelectorAll('.charts-bar-svg, .charts-histogram-svg, .charts-pie-svg').length,
-        numericLabels: [...document.querySelectorAll('.charts-histogram-svg text')].map(text => {
-          const svg = text.ownerSVGElement, box = text.getBBox(), bounds = svg.viewBox.baseVal;
-          return {label: text.textContent, fontSize: parseFloat(getComputedStyle(text).fontSize) * svg.getScreenCTM().a,
-            clipped: box.x < -1 || box.y < -1 || box.x + box.width > bounds.width + 1 || box.y + box.height > bounds.height + 1};
-        }),
-      })`);
+      const metrics = await evaluate(`(() => {
+        const keys = ['phase', 'results', 'software', 'outputs', 'temperature', 'grain_count'];
+        const panels = keys.map(key => document.querySelector('[data-statistic="' + key + '"]')).filter(Boolean);
+        const graphs = panels.flatMap(panel => [...panel.querySelectorAll('.charts-bar-svg, .charts-histogram-svg, .charts-pie-svg')]);
+        return {
+          documentWidth: document.documentElement.scrollWidth, viewport: innerWidth,
+          mainLeft: document.querySelector('.charts-page').getBoundingClientRect().left,
+          sidebarRight: document.querySelector('.pc-sidebar').getBoundingClientRect().right,
+          titleTop: document.querySelector('.charts-heading h1').getBoundingClientRect().top,
+          headerBottom: document.querySelector('.pc-header').getBoundingClientRect().bottom,
+          titleVisible: (() => {
+            const title = document.querySelector('.charts-heading h1'), rect = title.getBoundingClientRect();
+            return title.contains(document.elementFromPoint(rect.left + 10, rect.top + 10));
+          })(),
+          height: document.documentElement.scrollHeight,
+          cards: panels.map(panel => {
+            const rect = panel.getBoundingClientRect();
+            return {key: panel.dataset.statistic, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
+          }),
+          primary: graphs.filter(svg => ['phase', 'results'].includes(svg.closest('[data-statistic]').dataset.statistic))
+            .map(svg => ({top: svg.getBoundingClientRect().top, bottom: svg.getBoundingClientRect().bottom})),
+          graphCount: graphs.length,
+          graphTypes: {bar: graphs.filter(svg => svg.classList.contains('charts-bar-svg')).length,
+            pie: graphs.filter(svg => svg.classList.contains('charts-pie-svg')).length,
+            histogram: graphs.filter(svg => svg.classList.contains('charts-histogram-svg')).length},
+          numericLabels: [...document.querySelectorAll('.charts-histogram-svg text')]
+            .filter(text => text.ownerSVGElement.checkVisibility()).map(text => {
+              const svg = text.ownerSVGElement, box = text.getBBox(), bounds = svg.viewBox.baseVal;
+              return {label: text.textContent, fontSize: parseFloat(getComputedStyle(text).fontSize) * svg.getScreenCTM().a,
+                clipped: box.x < -1 || box.y < -1 || box.x + box.width > bounds.width + 1 || box.y + box.height > bounds.height + 1};
+            }),
+          selection: (() => {
+            const chip = document.querySelector('.charts-filter');
+            return chip ? {top: chip.getBoundingClientRect().top, height: chip.parentElement.getBoundingClientRect().height} : null;
+          })(),
+        };
+      })()`);
       assert.ok(metrics.documentWidth <= width, `${label} overflows at ${width}: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.mainLeft >= metrics.sidebarRight - 1, `${label} under sidebar: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.titleVisible && metrics.titleTop >= metrics.headerBottom, `${label} title under navigation: ${JSON.stringify(metrics)}`);
-      assert.ok(metrics.filters.top >= metrics.titleTop && metrics.filters.bottom < 500 && metrics.filters.submitVisible,
-        `${label}: filters must be visible above the charts at ${width}: ${JSON.stringify(metrics)}`);
+      assert.equal(metrics.graphCount, expectedGraphs, `${label}: main dashboard chart count at ${width}`);
+      if (metrics.cards.length) {
+        assert.equal(metrics.cards.length, 6);
+        for (const card of metrics.cards) {
+          assert.ok(card.left >= metrics.mainLeft && card.right <= width, `${label}: card outside desktop ${JSON.stringify(card)}`);
+        }
+      }
+      if (expectedGraphs === 6) assert.deepEqual(metrics.graphTypes, {bar: 3, pie: 1, histogram: 2});
       for (const text of metrics.numericLabels) {
         assert.ok(text.fontSize >= 9.5 && !text.clipped, `${label}: readable numeric label at ${width}: ${JSON.stringify(text)}`);
       }
       if (metrics.primary.length) {
         assert.equal(metrics.primary.length, 2);
         for (const chart of metrics.primary) {
-          assert.ok(chart.top >= metrics.filters.bottom && chart.bottom < 1000,
-            `Primary aggregate chart must remain visible below the filters on the first screen: ${JSON.stringify(metrics)}`);
+          assert.ok(chart.top >= metrics.headerBottom && chart.bottom < 1000,
+            `Phase and coverage charts must remain visible on the first screen: ${JSON.stringify(metrics)}`);
         }
-        assert.equal(metrics.graphCount, expectedGraphs);
       }
+      if (metrics.selection) assert.ok(metrics.selection.height < 140, `Applied conditions must remain compact: ${JSON.stringify(metrics.selection)}`);
       if (process.env.CHARTS_SCREENSHOT_DIR && width === 1440) {
         mkdirSync(process.env.CHARTS_SCREENSHOT_DIR, {recursive: true});
         const viewport = await command('Page.captureScreenshot', {format: 'png'});
@@ -344,134 +322,84 @@ function exactEighths(value) {
       [['public', 'Public database'], ['mine', 'My data']]);
     assert.equal(await evaluate('document.body.textContent.includes("hidden-private-marker")'), false);
     assert.equal(await evaluate('document.body.textContent.includes("shared-record")'), false);
-    assert.deepEqual(await selections(), {material: 'phase', setup: 'software', measure: 'temperature'});
-    assert.equal(await evaluate('document.querySelectorAll(".charts-bar-svg, .charts-histogram-svg, .charts-pie-svg").length'), 4);
-    const headings = await evaluate('[...document.querySelectorAll(".charts-panel h2")].map(heading => heading.textContent)');
-    for (const heading of ['Materials & microstructure', 'Simulation setup', 'Simulation conditions']) assert.ok(headings.includes(heading));
-    assert.ok(headings.some(heading => /coverage/i.test(heading)));
-    assert.ok(await evaluate('document.querySelector(".charts-objects").textContent.includes("Source records")'));
-    assert.ok(await evaluate('document.querySelector(".charts-data-notes").textContent.includes("Statistics notes")'));
+    await assertFixedDashboard();
     assert.equal(await evaluate('document.querySelectorAll(".charts-pie-svg path").length'), 2);
     assert.ok(await evaluate('[...document.querySelectorAll(".charts-pie-svg path")].every(path => path.getTotalLength() > 0)'));
+    assert.equal(await evaluate('document.querySelector(".charts-additional-statistics").open'), false);
+    assert.equal(await evaluate('document.querySelector(".charts-objects").open'), false);
     const matching = await coverageLink('matching');
     const withoutMatching = await coverageLink('without_matching');
     assert.equal(matching.count, 7);
     assert.equal(withoutMatching.count, 6);
     assert.equal(matching.count + withoutMatching.count, 13);
     assert.equal(await evaluate('document.querySelectorAll(".charts-coverage-table tbody tr").length'), 2);
+    const pieCounts = await evaluate(`[...document.querySelectorAll('.charts-pie-slice')]
+      .map(link => Number(link.getAttribute('aria-label').match(/: (\\d+) (?:objects?|records?)/)[1])).sort((a, b) => a - b)`);
+    assert.deepEqual(pieCounts, [6, 7]);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=outputs] .charts-bar").length'), 3);
     const tableHeaders = await evaluate('[...document.querySelectorAll("table.charts-statistics-table th")].map(header => header.textContent)');
-    assert.ok(tableHeaders.includes('Objects'));
+    assert.ok(tableHeaders.some(header => /Objects|Records/.test(header)));
     assert.ok(tableHeaders.includes('Observations'));
     assert.ok(tableHeaders.some(header => /%|share|percentage/i.test(header)));
-    assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, #curve-object, #curve-component, #download-curve").length'), 0);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-heading .charts-button").length'), 0);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-filters-primary fieldset").length'), 3);
-    assert.equal(await evaluate('document.querySelectorAll("[data-filter-key=note], [data-filter-key=discretization_count_range], [data-filter-key=result]").length'), 0);
-    assert.match(await evaluate('document.querySelector("[data-filter-key=temperature_range] .charts-filter-coverage").textContent'), /12 of 13 records/);
-    assert.equal(await evaluate('document.querySelector("[data-filter-key=results] input[value=matching]").closest("label").querySelector(".charts-filter-option-count").textContent'), '7');
     for (const width of [1280, 1440, 1920]) {
-      await layout('varied-data', width);
+      await layout('dashboard-overview', width);
       await comparePageHeadings(width);
-      await filterPopup(width);
-      await filterPopup(width, 'results');
-      await moreFiltersLayout(width);
     }
-
+    await evaluate('document.querySelector("[data-statistic=phase] .charts-chart-data > summary").focus()');
+    await pressKey('Enter', 'Enter', 13);
+    assert.equal(await evaluate('document.querySelector("[data-statistic=phase] .charts-chart-data").open'), true);
+    await openAdditional();
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('.charts-additional-statistics [data-category]')]
+      .map(section => section.dataset.category).sort()`), ['elastic_model', 'loading_mode', 'loading_type', 'plastic_model', 'texture']);
+    for (const key of ['texture', 'elastic_model', 'plastic_model', 'loading_type', 'loading_mode']) {
+      assert.ok(await evaluate(`document.querySelector('.charts-additional-statistics [data-category=${key}] .charts-statistics-table tbody tr') !== null`));
+    }
+    assert.ok(await evaluate('!!document.querySelector(".charts-additional-statistics svg[data-measure=discretization_count]")'));
+    assert.ok(await evaluate('!!document.querySelector(".charts-additional-statistics .charts-statistics-notes tbody tr")'));
+    await layout('additional-statistics', 1440);
     await navigate('/charts/?coverage=all&coverage=matching');
     assert.ok(await evaluate('!!document.querySelector(".charts-errors") && !!document.querySelector(".charts-empty")'));
-    assert.match(await evaluate('document.querySelector("[data-filter-key=software] .charts-filter-coverage").textContent'), /13 of 13 records/);
-    assert.equal(await evaluate('document.querySelector("[data-filter-key=results] input[value=matching]").closest("label").querySelector(".charts-filter-option-count").textContent'), '7');
-    await submitFilters(0);
-    assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("coverage")'), ['all', 'matching']);
-    await setFilter('results', 'all', false);
-    await submitFilters(7);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-errors").length'), 0);
+    await navigate(await evaluate('[...document.querySelectorAll(".charts-filter")].find(link => link.textContent.includes("all")).getAttribute("href")'));
+    assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '7');
     await navigate('/charts/?scope=mine&include_private=1&include_private=0&phase=Copper');
     assert.ok(await evaluate('!!document.querySelector(".charts-errors") && !!document.querySelector(".charts-empty")'));
     assert.equal(await evaluate('document.getElementById("charts-include-private").checked'), false);
-    assert.equal(await evaluate('document.querySelector(".charts-empty h2").textContent'), 'Correct the filters to view statistics');
-    await submitFilters(0);
-    assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("include_private")'), ['1', '0']);
     await navigate(await evaluate('document.querySelector(".charts-filter").getAttribute("href")'));
     assert.ok(await evaluate('!!document.querySelector(".charts-errors") && !!document.querySelector(".charts-empty")'));
     assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("include_private")'), ['1', '0']);
-    await navigate(await evaluate('document.querySelector(".charts-clear").getAttribute("href")'));
+    await clearSelection();
     assert.equal(await evaluate('document.querySelectorAll(".charts-errors").length'), 0);
-    assert.equal(await evaluate('document.getElementById("charts-include-private").checked'), false);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
-    await navigate();
-
-    await setFilter('phase', 'Copper');
-    await setFilter('software', 'Software 7');
-    await setFilter('results', 'matching');
-    assert.equal(await evaluate('document.querySelector("[data-filter-key=software] [data-filter-summary]").textContent'), 'Software 7');
-    assert.equal(await evaluate('document.querySelector("[data-filter-key=results] [data-filter-summary]").textContent'), 'Stress–strain available');
-    await submitFilters(2);
+    await navigate('/charts/?phase=Copper');
+    await assertLinkedCount(await categoryLink('software', 'Software 7'));
+    await assertLinkedCount(await coverageLink('matching'));
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 3);
-    assert.deepEqual(await evaluate('[...document.querySelectorAll("#charts-filter-form input:checked")].map(input => [input.name, input.value])'),
-      [['phase', 'Copper'], ['software', 'Software 7'], ['coverage', 'matching']]);
+    assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '2');
     assert.ok(await evaluate('[...document.querySelectorAll(".charts-table tbody tr")].every(row => row.textContent.includes("Copper") && row.textContent.includes("Software 7"))'));
-    for (const width of [1280, 1440, 1920]) await layout('visible-filters-applied', width);
-    await setFilter('results', 'without_matching');
-    assert.equal(await evaluate('document.querySelector("[data-filter-key=results] input[value=matching]").checked'), false);
-    await submitFilters(0);
+    for (const width of [1280, 1440, 1920]) await layout('dashboard-selected', width);
+    await assertLinkedCount(await coverageLink('without_matching'));
+    for (const width of [1280, 1440, 1920]) await layout('empty-selection', width, 0);
+    await clearSelection();
+    await navigate('/charts/?phase=Copper&phase=Nickel');
     assert.ok(await evaluate('!!document.querySelector(".charts-empty")'));
-    assert.ok(await evaluate('[...document.querySelectorAll("[data-filter-key=software] input")].some(input => input.value === "Software 9")'));
-    for (const width of [1280, 1440, 1920]) await layout('visible-filters-empty', width);
-    await navigate(await evaluate('document.querySelector(".charts-clear").getAttribute("href")'));
-    assert.equal(await evaluate('document.querySelectorAll("#charts-filter-form input:checked:not([data-filter-all])").length'), 0);
-    await setFilter('phase', 'Copper');
-    await setFilter('phase', 'Nickel');
-    await submitFilters(0);
     assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("phase")'), ['Copper', 'Nickel']);
-    assert.equal(await evaluate('document.querySelector("[data-filter-key=phase] [data-filter-summary]").textContent'), '2 selected');
-    await navigate(await evaluate('document.querySelector(".charts-clear").getAttribute("href")'));
-    const temperatureInterval = await evaluate('document.querySelector("[data-filter-key=temperature_range] input").value');
-    await setFilter('temperature_range', temperatureInterval);
-    await submitFilters(3);
-    assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("range")'), [temperatureInterval]);
+    await clearSelection();
+    await assertLinkedCount(await histogramLink('temperature'));
     assert.ok(await evaluate('document.querySelector(".charts-filter").textContent.includes("Temperature")'));
-    await navigate('/charts/?scope=mine&include_private=1&material_group=texture&group=loading_mode&measure=grain_count');
-    await setFilter('phase', 'Steel');
-    await setFilter('software', 'Software 6');
-    await setFilter('results', 'matching');
-    await submitFilters(2);
-    await assertPrivate();
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
-    assert.ok(await evaluate('[...document.querySelectorAll(".charts-table tbody tr")].every(row => row.textContent.includes("Private") && row.textContent.includes("Steel") && row.textContent.includes("Software 6"))'));
-    await navigate('/charts/?scope=mine&include_private=1');
-    await setFilter('results', 'matching');
-    await setFilter('results', 'plastic_strain');
-    await submitFilters(12);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 2);
-    assert.ok(await evaluate('[...document.querySelectorAll(".charts-table tbody tr")].every(row => row.textContent.includes("Private"))'));
-    await setFilter('results', 'all');
-    await submitFilters(12);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 1);
-    assert.equal(await evaluate('document.querySelector("[data-filter-key=results] [data-filter-summary]").textContent'), 'Plastic strain');
-    await setFilter('results', 'plastic_strain', false);
-    await submitFilters(24);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 0);
     await navigate();
-
-    await evaluate(`(() => {
-      const link = [...document.querySelectorAll('.charts-coverage-link')]
-        .find(element => element.dataset.coverage === 'without_matching');
-      link.focus();
-    })()`);
-    await command('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
-    await command('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
+    await evaluate(`document.querySelector('.charts-coverage-link[data-coverage="without_matching"]').focus()`);
+    await pressKey('Enter', 'Enter', 13);
     await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + withoutMatching.path)} && document.readyState === 'complete'
       && document.querySelector('.charts-page').classList.contains('charts-js')`);
     assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), withoutMatching.count);
     assert.equal((await coverageLink('matching')).count, 0);
     assert.equal((await coverageLink('without_matching')).count, 6);
     assert.equal(await evaluate('document.querySelector(".charts-objects").open'), true);
-    const withoutAndCopper = await categoryLink('.charts-materials', 'Copper');
+    const withoutAndCopper = await categoryLink('phase', 'Copper');
     await assertLinkedCount(withoutAndCopper);
     assert.equal(withoutAndCopper.count, 2);
     await navigate();
-    await choose('charts-scope', 'mine', 'scope');
+    await chooseScope('mine');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
     assert.equal(await evaluate('document.getElementById("charts-include-private").checked'), false);
     await setPrivate(true);
@@ -479,82 +407,61 @@ function exactEighths(value) {
     assert.equal((await coverageLink('matching')).count, 18);
     assert.equal((await coverageLink('without_matching')).count, 6);
     assert.equal(await evaluate('document.body.textContent.includes("shared-record")'), false);
-    await evaluate('document.querySelector(".charts-composition details").open = true');
-    assert.equal(await evaluate('document.querySelectorAll(".charts-composition .charts-statistics-table tbody tr").length'), 12);
-    await choose('charts-material-group', 'texture', 'material_group');
-    await choose('charts-group', 'elastic_model', 'group');
-    assert.ok(await evaluate('document.querySelector(".charts-composition").textContent.includes("Anisotropic elasticity")'));
-    await choose('charts-measure', 'grain_count', 'measure');
-    assert.ok(await evaluate('document.querySelector(".charts-histogram-svg").getAttribute("aria-label").includes("Grain number")'));
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'elastic_model', measure: 'grain_count'});
-    await choose('charts-group', 'loading_mode', 'group');
-    const texture = await categoryLink('.charts-materials', 'Goss');
-    await assertLinkedCount(texture);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=software] .charts-statistics-table tbody tr").length'), 12);
+    const plastic = await categoryLink('outputs', 'Plastic strain');
+    assert.equal(plastic.count, 12);
+    await assertLinkedCount(plastic);
     await assertPrivate();
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
-    const cyclic = await categoryLink('.charts-composition', 'cyclic');
+    await assertLinkedCount(await coverageLink('matching'));
+    assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
+    assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 2);
+    assert.ok(await evaluate('[...document.querySelectorAll(".charts-table tbody tr")].every(row => row.textContent.includes("Private"))'));
+    await clearSelection();
+    await assertPrivate();
+    await openAdditional();
+    await assertLinkedCount(await categoryLink('texture', 'Goss'));
+    await assertPrivate();
+    await openAdditional();
+    const cyclic = await categoryLink('loading_mode', 'cyclic');
     await assertLinkedCount(cyclic);
     await assertPrivate();
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 2);
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
     assert.ok(await evaluate('[...document.querySelectorAll(".charts-object-id")].every(element => /^charts-browser-\\d+$/.test(element.textContent))'));
-    const grainBin = await evaluate(`(() => {
-      const link = document.querySelector('.charts-histogram-svg .charts-bin[href]');
-      return {path: link.getAttribute('href'), count: Number(link.getAttribute('aria-label').match(/View (\\d+) objects/)[1])};
-    })()`);
-    await assertLinkedCount(grainBin);
+    await assertLinkedCount(await histogramLink('grain_count'));
     await assertPrivate();
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 3);
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
-
-    const removeFilter = await evaluate('document.querySelector(".charts-filter").getAttribute("href")');
-    await navigate(removeFilter);
+    await navigate(await evaluate('document.querySelector(".charts-filter").getAttribute("href")'));
     await assertPrivate();
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 2);
-    const clearSelection = await evaluate('document.querySelector(".charts-clear").getAttribute("href")');
-    await navigate(clearSelection);
+    await clearSelection();
     await assertPrivate();
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '24');
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
-    await choose('charts-material-group', 'phase', 'material_group');
-    await choose('charts-group', 'software', 'group');
-    const phase = await categoryLink('.charts-materials', 'Copper');
-    await evaluate(`document.querySelector('.charts-materials .charts-bar[data-label="Copper"]').focus()`);
-    assert.equal(await evaluate('document.activeElement.getAttribute("data-label")'), 'Copper');
-    await command('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
-    await command('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
+    const phase = await categoryLink('phase', 'Copper');
+    await evaluate(`document.querySelector('[data-statistic="phase"] .charts-bar[data-label="Copper"]').focus()`);
+    await pressKey('Enter', 'Enter', 13);
     await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + phase.path)} && document.readyState === 'complete'
       && document.querySelector('.charts-page').classList.contains('charts-js')`);
     assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), phase.count);
     assert.equal(await evaluate('document.querySelectorAll(".charts-table tbody tr").length'), phase.count);
     assert.ok(await evaluate('document.querySelector(".charts-filter").textContent.includes("Copper")'));
-    const software = await categoryLink('.charts-composition', 'Software 1');
-    await assertLinkedCount(software);
+    await assertLinkedCount(await categoryLink('software', 'Software 1'));
     await assertPrivate();
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 2);
     assert.ok(await evaluate('[...document.querySelectorAll(".charts-table tbody tr")].every(row => row.textContent.includes("Copper") && row.textContent.includes("Software 1"))'));
-    const clear = await evaluate('document.querySelector(".charts-clear").getAttribute("href")');
-    await navigate(clear);
+    await clearSelection();
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '24');
     await assertPrivate();
-
-    const bin = await evaluate(`(() => {
-      const link = document.querySelector('.charts-histogram-svg .charts-bin[href]');
-      return {path: link.getAttribute('href'), count: Number(link.getAttribute('aria-label').match(/View (\\d+) objects/)[1])};
-    })()`);
-    await assertLinkedCount(bin);
-
+    await assertLinkedCount(await histogramLink('temperature'));
     await navigate('/charts/?scope=mine&include_private=1&show=objects');
     const firstIds = await evaluate('[...document.querySelectorAll(".charts-object-id")].map(el => el.textContent)');
-    const next = await evaluate('document.querySelector("a[rel=next]").getAttribute("href")');
-    await navigate(next);
+    await navigate(await evaluate('document.querySelector("a[rel=next]").getAttribute("href")'));
     await assertPrivate();
     assert.ok(await evaluate('document.querySelector(".charts-pagination").textContent.includes("Page 2")'));
     const secondIds = await evaluate('[...document.querySelectorAll(".charts-object-id")].map(el => el.textContent)');
     assert.equal(firstIds.filter(id => secondIds.includes(id)).length, 0);
     await navigate('/charts/?scope=public&software=' + encodeURIComponent('A solver with a very long uploaded descriptive name '.repeat(14).trim()) + '&show=objects');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
-    for (const width of [1280, 1440, 1920]) await layout('long-singleton', width);
+    for (const width of [1280, 1440, 1920]) await layout('long-singleton', width, 5);
     for (const legacy of ['all', 'shared']) {
       await navigate(`/charts/?scope=${legacy}&include_private=1&group=software`, true, '/charts/?scope=public&group=software');
       assert.equal(await evaluate('document.getElementById("charts-scope").value'), 'public');
@@ -562,36 +469,35 @@ function exactEighths(value) {
       assert.equal(await evaluate('document.body.textContent.includes("shared-record")'), false);
     }
     await navigate('/charts/?scope=mine&include_private=1&material_group=texture&group=loading_mode&measure=grain_count&phase=Copper&show=objects&page=2');
-    await choose('charts-scope', 'public', 'scope');
+    await chooseScope('public');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '13');
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 0);
     assert.equal(await evaluate('new URLSearchParams(location.search).has("include_private") || new URLSearchParams(location.search).has("page")'), false);
-    await choose('charts-scope', 'mine', 'scope');
+    assert.deepEqual(await evaluate(`['material_group', 'group', 'measure'].map(key => new URLSearchParams(location.search).get(key))`),
+      ['texture', 'loading_mode', 'grain_count']);
+    await assertFixedDashboard();
+    await chooseScope('mine');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'loading_mode', measure: 'grain_count'});
     await setPrivate(true);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '24');
     await setPrivate(false);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
-
     await navigate('/charts/?scope=mine&software=Software+9&measure=discretization_count');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '2');
-    assert.ok(await evaluate('[...document.querySelectorAll(".charts-histogram-svg text")].some(text => text.textContent.startsWith("Interval offset: +"))'));
-    const narrowLabels = await evaluate('[...document.querySelectorAll(".charts-bin-label")].map(label => label.textContent)');
-    assert.equal(new Set(narrowLabels).size, 2);
+    await openAdditional();
+    assert.ok(await evaluate('[...document.querySelectorAll("svg[data-measure=discretization_count] text")].some(text => text.textContent.startsWith("Interval offset: +"))'));
+    const narrowLabels = await evaluate('[...document.querySelectorAll("svg[data-measure=discretization_count] .charts-bin-label")].map(label => label.textContent)');
+    assert.deepEqual(narrowLabels, ['0', '0.5', '1']);
     assert.ok(narrowLabels.every(label => label.length < 30));
     const narrowRows = await evaluate(`(() => {
-      return [...document.querySelectorAll('.charts-distribution-table tbody tr')].map(row => ({
-        label: row.querySelector('th').textContent.trim(),
-        observations: Number(row.querySelectorAll('td')[0].textContent),
-        count: Number(row.querySelectorAll('td')[1].textContent),
-        path: row.querySelector('a')?.getAttribute('href'),
+      return [...document.querySelectorAll('[data-statistic=discretization_count] .charts-distribution-table tbody tr')].map(row => ({
+        label: row.querySelector('th').textContent.trim(), observations: Number(row.querySelectorAll('td')[0].textContent),
+        count: Number(row.querySelectorAll('td')[1].textContent), path: row.querySelector('a')?.getAttribute('href'),
       }));
     })()`);
     assert.equal(narrowRows.length, 2);
     const countBase = (10n ** 50n) * 8n;
-    const narrowMedian = await evaluate('document.querySelector(".charts-distribution-summary span:first-child strong").textContent');
+    const narrowMedian = await evaluate('document.querySelector("[data-statistic=discretization_count] .charts-distribution-summary span:first-child strong").textContent');
     assert.equal(exactEighths(narrowMedian), countBase + 4n);
     narrowRows.forEach((row, index) => {
       const [low, high] = row.label.split(' – ');
@@ -606,27 +512,32 @@ function exactEighths(value) {
       await assertLinkedCount(row);
       assert.equal(await evaluate('document.querySelector(".charts-object-id").textContent'), identifier);
     }
-
     await command('Emulation.setScriptExecutionDisabled', {value: true});
     await navigate('/charts/?scope=mine', false);
     assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-bar-svg, .charts-histogram-svg, .charts-pie-svg").length'), 4);
-    assert.ok(await evaluate('getComputedStyle(document.querySelector(".charts-apply")).display !== "none"'));
+    assert.ok(await evaluate('getComputedStyle(document.querySelector(".charts-scope-form .charts-apply")).display !== "none"'));
     await evaluate('window.scrollTo(0, 0)');
     const visible = await evaluate(`(() => {
-      const graphs = [...document.querySelectorAll('.charts-primary-grid .charts-bar-svg, .charts-primary-grid .charts-pie-svg')];
+      const graphs = [...document.querySelectorAll('[data-statistic="phase"] .charts-bar-svg, [data-statistic="results"] .charts-pie-svg')];
       return graphs.length === 2 && graphs.every(svg => {
-        const rect = svg.getBoundingClientRect();
-        const pie = svg.classList.contains('charts-pie-svg');
+        const rect = svg.getBoundingClientRect(), pie = svg.classList.contains('charts-pie-svg');
         return svg.contains(document.elementFromPoint(rect.left + (pie ? rect.width * .45 : 15), rect.top + (pie ? rect.height * .5 : 30)));
       });
     })()`);
     assert.ok(visible, 'The server-rendered bar and pie remain visible without JavaScript');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
-    await setFilter('phase', 'Copper');
-    await setFilter('software', 'Software 7');
-    await setFilter('results', 'matching');
-    await submitFilters(2, false);
+    const recordsPath = await evaluate('document.querySelector(".charts-metric-total").getAttribute("href")');
+    assert.equal(new URL(process.env.CHARTS_BASE_URL + recordsPath).searchParams.get('show'), 'objects');
+    await evaluate('document.querySelector(".charts-metric-total").focus()');
+    await pressKey('Enter', 'Enter', 13);
+    await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + recordsPath)}
+      && document.readyState === 'complete' && document.querySelector('.charts-objects').open`);
+    assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
+    await navigate('/charts/?scope=mine', false);
+    await assertLinkedCount(await categoryLink('phase', 'Copper'), false);
+    await assertLinkedCount(await categoryLink('software', 'Software 7'), false);
+    await assertLinkedCount(await coverageLink('matching'), false);
+    assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '2');
     assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
     assert.equal(await evaluate('document.querySelector(".charts-objects").open'), true);
     await navigate('/charts/?scope=mine', false);
@@ -635,68 +546,43 @@ function exactEighths(value) {
     await setPrivate(false, false);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
     await setPrivate(true, false);
-    await evaluate(`(() => {
-      const select = document.getElementById('charts-material-group');
-      select.value = 'texture';
-      select.closest('form').requestSubmit();
-    })()`);
-    await until(`new URLSearchParams(location.search).get('material_group') === 'texture' && document.readyState === 'complete'
-      && !!document.querySelector('.charts-materials svg[data-category=texture]')`);
-    assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
-    assert.equal(await evaluate('new URLSearchParams(location.search).get("scope")'), 'mine');
+    await openAdditional();
+    await assertLinkedCount(await categoryLink('texture', 'Goss'), false);
     await assertPrivate();
-    const noScriptLink = await categoryLink('.charts-materials', 'Goss');
-    await navigate(noScriptLink.path, false);
-    assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), noScriptLink.count);
-    assert.equal(await evaluate('document.querySelector(".charts-objects").open'), true);
-    await evaluate(`(() => {
-      const select = document.getElementById('charts-scope');
-      select.value = 'public';
-      select.closest('form').requestSubmit();
-    })()`);
-    await until(`document.readyState === 'complete' && new URLSearchParams(location.search).get('scope') === 'public'
-      && document.getElementById('charts-scope').value === 'public'`);
+    await chooseScope('public', false);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '13');
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 0);
-    assert.deepEqual(await selections(), {material: 'texture', setup: 'software', measure: 'temperature'});
     assert.equal(await evaluate('document.body.textContent.includes("shared-record")'), false);
-    await evaluate(`(() => {
-      const select = document.getElementById('charts-scope');
-      select.value = 'mine';
-      select.closest('form').requestSubmit();
-    })()`);
-    await until(`document.readyState === 'complete' && new URLSearchParams(location.search).get('scope') === 'mine'
-      && !!document.getElementById('charts-include-private')`);
+    await chooseScope('mine', false);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
     assert.equal(await evaluate('document.getElementById("charts-include-private").checked'), false);
     await command('Emulation.setScriptExecutionDisabled', {value: false});
-
     await command('Network.setCookie', {name: process.env.CHARTS_COOKIE_NAME, value: process.env.CHARTS_EMPTY_SESSION,
       url: process.env.CHARTS_BASE_URL, path: '/'});
     await navigate();
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '13');
     await navigate('/charts/?scope=mine');
-    assert.equal(await evaluate('document.querySelectorAll(".charts-composition").length'), 0);
     assert.ok(await evaluate('document.querySelector(".charts-empty h2").textContent.includes("No data")'));
-    for (const width of [1280, 1440, 1920]) await layout('empty-data', width);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-filter-unavailable").length'), 3);
-    assert.equal(await evaluate('document.querySelectorAll(".charts-more-filters").length'), 0);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-bar-svg, .charts-histogram-svg, .charts-pie-svg").length'), 0);
+    for (const width of [1280, 1440, 1920]) await layout('empty-data', width, 0);
     await command('Network.setCookie', {name: process.env.CHARTS_COOKIE_NAME, value: process.env.CHARTS_SPARSE_SESSION,
       url: process.env.CHARTS_BASE_URL, path: '/'});
     await navigate('/charts/?scope=mine&include_private=1');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
-    assert.equal(await evaluate('document.querySelectorAll(".charts-more-filters").length'), 0);
-    for (const width of [1280, 1440, 1920]) await layout('missing-metadata', width, 3);
+    await assertFixedDashboard();
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=temperature] svg, [data-statistic=grain_count] svg").length'), 0);
+    assert.ok(await evaluate('document.querySelector("[data-statistic=temperature]").textContent.includes("No usable temperature")'));
+    assert.ok(await evaluate('document.querySelector("[data-statistic=grain_count]").textContent.includes("No usable grain number")'));
+    for (const width of [1280, 1440, 1920]) await layout('missing-metadata', width, 4);
     await navigate('/charts/?scope=mine&include_private=1&texture=Goss');
     assert.ok(await evaluate('!!document.querySelector(".charts-empty")'));
-    assert.match(await evaluate('document.querySelector("[data-filter-key=texture] .charts-filter-coverage").textContent'), /0 of 1 record\b/);
-    await submitFilters(0);
-    assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("texture")'), ['Goss']);
-    await setFilter('texture', 'Goss', false);
-    await submitFilters(1);
-    const noteLink = await evaluate('document.querySelector(".charts-note-row a").getAttribute("href")');
-    await navigate(noteLink);
-    await submitFilters(1);
+    await clearSelection();
+    assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
+    await openAdditional();
+    await assertLinkedCount(await evaluate(`(() => {
+      const link = document.querySelector('.charts-statistics-notes tbody th a');
+      return {path: link.getAttribute('href'), count: 1};
+    })()`));
     assert.deepEqual(await evaluate('new URLSearchParams(location.search).getAll("note")'), ['temperature_excluded']);
     if (process.env.CHARTS_SAMPLE_SESSION) {
       await command('Network.setCookie', {name: process.env.CHARTS_COOKIE_NAME, value: process.env.CHARTS_SAMPLE_SESSION,
@@ -705,42 +591,38 @@ function exactEighths(value) {
       assert.ok(await evaluate('!!document.querySelector(".charts-empty")'));
       await setPrivate(true);
       assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
-      assert.equal((await categoryLink('.charts-materials', 'Copper')).count, 1);
-      assert.equal((await categoryLink('.charts-composition', 'Abaqus CAE')).count, 1);
-      assert.match(await evaluate('document.querySelector(".charts-distribution-summary").textContent'), /Median\s+298\s+K/);
-      assert.ok(await evaluate('document.querySelector(".charts-data-notes").textContent.includes("Different curve lengths")'));
-      assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, #curve-object, #curve-component").length'), 0);
+      assert.equal((await categoryLink('phase', 'Copper')).count, 1);
+      assert.equal((await categoryLink('software', 'Abaqus CAE')).count, 1);
+      assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Median\s+298/);
+      assert.ok(await evaluate('document.querySelector("[data-statistic=temperature] h2").textContent.includes("(K)")'));
+      await openAdditional();
+      assert.ok(await evaluate('document.querySelector(".charts-additional-statistics").textContent.includes("Different curve lengths")'));
       for (const width of [1280, 1440, 1920]) await layout('sample-copper', width);
-      await assertLinkedCount(await categoryLink('.charts-materials', 'Copper'));
+      await assertLinkedCount(await categoryLink('phase', 'Copper'));
       await assertPrivate();
-      await assertLinkedCount(await categoryLink('.charts-composition', 'Abaqus CAE'));
+      await assertLinkedCount(await categoryLink('software', 'Abaqus CAE'));
       for (const [measure, value, formatted] of [
-        ['temperature', '298', '298 K'], ['grain_count', '343', '343'], ['discretization_count', '2744', '2,744'],
+        ['temperature', '298', '298'], ['grain_count', '343', '343'], ['discretization_count', '2744', '2,744'],
       ]) {
-        if (measure !== 'temperature') await choose('charts-measure', measure, 'measure');
-        assert.ok((await evaluate('document.querySelector(".charts-distribution-summary").textContent')).includes(formatted));
-        const sampleBin = await evaluate(`(() => {
-          const link = document.querySelector('.charts-histogram-svg .charts-bin[href]');
-          return {path: link.getAttribute('href'), count: Number(link.getAttribute('aria-label').match(/View (\\d+) objects/)[1])};
-        })()`);
+        if (measure === 'discretization_count') await openAdditional();
+        assert.ok((await evaluate(`document.querySelector('[data-statistic=${measure}] .charts-distribution-summary').textContent`)).includes(formatted));
+        const sampleBin = await histogramLink(measure);
         assert.ok(new URL(process.env.CHARTS_BASE_URL + sampleBin.path).searchParams.getAll('range')
           .includes(`${measure}:${value}:${value}:1`));
         await assertLinkedCount(sampleBin);
         await assertPrivate();
       }
       assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 5);
-      await submitFilters(1);
-      assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 5);
       assert.ok(await evaluate('new URLSearchParams(location.search).getAll("range").includes("discretization_count:2744:2744:1")'));
       assert.equal(await evaluate('document.querySelector(".charts-object-id").textContent'), 'a46fde6c');
       assert.equal(await evaluate('document.querySelector(".charts-object-title").getAttribute("href")'),
         process.env.CHARTS_SAMPLE_DETAIL_URL);
-      await choose('charts-material-group', 'texture', 'material_group');
-      assert.equal((await categoryLink('.charts-materials', 'Goss')).count, 1);
+      await openAdditional();
+      assert.equal((await categoryLink('texture', 'Goss')).count, 1);
       console.log('Charts local sample checks passed: Copper, Abaqus CAE, Goss, 298 K, 343 grains, 2,744 cells, exact combined links, detail navigation, and 3 desktop layouts.');
     }
     assert.deepEqual(exceptions, []);
-    console.log('Charts browser checks passed: grouped filters, record coverage and option counts, exclusive response choices and combined outputs, missing metadata, retained note and interval conditions, native keyboard controls, private scope and preferences, coverage pie and statistics tables, combined drillthrough, pagination, no JavaScript GET filters, and 21 desktop layouts.');
+    console.log('Charts browser checks passed: fixed six-chart dashboard, compact chart selections, public/private scopes, coverage pie and real tables, additional statistics, precise intervals, combined drillthrough, pagination, keyboard navigation, no JavaScript GET navigation, missing metadata, and 22 desktop layouts.');
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

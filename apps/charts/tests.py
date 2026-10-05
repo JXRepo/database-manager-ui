@@ -1,6 +1,6 @@
 import copy
 from decimal import Decimal
-from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -90,9 +90,27 @@ class ChartsTests(TestCase):
         self.assertIn("distributions", response.context)
         return response
 
-    def test_filter_choices_respect_scope_and_remain_available_after_selection(self):
+    def test_dashboard_prioritizes_six_charts_without_a_filter_form(self):
         """
-        Filtering statistics retains alternative choices without exposing private metadata
+        The default page presents the dataset directly instead of a search form
+        """
+        self.create_object()
+        response = self.dashboard()
+        self.assertEqual(response.context["software_count"], 1)
+        self.assertEqual(len(response.context["output_plot"]["rows"]), 3)
+        self.assertEqual([item["key"] for item in response.context["primary_distributions"]],
+                         ["temperature", "grain_count"])
+        for key in ("phase", "results", "software", "outputs", "temperature", "grain_count"):
+            self.assertContains(response, f'data-statistic="{key}"', count=1)
+        self.assertNotContains(response, 'id="charts-filter-form"')
+        self.assertNotContains(response, "Apply filters")
+        self.assertNotContains(response, "More filters")
+        self.assertNotContains(response, "Chart category")
+        self.assertNotContains(response, 'aria-label="Selected statistics"')
+
+    def test_fixed_statistics_respect_scope_and_chart_selection(self):
+        """
+        Every chart describes the same selected records without exposing private metadata
         """
         self.create_object("own-public")
         self.create_object("other-public", owner=self.other, software="Public solver",
@@ -103,24 +121,21 @@ class ChartsTests(TestCase):
         shared.shared_users.add(self.viewer)
         self.create_object("hidden-private", owner=self.other, access="c", software="Hidden secret")
         cases = [({}, {"Abaqus CAE", "Public solver"}),
-                 ({"phase": "Copper"}, {"Abaqus CAE", "Public solver"}),
+                 ({"phase": "Copper"}, {"Abaqus CAE"}),
                  ({"scope": "mine"}, {"Abaqus CAE"}),
                  ({"scope": "mine", "include_private": "1"}, {"Abaqus CAE", "Private solver"})]
         for query, expected in cases:
             with self.subTest(query=query):
                 response = self.dashboard(**query)
-                self.assertIn("filter_fields", response.context)
-                fields = {field["key"]: field for field in response.context["filter_fields"]}
-                self.assertEqual({option["value"] for option in fields["software"]["options"]}, expected)
-                self.assertContains(response, 'id="charts-filters"')
-                self.assertContains(response, "Apply filters")
+                self.assertEqual({row["label"] for row in response.context["software_category"]["rows"]}, expected)
+                self.assertNotContains(response, 'id="charts-filter-form"')
                 self.assertNotContains(response, "Shared secret")
                 self.assertNotContains(response, "Hidden secret")
         self.assertEqual(self.dashboard(phase="Copper").context["total_objects"], 1)
 
-    def test_filter_form_retains_repeated_values_numeric_intervals_and_preferences(self):
+    def test_selection_chips_retain_repeated_conditions_and_preferences(self):
         """
-        The visible form edits existing AND conditions while keeping the selected scope
+        Removing one bookmarked condition preserves every other requirement
         """
         self.create_object(software=["Abaqus CAE", "DAMASK"],
                            phase=[{"phase_name": "Copper"}, {"phase_name": "Nickel"}])
@@ -130,50 +145,44 @@ class ChartsTests(TestCase):
                  "material_group": "texture", "group": "loading_mode", "measure": "grain_count",
                  "page": "3", "show": "objects"}
         response = self.dashboard(**query)
-        self.assertIn("filter_fields", response.context)
-        fields = {field["key"]: field for field in response.context["filter_fields"]}
-        for key in ("phase", "software", "coverage", "result"):
-            selected = query[key] if isinstance(query[key], list) else [query[key]]
-            field = fields["results"] if key in {"coverage", "result"} else fields[key]
-            self.assertEqual({option["value"] for option in field["options"]
-                              if option["selected"] and option["name"] == key},
-                             set(selected))
-        for key, value in zip(("temperature_range", "grain_count_range"), query["range"]):
-            self.assertEqual([option["value"] for option in fields[key]["options"] if option["selected"]], [value])
-        params = dict(response.context["control_params"]["filters"])
-        for key in ("scope", "include_private", "material_group", "group", "measure"):
-            self.assertEqual(params[key], query[key])
-        self.assertEqual(params["note"], "temperature_excluded")
-        self.assertFalse({"phase", "software", "coverage", "result", "range", "page", "show"} & params.keys())
+        chips = response.context["active_filters"]
+        self.assertEqual(len(chips), 10)
+        for chip in chips:
+            params = parse_qs(urlsplit(chip["url"]).query)
+            for key in ("scope", "include_private", "material_group", "group", "measure"):
+                self.assertEqual(params[key], [query[key]])
+            self.assertNotIn("page", params)
+        first = parse_qs(urlsplit(chips[0]["url"]).query)
+        self.assertEqual(first["phase"], ["Nickel"])
+        self.assertEqual(first["software"], query["software"])
+        self.assertEqual(first["range"], query["range"])
+        self.assertEqual(first["note"], [query["note"]])
 
-    def test_invalid_filter_values_remain_visible_and_do_not_broaden_the_selection(self):
+    def test_invalid_bookmarked_conditions_are_escaped_and_removable(self):
         """
-        Unrecognized bookmarked conditions stay checked so applying cannot silently discard them
+        Invalid selections stay visible and can be removed without broadening other conditions
         """
         self.create_object()
         label = 'Unknown"><script>alert(1)</script>'
         response = self.dashboard(software=label, coverage="invalid", range="temperature:broken")
         self.assertEqual(response.context["total_objects"], 0)
+        self.assertEqual(response.context["base_count"], 1)
         self.assertTrue(response.context["filter_errors"])
-        self.assertIn("filter_fields", response.context)
-        fields = {field["key"]: field for field in response.context["filter_fields"]}
-        self.assertEqual((fields["software"]["available_count"], fields["software"]["total_count"]), (1, 1))
-        self.assertEqual(next(option["count"] for option in fields["software"]["options"]
-                              if option["value"] == "Abaqus CAE"), 1)
-        for key, value in (("software", label), ("coverage", "invalid"), ("temperature_range", "temperature:broken")):
-            field = fields["results"] if key == "coverage" else fields[key]
-            self.assertIn(value, [option["value"] for option in field["options"] if option["selected"]])
+        chips = response.context["active_filters"]
+        self.assertEqual(len(chips), 3)
         self.assertNotContains(response, "<script>alert(1)</script>")
-        response = self.dashboard(coverage=["matching", "MATCHING"], component="invalid", curve="invalid")
-        fields = {field["key"]: field for field in response.context["filter_fields"]}
-        self.assertEqual({option["value"] for option in fields["results"]["options"] if option["selected"]},
-                         {"matching", "MATCHING"})
-        self.assertEqual(dict(response.context["control_params"]["filters"]),
-                         {"component": "invalid", "curve": "invalid"})
+        for chip in chips:
+            selected = self.client.get(chip["url"])
+            self.assertEqual(selected.context["total_objects"], 0)
+        interval = self.client.get(chips[-1]["url"])
+        self.assertNotIn("range", parse_qs(urlsplit(chips[-1]["url"]).query))
+        self.assertTrue(interval.context["filter_errors"])
+        cleared = self.client.get(response.context["clear_url"])
+        self.assertEqual(cleared.context["total_objects"], 1)
 
-    def test_filter_coverage_counts_distinct_scope_records(self):
+    def test_fixed_charts_count_records_separately_from_phase_observations(self):
         """
-        Missing optional values and repeated phases cannot inflate filter coverage
+        Repeated labels count each record once while numeric phases retain their observations
         """
         phase = {"phase_name": "Copper", "orientation": {"grain_count": 343, "texture_type": "Goss"}}
         self.create_object("multi", software=["Abaqus CAE", "abaqus cae", "DAMASK"], phase=[phase, phase])
@@ -183,44 +192,54 @@ class ChartsTests(TestCase):
         self.create_object("own-private", access="c", software="Private solver")
         shared = self.create_object("shared", owner=self.other, access="c", software="Shared solver")
         shared.shared_users.add(self.viewer)
-        for query, matching in (({}, 3), ({"software": "DAMASK"}, 1), ({"software": "Absent"}, 0)):
-            with self.subTest(query=query):
-                response = self.dashboard(**query)
-                self.assertEqual(response.context["total_objects"], matching)
-                fields = {field["key"]: field for field in response.context["filter_fields"]}
-                for key, available in (("software", 3), ("phase", 3), ("texture", 1),
-                                       ("temperature_range", 1), ("grain_count_range", 1)):
-                    self.assertEqual((fields[key].get("available_count"), fields[key].get("total_count")),
-                                     (available, 3))
-                software = {option["value"]: option.get("count") for option in fields["software"]["options"]}
-                self.assertEqual(software["Abaqus CAE"], 3)
-                self.assertEqual(software["DAMASK"], 1)
-                grains = fields["grain_count_range"]["options"]
-                self.assertEqual([(option["value"], option.get("count")) for option in grains],
-                                 [("grain_count:343:343:1", 1)])
-                self.assertNotContains(response, "Private solver")
-                self.assertNotContains(response, "Shared solver")
+        response = self.dashboard()
+        software = {row["label"]: row["count"] for row in response.context["software_category"]["rows"]}
+        self.assertEqual(software, {"Abaqus CAE": 3, "DAMASK": 1})
+        temperature, grains = response.context["primary_distributions"]
+        self.assertEqual((temperature["object_count"], grains["object_count"]), (1, 1))
+        self.assertEqual(grains["observation_count"], 2)
+        self.assertEqual([(bucket["count"], bucket["object_count"]) for bucket in grains["bins"]], [(2, 1)])
+        self.assertNotContains(response, "Private solver")
+        self.assertNotContains(response, "Shared solver")
+        selected = self.dashboard(software="DAMASK")
+        self.assertEqual(selected.context["total_objects"], 1)
+        self.assertEqual({row["count"] for row in selected.context["software_category"]["rows"]}, {1})
 
-    def test_empty_optional_filters_hide_but_active_conditions_remain_editable(self):
+    def test_missing_values_keep_empty_distribution_cards_and_selected_conditions(self):
         """
-        Absent metadata does not create empty menus or discard bookmarked conditions
+        Missing optional metadata cannot hide a scientific distribution or invent a value
         """
         self.create_object(phase=[{"phase_name": "Copper"}], global_temperature=None, mechanical_BC=[])
         response = self.dashboard()
-        fields = {field["key"]: field for field in response.context["filter_fields"]}
-        self.assertFalse({"texture", "elastic_model", "plastic_model", "loading_type", "loading_mode",
-                          "temperature_range", "grain_count_range", "discretization_count_range", "note"} & fields.keys())
-        self.assertEqual(response.context.get("filter_groups"), [])
+        for item in response.context["primary_distributions"]:
+            self.assertEqual(item["object_count"], 0)
+            self.assertEqual(item["plot"]["columns"], [])
+        self.assertContains(response, 'data-statistic="temperature"')
+        self.assertContains(response, 'data-statistic="grain_count"')
         selected = self.dashboard(texture="Goss")
         self.assertEqual(selected.context["total_objects"], 0)
-        fields = {field["key"]: field for field in selected.context["filter_fields"]}
-        self.assertEqual(fields["texture"]["available_count"], 0)
-        self.assertEqual([(option["value"], option["selected"]) for option in fields["texture"]["options"]],
-                         [("Goss", True)])
+        self.assertEqual([chip["label"] for chip in selected.context["active_filters"]], ["Texture: Goss"])
+        self.assertEqual(self.client.get(selected.context["active_filters"][0]["url"]).context["total_objects"], 1)
 
-    def test_results_menu_combines_coverage_and_required_outputs(self):
+    def test_large_constant_grain_number_keeps_exact_bounds_and_a_readable_tick(self):
         """
-        The consolidated controls retain exact coverage and output filtering
+        Compact axis labels cannot change the exact constant interval or its linked records
+        """
+        count = 10 ** 80 + 123
+        self.create_object(phase=[{"phase_name": "Copper", "orientation": {"grain_count": count}}])
+        response = self.dashboard()
+        item = response.context["primary_distributions"][1]
+        self.assertEqual(Decimal(item["minimum"]), count)
+        self.assertEqual(Decimal(item["maximum"]), count)
+        self.assertLessEqual(len(item["plot"]["x_ticks"][0]["label"]), 14)
+        bucket = item["bins"][0]
+        self.assertEqual((Decimal(bucket["low"]), Decimal(bucket["high"])), (count, count))
+        selected = self.client.get(bucket["url"])
+        self.assertEqual(selected.context["total_objects"], 1)
+
+    def test_pie_and_output_bars_preserve_exact_combined_filtering(self):
+        """
+        Disjoint coverage slices and overlapping output bars keep their original semantics
         """
         self.create_object("matching")
         self.create_object("different-components", stress={"stress_11": [0, 1]},
@@ -229,12 +248,9 @@ class ChartsTests(TestCase):
         self.assertEqual(response.context["total_objects"], 2)
         self.assertFalse(response.context["filter_errors"])
         self.assertEqual(response.context["active_filters"], [])
-        fields = {field["key"]: field for field in response.context["filter_fields"]}
-        results = fields["results"]
-        counts = {(option["name"], option["value"]): option["count"] for option in results["options"]}
-        self.assertEqual(counts[("coverage", "matching")], 1)
-        self.assertEqual(counts[("coverage", "without_matching")], 1)
-        self.assertEqual(counts[("result", "plastic_strain")], 1)
+        self.assertEqual([row["count"] for row in response.context["coverage_rows"]], [1, 1])
+        self.assertEqual({row["key"]: row["count"] for row in response.context["output_plot"]["rows"]},
+                         {"stress": 2, "total_strain": 2, "plastic_strain": 1})
         for query, count in (({"coverage": "matching", "result": "plastic_strain"}, 1),
                              ({"coverage": "without_matching", "result": "plastic_strain"}, 0),
                              ({"coverage": "all", "result": "plastic_strain"}, 1)):
@@ -244,18 +260,15 @@ class ChartsTests(TestCase):
             self.assertTrue(selected.context["filter_errors"])
             self.assertEqual(selected.context["total_objects"], 0)
             self.assertEqual(selected.context["base_count"], 2)
-            results = next(field for field in selected.context["filter_fields"] if field["key"] == "results")
-            self.assertEqual((results["available_count"], results["total_count"]), (2, 2))
-            self.assertEqual(next(option["count"] for option in results["options"]
-                                  if option["value"] == "matching"), 1)
 
-    def test_invalid_scope_choices_do_not_generate_filter_counts(self):
+    def test_invalid_scope_choices_cannot_generate_statistics(self):
         """
-        Invalid or repeated access selectors cannot populate a fallback scope
+        Invalid access selectors stay invalid after removing unrelated chart conditions
         """
         self.create_object("public")
         self.create_object("private", access="c", software="Private solver")
-        cases = ({"scope": "unknown"}, {"scope": ["mine", "public"]},
+        cases = ({"scope": "unknown"}, {"scope": ""}, {"scope": ["mine", "public"]},
+                 {"scope": "mine", "include_private": ""},
                  {"scope": "mine", "include_private": "invalid"},
                  {"scope": "mine", "include_private": ["1", "0"]})
         for query in cases:
@@ -265,19 +278,14 @@ class ChartsTests(TestCase):
                 self.assertEqual(response.context["total_objects"], 0)
                 self.assertEqual(response.context["base_count"], 0)
                 self.assertNotContains(response, "Private solver")
-                self.assertContains(response, "Correct the filters to view statistics")
-                submitted = self.client.get(f"{reverse('charts')}?{urlencode(response.context['control_params']['filters'])}")
-                self.assertTrue(submitted.context["filter_errors"])
-                self.assertEqual(submitted.context["total_objects"], 0)
-                self.assertEqual(submitted.context["base_count"], 0)
                 removed = self.client.get(response.context["active_filters"][0]["url"])
                 self.assertTrue(removed.context["filter_errors"])
                 self.assertEqual(removed.context["total_objects"], 0)
                 self.assertEqual(removed.context["base_count"], 0)
 
-    def test_retired_filter_controls_preserve_conditions_and_clear_keeps_preferences(self):
+    def test_clear_selection_keeps_private_scope_and_valid_preferences(self):
         """
-        Applying the simplified form cannot drop numeric or note requirements
+        Clearing chart selections retains the current scope without retaining invalid conditions
         """
         self.create_object("own", access="c", global_temperature=None)
         query = {"scope": "mine", "include_private": "1", "range": ["discretization_count:2744:2744:1", "unknown:0:1:1"],
@@ -285,9 +293,10 @@ class ChartsTests(TestCase):
                  "group": "loading_mode", "measure": "grain_count", "page": "2"}
         response = self.dashboard(**query)
         self.assertEqual(response.context["total_objects"], 0)
-        hidden = response.context["control_params"]["filters"]
-        self.assertEqual([value for key, value in hidden if key == "range"], query["range"])
-        self.assertEqual([value for key, value in hidden if key == "note"], query["note"])
+        interval_chip = next(chip for chip in response.context["active_filters"] if chip["label"].startswith("Discretization count:"))
+        preserved = parse_qs(urlsplit(interval_chip["url"]).query)
+        self.assertEqual(preserved["range"], ["unknown:0:1:1"])
+        self.assertEqual(preserved["note"], query["note"])
         cleared = self.client.get(response.context["clear_url"])
         self.assertEqual(cleared.context["total_objects"], 1)
         self.assertTrue(cleared.context["include_private"])
@@ -494,13 +503,16 @@ class ChartsTests(TestCase):
         """
         self.create_object()
         response = self.dashboard(range=["bad", "temperature:298:298:1", "grain_count:343:343:1"])
-        for index, chip in enumerate(response.context["active_filters"]):
+        for index, chip in enumerate(response.context["active_filters"][:2]):
             query = parse_qs(urlsplit(chip["url"]).query)
             self.assertEqual(query["range"][0], "bad")
             self.assertNotIn(("temperature:298:298:1", "grain_count:343:343:1")[index], query["range"])
             selected = self.client.get(chip["url"])
             self.assertTrue(selected.context["filter_errors"])
             self.assertEqual(selected.context["total_objects"], 0)
+        corrected = self.client.get(response.context["active_filters"][-1]["url"])
+        self.assertFalse(corrected.context["filter_errors"])
+        self.assertEqual(corrected.context["total_objects"], 1)
 
     def test_successive_chart_selections_refine_the_same_objects(self):
         """
@@ -737,9 +749,9 @@ class ChartsTests(TestCase):
         self.assertEqual(response.context["material_group"], "phase")
         self.assertEqual(response.context["group"], "software")
 
-    def test_panel_controls_keep_filters_and_other_preferences(self):
+    def test_scope_control_resets_conditions_and_keeps_valid_legacy_preferences(self):
         """
-        Changing a visible aggregate never drops active conditions or scope
+        A deliberate scope change starts an unfiltered overview within that scope
         """
         self.create_object(software=["Abaqus CAE", "DAMASK"])
         query = {
@@ -752,16 +764,13 @@ class ChartsTests(TestCase):
         response = self.dashboard(**query)
         self.assertEqual(response.context["total_objects"], 1)
         self.assertEqual(len(response.context["active_filters"]), 8)
-        for control in ("material_group", "group", "measure"):
-            params = response.context["control_params"][control]
-            for key in ("scope", "include_private", "phase", "software", "result", "range", "coverage"):
-                expected = query[key] if isinstance(query[key], list) else [query[key]]
-                self.assertEqual([value for name, value in params if name == key], expected)
-            for key in {"material_group", "group", "measure"} - {control}:
-                self.assertIn((key, query[key]), params)
-            self.assertFalse({control, "curve", "component", "show", "page"} & {key for key, _value in params})
         self.assertEqual(dict(response.context["control_params"]["scope"]),
                          {"material_group": "texture", "group": "loading_mode", "measure": "grain_count"})
+        changed = self.dashboard(scope="public", **dict(response.context["control_params"]["scope"]))
+        self.assertEqual(changed.context["active_filters"], [])
+        self.assertEqual(changed.context["total_objects"], 1)
+        invalid = self.dashboard(group="unknown", measure="unknown")
+        self.assertEqual(invalid.context["control_params"]["scope"], [])
 
     def test_matching_components_count_real_pairs_and_preserve_legacy_groups(self):
         """
@@ -780,7 +789,9 @@ class ChartsTests(TestCase):
         response = self.dashboard()
         self.assertEqual(response.context["matching_count"], 4)
         self.assertEqual({row["key"] for row in response.context["output_rows"]},
-                         {"stress", "total_strain", "plastic_strain", "supplied_equivalent", "calculated_equivalent"})
+                         {"stress", "total_strain", "plastic_strain"})
+        self.assertEqual({row["key"] for row in response.context["extra_output_rows"]},
+                         {"supplied_equivalent", "calculated_equivalent"})
         row = next(item for item in response.context["result_rows"] if item["key"] == "matching_response")
         self.assertEqual(row["count"], 4)
         selected = self.client.get(response.context["matching_url"])

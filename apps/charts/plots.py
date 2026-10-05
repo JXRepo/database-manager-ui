@@ -96,7 +96,7 @@ def histogram_plot(distribution):
     Returns
     -------
     dict
-        SVG columns, count ticks and unchanged interval links.
+        SVG columns, boundary labels, count ticks and unchanged interval links.
     """
     bins = distribution["bins"]
     scale = axis_scale([bucket["count"] for bucket in bins], counts=True)
@@ -110,8 +110,20 @@ def histogram_plot(distribution):
                         "y": round(174 - height, 2), "width": round(width, 2),
                         "plot_height": round(height, 2), "count_y": round(167 - height, 2),
                         "low_label": bucket["display_low"], "high_label": bucket["display_high"]})
-    return {"columns": columns, "ticks": [{**tick, "y": round(174 - tick["position"] * 146, 2)}
-                                          for tick in scale["ticks"]]}
+    x_ticks = []
+    if bins:
+        if distribution["constant"]:
+            x_ticks.append({"label": bins[0]["display_low"], "x": columns[0]["center"], "anchor": "middle"})
+        else:
+            longest = max(len(bucket[key]) for bucket in bins for key in ("display_low", "display_high"))
+            divisions = 2 if longest > 8 else 4
+            indices = sorted({round(index * len(bins) / divisions) for index in range(divisions + 1)})
+            for index in indices:
+                label = bins[index]["display_low"] if index < len(bins) else bins[-1]["display_high"]
+                anchor = "start" if index == 0 else "end" if index == len(bins) else "middle"
+                x_ticks.append({"label": label, "x": round(62 + slot * index, 2), "anchor": anchor})
+    return {"columns": columns, "x_ticks": x_ticks,
+            "ticks": [{**tick, "y": round(174 - tick["position"] * 146, 2)} for tick in scale["ticks"]]}
 
 
 def pie_plot(rows):

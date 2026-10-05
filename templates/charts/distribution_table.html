@@ -1,6 +1,6 @@
 <div class="charts-statistics-wrap">
   <table class="charts-statistics-table charts-distribution-table">
-    <caption>{% if item.constant %}Value frequency table{% else %}Histogram statistics{% endif %}<span>{{ item.observation_count }} {{ item.observation_unit|slice:':-1' }}{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}.</span></caption>
+    <caption class="visually-hidden">{{ item.title }}: {{ item.observation_count }} {{ item.observation_unit|slice:':-1' }}{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</caption>
     <thead><tr><th scope="col">{% if item.constant %}Value{% else %}Interval{% endif %}{% if item.unit %} ({{ item.unit }}){% endif %}</th><th scope="col">Observations</th><th scope="col">Objects</th></tr></thead>
     <tbody>{% for bin in item.bins %}<tr><th scope="row">{% if bin.count %}<a href="{{ bin.url }}">{{ bin.label }}</a>{% else %}{{ bin.label }}{% endif %}</th><td>{{ bin.count }}</td><td>{{ bin.object_count }}</td></tr>{% endfor %}</tbody>
   </table>

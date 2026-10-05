@@ -16,7 +16,6 @@ from .analytics import (
     distribution, format_number, in_bin, number, summarize_object,
 )
 from .plots import bar_plot, histogram_plot, pie_plot
-from .filters import build_filter_fields
 
 SCOPES = {"public": "Public database", "mine": "My data"}
 LEGACY_SCOPES = {"all", "shared"}
@@ -45,7 +44,7 @@ def chart_url(query, changes=None, objects=False):
     str
         Local Charts URL with encoded values.
     """
-    values = {key: value for key, value in query.items() if key != "page" and value != ""}
+    values = {key: value for key, value in query.items() if key != "page"}
     for key, value in (changes or {}).items():
         if value is None:
             values.pop(key, None)
@@ -234,14 +233,11 @@ def index(request):
     else:
         objects = objects.filter(access_type="all")
     records = []
-    scope_records = []
-    base_count = 0
-    if scope_valid:
+    base_count = objects.count() if scope_valid else 0
+    if scope_valid and not errors:
         for obj in objects.only("pk", "data", "access_type").order_by("-uploaded_at", "-pk").iterator(chunk_size=1):
-            base_count += 1
             record = summarize_object(obj)
-            scope_records.append(record)
-            if not errors and matches_filters(record, query, intervals):
+            if matches_filters(record, query, intervals):
                 records.append(record)
             del obj
     total = len(records)
@@ -264,13 +260,14 @@ def index(request):
         for bucket in item["bins"]:
             bounds = ":".join([measure, bucket["low"], bucket["high"], "1" if bucket["inclusive"] else "0"])
             bucket["url"] = refine_url(query, "range", bounds, measure=measure)
+        item["plot"] = histogram_plot(item)
         distributions.append(item)
     result_rows = []
     for key, title in RESULT_TITLES.items():
         if key == "paired":
             continue
         count = sum(key in record["results"] for record in records)
-        result_rows.append({"key": key, "title": title, "count": count,
+        result_rows.append({"key": key, "title": title, "label": title, "count": count,
                             "percent": round(count * 100 / total, 1) if total else 0,
                             "url": refine_url(query, "result", key)})
     note_rows = []
@@ -302,6 +299,10 @@ def index(request):
         value = format_number(low, 18) if low == high else f"{format_number(low, 18)} – {'< ' if not inclusive else ''}{format_number(high, 18)}"
         active_filters.append({"label": f"{title}: {value} {unit}".strip(),
                                "url": chart_url(retained_query, {"range": query["range"][:index] + query["range"][index + 1:]})})
+    for index, value in enumerate(query.get("range", [])):
+        if index not in {interval[0] for interval in intervals}:
+            active_filters.append({"label": f"Interval: {value}",
+                                   "url": chart_url(retained_query, {"range": query["range"][:index] + query["range"][index + 1:]})})
     page = Paginator(records, 10).get_page(query.get("page"))
     clear_params = {"scope": scope if scope in SCOPES else "public"}
     if include_private:
@@ -314,34 +315,16 @@ def index(request):
     material_category = categories.get(material_group, categories["phase"])
     measure = query.get("measure") or "temperature"
     selected_distribution = next((item for item in distributions if item["key"] == measure), distributions[0])
-    controls = {}
-    for name in ("material_group", "group", "measure"):
-        excluded = {name, "curve", "component", "show", "page"}
-        controls[name] = [(key, value) for key, values in query.items() if key not in excluded
-                          for value in (values if isinstance(values, list) else [values])]
-    controls["scope"] = [(key, value) for key in ("material_group", "group", "measure")
-                         if (value := query.get(key))]
-    filter_fields = build_filter_fields(scope_records, query)
-    rendered = {(option["name"], option["value"]) for field in filter_fields for option in field["options"]}
-    controls["filters"] = []
-    for key, values in retained_query.items():
-        if key in {"page", "show"}:
-            continue
-        for value in values if isinstance(values, list) else [values]:
-            if (key, value) not in rendered:
-                controls["filters"].append((key, value))
-    fields_by_key = {field["key"]: field for field in filter_fields}
-    filter_groups = []
-    for key, label, keys in (("conditions", "Simulation conditions", ("temperature_range", "loading_type", "loading_mode")),
-                             ("microstructure", "Microstructure & models", ("texture", "grain_count_range", "elastic_model", "plastic_model"))):
-        fields = [fields_by_key[key] for key in keys if key in fields_by_key]
-        if fields:
-            filter_groups.append({"key": key, "label": label, "fields": fields})
+    controls = {"scope": [(key, query[key]) for key, choices in
+                          (("material_group", MATERIAL_GROUPS), ("group", SETUP_GROUPS), ("measure", MEASURES))
+                          if query.get(key) in choices]}
+    output_rows = [row for row in result_rows if row["key"] in {"stress", "total_strain", "plastic_strain"}]
     context = {
         "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "Public database"),
         "include_private": include_private, "scope_valid": scope_valid,
         "scope_options": SCOPES.items(), "base_count": base_count, "total_objects": total,
         "phase_count": len(categories["phase"]["rows"]),
+        "software_count": len(categories["software"]["rows"]),
         "matching_count": sum("matching_response" in record["results"] for record in records),
         "plastic_count": sum("plastic_strain" in record["results"] for record in records),
         "matching_url": refine_url(query, "result", "matching_response"),
@@ -349,10 +332,12 @@ def index(request):
         "categories": categories, "distributions": distributions,
         "coverage_rows": coverage_rows, "coverage_plot": pie_plot(coverage_rows),
         "active_measure": query.get("measure", "temperature"), "result_rows": result_rows,
-        "output_rows": [row for row in result_rows if row["key"] != "matching_response"],
+        "output_rows": output_rows, "output_plot": bar_plot(output_rows),
+        "extra_output_rows": [row for row in result_rows if row["key"] in {"supplied_equivalent", "calculated_equivalent"}],
         "note_rows": note_rows, "noted_objects": sum(bool(record["notes"]) for record in records),
         "active_filters": active_filters, "filter_errors": errors, "clear_url": clear_url,
         "objects_page": page,
+        "records_url": chart_url(query, objects=True),
         "objects_open": bool(active_filters or query.get("show") == "objects"),
         "previous_url": chart_url(query, {"page": page.previous_page_number()}, objects=True) if page.has_previous() else "",
         "next_url": chart_url(query, {"page": page.next_page_number()}, objects=True) if page.has_next() else "",
@@ -363,8 +348,10 @@ def index(request):
         "selected_category": selected_category,
         "category_plot": bar_plot(selected_category["rows"]), "group": group,
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
+        "phase_category": categories["phase"], "phase_plot": bar_plot(categories["phase"]["rows"]),
+        "software_category": categories["software"], "software_plot": bar_plot(categories["software"]["rows"]),
+        "primary_distributions": distributions[:2], "discretization_distribution": distributions[2],
+        "additional_categories": [categories[key] for key in ("texture", "elastic_model", "plastic_model", "loading_type", "loading_mode")],
         "control_params": controls,
-        "filter_fields": filter_fields, "primary_filters": filter_fields[:3], "filter_groups": filter_groups,
-        "more_filter_count": sum(field["selected_count"] for field in filter_fields[3:]),
     }
     return render(request, "charts/index.html", context)
