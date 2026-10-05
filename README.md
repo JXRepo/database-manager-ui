@@ -385,17 +385,39 @@ distributed. Individual stress–strain curves and PNG/CSV downloads belong to
 the data detail page, reached by opening an object in the filtered list.
 
 The **Filters** panel stays visible above the charts, including for empty
-selections. Phase, Software and Stress–strain coverage are available directly;
-**More filters** includes texture, material models, loading, reported outputs,
-numeric intervals and statistics notes. Select values and click **Apply filters**
-to update the charts and their records together. All checked conditions must
-match the same object, including multiple values within one field. Choices
-come from the current data scope and remain available after filtering; active
-bookmarked values remain selected even when unavailable or invalid.
+selections. Its main controls are **Phase**, **Software** and **Results**.
+Results combines an exclusive All / Available / Not available choice for
+matching stress–strain components with requirements for stress, total strain
+or plastic strain outputs. Additional equivalent or legacy output conditions
+appear only when already selected in a bookmarked URL.
+**More filters** groups temperature and loading type/mode under **Simulation
+conditions**, and texture, grain number and elastic/plastic models under
+**Microstructure & models**. Optional fields with no usable values in the scope
+are omitted unless they have an active condition. Empty primary controls
+show that no data are available.
+
+Each field shows how many distinct records have usable values; menu choices
+show distinct record counts in the complete current data scope, before applying
+filters. Multiple phases or descriptions never count one record twice for the
+same option. These counts remain available after an empty selection and do not
+predict the result of combining several conditions. **All** includes records
+without a value; selecting a value or interval requires matching data.
+Invalid filter conditions retain counts for a valid data scope while returning
+no matching objects. Invalid scope or private inclusion choices do not populate
+a fallback scope or claim that the scope contains no records.
+Repeated single-value parameters remain invalid when applying filters or removing
+another condition; correcting the scope or explicitly clearing resolves them.
+Select values and click **Apply filters** to update charts and records together.
+All checked conditions must match the same object, including multiple values
+within one field. Active bookmarked values remain editable even when unavailable
+or invalid. Discretization count stays in the condition histogram and statistics
+notes stay in their own section; active interval and note conditions are retained
+when submitting the simplified form and can be removed through Applied filters.
+
 Applying filters preserves the scope, private inclusion and chart preferences,
 and starts the record list on its first page. **Clear filters** clears conditions
-within the current scope. Open **Source records** below the charts to inspect
-the matching objects.
+while preserving the current scope, valid private inclusion and chart preferences.
+Open **Source records** below the charts to inspect the matching objects.
 **Chart category** selects how a bar chart groups the data and does not itself
 filter the objects. The filter form works through ordinary GET navigation
 without JavaScript.

@@ -20,10 +20,10 @@
       }
     });
     menu.addEventListener('change', () => {
-      const selected = [...menu.querySelectorAll('input:checked')];
+      const selected = [...menu.querySelectorAll('input:checked:not([data-filter-all])')];
       let label = 'All';
       if (selected.length === 1) {
-        label = selected[0].closest('label').textContent.trim();
+        label = selected[0].dataset.filterLabel || selected[0].closest('label').querySelector('[data-filter-label]').textContent.trim();
       } else if (selected.length) {
         label = `${selected.length} selected`;
       }

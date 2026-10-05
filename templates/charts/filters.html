@@ -2,7 +2,7 @@
   <form method="get" action="{% url 'charts' %}" id="charts-filter-form">
     {% for key, value in control_params.filters %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
     <div class="charts-filters-heading">
-      <div><h2 id="filters-heading"><i data-feather="filter" aria-hidden="true"></i>Filters</h2><span>Match all selected values</span></div>
+      <div><h2 id="filters-heading"><i data-feather="filter" aria-hidden="true"></i>Filters</h2><span>All conditions must match the same record</span></div>
       <span class="charts-filter-count">{{ total_objects }} matching record{{ total_objects|pluralize }}{% if active_filters %} of {{ base_count }}{% endif %}</span>
     </div>
     <div class="charts-filters-primary">
@@ -12,10 +12,11 @@
         <a href="{{ clear_url }}" class="charts-clear">Clear filters</a>
       </div>
     </div>
-    <details class="charts-more-filters">
+    {% if filter_groups %}<details class="charts-more-filters">
       <summary>More filters{% if more_filter_count %}<span>{{ more_filter_count }} selected</span>{% endif %}</summary>
-      <div class="charts-filters-extra">{% for field in more_filters %}{% include 'charts/filter_field.html' %}{% endfor %}</div>
-    </details>
+      <p class="charts-filter-help">All includes records without a value. Availability and option counts use the data scope above.</p>
+      {% for group in filter_groups %}<section class="charts-filter-group charts-filter-group-{{ group.key }}" aria-labelledby="filter-group-{{ forloop.counter }}"><h3 id="filter-group-{{ forloop.counter }}">{{ group.label }}</h3><div class="charts-filters-extra">{% for field in group.fields %}{% include 'charts/filter_field.html' %}{% endfor %}</div></section>{% endfor %}
+    </details>{% endif %}
     {% if active_filters %}
       <div class="charts-filter-strip" aria-label="Active filters">
         <span class="charts-filter-label">Applied filters</span>

@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Remove record navigation from Charts filters)
+code_base: see latest git commit (Streamline Charts filters and show record coverage)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts filter actions and documentation
+  - Charts filter choices, coverage counts, grouped controls, browser checks and documentation
 ---
 
 # Project handoff
@@ -14,7 +14,34 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：从筛选区移除记录入口
+### 本轮：面向上线精简 Charts 筛选
+
+- 用户要求认真调整到友好的可用版本，项目预计本周或下周上线。首行只保留 Phase、
+  Software 和 Results；Results 合并匹配应力–应变分量的 All／Available／Not available
+  单选及 Stress／Total strain／Plastic strain 输出要求，避免两个独立结果筛选框。
+- More filters 按 Simulation conditions（温度、加载类型／模式）与 Microstructure & models
+  （Texture、Grain number、弹性／塑性模型）分组；微观与模型采用两列，成对排列。
+  当前范围没有可用值的选填项隐藏，已有条件则继续可见以便纠正；空范围的主控件说明无数据。
+- 每个字段展示具有可用值的不同记录数，每个选项展示完整当前数据范围内的不同记录数。
+  多相与重复描述不会重复计数；数值分箱仍用 Decimal，Grain number 的选项计对象而非相观测。
+  数量明确按 Data scope 统计，不冒充组合筛选后的结果；All 保留缺失信息的对象。
+- 离散数量保留在条件直方图，Statistics notes 保留在独立备注区；不再提供独立筛选框。
+  旧链接的 note／离散数区间继续由隐藏输入保留，并可从 Applied filters 移除。
+  技术／未知输出条件在已有书签里才显示，无效或多重 coverage 条件继续以复选保留原语义。
+  coverage=all 只在独立出现时表示不限制，和其他 coverage 值混用仍报错且返回零记录。
+- Clear filters 现保留有效图表偏好及范围／私有开关。原生 GET、同一对象 AND、分页、
+  权限、JSON 保存／导出和详情曲线均未改变；没有新依赖或数据库迁移。
+- 独立复查发现无效筛选会让完整范围的计数消失，已修正：合法数据范围独立构建摘要，
+  无效条件仍报错并保持零匹配；无效／重复的 scope 或 include_private 不生成回退范围计数，
+  界面明确要求先纠正范围。Apply 和移除其他条件仍保留重复单值参数，避免悄悄扩大结果；
+  只有明确修改范围或 Clear 才重置错误选择。已增加后端与真实浏览器回归，复查通过。
+- 46 项 Charts 测试通过，无跳过；包含真实 Chromium 的 21 种合成数据桌面布局及
+  3 种用户样例布局，三个桌面宽度的分组与菜单、记录覆盖数量、结果互斥及组合输出、
+  缺失字段、旧条件提交、清除、键盘与无 JavaScript 操作。样例文件与隔离库 JSON 未改。
+  日志 /tmp/charts-filter-usability.log，截图 /tmp/charts-filter-usability-qa；
+  尚未确认 Render 部署完成。
+
+### 上轮：从筛选区移除记录入口
 
 - 用户指出 View records 放在 Filters 中显得奇怪；已移除该链接和仅供它使用的
   objects_url 模板上下文。筛选操作只保留 Apply filters 与 Clear filters。

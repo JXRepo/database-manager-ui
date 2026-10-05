@@ -114,7 +114,11 @@ def parse_filters(params):
         errors.append("Choose an available data scope.")
     if "include_private" in query and query["include_private"] not in {"0", "1"}:
         errors.append("Choose whether to include private data using 0 or 1.")
-    if any(value not in COVERAGE_TITLES for value in query.get("coverage", [])):
+    if query.get("coverage") == ["all"]:
+        query.pop("coverage")
+    if "all" in query.get("coverage", []):
+        errors.append("Choose one stress–strain coverage option.")
+    elif any(value not in COVERAGE_TITLES for value in query.get("coverage", [])):
         errors.append("Choose an available stress–strain coverage category.")
     if any(value not in RESULT_TITLES for value in query.get("result", [])):
         errors.append("Choose an available result type.")
@@ -214,7 +218,12 @@ def index(request):
         group = query["group"] = "software"
     material_group = query.get("material_group") or "phase"
     scope = query.get("scope", "public")
-    include_private = scope == "mine" and query.get("include_private") == "1"
+    scope_valid = (
+        scope in SCOPES and len(request.GET.getlist("scope")) <= 1
+        and query.get("include_private", "0") in {"0", "1"}
+        and len(request.GET.getlist("include_private")) <= 1
+    )
+    include_private = scope_valid and scope == "mine" and query.get("include_private") == "1"
     if scope == "public" and not errors:
         query.pop("include_private", None)
     objects = JSONData.objects.all()
@@ -227,12 +236,12 @@ def index(request):
     records = []
     scope_records = []
     base_count = 0
-    if not errors:
+    if scope_valid:
         for obj in objects.only("pk", "data", "access_type").order_by("-uploaded_at", "-pk").iterator(chunk_size=1):
             base_count += 1
             record = summarize_object(obj)
             scope_records.append(record)
-            if matches_filters(record, query, intervals):
+            if not errors and matches_filters(record, query, intervals):
                 records.append(record)
             del obj
     total = len(records)
@@ -270,6 +279,12 @@ def index(request):
         if count:
             note_rows.append({"key": key, "title": title, "description": description, "count": count,
                               "url": refine_url(query, "note", key)})
+    retained_query = dict(query)
+    single_keys = {"scope", "include_private", *VIEW_KEYS, *FILTER_KEYS} - set(MULTIPLE_FILTERS)
+    for key in single_keys:
+        values = request.GET.getlist(key)
+        if len(values) > 1:
+            retained_query[key] = [value.strip() for value in values]
     active_filters = []
     for key, title in {**CATEGORY_TITLES, "result": "Results", "note": "Data note", "coverage": "Coverage"}.items():
         for index, selected in enumerate(query.get(key, [])):
@@ -281,16 +296,19 @@ def index(request):
             if key == "coverage":
                 value = COVERAGE_TITLES.get(value, value)
             remaining = query[key][:index] + query[key][index + 1:]
-            active_filters.append({"label": f"{title}: {value}", "url": chart_url(query, {key: remaining})})
+            active_filters.append({"label": f"{title}: {value}", "url": chart_url(retained_query, {key: remaining})})
     for index, measure, low, high, inclusive in intervals:
         title, unit, _observation = MEASURES[measure]
         value = format_number(low, 18) if low == high else f"{format_number(low, 18)} – {'< ' if not inclusive else ''}{format_number(high, 18)}"
         active_filters.append({"label": f"{title}: {value} {unit}".strip(),
-                               "url": chart_url(query, {"range": query["range"][:index] + query["range"][index + 1:]})})
+                               "url": chart_url(retained_query, {"range": query["range"][:index] + query["range"][index + 1:]})})
     page = Paginator(records, 10).get_page(query.get("page"))
     clear_params = {"scope": scope if scope in SCOPES else "public"}
     if include_private:
         clear_params["include_private"] = "1"
+    for key, choices in (("material_group", MATERIAL_GROUPS), ("group", SETUP_GROUPS), ("measure", MEASURES)):
+        if query.get(key) in choices:
+            clear_params[key] = query[key]
     clear_url = chart_url(clear_params)
     selected_category = categories.get(group, categories["software"])
     material_category = categories.get(material_group, categories["phase"])
@@ -304,14 +322,24 @@ def index(request):
     controls["scope"] = [(key, value) for key in ("material_group", "group", "measure")
                          if (value := query.get(key))]
     filter_fields = build_filter_fields(scope_records, query)
-    excluded = {*CATEGORY_TITLES, "coverage", "result", "note", "range", "page", "show"}
-    controls["filters"] = [(key, value) for key, values in query.items() if key not in excluded
-                           for value in (values if isinstance(values, list) else [values])]
-    controls["filters"].extend(("range", value) for value in query.get("range", [])
-                              if value.partition(":")[0] not in MEASURES)
+    rendered = {(option["name"], option["value"]) for field in filter_fields for option in field["options"]}
+    controls["filters"] = []
+    for key, values in retained_query.items():
+        if key in {"page", "show"}:
+            continue
+        for value in values if isinstance(values, list) else [values]:
+            if (key, value) not in rendered:
+                controls["filters"].append((key, value))
+    fields_by_key = {field["key"]: field for field in filter_fields}
+    filter_groups = []
+    for key, label, keys in (("conditions", "Simulation conditions", ("temperature_range", "loading_type", "loading_mode")),
+                             ("microstructure", "Microstructure & models", ("texture", "grain_count_range", "elastic_model", "plastic_model"))):
+        fields = [fields_by_key[key] for key in keys if key in fields_by_key]
+        if fields:
+            filter_groups.append({"key": key, "label": label, "fields": fields})
     context = {
         "segment": "charts", "scope": scope, "scope_label": SCOPES.get(scope, "Public database"),
-        "include_private": include_private,
+        "include_private": include_private, "scope_valid": scope_valid,
         "scope_options": SCOPES.items(), "base_count": base_count, "total_objects": total,
         "phase_count": len(categories["phase"]["rows"]),
         "matching_count": sum("matching_response" in record["results"] for record in records),
@@ -336,7 +364,7 @@ def index(request):
         "category_plot": bar_plot(selected_category["rows"]), "group": group,
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
         "control_params": controls,
-        "filter_fields": filter_fields, "primary_filters": filter_fields[:3], "more_filters": filter_fields[3:],
+        "filter_fields": filter_fields, "primary_filters": filter_fields[:3], "filter_groups": filter_groups,
         "more_filter_count": sum(field["selected_count"] for field in filter_fields[3:]),
     }
     return render(request, "charts/index.html", context)

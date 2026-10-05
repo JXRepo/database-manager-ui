@@ -31,7 +31,8 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         viewer = User.objects.create_user(username="charts-browser-viewer")
         owner = User.objects.create_user(username="charts-browser-owner")
         empty = User.objects.create_user(username="charts-browser-empty")
-        for user in (viewer, empty):
+        sparse = User.objects.create_user(username="charts-browser-sparse")
+        for user in (viewer, empty, sparse):
             AccountProfile.objects.create(user=user, getting_started_dismissed_at=timezone.now())
         for index in range(24):
             phase = ("Copper", "Nickel", "Steel")[index % 3]
@@ -66,6 +67,10 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
                                         phase=[{"phase_name": "Aluminium"}]), access_type="c")
         shared.shared_users.add(viewer)
         JSONData.objects.create(owner=owner, data=valid_upload_object(identifier="hidden-private-marker"), access_type="c")
+        JSONData.objects.create(owner=sparse, data=valid_upload_object(
+            identifier="optional-values-absent",
+            phase=[{"phase_name": "Copper", "constitutive_model": {"elastic_parameters": {"E": 100}}}],
+        ), access_type="c")
         sample_path = settings.BASE_DIR / "example_json_files" / "a46fde6c.json"
         sample_source = None
         sample_object = None
@@ -81,10 +86,13 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         empty_client = Client()
         empty_client.force_login(empty)
         empty_cookie = empty_client.cookies[settings.SESSION_COOKIE_NAME].value
+        sparse_client = Client()
+        sparse_client.force_login(sparse)
         self.client.force_login(viewer)
         environment = dict(os.environ, CHARTS_BASE_URL=self.live_server_url,
                            CHARTS_SESSION=self.client.cookies[settings.SESSION_COOKIE_NAME].value,
-                           CHARTS_EMPTY_SESSION=empty_cookie, CHARTS_COOKIE_NAME=settings.SESSION_COOKIE_NAME)
+                           CHARTS_EMPTY_SESSION=empty_cookie, CHARTS_COOKIE_NAME=settings.SESSION_COOKIE_NAME,
+                           CHARTS_SPARSE_SESSION=sparse_client.cookies[settings.SESSION_COOKIE_NAME].value)
         if sample_cookie:
             environment.update(CHARTS_SAMPLE_SESSION=sample_cookie,
                                CHARTS_SAMPLE_DETAIL_URL=reverse("json_data_detail", args=[sample_object.pk]))

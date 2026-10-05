@@ -1,6 +1,6 @@
 import copy
 from decimal import Decimal
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -134,14 +134,17 @@ class ChartsTests(TestCase):
         fields = {field["key"]: field for field in response.context["filter_fields"]}
         for key in ("phase", "software", "coverage", "result"):
             selected = query[key] if isinstance(query[key], list) else [query[key]]
-            self.assertEqual({option["value"] for option in fields[key]["options"] if option["selected"]},
+            field = fields["results"] if key in {"coverage", "result"} else fields[key]
+            self.assertEqual({option["value"] for option in field["options"]
+                              if option["selected"] and option["name"] == key},
                              set(selected))
         for key, value in zip(("temperature_range", "grain_count_range"), query["range"]):
             self.assertEqual([option["value"] for option in fields[key]["options"] if option["selected"]], [value])
         params = dict(response.context["control_params"]["filters"])
         for key in ("scope", "include_private", "material_group", "group", "measure"):
             self.assertEqual(params[key], query[key])
-        self.assertFalse({"phase", "software", "coverage", "result", "range", "note", "page", "show"} & params.keys())
+        self.assertEqual(params["note"], "temperature_excluded")
+        self.assertFalse({"phase", "software", "coverage", "result", "range", "page", "show"} & params.keys())
 
     def test_invalid_filter_values_remain_visible_and_do_not_broaden_the_selection(self):
         """
@@ -154,15 +157,143 @@ class ChartsTests(TestCase):
         self.assertTrue(response.context["filter_errors"])
         self.assertIn("filter_fields", response.context)
         fields = {field["key"]: field for field in response.context["filter_fields"]}
+        self.assertEqual((fields["software"]["available_count"], fields["software"]["total_count"]), (1, 1))
+        self.assertEqual(next(option["count"] for option in fields["software"]["options"]
+                              if option["value"] == "Abaqus CAE"), 1)
         for key, value in (("software", label), ("coverage", "invalid"), ("temperature_range", "temperature:broken")):
-            self.assertIn(value, [option["value"] for option in fields[key]["options"] if option["selected"]])
+            field = fields["results"] if key == "coverage" else fields[key]
+            self.assertIn(value, [option["value"] for option in field["options"] if option["selected"]])
         self.assertNotContains(response, "<script>alert(1)</script>")
         response = self.dashboard(coverage=["matching", "MATCHING"], component="invalid", curve="invalid")
         fields = {field["key"]: field for field in response.context["filter_fields"]}
-        self.assertEqual({option["value"] for option in fields["coverage"]["options"] if option["selected"]},
+        self.assertEqual({option["value"] for option in fields["results"]["options"] if option["selected"]},
                          {"matching", "MATCHING"})
         self.assertEqual(dict(response.context["control_params"]["filters"]),
                          {"component": "invalid", "curve": "invalid"})
+
+    def test_filter_coverage_counts_distinct_scope_records(self):
+        """
+        Missing optional values and repeated phases cannot inflate filter coverage
+        """
+        phase = {"phase_name": "Copper", "orientation": {"grain_count": 343, "texture_type": "Goss"}}
+        self.create_object("multi", software=["Abaqus CAE", "abaqus cae", "DAMASK"], phase=[phase, phase])
+        self.create_object("missing", phase=[{"phase_name": "Copper"}], global_temperature=None)
+        self.create_object("invalid-temperature", phase=[{"phase_name": "Copper"}],
+                           units={"Temperature": "unknown"})
+        self.create_object("own-private", access="c", software="Private solver")
+        shared = self.create_object("shared", owner=self.other, access="c", software="Shared solver")
+        shared.shared_users.add(self.viewer)
+        for query, matching in (({}, 3), ({"software": "DAMASK"}, 1), ({"software": "Absent"}, 0)):
+            with self.subTest(query=query):
+                response = self.dashboard(**query)
+                self.assertEqual(response.context["total_objects"], matching)
+                fields = {field["key"]: field for field in response.context["filter_fields"]}
+                for key, available in (("software", 3), ("phase", 3), ("texture", 1),
+                                       ("temperature_range", 1), ("grain_count_range", 1)):
+                    self.assertEqual((fields[key].get("available_count"), fields[key].get("total_count")),
+                                     (available, 3))
+                software = {option["value"]: option.get("count") for option in fields["software"]["options"]}
+                self.assertEqual(software["Abaqus CAE"], 3)
+                self.assertEqual(software["DAMASK"], 1)
+                grains = fields["grain_count_range"]["options"]
+                self.assertEqual([(option["value"], option.get("count")) for option in grains],
+                                 [("grain_count:343:343:1", 1)])
+                self.assertNotContains(response, "Private solver")
+                self.assertNotContains(response, "Shared solver")
+
+    def test_empty_optional_filters_hide_but_active_conditions_remain_editable(self):
+        """
+        Absent metadata does not create empty menus or discard bookmarked conditions
+        """
+        self.create_object(phase=[{"phase_name": "Copper"}], global_temperature=None, mechanical_BC=[])
+        response = self.dashboard()
+        fields = {field["key"]: field for field in response.context["filter_fields"]}
+        self.assertFalse({"texture", "elastic_model", "plastic_model", "loading_type", "loading_mode",
+                          "temperature_range", "grain_count_range", "discretization_count_range", "note"} & fields.keys())
+        self.assertEqual(response.context.get("filter_groups"), [])
+        selected = self.dashboard(texture="Goss")
+        self.assertEqual(selected.context["total_objects"], 0)
+        fields = {field["key"]: field for field in selected.context["filter_fields"]}
+        self.assertEqual(fields["texture"]["available_count"], 0)
+        self.assertEqual([(option["value"], option["selected"]) for option in fields["texture"]["options"]],
+                         [("Goss", True)])
+
+    def test_results_menu_combines_coverage_and_required_outputs(self):
+        """
+        The consolidated controls retain exact coverage and output filtering
+        """
+        self.create_object("matching")
+        self.create_object("different-components", stress={"stress_11": [0, 1]},
+                           total_strain={"strain_22": [0, .01]}, plastic_strain={})
+        response = self.dashboard(coverage="all")
+        self.assertEqual(response.context["total_objects"], 2)
+        self.assertFalse(response.context["filter_errors"])
+        self.assertEqual(response.context["active_filters"], [])
+        fields = {field["key"]: field for field in response.context["filter_fields"]}
+        results = fields["results"]
+        counts = {(option["name"], option["value"]): option["count"] for option in results["options"]}
+        self.assertEqual(counts[("coverage", "matching")], 1)
+        self.assertEqual(counts[("coverage", "without_matching")], 1)
+        self.assertEqual(counts[("result", "plastic_strain")], 1)
+        for query, count in (({"coverage": "matching", "result": "plastic_strain"}, 1),
+                             ({"coverage": "without_matching", "result": "plastic_strain"}, 0),
+                             ({"coverage": "all", "result": "plastic_strain"}, 1)):
+            self.assertEqual(self.dashboard(**query).context["total_objects"], count)
+        for value in (["all", "matching"], ["all", "invalid"], ""):
+            selected = self.dashboard(coverage=value)
+            self.assertTrue(selected.context["filter_errors"])
+            self.assertEqual(selected.context["total_objects"], 0)
+            self.assertEqual(selected.context["base_count"], 2)
+            results = next(field for field in selected.context["filter_fields"] if field["key"] == "results")
+            self.assertEqual((results["available_count"], results["total_count"]), (2, 2))
+            self.assertEqual(next(option["count"] for option in results["options"]
+                                  if option["value"] == "matching"), 1)
+
+    def test_invalid_scope_choices_do_not_generate_filter_counts(self):
+        """
+        Invalid or repeated access selectors cannot populate a fallback scope
+        """
+        self.create_object("public")
+        self.create_object("private", access="c", software="Private solver")
+        cases = ({"scope": "unknown"}, {"scope": ["mine", "public"]},
+                 {"scope": "mine", "include_private": "invalid"},
+                 {"scope": "mine", "include_private": ["1", "0"]})
+        for query in cases:
+            with self.subTest(query=query):
+                response = self.dashboard(phase="Copper", **query)
+                self.assertTrue(response.context["filter_errors"])
+                self.assertEqual(response.context["total_objects"], 0)
+                self.assertEqual(response.context["base_count"], 0)
+                self.assertNotContains(response, "Private solver")
+                self.assertContains(response, "Correct the filters to view statistics")
+                submitted = self.client.get(f"{reverse('charts')}?{urlencode(response.context['control_params']['filters'])}")
+                self.assertTrue(submitted.context["filter_errors"])
+                self.assertEqual(submitted.context["total_objects"], 0)
+                self.assertEqual(submitted.context["base_count"], 0)
+                removed = self.client.get(response.context["active_filters"][0]["url"])
+                self.assertTrue(removed.context["filter_errors"])
+                self.assertEqual(removed.context["total_objects"], 0)
+                self.assertEqual(removed.context["base_count"], 0)
+
+    def test_retired_filter_controls_preserve_conditions_and_clear_keeps_preferences(self):
+        """
+        Applying the simplified form cannot drop numeric or note requirements
+        """
+        self.create_object("own", access="c", global_temperature=None)
+        query = {"scope": "mine", "include_private": "1", "range": ["discretization_count:2744:2744:1", "unknown:0:1:1"],
+                 "note": ["temperature_excluded", "invalid"], "material_group": "texture",
+                 "group": "loading_mode", "measure": "grain_count", "page": "2"}
+        response = self.dashboard(**query)
+        self.assertEqual(response.context["total_objects"], 0)
+        hidden = response.context["control_params"]["filters"]
+        self.assertEqual([value for key, value in hidden if key == "range"], query["range"])
+        self.assertEqual([value for key, value in hidden if key == "note"], query["note"])
+        cleared = self.client.get(response.context["clear_url"])
+        self.assertEqual(cleared.context["total_objects"], 1)
+        self.assertTrue(cleared.context["include_private"])
+        for key in ("material_group", "group"):
+            self.assertEqual(cleared.context[key], query[key])
+        self.assertEqual(cleared.context["active_measure"], "grain_count")
 
     def test_public_and_own_scopes_exclude_received_private_records(self):
         """

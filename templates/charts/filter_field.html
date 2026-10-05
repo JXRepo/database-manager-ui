@@ -1,11 +1,15 @@
 <fieldset class="charts-filter-field" data-filter-key="{{ field.key }}">
-  <legend>{{ field.label }}</legend>
+  <legend>{{ field.label }}<span class="charts-filter-coverage">{% if not scope_valid %}Correct the data scope to see availability{% elif field.total_count %}{{ field.coverage_label|default:'Available in' }} {{ field.available_count }} of {{ field.total_count }} record{{ field.total_count|pluralize }}{% else %}No records in this scope{% endif %}</span></legend>
+  {% if field.options %}
   <details class="charts-filter-menu{% if field.selected_count %} has-selection{% endif %}">
     <summary title="{{ field.summary }}"><span data-filter-summary>{{ field.summary }}</span><i data-feather="chevron-down" aria-hidden="true"></i></summary>
     <div class="charts-filter-options{% if field.name == 'range' %} charts-filter-options-numeric{% endif %}">
+      <div class="charts-filter-option-heading"><span>In this data scope</span><span>Records</span></div>
       {% for option in field.options %}
-        <label><input type="checkbox" name="{{ field.name }}" value="{{ option.value }}"{% if option.selected %} checked{% endif %}><span title="{{ option.label }}">{{ option.label }}</span></label>
-      {% empty %}<p>No values reported in this scope.</p>{% endfor %}
+        {% ifchanged option.group %}{% if option.group %}<p class="charts-filter-option-group">{{ option.group }}</p>{% endif %}{% endifchanged %}
+        <label><input type="{{ option.input_type }}" name="{{ option.name }}" value="{{ option.value }}"{% if option.selected %} checked{% endif %}{% if option.is_all %} data-filter-all{% endif %}{% if option.summary_label %} data-filter-label="{{ option.summary_label }}"{% endif %}><span class="charts-filter-option-label" data-filter-label title="{{ option.label }}">{{ option.label }}</span>{% if scope_valid %}<span class="charts-filter-option-count" aria-label="{{ option.count }} record{{ option.count|pluralize }} in this data scope">{{ option.count }}</span>{% else %}<span class="charts-filter-option-count" aria-label="Record count unavailable">—</span>{% endif %}</label>
+      {% endfor %}
     </div>
   </details>
+  {% else %}<div class="charts-filter-unavailable" aria-disabled="true">{% if scope_valid %}No data available{% else %}Correct the data scope{% endif %}</div>{% endif %}
 </fieldset>
