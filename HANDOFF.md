@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-05
-code_base: see latest git commit (Fixed desktop detail curve size)
+code_base: see latest git commit (Charts heading alignment)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Detail curve dimensions, browser size checks and documentation
+  - Charts heading layout, desktop comparison checks and handoff
 ---
 
 # Project handoff
@@ -14,7 +14,23 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：详情曲线固定尺寸
+### 本轮：Charts 标题位置与公共页面对齐
+
+- 用户指出前次调整后 Charts 标题的位置和大小仍不一致。真实浏览器对比发现：
+  1280px 下比 My Data 向左偏 18px、向下偏 6px，字号和字重本身已相同。
+- 移除 charts.css 对内容宽度和边距的独立覆盖，复用公共 pc-content 的
+  顶部 20px、左右 40px；标题补齐与 My Data／Share 相同的 row／col 结构，
+  breadcrumb 复用公共正文颜色。保留语义 h1 和公共 h5 外观。
+- 内容宽度收紧后，1280px 桌面的直方图区间刻度略小于既有可读性下限，
+  将该桌面区间的刻度字号从 15px 调整为 16px，其他宽度保持原样。
+- 38 项 Charts 测试通过，无跳过；Chromium 直接比较 My Data、Share 与 Charts 在
+  1280／1440／1920 下的标题位置、高度、字体和导航间距、颜色，全部一致。
+  标题实际坐标均为 (304, 102.25)，字号 18px；既有 15 种 Charts 桌面布局、
+  统计跳转、私有范围、空数据、长内容、无 JavaScript 和本地样例检查通过。
+  已查看三个页面的实际截图；日志 /tmp/charts-heading-consistency.log，
+  截图 /tmp/charts-heading-consistency-qa；尚未确认 Render 部署完成。
+
+### 上轮：详情曲线固定尺寸
 
 - 用户转述 Ronak 认为详情曲线横向太长，要求选择合适的固定尺寸。
   将 .plot-canvas-wrap 设为宽 720px、max-width:100%，.plot-canvas-box 高 480px，

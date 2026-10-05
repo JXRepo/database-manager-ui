@@ -85,6 +85,41 @@ function exactEighths(value) {
           .map(animation => animation.finished.catch(() => {})));
       })()`);
     }
+    async function headingMetrics() {
+      await settleLayout();
+      return evaluate(`(() => {
+        const title = document.querySelector('.page-header-title > h1, .page-header-title > h5');
+        const breadcrumb = document.querySelector('.page-header .breadcrumb');
+        const titleRect = title.getBoundingClientRect(), breadcrumbRect = breadcrumb.getBoundingClientRect();
+        const font = element => {
+          const style = getComputedStyle(element);
+          return {size: style.fontSize, weight: style.fontWeight, lineHeight: style.lineHeight,
+            family: style.fontFamily, color: style.color};
+        };
+        return {left: titleRect.left, top: titleRect.top, height: titleRect.height, font: font(title),
+          breadcrumbTop: breadcrumbRect.top, breadcrumbGap: breadcrumbRect.left - titleRect.right,
+          breadcrumbFont: font(breadcrumb)};
+      })()`);
+    }
+    async function comparePageHeadings(width) {
+      await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
+      const charts = await headingMetrics();
+      for (const path of ['/data-list/', '/share/']) {
+        stage = `compare Charts heading with ${path} at ${width}`;
+        await command('Page.navigate', {url: process.env.CHARTS_BASE_URL + path});
+        await until(`location.pathname === ${JSON.stringify(path)} && document.readyState === 'complete'
+          && !!document.querySelector('.page-header-title > h5')`);
+        const reference = await headingMetrics();
+        assert.deepEqual(charts, reference, `Charts heading must match ${path} at ${width}`);
+        console.log(`${width}px: Charts matches ${path} at (${charts.left}, ${charts.top}), ${charts.font.size}.`);
+        if (process.env.CHARTS_SCREENSHOT_DIR && width === 1440) {
+          const shot = await command('Page.captureScreenshot', {format: 'png'});
+          writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, 'heading-' + path.replaceAll('/', '') + '.png'),
+            Buffer.from(shot.data, 'base64'));
+        }
+      }
+      await navigate();
+    }
     async function choose(id, value, parameter) {
       stage = `choose ${id} = ${value}`;
       await evaluate(`(() => {
@@ -227,7 +262,10 @@ function exactEighths(value) {
     assert.ok(tableHeaders.includes('Observations'));
     assert.ok(tableHeaders.some(header => /%|share|percentage/i.test(header)));
     assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, #curve-object, #curve-component, #download-curve").length'), 0);
-    for (const width of [1280, 1440, 1920]) await layout('varied-data', width);
+    for (const width of [1280, 1440, 1920]) {
+      await layout('varied-data', width);
+      await comparePageHeadings(width);
+    }
 
     await evaluate(`(() => {
       const link = [...document.querySelectorAll('.charts-coverage-link')]

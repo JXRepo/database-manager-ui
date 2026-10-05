@@ -9,13 +9,13 @@
   padding-top: 74px;
   padding-bottom: 20px;
 }
-.charts-page .charts-content { max-width: 1600px; margin: 0 auto; padding: 26px 30px 0; }
 .charts-page * { min-width: 0; }
 .charts-page [hidden] { display: none !important; }
 .charts-page h1, .charts-page h2, .charts-page h3, .charts-page p { margin: 0; }
 .charts-page h2 { color: var(--charts-ink); font-size: 16px; font-weight: 650; line-height: 1.5; }
 .charts-page h3 { color: var(--charts-ink); font-size: 13px; }
 .charts-page a { color: var(--charts-blue); }
+.charts-page .page-header { color: var(--bs-body-color); }
 .charts-page a:focus-visible, .charts-page button:focus-visible, .charts-page select:focus-visible, .charts-page input:focus-visible, .charts-page summary:focus-visible { outline: 3px solid #84ace0; outline-offset: 3px; }
 .charts-page [data-feather], .charts-page svg.feather { width: 15px; height: 15px; flex-shrink: 0; }
 .charts-heading, .charts-heading-actions, .charts-scope-form { display: flex; align-items: center; }
@@ -156,11 +156,11 @@
   .pc-sidebar:not(.pc-sidebar-hide) ~ .charts-page { margin-left: 264px; }
 }
 @media (min-width: 1025px) and (max-width: 1360px) {
-  .charts-page .charts-content { padding-left: 22px; padding-right: 22px; }
   .charts-panel { padding: 18px; }
   .charts-primary-grid, .charts-secondary-grid { gap: 16px; }
   .charts-metric { padding-left: 18px; gap: 10px; }
   .charts-heading-actions { gap: 9px; }
   .charts-scope-form > label:first-of-type { display: none; }
   .charts-bar-label { font-size: 13px; }
+  .charts-bin-label { font-size: 16px; }
 }
