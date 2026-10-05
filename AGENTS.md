@@ -153,7 +153,8 @@ Current priority:
 - Keep individual stress–strain plots and curve downloads on the detail page; do not duplicate a single object's response or infer scientific comparability from aggregate metadata
 - Count matching stress–strain availability only when the same component is available in both groups, including supplied or eligible calculated equivalents; keep the legacy result=paired filter's both-groups meaning
 - Use a disjoint, exhaustive matching/without_matching stress–strain coverage pie chart; overlapping phase, software, model and output counts use bars or tables with percentages of selected objects, never misleading pie proportions
-- Show real aggregate HTML statistics tables; use equal-width numeric histogram intervals with empty bins and an inclusive final maximum, and a single frequency column for constant values; distinguish observations from distinct objects
+- Charts omits per-card Data table sections; preserve exact counts, hover details, and expandable charts for remaining categories and loading combinations
+- Use equal-width numeric histogram intervals with empty bins and an inclusive final maximum; constant temperatures use one frequency column and constant grain counts use one point; distinguish observations from distinct objects
 - Render aggregate charts as server-side SVG that remains visible without JavaScript; retain units, distinguishable ticks and exact numerical interval links, with each category's coverage and observation denominator visible
 - Do not infer physical comparability, combine mixed-unit mechanical extrema, or describe metadata and array availability as a validation pass
 - Preserve active filters and permissions in the object list and pagination; invalid filters show errors and no records, never a broader selection

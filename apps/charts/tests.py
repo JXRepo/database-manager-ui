@@ -113,6 +113,8 @@ class ChartsTests(TestCase):
         self.assertNotContains(response, "Additional statistics")
         self.assertNotContains(response, "Source records")
         self.assertNotContains(response, 'class="charts-records"')
+        self.assertNotContains(response, "Data table")
+        self.assertNotContains(response, 'class="charts-more-categories"')
 
     def test_model_families_count_objects_without_combining_their_proportions(self):
         """
@@ -210,7 +212,7 @@ class ChartsTests(TestCase):
 
     def test_texture_bubbles_preserve_overlapping_categories_and_full_names(self):
         """
-        Independent texture bubbles keep category counts and complete linked table labels
+        Independent texture bubbles keep category counts and complete linked labels
         """
         long_name = "An explicitly reported very long texture description " * 8
         self.create_object("two-textures", phase=[{"phase_name": "Copper", "orientation": {"texture_type": "Goss"}},

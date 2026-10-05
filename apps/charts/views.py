@@ -273,6 +273,16 @@ def index(request):
             if value.casefold() not in {item.casefold() for item in values}:
                 selected[key] = [*values, value]
         row["url"] = chart_url(selected, {"curve": None, "component": None, "show": None})
+    for category in (categories["phase"], categories["texture"], categories["software"], model_category):
+        remaining = category["rows"][6:]
+        if remaining:
+            category["more_plot"] = bar_plot(remaining, limit=len(remaining))
+    loading_plot = heatmap_plot(loading)
+    shown_pairs = {(cell["type"].casefold(), cell["mode"].casefold()) for cell in loading_plot["cells"]}
+    remaining = [{**row, "label": f'{row["type"]} / {row["mode"]}'} for row in loading["pairs"]
+                 if (row["type"].casefold(), row["mode"].casefold()) not in shown_pairs]
+    if remaining:
+        loading.update(key="loading", title="Loading types & modes", more_plot=bar_plot(remaining, limit=len(remaining)))
     distributions = []
     for measure in MEASURES:
         item = distribution(records, measure)
@@ -378,7 +388,7 @@ def index(request):
         "software_category": categories["software"], "software_plot": column_plot(categories["software"]["rows"]),
         "texture_category": categories["texture"], "texture_plot": bubble_plot(categories["texture"]["rows"]),
         "model_category": model_category, "model_plot": bar_plot(model_rows),
-        "loading_matrix": loading, "loading_plot": heatmap_plot(loading),
+        "loading_matrix": loading, "loading_plot": loading_plot,
         "primary_distributions": distributions[:2],
         "control_params": controls,
     }

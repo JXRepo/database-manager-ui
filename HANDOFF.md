@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-06
-code_base: see latest git commit (Build an eight-card materials statistics dashboard)
+code_base: see latest git commit (Remove per-card statistics tables from Charts)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Eight Charts cards, numerical summaries, desktop verification and help documentation
+  - Charts table removal, expandable category charts, desktop verification and help documentation
 ---
 
 # Project handoff
@@ -14,7 +14,27 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：八个材料模拟统计卡片，搭配不同图形
+### 本轮：删除各统计卡片下的 Data table
+
+- 用户要求删除 Data table。八个主图和四个概览数字保留，移除各卡片下的折叠表格及
+  未再使用的 category_table／distribution_table／loading_table／statistics_table 模板。
+  图上的数字、完整名称悬停提示、对象占比和点击筛选保留；环形图旁两行数量与百分比
+  图例保留，View data 仍打开独立的对象列表。
+- 分类主图仍最多显示六项；只有存在更多类别时才显示 More categories，展开后用
+  可滚动的 SVG 图展示剩余类别。热图仍初始最多六种类型／四种模式，其余实际存在的
+  组合通过 More combinations 查看。这些入口使用原生 details，无 JavaScript 也能
+  展开和筛选，不遗漏后面的类别或组合。
+- 所有图表链接继续收窄同一对象并保留当前公共／本人私有范围；原有精确数值区间
+  书签继续可用。没有修改统计口径、储存 JSON、导出或详情页，也无新依赖或迁移。
+  README、AGENTS 和小助手 Charts 回答已同步，图形函数中旧表格说明已更新。
+- 74 项测试通过，无跳过，包括 55 项 Charts 和 19 项小助手测试。真实 Chromium 检查
+  1280／1440／1920 桌面、长名称和缺失／空数据、精确区间、私有权限、独立列表、
+  类别与组合展开、键盘及无 JavaScript 筛选。用户 Copper 样例和隔离 SQLite JSON
+  未改变；已查看公共和样例截图，JavaScript 语法与 git diff --check 通过。
+  日志 /tmp/charts-no-data-tables.log，截图 /tmp/charts-no-data-tables-qa。
+  尚未确认 Render 部署完成。
+
+### 上轮：八个材料模拟统计卡片，搭配不同图形
 
 - 用户认可重新选择内容后要求实施。保留四个简单概览数字和 Public database／
   My data＋Include private data，卡片依次为 Phase 棒棒糖图、匹配应力–应变覆盖环形图、

@@ -1,7 +1,0 @@
-<div class="charts-statistics-wrap charts-category-table">
-  <table class="charts-statistics-table">
-    <caption class="visually-hidden">{{ caption }}: {{ total_objects }} object{{ total_objects|pluralize }}</caption>
-    <thead><tr><th scope="col">{{ label_heading|default:'Category' }}</th><th scope="col">Objects</th><th scope="col">% of objects</th></tr></thead>
-    <tbody>{% for row in rows %}<tr><th scope="row"><a href="{{ row.url }}">{% if row.label %}{{ row.label }}{% else %}{{ row.title }}{% endif %}</a></th><td>{{ row.count }}</td><td>{{ row.percent|floatformat:'1u' }}%</td></tr>{% endfor %}</tbody>
-  </table>
-</div>

@@ -64,7 +64,7 @@ def bar_plot(rows, limit=6):
     rows : list of dict
         Labels, counts and links for the current object selection.
     limit : int, optional
-        Initial rows drawn, with remaining rows retained for the data table.
+        Maximum rows drawn in the initial or expanded category chart.
 
     Returns
     -------
@@ -216,7 +216,7 @@ def column_plot(rows, limit=6):
     """
     Draw software counts on a common vertical axis starting at zero
 
-    Full category names remain in link titles and the accompanying data table.
+    Full category names remain in link titles and the expanded category chart.
 
     Parameters
     ----------

@@ -183,18 +183,14 @@ function exactEighths(value) {
         const bar = [...panel.querySelectorAll('.charts-bar, .charts-bubble, .charts-column')]
           .find(element => element.dataset.label === ${JSON.stringify(label)});
         if (bar) return {path: bar.getAttribute('href'), count: Number(bar.dataset.count ?? bar.querySelector('.charts-bar-count').textContent)};
-        const link = [...panel.querySelectorAll('.charts-statistics-table tbody th a')]
-          .find(element => element.textContent.trim() === ${JSON.stringify(label)});
-        if (!link) throw new Error('Missing chart category: ' + ${JSON.stringify(key + ': ' + label)});
-        return {path: link.getAttribute('href'), count: Number(link.closest('tr').querySelector('td').textContent)};
+        throw new Error('Missing chart category: ' + ${JSON.stringify(key + ': ' + label)});
       })()`);
     }
     async function histogramLink(measure) {
+      if (measure === 'grain_count') return boxLink();
       return evaluate(`(() => {
         const link = document.querySelector('svg[data-measure="' + ${JSON.stringify(measure)} + '"] .charts-bin[href]');
-        if (link) return {path: link.getAttribute('href'), count: Number(link.dataset.objectCount)};
-        const tableLink = document.querySelector('[data-statistic="' + ${JSON.stringify(measure)} + '"] .charts-distribution-table th a');
-        return {path: tableLink.getAttribute('href'), count: Number(tableLink.closest('tr').querySelectorAll('td')[1].textContent)};
+        return {path: link.getAttribute('href'), count: Number(link.dataset.objectCount)};
       })()`);
     }
     async function loadingLink(type, mode) {
@@ -255,9 +251,11 @@ function exactEighths(value) {
       assert.equal(await evaluate('document.querySelectorAll(".charts-metrics details, .charts-metrics select, .charts-metric > small").length'), 0);
       const totals = await evaluate('[...document.querySelectorAll(".charts-metric dd")].map(value => value.textContent.trim())');
       assert.ok(totals.every(value => /^\d+$/.test(value)));
-      assert.equal(Number(totals[1]), await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-statistics-table tbody tr").length'));
+      assert.equal(Number(totals[1]), await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-bar").length'));
       assert.equal(Number(totals[3]), (await coverageLink('matching')).count);
-      assert.equal(await evaluate('document.querySelectorAll(".charts-lollipop-svg").length'), 1);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-plot-stage .charts-lollipop-svg").length'), 1);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-chart-data, .charts-distribution-table, .charts-category-table").length'), 0);
+      assert.equal(await evaluate('document.querySelector(".charts-page").textContent.includes("Data table")'), false);
       assert.equal(await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-bar-mark").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-additional-statistics, .charts-objects, .charts-records").length'), 0);
       assert.equal(await evaluate('/Additional statistics|Source records/.test(document.querySelector(".charts-page").textContent)'), false);
@@ -279,7 +277,7 @@ function exactEighths(value) {
       const metrics = await evaluate(`(() => {
         const keys = ['phase', 'results', 'models', 'loading', 'temperature', 'grain_count', 'texture', 'software'];
         const panels = keys.map(key => document.querySelector('[data-statistic="' + key + '"]')).filter(Boolean);
-        const graphs = panels.flatMap(panel => [...panel.querySelectorAll('.charts-bar-svg, .charts-histogram-svg, .charts-pie-svg, .charts-bubble-svg, .charts-column-svg, .charts-heatmap-svg, .charts-box-svg')]);
+        const graphs = panels.flatMap(panel => [...panel.querySelector('.charts-plot-stage').querySelectorAll('svg')]);
         return {
           documentWidth: document.documentElement.scrollWidth, viewport: innerWidth,
           mainLeft: document.querySelector('.charts-page').getBoundingClientRect().left,
@@ -306,7 +304,7 @@ function exactEighths(value) {
             column: graphs.filter(svg => svg.classList.contains('charts-column-svg')).length,
             heatmap: graphs.filter(svg => svg.classList.contains('charts-heatmap-svg')).length,
             box: graphs.filter(svg => svg.classList.contains('charts-box-svg')).length},
-          lollipops: [...document.querySelectorAll('.charts-lollipop-dot')].map(dot => {
+          lollipops: [...document.querySelectorAll('.charts-plot-stage .charts-lollipop-dot')].map(dot => {
             const link = dot.closest('a'), stem = link.querySelector('.charts-lollipop-stem');
             const svg = dot.ownerSVGElement, bounds = svg.getBoundingClientRect();
             const dotRect = dot.getBoundingClientRect(), count = link.querySelector('.charts-bar-count');
@@ -440,15 +438,12 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelectorAll(".charts-donut-svg").length'), 1);
     const tableHeaders = await evaluate('[...document.querySelectorAll("table.charts-statistics-table th")].map(header => header.textContent)');
     assert.ok(tableHeaders.some(header => /Objects|Records/.test(header)));
-    assert.ok(tableHeaders.includes('Observations'));
     assert.ok(tableHeaders.some(header => /%|share|percentage/i.test(header)));
     for (const width of [1280, 1440, 1920]) {
       await layout('dashboard-overview', width);
       await comparePageHeadings(width);
     }
-    await evaluate('document.querySelector("[data-statistic=phase] .charts-chart-data > summary").focus()');
-    await pressKey('Enter', 'Enter', 13);
-    assert.equal(await evaluate('document.querySelector("[data-statistic=phase] .charts-chart-data").open'), true);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-more-categories").length'), 0);
     const dotLink = await evaluate(`(() => {
       const dot = document.querySelector('.charts-lollipop-dot'), rect = dot.getBoundingClientRect();
       const link = dot.closest('a');
@@ -522,7 +517,7 @@ function exactEighths(value) {
     assert.equal((await coverageLink('matching')).count, 18);
     assert.equal((await coverageLink('without_matching')).count, 6);
     assert.equal(await evaluate('document.body.textContent.includes("shared-record")'), false);
-    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=software] .charts-statistics-table tbody tr").length'), 12);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=software] .charts-column, [data-statistic=software] .charts-more-categories .charts-bar").length'), 12);
     const plastic = {path: '/charts/?scope=mine&include_private=1&result=plastic_strain', count: 12};
     await assertLinkedCount(plastic);
     await assertPrivate();
@@ -604,23 +599,20 @@ function exactEighths(value) {
     const narrowLabels = await evaluate('[...document.querySelectorAll("svg[data-measure=grain_count] .charts-bin-label")].map(label => label.textContent)');
     assert.deepEqual(narrowLabels, ['0', '0.2', '0.4', '0.6', '0.8', '1']);
     assert.ok(narrowLabels.every(label => label.length < 30));
+    assert.equal(await evaluate('document.querySelectorAll(".charts-box-selection").length'), 0);
+    const largeCount = 10n ** 50n;
+    const bookmarkedIntervals = [`grain_count:${largeCount}:${largeCount}.5:0`,
+      `grain_count:${largeCount}.5:${largeCount + 1n}:1`];
     const narrowRows = await evaluate(`(() => {
-      return [...document.querySelectorAll('[data-statistic=grain_count] .charts-distribution-table tbody tr')].map(row => ({
-        label: row.querySelector('th').textContent.trim(), observations: Number(row.querySelectorAll('td')[0].textContent),
-        count: Number(row.querySelectorAll('td')[1].textContent), path: row.querySelector('a')?.getAttribute('href'),
-      }));
+      return ${JSON.stringify(bookmarkedIntervals)}.map(interval => {
+        const params = new URLSearchParams(location.search);
+        params.append('range', interval);
+        return {path: '/charts/?' + params.toString(), count: 1};
+      });
     })()`);
-    assert.equal(narrowRows.length, 2);
     const countBase = (10n ** 50n) * 8n;
     const narrowMedian = await evaluate('document.querySelector("[data-statistic=grain_count] .charts-distribution-summary span:first-child strong").textContent');
     assert.equal(exactEighths(narrowMedian), countBase + 4n);
-    narrowRows.forEach((row, index) => {
-      const [low, high] = row.label.split(' – ');
-      assert.equal(exactEighths(low), countBase + BigInt(index) * 4n);
-      assert.equal(exactEighths(high.replace(/^<\s*/, '')), countBase + BigInt(index + 1) * 4n);
-    });
-    assert.equal(narrowRows.reduce((total, row) => total + row.observations, 0), 2);
-    assert.equal(narrowRows.reduce((total, row) => total + row.count, 0), 2);
     for (const width of [1280, 1440, 1920]) await layout('narrow-counts', width);
     for (const [row, identifier] of [[narrowRows[0], 'charts-browser-8'], [narrowRows[1], 'charts-browser-20']]) {
       assert.equal(row.count, 1);
@@ -692,8 +684,8 @@ function exactEighths(value) {
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".charts-metric dd")].map(value => value.textContent.trim())'),
       ['8', '8', '8', '8']);
     assert.equal(await evaluate('document.querySelectorAll(".charts-bubble").length'), 6);
-    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=texture] .charts-statistics-table tbody tr").length'), 8);
-    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-statistics-table tbody tr").length'), 9);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=texture] .charts-bubble, [data-statistic=texture] .charts-more-categories .charts-bar").length'), 8);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-bar").length'), 9);
     assert.equal(await evaluate('document.querySelectorAll(".charts-heatmap-svg g > .charts-heatmap-mark").length') > 0, true);
     for (const width of [1280, 1440, 1920]) await layout('varied-long-categories', width);
     const diverseCell = await evaluate(`(() => {
@@ -705,6 +697,29 @@ function exactEighths(value) {
     await clearSelection();
     await command('Emulation.setScriptExecutionDisabled', {value: true});
     await navigate('/charts/?scope=mine&include_private=1', false);
+    await evaluate('document.querySelector("[data-statistic=texture] .charts-more-categories > summary").focus()');
+    await pressKey('Enter', 'Enter', 13);
+    assert.equal(await evaluate('document.querySelector("[data-statistic=texture] .charts-more-categories").open'), true);
+    const moreTexture = await evaluate(`(() => {
+      const link = document.querySelector('[data-statistic=texture] .charts-more-categories .charts-bar');
+      link.focus();
+      return {path: link.getAttribute('href'), count: Number(link.querySelector('.charts-bar-count').textContent)};
+    })()`);
+    await pressKey('Enter', 'Enter', 13);
+    await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + moreTexture.path)}
+      && document.readyState === 'complete' && !!document.querySelector('.charts-bubble-svg')`);
+    await assertLinkedCount(moreTexture, false);
+    await clearSelection(false);
+    await evaluate('document.querySelector("[data-statistic=loading] .charts-more-categories > summary").focus()');
+    await pressKey('Enter', 'Enter', 13);
+    assert.equal(await evaluate('document.querySelector("[data-statistic=loading] .charts-more-categories").open'), true);
+    const moreLoading = await evaluate(`(() => {
+      const link = document.querySelector('[data-statistic=loading] .charts-more-categories .charts-bar');
+      return {path: link.getAttribute('href'), count: Number(link.querySelector('.charts-bar-count').textContent)};
+    })()`);
+    await assertLinkedCount(moreLoading, false);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 2);
+    await clearSelection(false);
     const labelClick = await evaluate(`(() => {
       const label = document.querySelector('.charts-column-svg .charts-svg-label');
       label.scrollIntoView({block: 'center', behavior: 'instant'});
@@ -770,7 +785,12 @@ function exactEighths(value) {
         assert.ok((await evaluate(`document.querySelector('[data-statistic=${measure}] .charts-distribution-summary').textContent`)).includes(formatted));
         const sampleBin = await histogramLink(measure);
         assert.ok(new URL(process.env.CHARTS_BASE_URL + sampleBin.path).searchParams.getAll('range')
-          .includes(`${measure}:${value}:${value}:1`));
+          .some(interval => {
+            const [key, low, high, inclusive] = interval.split(':');
+            return key === measure && inclusive === '1'
+              && exactEighths(low) === exactEighths(value)
+              && exactEighths(high) === exactEighths(value);
+          }));
         await assertLinkedCount(sampleBin);
         await assertPrivate();
       }

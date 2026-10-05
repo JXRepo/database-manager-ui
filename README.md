@@ -410,7 +410,7 @@ Eight cards are visible directly, in four pairs:
 - **Software** compares reported software names with vertical columns.
 
 There is no independent Filters form or chart-category selector. Clicking a
-line, dot, bar, donut segment, bubble, heatmap cell, box interval or table entry narrows
+line, dot, bar, donut segment, bubble, heatmap cell or box interval narrows
 the same selection and updates all statistics. Active conditions appear only
 when selected, with individual removal links and **Clear selection**. Conditions
 combine with AND on the same accessible object, including successive selections
@@ -422,12 +422,16 @@ conditions show errors and no records rather than broadening the selection.
 Invalid numeric intervals are also individually removable. Repeated scope or
 private-inclusion parameters stay invalid when removing another condition.
 
-Each chart retains its denominator and units. Full HTML statistics tables are
-available under **Data table**, including complete names and categories beyond
-the first six plotted categories. Loading initially shows up to six types and
-four modes; its table retains all observed combinations. The dashboard has no
-Additional statistics or Source records
-sections. **View data** opens **Data objects**, with the same exact
+Each chart retains its denominator and units. Per-card **Data table** sections
+are omitted. Hover over marks or labels to read full category names, exact
+counts and percentages. **More categories** appears only when a category chart
+has more than six labels; it expands a bounded scrolling chart of the remaining
+categories. Loading initially shows up to six types and four modes;
+**More combinations** shows observed combinations outside that initial matrix.
+These expansions and links work without JavaScript. The compact coverage legend
+beside the donut retains its two counts and percentages. The dashboard has no
+Additional statistics or Source records sections. **View data** opens
+**Data objects**, with the same exact
 selection, scope, private inclusion and pagination; object titles open detail
 pages, and **Back to Charts** returns to the selected statistics. Existing
 show=objects links use this page. Historical model, loading, discretization,
@@ -447,16 +451,15 @@ legacy result=paired filter continues to mean both groups are present.
 
 Numeric histograms retain exact Decimal boundaries, equal-width intervals,
 empty bins and an inclusive final maximum. A constant value has one frequency
-column in the histogram or one row in the grain frequency table. The grain
-box plot retains this table of equal-width intervals, including empty bins.
+column in the temperature histogram or one point in the grain box plot.
 Temperatures convert only from explicit supported Kelvin, Celsius or
 Fahrenheit units; missing, unknown, invalid and below-zero values are excluded.
-Grain counts are phase observations; interval links and the table's Objects
-column deduplicate matching records. Numeric tables retain original extrema and
-precise interval bounds, including large neighboring integers and fractional
-medians and quartiles; labels may use a visible axis or interval offset for
-readability. Category links and grain interval links count distinct objects;
-the box and frequency table describe phase observations.
+Grain counts are phase observations; interval links deduplicate matching records.
+Numeric summaries retain original extrema and precise interval bounds, including
+large neighboring integers and fractional medians and quartiles; labels may use
+a visible axis or interval offset for readability. Category links and grain
+interval links count distinct objects; the box describes phase observations.
+Existing numeric interval bookmarks keep their exact comparisons.
 
 Plots use server-rendered SVG and ordinary GET links, remain visible without
 JavaScript, and need no chart-library network dependency. Statistics read shared

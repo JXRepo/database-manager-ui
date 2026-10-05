@@ -1,0 +1,6 @@
+{% if category.more_plot %}
+  <details class="charts-more-categories">
+    <summary>{% if category.key == 'loading' %}More combinations{% else %}More categories{% endif %}<span>{{ category.more_plot.rows|length }}</span></summary>
+    <div class="charts-more-plot">{% include 'charts/category.html' with plot=category.more_plot %}</div>
+  </details>
+{% endif %}

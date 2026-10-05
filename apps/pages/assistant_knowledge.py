@@ -191,8 +191,9 @@ TOPICS = (
                   "own private uploads. Private records shared with you do not enter these statistics. "
                   "Eight cards show material phases, texture types, constitutive models, loading types "
                   "and modes, temperature, grain number, software and stress-strain coverage. Select a "
-                  "chart category or numeric interval to narrow all statistics. Data table shows full "
-                  "names and exact counts. View data opens the matching objects; open one for its curves "
+                  "chart category or numeric interval to narrow all statistics. Hover over a chart "
+                  "mark for full names and exact counts. More categories or More combinations shows "
+                  "remaining categories when present. View data opens the matching objects; open one for its curves "
                   "and downloads. Counts do not establish physical comparability or scientific validity.",
         "route": "charts", "link": "Open Charts",
     },

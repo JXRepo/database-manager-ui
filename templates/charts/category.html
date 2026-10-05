@@ -2,8 +2,8 @@
   {% for tick in plot.ticks %}<line x1="{{ tick.x }}" x2="{{ tick.x }}" y1="12" y2="{{ plot.baseline }}" class="charts-grid-line"/><text x="{{ tick.x }}" y="{{ plot.baseline|add:'20' }}" text-anchor="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
   {% for row in plot.rows %}
     <g class="charts-category-row">
-    <a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}. Filter statistics to these objects." data-label="{{ row.label }}"{% if row.color %} style="--charts-bar-color: {{ row.color }}"{% endif %}>
-      <title>{{ row.label }}: {{ row.count }}</title>
+    <a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}, {{ row.percent|floatformat:'1u' }}% of selected objects. Filter statistics to these objects." data-label="{{ row.label }}"{% if row.color %} style="--charts-bar-color: {{ row.color }}"{% endif %}>
+      <title>{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}% of selected objects)</title>
       <rect x="0" y="{{ row.y|add:'-5' }}" width="{% if lollipop %}358{% else %}338{% endif %}" height="34" fill="transparent"/>
       {% if lollipop %}
         <g transform="translate(134 {{ row.y|add:'11' }})">
@@ -16,7 +16,7 @@
         <text x="{{ row.value_x }}" y="{{ row.label_y }}" class="charts-bar-count">{{ row.count }}</text>
       {% endif %}
     </a>
-    <foreignObject x="0" y="{{ row.label_y|add:'-15' }}" width="122" height="22"><a xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label" href="{{ row.url }}" tabindex="-1" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}">{{ row.label }}</a></foreignObject>
+    <foreignObject x="0" y="{{ row.label_y|add:'-15' }}" width="122" height="22"><a xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label" href="{{ row.url }}" tabindex="-1" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}% of selected objects)">{{ row.label }}</a></foreignObject>
     </g>
   {% endfor %}
   <text x="220" y="{{ plot.height|add:'-2' }}" text-anchor="middle" class="charts-axis-text">Data objects</text>
