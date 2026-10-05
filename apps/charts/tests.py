@@ -90,7 +90,7 @@ class ChartsTests(TestCase):
         self.assertIn("distributions", response.context)
         return response
 
-    def test_dashboard_prioritizes_six_charts_without_a_filter_form(self):
+    def test_dashboard_prioritizes_eight_charts_without_a_filter_form(self):
         """
         The default page presents the dataset directly instead of a search form
         """
@@ -100,8 +100,11 @@ class ChartsTests(TestCase):
         self.assertEqual(len(response.context["output_plot"]["rows"]), 3)
         self.assertEqual([item["key"] for item in response.context["primary_distributions"]],
                          ["temperature", "grain_count"])
-        for key in ("phase", "results", "software", "outputs", "temperature", "grain_count"):
+        for key in ("phase", "results", "models", "loading", "temperature", "grain_count", "texture", "software"):
             self.assertContains(response, f'data-statistic="{key}"', count=1)
+        self.assertNotContains(response, 'data-statistic="outputs"')
+        for style in ("lollipop", "donut", "bar", "heatmap", "histogram", "box", "bubble", "column"):
+            self.assertContains(response, f"charts-{style}-svg")
         self.assertNotContains(response, 'id="charts-filter-form"')
         self.assertNotContains(response, "Apply filters")
         self.assertNotContains(response, "More filters")
@@ -110,6 +113,117 @@ class ChartsTests(TestCase):
         self.assertNotContains(response, "Additional statistics")
         self.assertNotContains(response, "Source records")
         self.assertNotContains(response, 'class="charts-records"')
+
+    def test_model_families_count_objects_without_combining_their_proportions(self):
+        """
+        Model rows retain family identity and exact links across overlapping phases
+        """
+        wanted = self.create_object("overlapping-models", phase=[
+            {"phase_name": "Copper", "constitutive_model": {"elastic_model_name": "Model A", "plastic_model_name": "Model A"}},
+            {"phase_name": "Nickel", "constitutive_model": {"elastic_model_name": "model a", "plastic_model_name": "Model B"}},
+        ])
+        self.create_object("elastic-only", phase=[{"phase_name": "Steel", "constitutive_model": {"elastic_model_name": "Model A"}}])
+        self.create_object("unnamed", phase=[])
+        self.create_object("private-model", access="c")
+        response = self.dashboard()
+        category = response.context["model_category"]
+        self.assertEqual(category["available"], 2)
+        self.assertEqual({row["label"]: row["count"] for row in category["rows"]},
+                         {"Model A (Elastic)": 2, "Model A (Plastic)": 1, "Model B (Plastic)": 1})
+        for row in category["rows"]:
+            linked = self.client.get(row["url"])
+            self.assertEqual(linked.context["total_objects"], row["count"])
+            self.assertAlmostEqual(row["percent"], row["count"] * 100 / 3, places=1)
+            self.assertIn(wanted.pk, [record["id"] for record in linked.context["objects_page"]])
+
+    def test_loading_heatmap_counts_object_cooccurrence_with_existing_and_filters(self):
+        """
+        Heatmap cells deduplicate objects and preserve private scope and repeated selections
+        """
+        separate = self.create_object("separate-entries", access="c", mechanical_BC=[
+            {"loading_type": "force", "loading_mode": "cyclic"},
+            {"loading_type": "displacement", "loading_mode": "static"},
+            {"loading_type": "Force", "loading_mode": "CYCLIC"},
+        ])
+        together = self.create_object("one-entry", mechanical_BC=[{"loading_type": "force", "loading_mode": "static"}])
+        self.create_object("no-mode", mechanical_BC=[{"loading_type": "force"}], thermal_BC=[{"loading_mode": "static"}])
+        shared = self.create_object("received-share", owner=self.other, access="c")
+        shared.shared_users.add(self.viewer)
+        response = self.dashboard(scope="mine", include_private="1", loading_type="force")
+        matrix = response.context["loading_matrix"]
+        self.assertEqual(matrix["available"], 2)
+        counts = {(row["type"].casefold(), row["mode"].casefold()): row["count"] for row in matrix["pairs"]}
+        self.assertEqual(counts, {("force", "cyclic"): 1, ("force", "static"): 2,
+                                 ("displacement", "cyclic"): 1, ("displacement", "static"): 1})
+        self.assertContains(response, "Objects reporting both labels")
+        for row in matrix["pairs"]:
+            params = parse_qs(urlsplit(row["url"]).query)
+            self.assertEqual(params["include_private"], ["1"])
+            self.assertEqual(len(params["loading_type"]), 1 if row["type"].casefold() == "force" else 2)
+            linked = self.client.get(row["url"])
+            self.assertEqual(linked.context["total_objects"], row["count"])
+            ids = {record["id"] for record in linked.context["objects_page"]}
+            self.assertEqual(ids, {separate.pk, together.pk} if row["count"] == 2 else {separate.pk})
+        public = self.dashboard()
+        self.assertEqual(public.context["loading_matrix"]["available"], 1)
+        self.assertEqual(len(public.context["loading_matrix"]["pairs"]), 1)
+
+    def test_grain_box_uses_phase_quartiles_and_distinct_objects_for_navigation(self):
+        """
+        Exact interpolated quartiles count observations independently of linked objects
+        """
+        multi = self.create_object("three-phases", phase=[{"phase_name": "Copper", "orientation": {"grain_count": value}}
+                                                        for value in (10, 20, 30)])
+        self.create_object("large-phase", phase=[{"phase_name": "Nickel", "orientation": {"grain_count": 100}}])
+        self.create_object("private-grains", access="c")
+        response = self.dashboard()
+        grains = response.context["primary_distributions"][1]
+        box = grains["box"]
+        self.assertEqual(box["values"], [Decimal(value) for value in ("10", "17.5", "25", "47.5", "100")])
+        self.assertEqual((box["count"], box["object_count"]), (2, 1))
+        linked = self.client.get(box["url"])
+        self.assertEqual([record["id"] for record in linked.context["objects_page"]], [multi.pk])
+        self.assertEqual(grains["observation_count"], 4)
+        self.assertEqual(sum(bucket["count"] for bucket in grains["bins"]), 4)
+        self.assertContains(response, "Whiskers: min–max")
+        multi.refresh_from_db()
+        self.assertEqual([phase["orientation"]["grain_count"] for phase in multi.data["phase"]], [10, 20, 30])
+
+    def test_grain_box_preserves_large_neighbors_and_constant_observations(self):
+        """
+        Box summaries retain fractional precision and never fabricate interval observations
+        """
+        base = 10 ** 50
+        first = self.create_object("large-a", phase=[{"phase_name": "Copper", "orientation": {"grain_count": base}}])
+        self.create_object("large-b", phase=[{"phase_name": "Copper", "orientation": {"grain_count": base + 1}}])
+        response = self.dashboard()
+        box = response.context["primary_distributions"][1]["box"]
+        self.assertEqual(box["values"], [Decimal(str(base)), Decimal(f"{base}.25"), Decimal(f"{base}.5"),
+                                         Decimal(f"{base}.75"), Decimal(str(base + 1))])
+        self.assertEqual((box["count"], box["object_count"]), (0, 0))
+        self.assertNotContains(response, 'class="charts-box-selection"')
+        singleton = self.dashboard(range=f"grain_count:{base}:{base}:1")
+        grains = singleton.context["primary_distributions"][1]
+        self.assertTrue(grains["box_plot"]["constant"])
+        self.assertEqual(grains["box"]["object_count"], 1)
+        self.assertEqual([record["id"] for record in self.client.get(grains["box"]["url"]).context["objects_page"]], [first.pk])
+
+    def test_texture_bubbles_preserve_overlapping_categories_and_full_names(self):
+        """
+        Independent texture bubbles keep category counts and complete linked table labels
+        """
+        long_name = "An explicitly reported very long texture description " * 8
+        self.create_object("two-textures", phase=[{"phase_name": "Copper", "orientation": {"texture_type": "Goss"}},
+                                                  {"phase_name": "Nickel", "orientation": {"texture_type": "Random"}},
+                                                  {"phase_name": "Steel", "orientation": {"texture_type": "goss"}}])
+        self.create_object("long-texture", phase=[{"phase_name": "Copper", "orientation": {"texture_type": long_name}}])
+        response = self.dashboard()
+        self.assertEqual(response.context["texture_category"]["available"], 2)
+        self.assertEqual(len(response.context["texture_plot"]["rows"]), 3)
+        self.assertContains(response, long_name.strip())
+        for row in response.context["texture_category"]["rows"]:
+            self.assertEqual(row["count"], 1)
+            self.assertEqual(self.client.get(row["url"]).context["total_objects"], 1)
 
     def test_statistics_totals_count_distinct_categories_and_selected_objects(self):
         """

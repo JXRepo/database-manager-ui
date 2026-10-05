@@ -386,20 +386,31 @@ than phase observations. Stress–strain availability counts objects with matchi
 components, not individual curves. All four totals describe the current
 accessible selection; missing names contribute no category. **View data** beside
 Data scope links to a separate page of matching objects.
-Six charts are visible directly, in three pairs:
+Eight cards are visible directly, in four pairs:
 
 - **Phase** counts objects for each phase name with a horizontal lollipop chart:
   thin lines end in dots, with exact counts beside them.
-- **Stress–strain coverage** uses a pie chart for the exhaustive, disjoint
+- **Stress–strain coverage** uses a donut chart for the exhaustive, disjoint
   classes with and without matching components.
-- **Software** counts objects for each software name with horizontal bars.
-- **Reported outputs** counts stress, total strain and plastic strain
-  availability with horizontal bars. These categories can overlap.
+- **Constitutive models** compares reported elastic and plastic model names
+  with separately colored horizontal bars. Each family counts objects per name;
+  the coverage denominator counts objects reporting either family.
+- **Loading types & modes** uses a heatmap of objects reporting both labels.
+  This is object-level co-occurrence: the type and mode can belong to separate
+  mechanical boundary entries. A cell selects both labels on the same object.
 - **Temperature** shows a histogram in kelvin.
-- **Grain number** shows a histogram of phase observations.
+- **Grain number** shows a box plot of phase observations. Quartiles use linear
+  interpolation at positions `(n - 1) × p`, where `p` is 0.25 or 0.75; the median
+  is the central observation or the mean of the two central observations.
+  Whiskers show the actual minimum and maximum, with no outlier classification.
+  A constant value is shown as one point. The box selects the inclusive Q1–Q3
+  interval only when real observations fall within it.
+- **Texture types** uses independently sized bubbles; circle area is
+  proportional to object count, rather than a share of a disjoint whole.
+- **Software** compares reported software names with vertical columns.
 
 There is no independent Filters form or chart-category selector. Clicking a
-line, dot, bar, pie slice, numeric interval or statistics-table entry narrows
+line, dot, bar, donut segment, bubble, heatmap cell, box interval or table entry narrows
 the same selection and updates all statistics. Active conditions appear only
 when selected, with individual removal links and **Clear selection**. Conditions
 combine with AND on the same accessible object, including successive selections
@@ -413,7 +424,9 @@ private-inclusion parameters stay invalid when removing another condition.
 
 Each chart retains its denominator and units. Full HTML statistics tables are
 available under **Data table**, including complete names and categories beyond
-the first six bars. The dashboard has no Additional statistics or Source records
+the first six plotted categories. Loading initially shows up to six types and
+four modes; its table retains all observed combinations. The dashboard has no
+Additional statistics or Source records
 sections. **View data** opens **Data objects**, with the same exact
 selection, scope, private inclusion and pagination; object titles open detail
 pages, and **Back to Charts** returns to the selected statistics. Existing
@@ -425,7 +438,8 @@ chart cards instead of a fabricated value.
 Category counts deduplicate each object per case-insensitive label. Multiple
 phases, software descriptions, models or loading conditions can contribute to
 several labels, so their percentages can sum to more than 100%; they use bars,
-lollipops or tables, never a misleading composition pie. Output availability includes all
+lollipops, independent bubbles, a heatmap or tables, never a misleading
+composition pie. Output availability includes all
 supported components and supplied equivalent arrays. Calculated equivalents
 require an absent equivalent field and all six components, following the detail
 page. Matching stress–strain requires a common component in both groups; the
@@ -433,12 +447,16 @@ legacy result=paired filter continues to mean both groups are present.
 
 Numeric histograms retain exact Decimal boundaries, equal-width intervals,
 empty bins and an inclusive final maximum. A constant value has one frequency
-column. Temperatures convert only from explicit supported Kelvin, Celsius or
+column in the histogram or one row in the grain frequency table. The grain
+box plot retains this table of equal-width intervals, including empty bins.
+Temperatures convert only from explicit supported Kelvin, Celsius or
 Fahrenheit units; missing, unknown, invalid and below-zero values are excluded.
 Grain counts are phase observations; interval links and the table's Objects
 column deduplicate matching records. Numeric tables retain original extrema and
 precise interval bounds, including large neighboring integers and fractional
-medians; labels may use a visible interval offset for readability.
+medians and quartiles; labels may use a visible axis or interval offset for
+readability. Category links and grain interval links count distinct objects;
+the box and frequency table describe phase observations.
 
 Plots use server-rendered SVG and ordinary GET links, remain visible without
 JavaScript, and need no chart-library network dependency. Statistics read shared

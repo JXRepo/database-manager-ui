@@ -2,10 +2,10 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-06
-code_base: see latest git commit (Use a lollipop chart for material phase counts)
+code_base: see latest git commit (Build an eight-card materials statistics dashboard)
 next_topic: Continue reviewing Charts and detail-page usability
 files_modified:
-  - Charts phase lollipop appearance, browser checks and documentation
+  - Eight Charts cards, numerical summaries, desktop verification and help documentation
 ---
 
 # Project handoff
@@ -14,7 +14,40 @@ files_modified:
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
-### 本轮：第一个 Phase 卡片改为棒棒糖图
+### 本轮：八个材料模拟统计卡片，搭配不同图形
+
+- 用户认可重新选择内容后要求实施。保留四个简单概览数字和 Public database／
+  My data＋Include private data，卡片依次为 Phase 棒棒糖图、匹配应力–应变覆盖环形图、
+  Constitutive models 弹性／塑性模型条形图、Loading types & modes 热力图、
+  Temperature (K) 直方图、Grain number 箱线图、Texture types 气泡图和 Software 柱状图。
+  移除 Reported outputs 主卡；未添加单对象曲线、温度×晶粒散点图或材料×输出卡片。
+  Additional statistics、内联 Source records 和独立 Filters 表单继续不显示。
+- 模型分别按弹性／塑性名称计每个对象一次，覆盖分母按报告任一模型的对象计。
+  热图计同一对象同时报告指定加载类型与模式的数量；标签可来自不同 mechanical_BC
+  条目，界面显示 Objects reporting both labels，说明和小助手也明确这个口径。
+  每个单元格用原有两个 AND 条件跳转，不推断同一边界条目配对、不组合张量载荷。
+- 晶粒箱线图按相观测计算四分位数：排序后位置 (n − 1) × 0.25／0.75 线性插值；
+  中位数沿用原来的中心值／两个中心值平均，须显示实际最小／最大值，不判断离群点。
+  只有实际观测落入 Q1–Q3 时才提供对应精确区间链接；常量显示单点。
+  原来等宽区间、空区间及含最大值的频数表保留；观测数与用于跳转的不同对象数分开。
+  Decimal 原始极值、四分位数及大数相邻值不丢精度，较长刻度减少显示密度防止重叠。
+- 织构气泡面积与对象数成比例，不将可重叠类别当成互斥饼图比例。类别图初始最多六项；
+  热图初始六种类型／四种模式，完整类别与全部实际组合在 HTML Data table 查看。
+  宽英文和中文标签使用 SVG 内有固定区域的原生 HTML 标签，单行省略或两行显示；
+  图形仍由服务端生成，无 JavaScript 也可见／可筛选，无新依赖或数据库迁移。
+  标记链接与标签原生链接互为相邻元素，避免嵌套链接；悬停和完整表保留上传名称。
+- 所有图表选择仍对当前可访问对象加 AND 条件，保留私有范围和精确结果数量。
+  原来的 output／model／loading／range／note 书签继续工作，View data 保持独立列表、
+  分页、返回和详情访问。统计不改变储存的 JSON、导出或详情页曲线。
+- 55 项 Charts 测试通过，无跳过；真实 Chromium 验证 1280／1440／1920 桌面、
+  八种图形、分类和组合条件、四分位区间、极大相邻整数、缺失／空数据、长 W 字符和
+  中文、标签与刻度不重叠、无 JavaScript 实际鼠标点击和键盘操作、独立列表与私有权限。
+  另有 19 项小助手 FAQ／覆盖／验收测试通过，Charts 回答和 README 已同步。
+  用户 Copper 样例和隔离 SQLite JSON 未改变；已查看公共、样例和宽字符截图。
+  日志 /tmp/charts-eight-cards-final.log、/tmp/charts-eight-cards-help.log，
+  截图 /tmp/charts-eight-cards-final-qa。尚未确认 Render 部署完成。
+
+### 上轮：第一个 Phase 卡片改为棒棒糖图
 
 - 用户要求采用推荐的棒棒糖图。Phase 卡片用细线＋蓝色圆点代替粗条，数量紧挨圆点。
   复用原来的分类计数、坐标、排序和 GET 链接，保留 Data table、完整名称和筛选口径；

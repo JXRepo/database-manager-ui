@@ -32,7 +32,8 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         owner = User.objects.create_user(username="charts-browser-owner")
         empty = User.objects.create_user(username="charts-browser-empty")
         sparse = User.objects.create_user(username="charts-browser-sparse")
-        for user in (viewer, empty, sparse):
+        diverse = User.objects.create_user(username="charts-browser-diverse")
+        for user in (viewer, empty, sparse, diverse):
             AccountProfile.objects.create(user=user, getting_started_dismissed_at=timezone.now())
         for index in range(24):
             phase = ("Copper", "Nickel", "Steel")[index % 3]
@@ -72,6 +73,20 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
             identifier="optional-values-absent",
             phase=[{"phase_name": "Copper", "constitutive_model": {"elastic_parameters": {"E": 100}}}],
         ), access_type="c")
+        for index in range(8):
+            wide_label = "W" * 40 if index % 2 == 0 else "材料模拟" * 20
+            data = valid_upload_object(
+                identifier=f"varied-charts-{index}", software=f"{index + 1} {wide_label}",
+                phase=[{"phase_name": f"{index + 1} {wide_label}", "constitutive_model": {
+                    "elastic_model_name": f"{index + 1} {wide_label}",
+                    "plastic_model_name": "Crystal plasticity"},
+                    "orientation": {"grain_count": (index + 1) * 100,
+                                    "texture_type": f"{index + 1} {wide_label}"}}],
+                global_temperature=300 + index * 25,
+                mechanical_BC=[{"loading_type": f"{index % 7 + 1} {wide_label}",
+                                "loading_mode": f"{index % 5 + 1} {wide_label}"}],
+            )
+            JSONData.objects.create(owner=diverse, data=data, access_type="c")
         sample_path = settings.BASE_DIR / "example_json_files" / "a46fde6c.json"
         sample_source = None
         sample_object = None
@@ -89,11 +104,14 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         empty_cookie = empty_client.cookies[settings.SESSION_COOKIE_NAME].value
         sparse_client = Client()
         sparse_client.force_login(sparse)
+        diverse_client = Client()
+        diverse_client.force_login(diverse)
         self.client.force_login(viewer)
         environment = dict(os.environ, CHARTS_BASE_URL=self.live_server_url,
                            CHARTS_SESSION=self.client.cookies[settings.SESSION_COOKIE_NAME].value,
                            CHARTS_EMPTY_SESSION=empty_cookie, CHARTS_COOKIE_NAME=settings.SESSION_COOKIE_NAME,
-                           CHARTS_SPARSE_SESSION=sparse_client.cookies[settings.SESSION_COOKIE_NAME].value)
+                           CHARTS_SPARSE_SESSION=sparse_client.cookies[settings.SESSION_COOKIE_NAME].value,
+                           CHARTS_DIVERSE_SESSION=diverse_client.cookies[settings.SESSION_COOKIE_NAME].value)
         if sample_cookie:
             environment.update(CHARTS_SAMPLE_SESSION=sample_cookie,
                                CHARTS_SAMPLE_DETAIL_URL=reverse("json_data_detail", args=[sample_object.pk]))

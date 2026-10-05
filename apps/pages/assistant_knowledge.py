@@ -189,11 +189,11 @@ TOPICS = (
         "answer": "Charts starts with Public database, containing all public platform records. Choose "
                   "My data to chart your own public uploads; Include private data also includes your "
                   "own private uploads. Private records shared with you do not enter these statistics. "
-                  "Category bars, a condition histogram, a stress-strain coverage pie and statistical "
-                  "tables describe the selected dataset. Select a bar, interval or coverage category "
-                  "to narrow it. Source records lists the records behind the statistics; open one for "
-                  "its curves and downloads. Statistics notes explains missing or excluded values and "
-                  "other limitations. Counts do not establish physical comparability or scientific validity.",
+                  "Eight cards show material phases, texture types, constitutive models, loading types "
+                  "and modes, temperature, grain number, software and stress-strain coverage. Select a "
+                  "chart category or numeric interval to narrow all statistics. Data table shows full "
+                  "names and exact counts. View data opens the matching objects; open one for its curves "
+                  "and downloads. Counts do not establish physical comparability or scientific validity.",
         "route": "charts", "link": "Open Charts",
     },
     {
@@ -901,7 +901,10 @@ TOPICS += (
         "answer": "Each object counts once per category label, but an object with several phases or "
                   "descriptions can appear under several labels. Those category counts can add up to "
                   "more than the object total. Grain distributions count phase observations; their links "
-                  "list distinct objects. The stress-strain coverage pie divides objects into matching "
+                  "list distinct objects. The grain box shows interpolated quartiles and the median, "
+                  "with whiskers at the minimum and maximum. Loading heatmap cells count objects "
+                  "reporting both labels, which may belong to separate boundary entries. "
+                  "The stress-strain coverage donut divides objects into matching "
                   "and without matching components; those two counts add up to the selected total. "
                   "Read the displayed denominator and coverage for each chart. "
                   "Matching labels alone do not prove that simulation results are physically comparable.",
@@ -915,8 +918,9 @@ TOPICS += (
         "answer": "Choose Public database for all public platform records, or My data for your own "
                   "public uploads. In My data, Include private data also includes your own private "
                   "uploads. Received private shares remain available through Search, outside these "
-                  "statistics. Clicking a bar, numeric interval or coverage count refines the current "
-                  "selection and opens Source records. Successive conditions must match the same object, including two "
+                  "statistics. Clicking a chart category, numeric interval or coverage count refines "
+                  "all statistics. View data opens the matching objects. Successive conditions must "
+                  "match the same object, including two "
                   "labels in one category. Remove individual filters or clear them; changing scope resets "
                   "the filters while retaining your chart grouping and measure. Invalid filters show an "
                   "error instead of broadening the selection.",
@@ -929,7 +933,7 @@ TOPICS += (
         "patterns": ("temperature distribution", "uncharted temperature", "温度统计"),
         "answer": "Temperature statistics convert explicit supported Kelvin, Celsius and Fahrenheit "
                   "values to Kelvin. Missing, invalid, unknown-unit and below-zero Kelvin observations "
-                  "are excluded, not counted as zero. Check Statistics notes and the coverage count, then open "
+                  "are excluded, not counted as zero. Check the chart's coverage count, then open "
                   "the relevant objects to inspect their supplied values and units. Stored JSON and "
                   "exports keep the original units and values.",
         "route": "charts", "link": "Open Charts",
@@ -941,8 +945,8 @@ TOPICS += (
         "patterns": ("statistics notes", "data notes", "data quality", "scientific validation", "数据质量", "科学正确性"),
         "answer": "Upload success means the platform's required-field, identifier, sharing and resource "
                   "checks passed. It does not certify the physics or every original schema constraint. "
-                  "Charts counts describe metadata and available arrays. Expand Statistics notes for unequal "
-                  "lengths, missing units, unreadable arrays or conflicting metadata. Check units, loading "
+                  "Charts counts describe metadata and available arrays. Open a data object's detail "
+                  "page to inspect its supplied metadata and available curves. Check units, loading "
                   "conditions and the simulation method before scientific comparison or reuse.",
         "route": "charts", "link": "Open Charts",
         "related": ("object.analysis", "charts.curves", "detail.units"),

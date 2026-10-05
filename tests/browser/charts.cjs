@@ -180,9 +180,9 @@ function exactEighths(value) {
     async function categoryLink(key, label) {
       return evaluate(`(() => {
         const panel = document.querySelector('[data-statistic="' + ${JSON.stringify(key)} + '"]');
-        const bar = [...panel.querySelectorAll('.charts-bar')]
+        const bar = [...panel.querySelectorAll('.charts-bar, .charts-bubble, .charts-column')]
           .find(element => element.dataset.label === ${JSON.stringify(label)});
-        if (bar) return {path: bar.getAttribute('href'), count: Number(bar.querySelector('.charts-bar-count').textContent)};
+        if (bar) return {path: bar.getAttribute('href'), count: Number(bar.dataset.count ?? bar.querySelector('.charts-bar-count').textContent)};
         const link = [...panel.querySelectorAll('.charts-statistics-table tbody th a')]
           .find(element => element.textContent.trim() === ${JSON.stringify(label)});
         if (!link) throw new Error('Missing chart category: ' + ${JSON.stringify(key + ': ' + label)});
@@ -192,6 +192,21 @@ function exactEighths(value) {
     async function histogramLink(measure) {
       return evaluate(`(() => {
         const link = document.querySelector('svg[data-measure="' + ${JSON.stringify(measure)} + '"] .charts-bin[href]');
+        if (link) return {path: link.getAttribute('href'), count: Number(link.dataset.objectCount)};
+        const tableLink = document.querySelector('[data-statistic="' + ${JSON.stringify(measure)} + '"] .charts-distribution-table th a');
+        return {path: tableLink.getAttribute('href'), count: Number(tableLink.closest('tr').querySelectorAll('td')[1].textContent)};
+      })()`);
+    }
+    async function loadingLink(type, mode) {
+      return evaluate(`(() => {
+        const link = [...document.querySelectorAll('.charts-heatmap-cell')]
+          .find(cell => cell.dataset.type === ${JSON.stringify(type)} && cell.dataset.mode === ${JSON.stringify(mode)});
+        return {path: link.getAttribute('href'), count: Number(link.dataset.count)};
+      })()`);
+    }
+    async function boxLink() {
+      return evaluate(`(() => {
+        const link = document.querySelector('.charts-box-selection');
         return {path: link.getAttribute('href'), count: Number(link.dataset.objectCount)};
       })()`);
     }
@@ -246,24 +261,25 @@ function exactEighths(value) {
       assert.equal(await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-bar-mark").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-additional-statistics, .charts-objects, .charts-records").length'), 0);
       assert.equal(await evaluate('/Additional statistics|Source records/.test(document.querySelector(".charts-page").textContent)'), false);
-      assert.ok(await evaluate('[...document.querySelectorAll(".charts-bar, .charts-pie-slice, .charts-bin")].every(link => link.getAttribute("aria-label").includes("Filter statistics"))'));
+      assert.ok(await evaluate('[...document.querySelectorAll(".charts-bar, .charts-pie-slice, .charts-bin, .charts-bubble, .charts-column, .charts-heatmap-cell, .charts-box-selection")].every(link => link.getAttribute("aria-label").includes("Filter statistics"))'));
       assert.equal(await evaluate('document.querySelectorAll("#charts-filters, #charts-filter-form, .charts-more-filters, [data-filter-key]").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll("#charts-material-group, #charts-group, #charts-measure, .charts-chart-control").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-panel-purpose, .charts-section-help, .charts-page-footnote, .charts-subtle-note").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, #curve-object, #curve-component, #download-curve").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-data-notes").length'), 0);
       assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-statistic]')]
-        .map(panel => panel.dataset.statistic).filter(key => ['phase', 'results', 'software', 'outputs', 'temperature', 'grain_count'].includes(key))`),
-        ['phase', 'results', 'software', 'outputs', 'temperature', 'grain_count']);
+        .map(panel => panel.dataset.statistic)`),
+        ['phase', 'results', 'models', 'loading', 'temperature', 'grain_count', 'texture', 'software']);
+      assert.equal(await evaluate('document.querySelectorAll("[data-statistic=outputs]").length'), 0);
     }
-    async function layout(label, width, expectedGraphs = 6) {
+    async function layout(label, width, expectedGraphs = 8) {
       stage = `layout ${label} at ${width}`;
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
       await settleLayout();
       const metrics = await evaluate(`(() => {
-        const keys = ['phase', 'results', 'software', 'outputs', 'temperature', 'grain_count'];
+        const keys = ['phase', 'results', 'models', 'loading', 'temperature', 'grain_count', 'texture', 'software'];
         const panels = keys.map(key => document.querySelector('[data-statistic="' + key + '"]')).filter(Boolean);
-        const graphs = panels.flatMap(panel => [...panel.querySelectorAll('.charts-bar-svg, .charts-histogram-svg, .charts-pie-svg')]);
+        const graphs = panels.flatMap(panel => [...panel.querySelectorAll('.charts-bar-svg, .charts-histogram-svg, .charts-pie-svg, .charts-bubble-svg, .charts-column-svg, .charts-heatmap-svg, .charts-box-svg')]);
         return {
           documentWidth: document.documentElement.scrollWidth, viewport: innerWidth,
           mainLeft: document.querySelector('.charts-page').getBoundingClientRect().left,
@@ -285,7 +301,11 @@ function exactEighths(value) {
           graphTypes: {bar: graphs.filter(svg => svg.classList.contains('charts-bar-svg') && !svg.classList.contains('charts-lollipop-svg')).length,
             lollipop: graphs.filter(svg => svg.classList.contains('charts-lollipop-svg')).length,
             pie: graphs.filter(svg => svg.classList.contains('charts-pie-svg')).length,
-            histogram: graphs.filter(svg => svg.classList.contains('charts-histogram-svg')).length},
+            histogram: graphs.filter(svg => svg.classList.contains('charts-histogram-svg')).length,
+            bubble: graphs.filter(svg => svg.classList.contains('charts-bubble-svg')).length,
+            column: graphs.filter(svg => svg.classList.contains('charts-column-svg')).length,
+            heatmap: graphs.filter(svg => svg.classList.contains('charts-heatmap-svg')).length,
+            box: graphs.filter(svg => svg.classList.contains('charts-box-svg')).length},
           lollipops: [...document.querySelectorAll('.charts-lollipop-dot')].map(dot => {
             const link = dot.closest('a'), stem = link.querySelector('.charts-lollipop-stem');
             const svg = dot.ownerSVGElement, bounds = svg.getBoundingClientRect();
@@ -296,12 +316,24 @@ function exactEighths(value) {
               clipped: dotRect.left < bounds.left || dotRect.right > bounds.right || countRect.right > bounds.right,
               fontSize: parseFloat(getComputedStyle(count).fontSize) * svg.getScreenCTM().a};
           }),
-          numericLabels: [...document.querySelectorAll('.charts-histogram-svg text')]
+          numericLabels: graphs.flatMap(svg => [...svg.querySelectorAll('text')])
             .filter(text => text.ownerSVGElement.checkVisibility()).map(text => {
-              const svg = text.ownerSVGElement, box = text.getBBox(), bounds = svg.viewBox.baseVal;
-              return {label: text.textContent, fontSize: parseFloat(getComputedStyle(text).fontSize) * svg.getScreenCTM().a,
-                clipped: box.x < -1 || box.y < -1 || box.x + box.width > bounds.width + 1 || box.y + box.height > bounds.height + 1};
+              const svg = text.ownerSVGElement, box = text.getBoundingClientRect(), bounds = svg.getBoundingClientRect();
+              return {label: text.textContent, chart: svg.getAttribute('class'), box: {x: box.x, y: box.y, width: box.width, height: box.height},
+                fontSize: parseFloat(getComputedStyle(text).fontSize) * svg.getScreenCTM().a,
+                clipped: box.left < bounds.left - 1 || box.top < bounds.top - 1 || box.right > bounds.right + 1 || box.bottom > bounds.bottom + 1};
             }),
+          boxTicks: [...document.querySelectorAll('.charts-box-svg .charts-bin-label')].map(text => {
+            const rect = text.getBoundingClientRect();
+            return {left: rect.left, right: rect.right, label: text.textContent};
+          }),
+          categoryLabels: graphs.flatMap((svg, chart) => [...svg.querySelectorAll('.charts-svg-label')].map(label => {
+            const rect = label.getBoundingClientRect(), bounds = svg.getBoundingClientRect(), style = getComputedStyle(label);
+            return {chart, text: label.textContent, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              fontSize: parseFloat(style.fontSize) * svg.getScreenCTM().a,
+              bounded: style.overflow === 'hidden' && (style.textOverflow === 'ellipsis' || style.webkitLineClamp === '2'),
+              clipped: rect.left < bounds.left - 1 || rect.top < bounds.top - 1 || rect.right > bounds.right + 1 || rect.bottom > bounds.bottom + 1};
+          })),
           selection: (() => {
             const chip = document.querySelector('.charts-filter');
             return chip ? {top: chip.getBoundingClientRect().top, height: chip.parentElement.getBoundingClientRect().height} : null;
@@ -327,12 +359,13 @@ function exactEighths(value) {
         });
       }
       if (metrics.cards.length) {
-        assert.equal(metrics.cards.length, 6);
+        assert.equal(metrics.cards.length, 8);
         for (const card of metrics.cards) {
           assert.ok(card.left >= metrics.mainLeft && card.right <= width, `${label}: card outside desktop ${JSON.stringify(card)}`);
         }
       }
-      if (expectedGraphs === 6) assert.deepEqual(metrics.graphTypes, {bar: 2, lollipop: 1, pie: 1, histogram: 2});
+      if (expectedGraphs === 8) assert.deepEqual(metrics.graphTypes,
+        {bar: 1, lollipop: 1, pie: 1, histogram: 1, bubble: 1, column: 1, heatmap: 1, box: 1});
       for (const mark of metrics.lollipops) {
         assert.equal(mark.dotPosition, mark.stemEnd, `${label}: the dot must mark its count position`);
         assert.ok(!mark.clipped && mark.countLeft > mark.dotRight && mark.fontSize >= 9.5,
@@ -341,6 +374,21 @@ function exactEighths(value) {
       for (const text of metrics.numericLabels) {
         assert.ok(text.fontSize >= 9.5 && !text.clipped, `${label}: readable numeric label at ${width}: ${JSON.stringify(text)}`);
       }
+      metrics.boxTicks.forEach((tick, index) => {
+        assert.ok(!index || tick.left > metrics.boxTicks[index - 1].right + 3,
+          `${label}: box axis labels overlap at ${width}: ${JSON.stringify(metrics.boxTicks)}`);
+      });
+      metrics.categoryLabels.forEach((label, index) => {
+        assert.ok(label.bounded && !label.clipped && label.fontSize >= 9.5,
+          `${label}: category label must fit its region at ${width}: ${JSON.stringify(label)}`);
+        for (const previous of metrics.categoryLabels.slice(0, index)) {
+          if (previous.chart !== label.chart) continue;
+          const horizontal = Math.min(previous.right, label.right) - Math.max(previous.left, label.left);
+          const vertical = Math.min(previous.bottom, label.bottom) - Math.max(previous.top, label.top);
+          assert.ok(horizontal <= 1 || vertical <= 1,
+            `Category labels overlap at ${width}: ${JSON.stringify([previous, label])}`);
+        }
+      });
       if (metrics.primary.length) {
         assert.equal(metrics.primary.length, 2);
         for (const chart of metrics.primary) {
@@ -388,7 +436,8 @@ function exactEighths(value) {
     const pieCounts = await evaluate(`[...document.querySelectorAll('.charts-pie-slice')]
       .map(link => Number(link.getAttribute('aria-label').match(/: (\\d+) (?:objects?|records?)/)[1])).sort((a, b) => a - b)`);
     assert.deepEqual(pieCounts, [6, 7]);
-    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=outputs] .charts-bar").length'), 3);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-bar").length'), 2);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-donut-svg").length'), 1);
     const tableHeaders = await evaluate('[...document.querySelectorAll("table.charts-statistics-table th")].map(header => header.textContent)');
     assert.ok(tableHeaders.some(header => /Objects|Records/.test(header)));
     assert.ok(tableHeaders.includes('Observations'));
@@ -413,6 +462,12 @@ function exactEighths(value) {
     await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + dotLink.path)}
       && document.readyState === 'complete' && document.querySelector('.charts-page')?.classList.contains('charts-js')`);
     assert.equal(await evaluate('Number(document.querySelector(".charts-metric-total strong").textContent)'), dotLink.count);
+    await clearSelection();
+    await assertLinkedCount(await categoryLink('models', 'Anisotropic elasticity (Elastic)'));
+    await assertLinkedCount(await loadingLink('force', 'cyclic'));
+    await assertLinkedCount(await categoryLink('texture', 'Goss'));
+    await assertLinkedCount(await boxLink());
+    assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 5);
     await clearSelection();
     await assertLinkedCount({path: '/charts/?texture=Goss', count: 12});
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".charts-metric dd")].map(value => Number(value.textContent))'), [12, 3, 1, 6]);
@@ -468,8 +523,7 @@ function exactEighths(value) {
     assert.equal((await coverageLink('without_matching')).count, 6);
     assert.equal(await evaluate('document.body.textContent.includes("shared-record")'), false);
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=software] .charts-statistics-table tbody tr").length'), 12);
-    const plastic = await categoryLink('outputs', 'Plastic strain');
-    assert.equal(plastic.count, 12);
+    const plastic = {path: '/charts/?scope=mine&include_private=1&result=plastic_strain', count: 12};
     await assertLinkedCount(plastic);
     await assertPrivate();
     const privateRows = await assertLinkedCount(await coverageLink('matching'));
@@ -522,7 +576,7 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
     for (const width of [1280, 1440, 1920]) await layout('long-record', width, 0);
     await navigate(await evaluate('document.querySelector(".charts-heading-actions a").getAttribute("href")'));
-    for (const width of [1280, 1440, 1920]) await layout('long-singleton', width, 5);
+    for (const width of [1280, 1440, 1920]) await layout('long-singleton', width, 4);
     for (const legacy of ['all', 'shared']) {
       await navigate(`/charts/?scope=${legacy}&include_private=1&group=software`, true, '/charts/?scope=public&group=software');
       assert.equal(await evaluate('document.getElementById("charts-scope").value'), 'public');
@@ -546,9 +600,9 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
     await navigate('/charts/?scope=mine&software=Software+9&measure=grain_count');
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '2');
-    assert.ok(await evaluate('[...document.querySelectorAll("svg[data-measure=grain_count] text")].some(text => text.textContent.startsWith("Interval offset: +"))'));
+    assert.ok(await evaluate('[...document.querySelectorAll("svg[data-measure=grain_count] text")].some(text => text.textContent.startsWith("Axis offset: +"))'));
     const narrowLabels = await evaluate('[...document.querySelectorAll("svg[data-measure=grain_count] .charts-bin-label")].map(label => label.textContent)');
-    assert.deepEqual(narrowLabels, ['0', '0.5', '1']);
+    assert.deepEqual(narrowLabels, ['0', '0.2', '0.4', '0.6', '0.8', '1']);
     assert.ok(narrowLabels.every(label => label.length < 30));
     const narrowRows = await evaluate(`(() => {
       return [...document.querySelectorAll('[data-statistic=grain_count] .charts-distribution-table tbody tr')].map(row => ({
@@ -582,7 +636,7 @@ function exactEighths(value) {
       const graphs = [...document.querySelectorAll('[data-statistic="phase"] .charts-bar-svg, [data-statistic="results"] .charts-pie-svg')];
       return graphs.length === 2 && graphs.every(svg => {
         const rect = svg.getBoundingClientRect(), pie = svg.classList.contains('charts-pie-svg');
-        return svg.contains(document.elementFromPoint(rect.left + (pie ? rect.width * .45 : 15), rect.top + (pie ? rect.height * .5 : 30)));
+        return svg.contains(document.elementFromPoint(rect.left + (pie ? rect.width * .77 : 15), rect.top + (pie ? rect.height * .5 : 30)));
       });
     })()`);
     assert.ok(visible, 'The server-rendered bar and pie remain visible without JavaScript');
@@ -631,6 +685,51 @@ function exactEighths(value) {
     assert.ok(await evaluate('document.querySelector(".charts-empty h2").textContent.includes("No data")'));
     assert.equal(await evaluate('document.querySelectorAll(".charts-bar-svg, .charts-histogram-svg, .charts-pie-svg").length'), 0);
     for (const width of [1280, 1440, 1920]) await layout('empty-data', width, 0);
+    await command('Network.setCookie', {name: process.env.CHARTS_COOKIE_NAME, value: process.env.CHARTS_DIVERSE_SESSION,
+      url: process.env.CHARTS_BASE_URL, path: '/'});
+    await navigate('/charts/?scope=mine&include_private=1');
+    await assertFixedDashboard();
+    assert.deepEqual(await evaluate('[...document.querySelectorAll(".charts-metric dd")].map(value => value.textContent.trim())'),
+      ['8', '8', '8', '8']);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-bubble").length'), 6);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=texture] .charts-statistics-table tbody tr").length'), 8);
+    assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-statistics-table tbody tr").length'), 9);
+    assert.equal(await evaluate('document.querySelectorAll(".charts-heatmap-svg g > .charts-heatmap-mark").length') > 0, true);
+    for (const width of [1280, 1440, 1920]) await layout('varied-long-categories', width);
+    const diverseCell = await evaluate(`(() => {
+      const link = document.querySelector('.charts-heatmap-cell');
+      return {path: link.getAttribute('href'), count: Number(link.dataset.count)};
+    })()`);
+    await assertLinkedCount(diverseCell);
+    await assertPrivate();
+    await clearSelection();
+    await command('Emulation.setScriptExecutionDisabled', {value: true});
+    await navigate('/charts/?scope=mine&include_private=1', false);
+    const labelClick = await evaluate(`(() => {
+      const label = document.querySelector('.charts-column-svg .charts-svg-label');
+      label.scrollIntoView({block: 'center', behavior: 'instant'});
+      const rect = label.getBoundingClientRect(), link = label.closest('a');
+      return {x: rect.left + rect.width / 2, y: rect.top + 8,
+        path: link.getAttribute('href'), count: Number(link.dataset.count),
+        hit: document.elementFromPoint(rect.left + rect.width / 2, rect.top + 8)?.closest('a')?.getAttribute('href')};
+    })()`);
+    assert.equal(labelClick.hit, labelClick.path, `The bounded software label must remain clickable: ${JSON.stringify(labelClick)}`);
+    await command('Input.dispatchMouseEvent', {type: 'mousePressed', x: labelClick.x, y: labelClick.y, button: 'left', clickCount: 1});
+    await command('Input.dispatchMouseEvent', {type: 'mouseReleased', x: labelClick.x, y: labelClick.y, button: 'left', clickCount: 1});
+    await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + labelClick.path)}
+      && document.readyState === 'complete' && !!document.querySelector('.charts-column-svg')`);
+    await assertLinkedCount(labelClick, false);
+    await clearSelection(false);
+    const bubbleKeyboard = await evaluate(`(() => {
+      const link = document.querySelector('.charts-bubble');
+      link.focus();
+      return {path: link.getAttribute('href'), count: Number(link.dataset.count)};
+    })()`);
+    await pressKey('Enter', 'Enter', 13);
+    await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + bubbleKeyboard.path)}
+      && document.readyState === 'complete' && !!document.querySelector('.charts-bubble-svg')`);
+    await assertLinkedCount(bubbleKeyboard, false);
+    await command('Emulation.setScriptExecutionDisabled', {value: false});
     await command('Network.setCookie', {name: process.env.CHARTS_COOKIE_NAME, value: process.env.CHARTS_SPARSE_SESSION,
       url: process.env.CHARTS_BASE_URL, path: '/'});
     await navigate('/charts/?scope=mine&include_private=1');
@@ -640,7 +739,7 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=temperature] svg, [data-statistic=grain_count] svg").length'), 0);
     assert.ok(await evaluate('document.querySelector("[data-statistic=temperature]").textContent.includes("No usable temperature")'));
     assert.ok(await evaluate('document.querySelector("[data-statistic=grain_count]").textContent.includes("No usable grain number")'));
-    for (const width of [1280, 1440, 1920]) await layout('missing-metadata', width, 4);
+    for (const width of [1280, 1440, 1920]) await layout('missing-metadata', width, 3);
     await navigate('/charts/?scope=mine&include_private=1&texture=Goss');
     assert.ok(await evaluate('!!document.querySelector(".charts-empty")'));
     await clearSelection();
@@ -696,7 +795,7 @@ function exactEighths(value) {
       console.log('Charts local sample checks passed: Copper, Abaqus CAE, Goss, 298 K, 343 grains, 2,744 cells, exact combined links, detail navigation, and 3 desktop layouts.');
     }
     assert.deepEqual(exceptions, []);
-    console.log('Charts browser checks passed: phase lollipops, exact counts, dot hover and clicks, keyboard activation without JavaScript, simple totals, public/private scopes, precise intervals, record navigation and desktop layouts.');
+    console.log('Charts browser checks passed: eight statistical cards, distinct chart styles, exact counts and links, keyboard operation without JavaScript, public/private scopes, precise intervals, record navigation and desktop layouts.');
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

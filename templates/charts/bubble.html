@@ -1,0 +1,13 @@
+<svg class="charts-bubble-svg" viewBox="0 0 360 {{ plot.height }}" role="group" aria-label="Texture types: circle area represents the number of objects reporting each type" xmlns="http://www.w3.org/2000/svg">
+  {% for row in plot.rows %}
+    <g class="charts-category-row">
+    <a class="charts-bubble" href="{{ row.url }}" data-label="{{ row.label }}" data-count="{{ row.count }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}, {{ row.percent|floatformat:'1u' }}% of selected objects. Filter statistics to these objects.">
+      <title>{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)</title>
+      <circle cx="{{ row.x }}" cy="{{ row.y }}" r="{{ row.radius }}" fill="{{ row.color }}" class="charts-bubble-mark"/>
+      <text x="{{ row.x }}" y="{{ row.count_y }}" text-anchor="middle" class="charts-bubble-count{% if row.inside %} charts-on-color{% endif %}">{{ row.count }}</text>
+    </a>
+    <foreignObject x="{{ row.label_x }}" y="{{ row.label_y }}" width="108" height="20"><a xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" href="{{ row.url }}" tabindex="-1" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}">{{ row.label }}</a></foreignObject>
+    </g>
+  {% endfor %}
+  <text x="180" y="{{ plot.height|add:'-8' }}" text-anchor="middle" class="charts-axis-text">Circle area: data objects</text>
+</svg>

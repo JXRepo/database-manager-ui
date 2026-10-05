@@ -1,0 +1,7 @@
+<div class="charts-statistics-wrap">
+  <table class="charts-statistics-table charts-loading-table">
+    <caption class="visually-hidden">Objects reporting both labels: {{ total_objects }} selected objects; labels may belong to separate boundary entries</caption>
+    <thead><tr><th scope="col">Type / Mode</th><th scope="col">Objects</th><th scope="col">% of objects</th></tr></thead>
+    <tbody>{% for row in loading_matrix.pairs %}<tr><th scope="row"><a href="{{ row.url }}">{{ row.type }} / {{ row.mode }}</a></th><td>{{ row.count }}</td><td>{{ row.percent|floatformat:'1u' }}%</td></tr>{% endfor %}</tbody>
+  </table>
+</div>

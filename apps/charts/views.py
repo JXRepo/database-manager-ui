@@ -13,9 +13,9 @@ from django.views.decorators.cache import never_cache
 from apps.pages.models import JSONData
 from .analytics import (
     CATEGORY_TITLES, COVERAGE_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
-    distribution, format_number, in_bin, number, summarize_object,
+    distribution, format_number, in_bin, loading_matrix, number, summarize_object,
 )
-from .plots import bar_plot, histogram_plot, pie_plot
+from .plots import bar_plot, box_plot, bubble_plot, column_plot, heatmap_plot, histogram_plot, pie_plot
 
 SCOPES = {"public": "Public database", "mine": "My data"}
 LEGACY_SCOPES = {"all", "shared"}
@@ -254,6 +254,25 @@ def index(request):
         for row in category["rows"]:
             row["url"] = refine_url(query, key, row["label"])
         categories[key] = category
+    model_rows = []
+    for key, family, color in (("elastic_model", "Elastic", "#7968aa"),
+                               ("plastic_model", "Plastic", "#31877c")):
+        for row in categories[key]["rows"]:
+            model_rows.append({**row, "label": f'{row["label"]} ({family})', "color": color})
+    model_rows.sort(key=lambda row: (-row["count"], row["label"].casefold()))
+    model_category = {
+        "key": "models", "title": "Constitutive models", "rows": model_rows,
+        "available": sum(bool(record["categories"]["elastic_model"] or record["categories"]["plastic_model"])
+                         for record in records),
+    }
+    loading = loading_matrix(records)
+    for row in loading["pairs"]:
+        selected = dict(query)
+        for key, value in (("loading_type", row["type"]), ("loading_mode", row["mode"])):
+            values = selected.get(key, [])
+            if value.casefold() not in {item.casefold() for item in values}:
+                selected[key] = [*values, value]
+        row["url"] = chart_url(selected, {"curve": None, "component": None, "show": None})
     distributions = []
     for measure in MEASURES:
         item = distribution(records, measure)
@@ -261,6 +280,11 @@ def index(request):
             bounds = ":".join([measure, bucket["low"], bucket["high"], "1" if bucket["inclusive"] else "0"])
             bucket["url"] = refine_url(query, "range", bounds, measure=measure)
         item["plot"] = histogram_plot(item)
+        if measure == "grain_count" and item.get("box"):
+            box = item["box"]
+            bounds = ":".join([measure, box["low"], box["high"], "1"])
+            box["url"] = refine_url(query, "range", bounds, measure=measure)
+            item["box_plot"] = box_plot(item)
         distributions.append(item)
     result_rows = []
     for key, title in RESULT_TITLES.items():
@@ -331,7 +355,8 @@ def index(request):
         "matching_url": refine_url(query, "result", "matching_response"),
         "plastic_url": refine_url(query, "result", "plastic_strain"),
         "categories": categories, "distributions": distributions,
-        "coverage_rows": coverage_rows, "coverage_plot": pie_plot(coverage_rows),
+        "coverage_rows": coverage_rows, "coverage_plot": pie_plot(coverage_rows, inner_radius=64),
+        "coverage_percent": coverage_rows[0]["percent"],
         "active_measure": query.get("measure", "temperature"), "result_rows": result_rows,
         "output_rows": output_rows, "output_plot": bar_plot(output_rows),
         "extra_output_rows": [row for row in result_rows if row["key"] in {"supplied_equivalent", "calculated_equivalent"}],
@@ -350,7 +375,10 @@ def index(request):
         "category_plot": bar_plot(selected_category["rows"]), "group": group,
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
         "phase_category": categories["phase"], "phase_plot": bar_plot(categories["phase"]["rows"]),
-        "software_category": categories["software"], "software_plot": bar_plot(categories["software"]["rows"]),
+        "software_category": categories["software"], "software_plot": column_plot(categories["software"]["rows"]),
+        "texture_category": categories["texture"], "texture_plot": bubble_plot(categories["texture"]["rows"]),
+        "model_category": model_category, "model_plot": bar_plot(model_rows),
+        "loading_matrix": loading, "loading_plot": heatmap_plot(loading),
         "primary_distributions": distributions[:2],
         "control_params": controls,
     }

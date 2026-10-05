@@ -70,18 +70,22 @@
           <div class="charts-plot-stage">{% include 'charts/pie.html' %}</div>
         </section>
 
-        <section class="charts-panel" data-statistic="software" aria-labelledby="software-heading">
-          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label">{{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+        <section class="charts-panel" data-statistic="models" aria-labelledby="models-heading">
+          <div class="charts-panel-heading"><h2 id="models-heading">Constitutive models</h2><span class="charts-context-label">{{ model_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          {% if model_category.rows %}<div class="charts-model-key"><span><i class="charts-key-elastic" aria-hidden="true"></i>Elastic</span><span><i class="charts-key-plastic" aria-hidden="true"></i>Plastic</span></div>{% endif %}
           <div class="charts-plot-stage">
-            {% if software_category.rows %}{% include 'charts/category.html' with plot=software_plot category=software_category %}{% else %}<div class="charts-plot-empty"><strong>No software reported</strong></div>{% endif %}
+            {% if model_category.rows %}{% include 'charts/category.html' with plot=model_plot category=model_category %}{% else %}<div class="charts-plot-empty"><strong>No constitutive models reported</strong></div>{% endif %}
           </div>
-          {% if software_category.rows %}{% include 'charts/category_table.html' with category=software_category %}{% endif %}
+          {% if model_category.rows %}{% include 'charts/category_table.html' with category=model_category %}{% endif %}
         </section>
 
-        <section class="charts-panel" data-statistic="outputs" aria-labelledby="outputs-heading">
-          <div class="charts-panel-heading"><h2 id="outputs-heading">Reported outputs</h2><span class="charts-context-label">{{ total_objects }} object{{ total_objects|pluralize }}</span></div>
-          <div class="charts-plot-stage">{% include 'charts/category.html' with plot=output_plot category=False %}</div>
-          <details class="charts-chart-data"><summary>Data table</summary>{% include 'charts/statistics_table.html' with rows=output_rows caption='Reported outputs' label_heading='Output' %}</details>
+        <section class="charts-panel" data-statistic="loading" aria-labelledby="loading-heading">
+          <div class="charts-panel-heading"><h2 id="loading-heading">Loading types &amp; modes</h2><span class="charts-context-label">{{ loading_matrix.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          {% if loading_matrix.pairs %}
+            <p class="charts-distribution-caption charts-loading-caption">Objects reporting both labels</p>
+            <div class="charts-plot-stage">{% include 'charts/heatmap.html' %}</div>
+            <details class="charts-chart-data"><summary>Data table<span>{{ loading_matrix.pairs|length }} combination{{ loading_matrix.pairs|length|pluralize }}</span></summary>{% include 'charts/loading_table.html' %}</details>
+          {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>No loading type and mode reported</strong></div></div>{% endif %}
         </section>
 
         {% for item in primary_distributions %}
@@ -89,12 +93,28 @@
             <div class="charts-panel-heading"><h2 id="{{ item.key }}-heading">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</h2><span class="charts-context-label">{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
             {% if item.observation_count %}
               <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}</strong></span><span>Range <strong>{{ item.minimum }}{% if item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}</strong></span></div>
-              <div class="charts-plot-stage">{% include 'charts/histogram.html' with histogram=item.plot %}</div>
+              <div class="charts-plot-stage">{% if item.key == 'grain_count' %}{% include 'charts/box.html' with box=item.box_plot %}{% else %}{% include 'charts/histogram.html' with histogram=item.plot %}{% endif %}</div>
               {% if item.observation_unit == 'phases' %}<p class="charts-distribution-caption">{{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</p>{% endif %}
               <details class="charts-chart-data"><summary>Data table</summary>{% include 'charts/distribution_table.html' %}</details>
             {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>{% if item.key == 'temperature' %}No usable temperature{% else %}No usable grain number{% endif %}</strong></div></div>{% endif %}
           </section>
         {% endfor %}
+
+        <section class="charts-panel" data-statistic="texture" aria-labelledby="texture-heading">
+          <div class="charts-panel-heading"><h2 id="texture-heading">Texture types</h2><span class="charts-context-label">{{ texture_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-plot-stage">
+            {% if texture_category.rows %}{% include 'charts/bubble.html' with plot=texture_plot %}{% else %}<div class="charts-plot-empty"><strong>No texture type reported</strong></div>{% endif %}
+          </div>
+          {% if texture_category.rows %}{% include 'charts/category_table.html' with category=texture_category %}{% endif %}
+        </section>
+
+        <section class="charts-panel" data-statistic="software" aria-labelledby="software-heading">
+          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label">{{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-plot-stage">
+            {% if software_category.rows %}{% include 'charts/columns.html' with plot=software_plot %}{% else %}<div class="charts-plot-empty"><strong>No software reported</strong></div>{% endif %}
+          </div>
+          {% if software_category.rows %}{% include 'charts/category_table.html' with category=software_category %}{% endif %}
+        </section>
       </div>
 
     {% else %}

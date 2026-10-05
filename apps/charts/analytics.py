@@ -364,7 +364,8 @@ def distribution(records, measure):
     Describe numeric coverage with exact bins and explicit observation units
 
     Grain observations belong to supplied phase entries. Bin links deduplicate
-    objects even when multiple phases contribute to the same interval.
+    objects even when multiple phases contribute to the same interval. Quartiles
+    interpolate linearly at positions (n - 1) times the requested fraction.
 
     Parameters
     ----------
@@ -376,7 +377,7 @@ def distribution(records, measure):
     Returns
     -------
     dict
-        Counts, median, range and at most eight inclusive or half-open bins.
+        Counts, quartiles, range and at most eight inclusive or half-open bins.
     """
     title, unit, observation_unit = MEASURES[measure]
     observations = []
@@ -398,6 +399,13 @@ def distribution(records, measure):
     with localcontext() as context:
         context.prec = calculation_precision
         median = values[middle] if len(values) % 2 else (values[middle - 1] + values[middle]) / 2
+        quartiles = []
+        for fraction in (Decimal("0.25"), Decimal("0.75")):
+            position = (len(values) - 1) * fraction
+            index = int(position)
+            weight = position - index
+            quartiles.append(values[index] + weight * (values[min(index + 1, len(values) - 1)] - values[index]))
+    q1, q3 = quartiles
     unique = sorted(set(values))
     intervals = []
     if len(unique) == 1:
@@ -416,7 +424,7 @@ def distribution(records, measure):
     while len({format_number(value, precision) for value in endpoints}) < len(endpoints):
         precision += 3
     precision = max(precision, len(values[0].as_tuple().digits), len(values[-1].as_tuple().digits),
-                    len(median.as_tuple().digits))
+                    len(median.as_tuple().digits), len(q1.as_tuple().digits), len(q3.as_tuple().digits))
     offset = Decimal(0)
     with localcontext() as context:
         context.prec = calculation_precision
@@ -432,6 +440,13 @@ def distribution(records, measure):
         display_precision += 3
     result.update(minimum=format_number(values[0], precision), maximum=format_number(values[-1], precision),
                   median=format_number(median, precision))
+    middle_matches = [pk for value, pk in observations if in_bin(value, q1, q3, True)]
+    result["box"] = {
+        "values": [values[0], q1, median, q3, values[-1]],
+        "q1": format_number(q1, precision), "q3": format_number(q3, precision),
+        "low": str(q1), "high": str(q3), "inclusive": True,
+        "count": len(middle_matches), "object_count": len(set(middle_matches)),
+    }
     for low, high, inclusive in intervals:
         matches = [pk for value, pk in observations if in_bin(value, low, high, inclusive)]
         if low == high:
@@ -451,3 +466,39 @@ def distribution(records, measure):
     for item in result["bins"]:
         item["height"] = round(item["count"] * 100 / maximum_count, 2) if maximum_count else 0
     return result
+
+
+def loading_matrix(records):
+    """
+    Count objects reporting each combination of loading type and mode
+
+    Labels may belong to different boundary entries in the same object. The
+    matrix represents object coverage, rather than paired boundary conditions.
+
+    Parameters
+    ----------
+    records : list of dict
+        Metadata summaries for the active selection.
+
+    Returns
+    -------
+    dict
+        Observed combinations, axis categories and their object denominator.
+    """
+    available = [record for record in records
+                 if record["categories"]["loading_type"] and record["categories"]["loading_mode"]]
+    types = category_rows(available, "loading_type")["rows"]
+    modes = category_rows(available, "loading_mode")["rows"]
+    type_labels = {row["label"].casefold(): row["label"] for row in types}
+    mode_labels = {row["label"].casefold(): row["label"] for row in modes}
+    counts = Counter()
+    for record in available:
+        type_keys = {label.casefold() for label in record["categories"]["loading_type"]}
+        mode_keys = {label.casefold() for label in record["categories"]["loading_mode"]}
+        counts.update((type_key, mode_key) for type_key in type_keys for mode_key in mode_keys)
+    pairs = [{"type": type_labels[type_key], "mode": mode_labels[mode_key], "count": count,
+              "percent": round(count * 100 / len(records), 1)}
+             for (type_key, mode_key), count in counts.items()]
+    pairs.sort(key=lambda row: (-row["count"], row["type"].casefold(), row["mode"].casefold()))
+    return {"types": types, "modes": modes, "pairs": pairs, "available": len(available),
+            "missing": len(records) - len(available)}

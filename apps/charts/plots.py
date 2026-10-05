@@ -78,8 +78,7 @@ def bar_plot(rows, limit=6):
     for index, row in enumerate(shown):
         width = float(Decimal(row["count"]) / scale["maximum"]) * 172
         bars.append({**row, "width": round(width, 2), "y": 19 + index * 42,
-                     "label_y": 34 + index * 42, "value_x": round(134 + width + 7, 2),
-                     "short_label": row["label"] if len(row["label"]) <= 19 else row["label"][:17] + "…"})
+                     "label_y": 34 + index * 42, "value_x": round(134 + width + 7, 2)})
     return {"rows": bars, "all_rows": rows, "height": baseline + 43, "baseline": baseline,
             "ticks": [{**tick, "x": round(134 + tick["position"] * 172, 2)} for tick in scale["ticks"]]}
 
@@ -126,7 +125,7 @@ def histogram_plot(distribution):
             "ticks": [{**tick, "y": round(174 - tick["position"] * 146, 2)} for tick in scale["ticks"]]}
 
 
-def pie_plot(rows):
+def pie_plot(rows, inner_radius=0):
     """
     Draw disjoint object coverage slices without altering their counts
 
@@ -134,6 +133,8 @@ def pie_plot(rows):
     ----------
     rows : list of dict
         Exhaustive coverage categories with counts, colors and filter links.
+    inner_radius : int, optional
+        Hole radius for a donut, or zero for a filled pie.
 
     Returns
     -------
@@ -156,9 +157,171 @@ def pie_plot(rows):
             path = (f"M{center_x},{center_y - radius} "
                     f"A{radius},{radius} 0 1 1 {center_x},{center_y + radius} "
                     f"A{radius},{radius} 0 1 1 {center_x},{center_y - radius} Z")
+            if inner_radius:
+                path += (f" M{center_x},{center_y - inner_radius} "
+                         f"A{inner_radius},{inner_radius} 0 1 0 {center_x},{center_y + inner_radius} "
+                         f"A{inner_radius},{inner_radius} 0 1 0 {center_x},{center_y - inner_radius} Z")
+        elif inner_radius:
+            inner_start_x = center_x + inner_radius * math.cos(start)
+            inner_start_y = center_y + inner_radius * math.sin(start)
+            inner_end_x = center_x + inner_radius * math.cos(end)
+            inner_end_y = center_y + inner_radius * math.sin(end)
+            path = (f"M{x_start:.3f},{y_start:.3f} "
+                    f"A{radius},{radius} 0 {int(angle > math.pi)} 1 {x_end:.3f},{y_end:.3f} "
+                    f"L{inner_end_x:.3f},{inner_end_y:.3f} "
+                    f"A{inner_radius},{inner_radius} 0 {int(angle > math.pi)} 0 {inner_start_x:.3f},{inner_start_y:.3f} Z")
         else:
             path = (f"M{center_x},{center_y} L{x_start:.3f},{y_start:.3f} "
                     f"A{radius},{radius} 0 {int(angle > math.pi)} 1 {x_end:.3f},{y_end:.3f} Z")
         slices.append({**row, "path": path, "full_circle": full_circle})
         start = end
-    return {"slices": slices, "total": total, "center_x": center_x, "center_y": center_y, "radius": radius}
+    return {"slices": slices, "total": total, "center_x": center_x, "center_y": center_y,
+            "radius": radius, "inner_radius": inner_radius}
+
+
+def bubble_plot(rows, limit=6):
+    """
+    Show independent category counts with proportional circle areas
+
+    A fixed grid keeps labels legible without suggesting disjoint proportions.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Category counts and filter links.
+    limit : int, optional
+        Categories shown initially, with all others available in the table.
+
+    Returns
+    -------
+    dict
+        Circle geometry with an exact count for each category.
+    """
+    shown = rows[:limit]
+    maximum = max((row["count"] for row in shown), default=1)
+    colors = ("#347bb5", "#31877c", "#7968aa", "#b87d35", "#4b899c", "#a85f7f")
+    circles = []
+    for index, row in enumerate(shown):
+        radius = 43 * math.sqrt(row["count"] / maximum)
+        y = 56 + (index // 3) * 120
+        row_length = min(3, len(shown) - (index // 3) * 3)
+        circles.append({**row, "x": 180 + ((index % 3) - (row_length - 1) / 2) * 118, "y": y, "radius": radius,
+                        "color": colors[index % len(colors)], "count_y": y + 4 if radius >= 15 else y + 25,
+                        "inside": radius >= 15, "label_y": y + 46,
+                        "label_x": 126 + ((index % 3) - (row_length - 1) / 2) * 118})
+    return {"rows": circles, "maximum": maximum, "height": 280 if len(shown) > 3 else 160}
+
+
+def column_plot(rows, limit=6):
+    """
+    Draw software counts on a common vertical axis starting at zero
+
+    Full category names remain in link titles and the accompanying data table.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Category counts and filter links.
+    limit : int, optional
+        Maximum visible columns.
+
+    Returns
+    -------
+    dict
+        Columns and integer count ticks for an SVG chart.
+    """
+    shown = rows[:limit]
+    scale = axis_scale([row["count"] for row in shown], counts=True)
+    slot = 340 / max(len(shown), 1)
+    columns = []
+    for index, row in enumerate(shown):
+        height = float(Decimal(row["count"]) / scale["maximum"]) * 150
+        center = 48 + slot * (index + .5)
+        columns.append({**row, "x": round(center - min(slot * .6, 64) / 2, 2), "center": round(center, 2),
+                        "width": round(min(slot * .6, 64), 2), "height": round(height, 2),
+                        "y": round(192 - height, 2), "count_y": round(184 - height, 2),
+                        "label_x": round(48 + index * slot + 2, 2), "label_width": round(slot - 4, 2)})
+    return {"rows": columns, "ticks": [{**tick, "y": round(192 - tick["position"] * 150, 2)}
+                                        for tick in scale["ticks"]]}
+
+
+def heatmap_plot(matrix, limit=6):
+    """
+    Color observed loading combinations by their distinct object counts
+
+    Empty cells remain visible and have no navigation link. Full combinations
+    are retained in the HTML table when the visible axes are limited.
+
+    Parameters
+    ----------
+    matrix : dict
+        Counts and URLs for object level loading type and mode combinations.
+    limit : int, optional
+        Maximum categories on each visible axis.
+
+    Returns
+    -------
+    dict
+        Bounded cells, shortened axis labels and a visible count scale.
+    """
+    types, modes = matrix["types"][:limit], matrix["modes"][:min(limit, 4)]
+    counts = {(row["type"].casefold(), row["mode"].casefold()): row for row in matrix["pairs"]}
+    maximum = max((row["count"] for row in matrix["pairs"]), default=1)
+    width, height = 252 / max(len(modes), 1), 168 / max(len(types), 1)
+    cells = []
+    for y_index, type_row in enumerate(types):
+        for x_index, mode_row in enumerate(modes):
+            row = counts.get((type_row["label"].casefold(), mode_row["label"].casefold()), {})
+            count = row.get("count", 0)
+            strength = count / maximum
+            color = "#f1f5f8" if not count else "#{:02x}{:02x}{:02x}".format(
+                round(226 - strength * 185), round(237 - strength * 113), round(246 - strength * 79))
+            cells.append({**row, "type": type_row["label"], "mode": mode_row["label"], "count": count,
+                          "x": round(116 + x_index * width, 2), "y": round(48 + y_index * height, 2),
+                          "width": round(width - 3, 2), "height": round(height - 3, 2), "color": color,
+                          "center_x": round(116 + (x_index + .5) * width - 1.5, 2),
+                          "center_y": round(48 + (y_index + .5) * height - 1.5, 2), "dark": strength > .55})
+    return {
+        "cells": cells, "maximum": maximum,
+        "types": [{"label": row["label"], "y": round(38 + (index + .5) * height - 1.5, 2)}
+                  for index, row in enumerate(types)],
+        "modes": [{"label": row["label"], "x": round(116 + index * width, 2), "width": round(width - 3, 2)}
+                  for index, row in enumerate(modes)],
+    }
+
+
+def box_plot(distribution):
+    """
+    Plot exact quartiles with whiskers at the supplied minimum and maximum
+
+    Decimal normalization preserves nearby large grain counts. Quartiles use
+    linear interpolation at fractions of the ordered observation positions.
+
+    Parameters
+    ----------
+    distribution : dict
+        Numeric summary containing a five value box and its interval link.
+
+    Returns
+    -------
+    dict
+        Box geometry, readable ticks and an unchanged numeric selection.
+    """
+    box = distribution.get("box")
+    if not box:
+        return {}
+    values = box["values"]
+    scale = axis_scale(values)
+    with localcontext() as context:
+        context.prec = scale["precision"]
+        positions = [float((value - scale["minimum"]) / (scale["maximum"] - scale["minimum"])) * 300 + 40
+                     for value in values]
+    low, q1, median, q3, high = positions
+    ticks = scale["ticks"]
+    if max(len(tick["label"]) for tick in ticks) > 5 and len(ticks) > 3:
+        ticks = [ticks[index] for index in sorted({0, (len(ticks) - 1) // 2, len(ticks) - 1})]
+    return {**box, "minimum_x": low, "q1_x": q1, "median_x": median, "q3_x": q3, "maximum_x": high,
+            "width": q3 - q1, "constant": values[0] == values[-1], "offset": scale["offset"],
+            "ticks": [{**tick, "x": round(40 + tick["position"] * 300, 2),
+                       "anchor": "start" if index == 0 else "end" if index == len(ticks) - 1 else "middle"}
+                      for index, tick in enumerate(ticks)]}

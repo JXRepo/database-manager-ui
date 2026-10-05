@@ -56,7 +56,7 @@
 .charts-axis-text { font: 12px Arial, sans-serif; fill: #607c99; }
 .charts-bar-label { font: 12px Arial, sans-serif; fill: #284664; }
 .charts-bar-count, .charts-bin-count { font: 600 12px Arial, sans-serif; fill: #284664; }
-.charts-bar-mark { fill: #2c78bf; }
+.charts-bar-mark { fill: var(--charts-bar-color, #2c78bf); }
 .charts-bar:hover .charts-bar-mark, .charts-bar:focus .charts-bar-mark { fill: #205f9a; }
 .charts-lollipop-stem { stroke: #96badc; stroke-width: 2; stroke-linecap: round; }
 .charts-lollipop-dot { fill: #2c78bf; stroke: #fff; stroke-width: 2; }
@@ -86,6 +86,35 @@
 .charts-pie-slice:hover path { opacity: .8; }
 .charts-pie-slice:focus-visible { outline: none !important; }
 .charts-pie-slice:focus-visible path { stroke: #183e65; stroke-width: 4px; }
+.charts-donut-percent { font: 600 26px Arial, sans-serif; fill: #284664; }
+.charts-donut-svg .charts-axis-text { font-size: 16px; }
+.charts-model-key { display: flex; gap: 18px; color: var(--charts-muted); font-size: 11px; }
+.charts-model-key > span { display: inline-flex; align-items: center; gap: 6px; }
+.charts-model-key i { width: 9px; height: 9px; border-radius: 2px; }
+.charts-key-elastic { background: #7968aa; }
+.charts-key-plastic { background: #31877c; }
+.charts-bubble-svg { display: block; width: 100%; max-width: 360px; height: auto; }
+.charts-bubble-mark { stroke: #fff; stroke-width: 2; }
+.charts-bubble-count { font: 600 15px Arial, sans-serif; fill: #284664; }
+.charts-column-svg { display: block; width: 100%; max-width: 410px; height: auto; }
+.charts-column-mark { fill: #31877c; }
+.charts-heatmap-svg { display: block; width: 100%; max-width: 390px; height: auto; }
+.charts-box-svg { display: block; width: 100%; max-width: 380px; height: auto; }
+.charts-box-svg .charts-bin-label { font-size: 12px; }
+.charts-box-whisker { stroke: #607c99; stroke-width: 2; }
+.charts-box-mark { fill: #d9e9f6; stroke: #347bb5; stroke-width: 2; }
+.charts-box-median { stroke: #284664; stroke-width: 3; }
+.charts-box-point { fill: #347bb5; stroke: #fff; stroke-width: 2; }
+.charts-bubble:hover .charts-bubble-mark, .charts-column:hover .charts-column-mark, .charts-heatmap-cell:hover .charts-heatmap-mark, .charts-box-selection:hover .charts-box-mark { opacity: .8; }
+.charts-bubble:focus-visible, .charts-column:focus-visible, .charts-heatmap-cell:focus-visible, .charts-box-selection:focus-visible { outline: none !important; }
+.charts-bubble:focus-visible .charts-bubble-mark, .charts-column:focus-visible .charts-column-mark, .charts-heatmap-cell:focus-visible .charts-heatmap-mark, .charts-box-selection:focus-visible .charts-box-mark, .charts-box-selection:focus-visible .charts-box-point { stroke: #183e65; stroke-width: 3; }
+.charts-on-color { fill: #fff; }
+.charts-page .charts-svg-label { display: block; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--charts-ink); font: 12px/20px Arial, sans-serif; }
+.charts-svg-label-center { text-align: center; }
+.charts-svg-label-end { text-align: right; }
+.charts-page .charts-column-label { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 16px; }
+.charts-category-row:hover .charts-lollipop-dot, .charts-category-row:hover .charts-lollipop-stem { fill: #205f9a; stroke: #2c78bf; }
+.charts-category-row:hover .charts-bar-mark, .charts-category-row:hover .charts-bubble-mark, .charts-category-row:hover .charts-column-mark { opacity: .8; }
 .charts-coverage-table th:first-child { width: 47%; }
 .charts-coverage-table th:not(:first-child), .charts-coverage-table td { width: 26.5%; }
 .charts-coverage-link { display: inline-flex; align-items: center; gap: 6px; }
