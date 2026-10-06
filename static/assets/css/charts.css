@@ -52,6 +52,7 @@
 .charts-context-label { font-size: 11px; color: var(--charts-muted); white-space: nowrap; }
 .charts-plot-stage { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 225px; }
 .charts-bar-svg { display: block; width: 100%; max-width: 360px; height: auto; }
+.charts-lollipop-svg { max-width: 420px; }
 .charts-grid-line { stroke: #e7edf3; stroke-width: 1; }
 .charts-axis-text { font: 12px Arial, sans-serif; fill: #607c99; }
 .charts-bar-label { font: 12px Arial, sans-serif; fill: #284664; }

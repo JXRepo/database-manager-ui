@@ -1,15 +1,15 @@
-<svg class="charts-bar-svg{% if lollipop %} charts-lollipop-svg{% endif %}" viewBox="0 0 {% if lollipop %}360{% else %}340{% endif %} {{ plot.height }}" role="group" aria-label="{% if category %}{{ category.title }} counts{% else %}Available mechanical results{% endif %}"{% if category %} data-category="{{ category.key }}"{% endif %} xmlns="http://www.w3.org/2000/svg">
+<svg class="charts-bar-svg{% if lollipop %} charts-lollipop-svg{% endif %}" viewBox="0 0 {% if lollipop %}420 {{ plot.height|add:'4' }}{% else %}340 {{ plot.height }}{% endif %}" role="group" aria-label="{% if category %}{{ category.title }} counts{% else %}Available mechanical results{% endif %}"{% if category %} data-category="{{ category.key }}"{% endif %} xmlns="http://www.w3.org/2000/svg">
   {% for tick in plot.ticks %}<line x1="{{ tick.x }}" x2="{{ tick.x }}" y1="12" y2="{{ plot.baseline }}" class="charts-grid-line"/><text x="{{ tick.x }}" y="{{ plot.baseline|add:'20' }}" text-anchor="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
   {% for row in plot.rows %}
     <g class="charts-category-row">
     <a class="charts-bar" href="{{ row.url }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}, {{ row.percent|floatformat:'1u' }}% of selected objects. Filter statistics to these objects." data-label="{{ row.label }}"{% if row.color %} style="--charts-bar-color: {{ row.color }}"{% endif %}>
       <title>{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}% of selected objects)</title>
-      <rect x="0" y="{{ row.y|add:'-5' }}" width="{% if lollipop %}358{% else %}338{% endif %}" height="34" fill="transparent"/>
+      <rect x="0" y="{{ row.y|add:'-5' }}" width="{% if lollipop %}418{% else %}338{% endif %}" height="34" fill="transparent"/>
       {% if lollipop %}
         <g transform="translate(134 {{ row.y|add:'11' }})">
           <line x1="0" x2="{{ row.width }}" y1="0" y2="0" class="charts-lollipop-stem"/>
           <circle cx="{{ row.width }}" cy="0" r="6" class="charts-lollipop-dot"/>
-          <text x="{{ row.width }}" dx="13" y="4" class="charts-bar-count">{{ row.count }}</text>
+          <text x="{{ row.width }}" dx="13" y="4" class="charts-bar-count">{{ row.count }} ({{ row.percent|floatformat:'-1u' }}%)</text>
         </g>
       {% else %}
         <rect x="134" y="{{ row.y }}" width="{{ row.width }}" height="22" rx="3" class="charts-bar-mark"/>

@@ -389,7 +389,8 @@ Data scope links to a separate page of matching objects.
 Eight cards are visible directly, in four pairs:
 
 - **Phase** counts objects for each phase name with a horizontal lollipop chart:
-  thin lines end in dots, with exact counts beside them.
+  thin lines end in dots, with counts and percentages of all selected objects
+  beside them, for example `20 (40%)`. Expanded categories use the same labels.
 - **Stress–strain coverage** uses a donut chart for the exhaustive, disjoint
   classes with and without matching components.
 - **Constitutive models** compares reported elastic and plastic model names

@@ -182,7 +182,7 @@ function exactEighths(value) {
         const panel = document.querySelector('[data-statistic="' + ${JSON.stringify(key)} + '"]');
         const bar = [...panel.querySelectorAll('.charts-bar, .charts-bubble, .charts-column')]
           .find(element => element.dataset.label === ${JSON.stringify(label)});
-        if (bar) return {path: bar.getAttribute('href'), count: Number(bar.dataset.count ?? bar.querySelector('.charts-bar-count').textContent)};
+        if (bar) return {path: bar.getAttribute('href'), count: parseInt(bar.dataset.count ?? bar.querySelector('.charts-bar-count').textContent, 10)};
         throw new Error('Missing chart category: ' + ${JSON.stringify(key + ': ' + label)});
       })()`);
     }
@@ -280,6 +280,7 @@ function exactEighths(value) {
         const graphs = panels.flatMap(panel => [...panel.querySelector('.charts-plot-stage').querySelectorAll('svg')]);
         return {
           documentWidth: document.documentElement.scrollWidth, viewport: innerWidth,
+          totalObjects: Number(document.querySelector('.charts-metric-total strong')?.textContent),
           mainLeft: document.querySelector('.charts-page').getBoundingClientRect().left,
           sidebarRight: document.querySelector('.pc-sidebar').getBoundingClientRect().right,
           titleTop: document.querySelector('.charts-heading h1').getBoundingClientRect().top,
@@ -304,7 +305,7 @@ function exactEighths(value) {
             column: graphs.filter(svg => svg.classList.contains('charts-column-svg')).length,
             heatmap: graphs.filter(svg => svg.classList.contains('charts-heatmap-svg')).length,
             box: graphs.filter(svg => svg.classList.contains('charts-box-svg')).length},
-          lollipops: [...document.querySelectorAll('.charts-plot-stage .charts-lollipop-dot')].map(dot => {
+          lollipops: [...document.querySelectorAll('[data-statistic=phase] .charts-lollipop-dot')].filter(dot => dot.checkVisibility()).map(dot => {
             const link = dot.closest('a'), stem = link.querySelector('.charts-lollipop-stem');
             const svg = dot.ownerSVGElement, bounds = svg.getBoundingClientRect();
             const dotRect = dot.getBoundingClientRect(), count = link.querySelector('.charts-bar-count');
@@ -318,6 +319,7 @@ function exactEighths(value) {
             .filter(text => text.ownerSVGElement.checkVisibility()).map(text => {
               const svg = text.ownerSVGElement, box = text.getBoundingClientRect(), bounds = svg.getBoundingClientRect();
               return {label: text.textContent, chart: svg.getAttribute('class'), box: {x: box.x, y: box.y, width: box.width, height: box.height},
+                bounds: {x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height},
                 fontSize: parseFloat(getComputedStyle(text).fontSize) * svg.getScreenCTM().a,
                 clipped: box.left < bounds.left - 1 || box.top < bounds.top - 1 || box.right > bounds.right + 1 || box.bottom > bounds.bottom + 1};
             }),
@@ -368,6 +370,10 @@ function exactEighths(value) {
         assert.equal(mark.dotPosition, mark.stemEnd, `${label}: the dot must mark its count position`);
         assert.ok(!mark.clipped && mark.countLeft > mark.dotRight && mark.fontSize >= 9.5,
           `${label}: readable lollipop count at ${width}: ${JSON.stringify(mark)}`);
+        const values = mark.count.match(/^(\d+) \((\d+(?:\.\d+)?)%\)$/);
+        assert.ok(values, `${label}: show the count and percentage for ${mark.label}`);
+        assert.equal(Number(values[2]), Number((Number(values[1]) * 100 / metrics.totalObjects).toFixed(1)),
+          `${label}: phase percentage uses all selected objects`);
       }
       for (const text of metrics.numericLabels) {
         assert.ok(text.fontSize >= 9.5 && !text.clipped, `${label}: readable numeric label at ${width}: ${JSON.stringify(text)}`);
@@ -448,7 +454,7 @@ function exactEighths(value) {
       const dot = document.querySelector('.charts-lollipop-dot'), rect = dot.getBoundingClientRect();
       const link = dot.closest('a');
       return {x: rect.left + rect.width / 2, y: rect.top + rect.height / 2,
-        path: link.getAttribute('href'), count: Number(link.querySelector('.charts-bar-count').textContent)};
+        path: link.getAttribute('href'), count: parseInt(link.querySelector('.charts-bar-count').textContent, 10)};
     })()`);
     await command('Input.dispatchMouseEvent', {type: 'mouseMoved', x: dotLink.x, y: dotLink.y});
     assert.equal(await evaluate('getComputedStyle(document.querySelector(".charts-lollipop-dot")).fill'), 'rgb(32, 95, 154)');
@@ -688,6 +694,10 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-bar").length'), 9);
     assert.equal(await evaluate('document.querySelectorAll(".charts-heatmap-svg g > .charts-heatmap-mark").length') > 0, true);
     for (const width of [1280, 1440, 1920]) await layout('varied-long-categories', width);
+    await evaluate('document.querySelector("[data-statistic=phase] .charts-more-categories > summary").focus()');
+    await pressKey('Enter', 'Enter', 13);
+    for (const width of [1280, 1440, 1920]) await layout('expanded-phases', width);
+    await evaluate('document.querySelector("[data-statistic=phase] .charts-more-categories").open = false');
     const diverseCell = await evaluate(`(() => {
       const link = document.querySelector('.charts-heatmap-cell');
       return {path: link.getAttribute('href'), count: Number(link.dataset.count)};
@@ -697,6 +707,19 @@ function exactEighths(value) {
     await clearSelection();
     await command('Emulation.setScriptExecutionDisabled', {value: true});
     await navigate('/charts/?scope=mine&include_private=1', false);
+    await evaluate('document.querySelector("[data-statistic=phase] .charts-more-categories > summary").focus()');
+    await pressKey('Enter', 'Enter', 13);
+    assert.equal(await evaluate('document.querySelector("[data-statistic=phase] .charts-more-categories").open'), true);
+    const morePhase = await evaluate(`(() => {
+      const link = document.querySelector('[data-statistic=phase] .charts-more-categories .charts-bar');
+      link.focus();
+      return {path: link.getAttribute('href'), count: parseInt(link.querySelector('.charts-bar-count').textContent, 10)};
+    })()`);
+    await pressKey('Enter', 'Enter', 13);
+    await until(`location.href === ${JSON.stringify(process.env.CHARTS_BASE_URL + morePhase.path)}
+      && document.readyState === 'complete' && !!document.querySelector('.charts-lollipop-svg')`);
+    await assertLinkedCount(morePhase, false);
+    await clearSelection(false);
     await evaluate('document.querySelector("[data-statistic=texture] .charts-more-categories > summary").focus()');
     await pressKey('Enter', 'Enter', 13);
     assert.equal(await evaluate('document.querySelector("[data-statistic=texture] .charts-more-categories").open'), true);
