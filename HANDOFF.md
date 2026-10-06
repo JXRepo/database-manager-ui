@@ -2,15 +2,76 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-06
-code_base: see latest git commit (Remove per-card statistics tables from Charts)
-next_topic: Continue reviewing Charts and detail-page usability
+code_base: e958725 (Remove per-card statistics tables from Charts; application baseline)
+next_topic: Review the eight Charts cards one by one with the user
 files_modified:
-  - Charts table removal, expandable category charts, desktop verification and help documentation
+  - HANDOFF.md
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 新聊天先看这里：下一步逐张梳理 Charts 卡片
+
+- 用户最后的要求是：写好交接，新开聊天后准备挨个卡片讨论。**下一轮只逐张梳理
+  Charts 卡片；还没有任何下一张卡片的具体修改要求。** 按下面的页面顺序继续，
+  用户未另指定时从第一张 Phase 开始。先简单说清这一张表示什么，再按用户反馈调整。
+- 回答要简单、直接、白话，用中文；应用界面保持英文。明确要求修改时直接实施，
+  验证后提交并推送，不反复确认常规步骤。不要一次重新设计全部卡片或自行增加功能。
+- 当前应用基线是 main 的 `e958725`，已推送，写本次交接前工作区干净。
+  前一应用提交 `233a409` 实现八张卡片，`e958725` 删除各卡片的 Data table。
+  本次只更新交接文档，没有新的界面或统计逻辑改动；Render 是否完成部署仍未确认。
+
+八张卡片目前按桌面两列、四行排列，阅读顺序为每行从左到右：
+
+| 顺序 | 卡片 | 当前图形 | 当前统计含义 |
+| --- | --- | --- | --- |
+| 1 | Phase | 棒棒糖图 | 每个材料相名称对应多少个数据对象；同一对象在同一名称下只计一次 |
+| 2 | Stress–strain coverage | 环形饼图 | 有／没有匹配应力–应变分量的对象占比，两个部分互斥且覆盖全部选中对象 |
+| 3 | Constitutive models | 水平条形图 | 各弹性／塑性模型名称对应的对象数量，两类用不同颜色 |
+| 4 | Loading types & modes | 热力图 | 同一对象同时报告指定加载类型和模式的数量，标签可能来自不同边界条目 |
+| 5 | Temperature (K) | 直方图 | 可用温度换算成 Kelvin 后的分布，并显示中位数和范围 |
+| 6 | Grain number | 箱线图 | 晶粒数量的相观测分布，显示四分位、中位数和实际最小／最大值 |
+| 7 | Texture types | 气泡图 | 各织构名称对应的对象数量，圆的面积与数量成比例 |
+| 8 | Software | 竖向柱状图 | 各软件名称对应的对象数量 |
+
+最近已明确的页面决定和刚讨论的内容：
+
+- 用户希望图形丰富、好看，同时内容对材料模拟数据用户有用。现在八张图均保留；
+  已回答“饼图啥的都有是吗”，其中饼图采用环形形式。
+- 刚讨论“环形饼图和正常饼图哪个更 fancy”。助手建议保留环形图：更清爽，中间
+  可以显示百分比。用户尚未提出改成普通饼图，现有环形图没有因此改动。
+- 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
+  悬停提示和点击筛选保留；类别超过六项时出现 More categories，热图还有组合时
+  出现 More combinations，展开后仍是图形。环形图旁两行数量／百分比图例保留。
+- 顶部继续保留四个简单数字：Data objects、Material phases、Texture types、
+  Objects with stress–strain data。后者计具有匹配分量的数据对象，不是曲线条数。
+- 范围只保留 Public database 和 My data。My data 默认只计本人公开上传，
+  Include private data 加入本人私有上传；收到的私有分享不进入这两个范围。
+- 点击图表收窄同一对象上的 AND 条件并联动所有图，保留权限和精确数量。
+  View data 打开独立的对象列表；Additional statistics、内联 Source records 和
+  独立 Filters 表单继续不显示。单对象曲线与下载仍在详情页。
+- 科学口径不能随外观改动：类别可能重叠，不能当作互斥饼图；加载热图不保证同一
+  边界条目配对；Grain number 是晶粒数量，不是晶粒尺寸；缺失值不伪造为零。
+
+接手时主要读这些文件：
+
+- 页面与样式：`templates/charts/index.html`、各图形模板、
+  `templates/charts/more_categories.html`、`static/assets/css/charts.css`。
+- 范围、筛选与统计：`apps/charts/views.py`、`apps/charts/analytics.py`、
+  `apps/charts/plots.py`。规则与当前行为见 `AGENTS.md` 和 README 的 Charts 部分。
+- 验证：`apps/charts/tests.py`、`apps/charts/test_browser.py`、
+  `tests/browser/charts.cjs`。改 Charts 后按 AGENTS 用 DEBUG=True 和本机项目解释器
+  运行相关测试，真实 Chromium 验证不能跳过；重点检查桌面布局、筛选和私有权限。
+- 用户常用样例是 `example_json_files/a46fde6c.json`。上一轮已验证 Copper、
+  Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
+
+最近验证来自 `e958725` 的应用修改：74 项测试通过，无跳过，包含 55 项 Charts 和
+19 项小助手测试；真实 Chromium 核对 1280／1440／1920 桌面、私有权限、精确区间、
+展开入口和无 JavaScript 操作。本次交接文档更新不代表重新运行了业务测试。
+日志 `/tmp/charts-no-data-tables.log`，截图 `/tmp/charts-no-data-tables-qa`；这些路径
+只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**
 
@@ -1575,8 +1636,9 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 ## 下一步
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
-2. **下一轮专注 Charts。** 先看上面的 Charts 接手入口，再听用户具体要调整什么；
-   讨论时先白话解释，要求明确后再实施，不将“接着弄 Charts”扩大成整体重构。
+2. **下一轮逐张梳理 Charts 卡片。** 先读最上面的新聊天交接和八卡片列表，
+   用户未另指定时从 Phase 开始；简单解释这一张的用途，按具体反馈逐张调整。
+   不将“挨个卡片屡屡”扩大成全页重构，不恢复已删除的 Data table。
 3. 上传最新界面调整已完成、验证并推送，不重复实现。新反馈涉及上传时，沿用当前字段识别、
    原始数据保留、按文件保存和精简提示规则；不要自动修改 Ronak 的原文件来凑齐字段。
 4. 如核对线上问题，先确认 Render 部署提交。Git push 成功不证明部署完成，也不证明线上行为成功。
