@@ -3,12 +3,12 @@
   {% for tick in plot.ticks %}<line x1="48" x2="388" y1="{{ tick.y }}" y2="{{ tick.y }}" class="charts-grid-line"/><text x="38" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
   {% for row in plot.rows %}
     <g class="charts-category-row">
-    <a class="charts-column" href="{{ row.url }}" data-label="{{ row.label }}" data-count="{{ row.count }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}. Filter statistics to these objects.">
+    <g class="charts-column" role="img" tabindex="0" data-label="{{ row.label }}" data-count="{{ row.count }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}, {{ row.percent|floatformat:'1u' }}% of selected objects.">
       <title>{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)</title>
       <rect x="{{ row.x }}" y="{{ row.y }}" width="{{ row.width }}" height="{{ row.height }}" rx="4" class="charts-column-mark"/>
       <text x="{{ row.center }}" y="{{ row.count_y }}" text-anchor="middle" class="charts-bar-count">{{ row.count }}</text>
-    </a>
-    <foreignObject x="{{ row.label_x }}" y="204" width="{{ row.label_width }}" height="36"><a xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-column-label" href="{{ row.url }}" data-count="{{ row.count }}" tabindex="-1" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}">{{ row.label }}</a></foreignObject>
+    </g>
+    <foreignObject x="{{ row.label_x }}" y="204" width="{{ row.label_width }}" height="36"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-column-label" data-count="{{ row.count }}" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)">{{ row.label }}</span></foreignObject>
     </g>
   {% endfor %}
   <text x="218" y="265" text-anchor="middle" class="charts-axis-text">Software</text>

@@ -1,12 +1,13 @@
 <svg class="charts-box-svg" data-measure="{{ item.key }}" viewBox="0 0 380 230" role="group" aria-label="Grain number box plot: linearly interpolated quartiles, median and whiskers at minimum and maximum; {{ item.observation_count }} phase observations" xmlns="http://www.w3.org/2000/svg">
+  <title>Minimum: {{ item.minimum }} · Q1: {{ box.q1 }} · Median: {{ item.median }} · Q3: {{ box.q3 }} · Maximum: {{ item.maximum }} · {{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</title>
   {% if box.offset %}<text x="340" y="21" text-anchor="end" class="charts-axis-text">Axis offset: {{ box.offset }}</text>{% endif %}
   <line x1="{{ box.minimum_x }}" x2="{{ box.maximum_x }}" y1="96" y2="96" class="charts-box-whisker"/>
   <line x1="{{ box.minimum_x }}" x2="{{ box.minimum_x }}" y1="78" y2="114" class="charts-box-whisker"/>
   <line x1="{{ box.maximum_x }}" x2="{{ box.maximum_x }}" y1="78" y2="114" class="charts-box-whisker"/>
-  {% if box.object_count %}<a class="charts-box-selection" href="{{ box.url }}" data-object-count="{{ box.object_count }}" aria-label="Q1–Q3: {{ box.q1 }}–{{ box.q3 }} grains, {{ box.count }} phase{{ box.count|pluralize }} from {{ box.object_count }} object{{ box.object_count|pluralize }}. Filter statistics to these objects.">{% else %}<g>{% endif %}
+  {% if box.object_count %}<g class="charts-box-selection" role="img" tabindex="0" data-object-count="{{ box.object_count }}" aria-label="Q1–Q3: {{ box.q1 }}–{{ box.q3 }} grains, {{ box.count }} phase{{ box.count|pluralize }} from {{ box.object_count }} object{{ box.object_count|pluralize }}.">{% else %}<g>{% endif %}
     <title>Q1: {{ box.q1 }} · Median: {{ item.median }} · Q3: {{ box.q3 }} · {{ box.count }} phase{{ box.count|pluralize }} from {{ box.object_count }} object{{ box.object_count|pluralize }}</title>
     {% if box.constant %}<circle cx="{{ box.median_x }}" cy="96" r="8" class="charts-box-point"/>{% else %}<rect x="{{ box.q1_x }}" y="67" width="{{ box.width }}" height="58" rx="4" class="charts-box-mark"/><line x1="{{ box.median_x }}" x2="{{ box.median_x }}" y1="67" y2="125" class="charts-box-median"/>{% endif %}
-  {% if box.object_count %}</a>{% else %}</g>{% endif %}
+  </g>
   {% for tick in box.ticks %}<line x1="{{ tick.x }}" x2="{{ tick.x }}" y1="145" y2="151" class="charts-grid-line"/><text x="{{ tick.x }}" y="171" text-anchor="{{ tick.anchor }}" class="charts-bin-label">{{ tick.label }}</text>{% endfor %}
   <text x="190" y="198" text-anchor="middle" class="charts-axis-text">Grain number</text>
   <text x="190" y="220" text-anchor="middle" class="charts-axis-text">Box: Q1–Q3 · Line: median · Whiskers: min–max</text>

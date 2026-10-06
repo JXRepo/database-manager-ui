@@ -1,12 +1,12 @@
 <div class="charts-pie-layout">
   <svg class="charts-pie-svg charts-donut-svg" viewBox="0 0 280 260" role="group" aria-label="Stress–strain coverage donut chart for {{ total_objects }} object{{ total_objects|pluralize }}" xmlns="http://www.w3.org/2000/svg">
-    {% for slice in coverage_plot.slices %}<a class="charts-pie-slice" href="{{ slice.url }}" aria-label="{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }}, {{ slice.percent|floatformat:'1u' }}%. Filter statistics to these objects."><title>{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }} ({{ slice.percent|floatformat:'1u' }}%)</title><path d="{{ slice.path }}" fill="{{ slice.color }}"/></a>{% endfor %}
+    {% for slice in coverage_plot.slices %}<g class="charts-pie-slice" role="img" tabindex="0" aria-label="{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }}, {{ slice.percent|floatformat:'1u' }}%."><title>{{ slice.label }}: {{ slice.count }} object{{ slice.count|pluralize }} ({{ slice.percent|floatformat:'1u' }}%)</title><path d="{{ slice.path }}" fill="{{ slice.color }}"/></g>{% endfor %}
     <text x="130" y="128" text-anchor="middle" class="charts-donut-percent">{{ coverage_percent|floatformat:'1u' }}%</text>
     <text x="130" y="151" text-anchor="middle" class="charts-axis-text">Available</text>
   </svg>
   <table class="charts-statistics-table charts-coverage-table">
     <caption class="visually-hidden">Stress–strain coverage: {{ total_objects }} object{{ total_objects|pluralize }}</caption>
     <thead><tr><th scope="col">Components</th><th scope="col">Objects</th><th scope="col">%</th></tr></thead>
-    <tbody>{% for row in coverage_rows %}<tr><th scope="row"><a class="charts-coverage-link" href="{{ row.url }}" data-count="{{ row.count }}" data-coverage="{{ row.key }}"><span class="charts-pie-key" style="background: {{ row.color }}" aria-hidden="true"></span>{% if row.key == 'matching' %}Available{% else %}Not available{% endif %}</a></th><td>{{ row.count }}</td><td>{{ row.percent|floatformat:'1u' }}%</td></tr>{% endfor %}</tbody>
+    <tbody>{% for row in coverage_rows %}<tr><th scope="row"><span class="charts-coverage-link" data-count="{{ row.count }}" data-coverage="{{ row.key }}" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)"><span class="charts-pie-key" style="background: {{ row.color }}" aria-hidden="true"></span>{% if row.key == 'matching' %}Available{% else %}Not available{% endif %}</span></th><td>{{ row.count }}</td><td>{{ row.percent|floatformat:'1u' }}%</td></tr>{% endfor %}</tbody>
   </table>
 </div>

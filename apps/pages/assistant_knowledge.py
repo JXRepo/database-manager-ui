@@ -190,9 +190,9 @@ TOPICS = (
                   "My data to chart your own public uploads; Include private data also includes your "
                   "own private uploads. Private records shared with you do not enter these statistics. "
                   "Eight cards show material phases, texture types, constitutive models, loading types "
-                  "and modes, temperature, grain number, software and stress-strain coverage. Select a "
-                  "chart category or numeric interval to narrow all statistics. Hover over a chart "
-                  "mark for full names and exact counts. More categories or More combinations shows "
+                  "and modes, temperature, grain number, software and stress-strain coverage. Hover over "
+                  "chart marks or labels for full names, exact counts, percentages and numeric intervals. "
+                  "Clicking a chart does not filter or navigate. More categories or More combinations shows "
                   "remaining categories when present. View data opens the matching objects; open one for its curves "
                   "and downloads. Counts do not establish physical comparability or scientific validity.",
         "route": "charts", "link": "Open Charts",
@@ -201,8 +201,8 @@ TOPICS = (
         "id": "charts.curves", "question": "How are curve previews prepared?",
         "related": ("manage.formats", "detail.no_plot", "charts.save"),
         "patterns": ("equivalent", "curve length", "different lengths", "preview", "等效", "长度不同", "曲线长度"),
-        "answer": "Curves are shown on each data object's detail page. Use Charts bars or intervals to "
-                  "find relevant objects, then open an object from the matching list. Supplied equivalent "
+        "answer": "Curves are shown on each data object's detail page. Use View data on Charts to "
+                  "open the matching list, then open an object. Supplied equivalent "
                   "arrays take precedence. An equivalent may be calculated only when "
                   "its field is absent and all six required components are available. Unequal arrays pair "
                   "by index to the shorter length, keeping the original sample order. Curve CSV keeps "
@@ -919,15 +919,15 @@ TOPICS += (
         "answer": "Choose Public database for all public platform records, or My data for your own "
                   "public uploads. In My data, Include private data also includes your own private "
                   "uploads. Received private shares remain available through Search, outside these "
-                  "statistics. Clicking a chart category, numeric interval or coverage count refines "
-                  "all statistics. View data opens the matching objects. Successive conditions must "
+                  "statistics. Chart marks and labels show information on hover; clicking them does "
+                  "not add filters or navigate. View data opens the matching objects. Existing bookmarked conditions must "
                   "match the same object, including two "
                   "labels in one category. Remove individual filters or clear them; changing scope resets "
                   "the filters while retaining your chart grouping and measure. Invalid filters show an "
                   "error instead of broadening the selection.",
         "route": "charts", "link": "Open Charts",
         "related": ("charts.overview", "charts.counts", "sharing.access"),
-        "examples": ("Can statistics include only my own uploads?", "What happens if I click a second category bar?", "统计图里连续点两个筛选条件是怎么组合的？"),
+        "examples": ("Can statistics include only my own uploads?", "What happens when I hover over a chart?", "统计图鼠标移上去会显示什么？"),
     },
     {
         "id": "charts.temperature", "question": "Why are some temperatures missing from Charts?",

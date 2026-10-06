@@ -4,11 +4,11 @@
   {% for row in loading_plot.modes %}<foreignObject x="{{ row.x }}" y="24" width="{{ row.width }}" height="20"><div xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" title="{{ row.label }}">{{ row.label }}</div></foreignObject>{% endfor %}
   {% for row in loading_plot.types %}<foreignObject x="4" y="{{ row.y }}" width="104" height="20"><div xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-end" title="{{ row.label }}">{{ row.label }}</div></foreignObject>{% endfor %}
   {% for cell in loading_plot.cells %}
-    {% if cell.count %}<a class="charts-heatmap-cell" href="{{ cell.url }}" data-type="{{ cell.type }}" data-mode="{{ cell.mode }}" data-count="{{ cell.count }}" aria-label="{{ cell.type }} and {{ cell.mode }}: {{ cell.count }} object{{ cell.count|pluralize }}. Filter statistics to these objects.">{% else %}<g>{% endif %}
+    <g class="charts-heatmap-cell" role="img" tabindex="0" data-type="{{ cell.type }}" data-mode="{{ cell.mode }}" data-count="{{ cell.count }}" aria-label="{{ cell.type }} and {{ cell.mode }}: {{ cell.count }} object{{ cell.count|pluralize }}, {{ cell.percent|floatformat:'1u' }}% of selected objects.">
       <title>{{ cell.type }} and {{ cell.mode }}: {{ cell.count }} object{{ cell.count|pluralize }}{% if cell.count %} ({{ cell.percent|floatformat:'1u' }}%){% endif %}</title>
       <rect x="{{ cell.x }}" y="{{ cell.y }}" width="{{ cell.width }}" height="{{ cell.height }}" rx="4" fill="{{ cell.color }}" class="charts-heatmap-mark"/>
       <text x="{{ cell.center_x }}" y="{{ cell.center_y }}" text-anchor="middle" dominant-baseline="middle" class="charts-bar-count{% if cell.dark %} charts-on-color{% endif %}">{{ cell.count }}</text>
-    {% if cell.count %}</a>{% else %}</g>{% endif %}
+    </g>
   {% endfor %}
   <defs><linearGradient id="loading-count-scale"><stop offset="0" stop-color="#f1f5f8"/><stop offset="1" stop-color="#297ca7"/></linearGradient></defs>
   <text x="116" y="247" class="charts-axis-text">0</text><rect x="133" y="237" width="85" height="10" rx="3" fill="url(#loading-count-scale)"/>

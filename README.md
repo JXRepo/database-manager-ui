@@ -398,26 +398,27 @@ Eight cards are visible directly, in four pairs:
   the coverage denominator counts objects reporting either family.
 - **Loading types & modes** uses a heatmap of objects reporting both labels.
   This is object-level co-occurrence: the type and mode can belong to separate
-  mechanical boundary entries. A cell selects both labels on the same object.
+  mechanical boundary entries. Hover over a cell to read both labels and their count.
 - **Temperature** shows a histogram in kelvin.
 - **Grain number** shows a box plot of phase observations. Quartiles use linear
   interpolation at positions `(n - 1) × p`, where `p` is 0.25 or 0.75; the median
   is the central observation or the mean of the two central observations.
   Whiskers show the actual minimum and maximum, with no outlier classification.
-  A constant value is shown as one point. The box selects the inclusive Q1–Q3
-  interval only when real observations fall within it.
+  A constant value is shown as one point. Hover details report the quartiles,
+  median, actual extrema and observation counts.
 - **Texture types** uses independently sized bubbles; circle area is
   proportional to object count, rather than a share of a disjoint whole.
 - **Software** compares reported software names with vertical columns.
 
-There is no independent Filters form or chart-category selector. Clicking a
-line, dot, bar, donut segment, bubble, heatmap cell or box interval narrows
-the same selection and updates all statistics. Active conditions appear only
-when selected, with individual removal links and **Clear selection**. Conditions
-combine with AND on the same accessible object, including successive selections
-within one category and across numeric measures. All charts update together.
+There is no independent Filters form or chart-category selector. Chart marks,
+category labels and the coverage legend show information on hover. Clicking them
+does not navigate, add conditions or reload the page. Existing bookmarked
+conditions appear with individual removal links and **Clear selection**.
+Bookmarked conditions combine with AND on the same accessible object, including
+repeated labels within one category and numeric intervals. All charts describe
+the resulting selection.
 Scope changes reset conditions and pagination. Valid private inclusion survives
-chart navigation, removal, clearing and pagination. Existing category, range,
+bookmarked navigation, removal, clearing and pagination. Existing category, range,
 result and note bookmarks retain their original filtering semantics; invalid
 conditions show errors and no records rather than broadening the selection.
 Invalid numeric intervals are also individually removable. Repeated scope or
@@ -429,8 +430,8 @@ counts and percentages. **More categories** appears only when a category chart
 has more than six labels; it expands a bounded scrolling chart of the remaining
 categories. Loading initially shows up to six types and four modes;
 **More combinations** shows observed combinations outside that initial matrix.
-These expansions and links work without JavaScript. The compact coverage legend
-beside the donut retains its two counts and percentages. The dashboard has no
+These expansions and hover details work without JavaScript. The compact coverage
+legend beside the donut retains its two counts and percentages. The dashboard has no
 Additional statistics or Source records sections. **View data** opens
 **Data objects**, with the same exact
 selection, scope, private inclusion and pagination; object titles open detail
@@ -455,14 +456,14 @@ empty bins and an inclusive final maximum. A constant value has one frequency
 column in the temperature histogram or one point in the grain box plot.
 Temperatures convert only from explicit supported Kelvin, Celsius or
 Fahrenheit units; missing, unknown, invalid and below-zero values are excluded.
-Grain counts are phase observations; interval links deduplicate matching records.
+Grain counts are phase observations; bookmarked intervals deduplicate matching records.
 Numeric summaries retain original extrema and precise interval bounds, including
 large neighboring integers and fractional medians and quartiles; labels may use
-a visible axis or interval offset for readability. Category links and grain
-interval links count distinct objects; the box describes phase observations.
+a visible axis or interval offset for readability. Category and grain interval
+bookmarks count distinct objects; the box describes phase observations.
 Existing numeric interval bookmarks keep their exact comparisons.
 
-Plots use server-rendered SVG and ordinary GET links, remain visible without
+Plots use server-rendered SVG with native hover details, remain visible without
 JavaScript, and need no chart-library network dependency. Statistics read shared
 metadata compatibility summaries without retaining raw curves. Functional
 conflicts never select a value silently. Notes and availability are not upload

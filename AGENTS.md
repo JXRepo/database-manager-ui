@@ -144,18 +144,19 @@ Current priority:
 - Validate a single include_private=0/1 value, reset filters and pagination on scope changes while preserving chart preferences, and preserve valid private inclusion in drillthrough and clearing; valid old all/shared scope links redirect to Public database
 - Use the shared metadata compatibility view, keep raw JSON out of retained statistical summaries, and never change stored data or exports while computing statistics
 - Count each object once per case-insensitive category label; multiple phases, models, descriptions or loading conditions may contribute to multiple labels
-- Every chart link refines the current selection with AND conditions on the same object, including repeated labels and numeric intervals; counts must equal the linked result count
+- Chart marks, category labels and the coverage legend show hover information only; clicking them must not navigate, add filters or reload the page, including without JavaScript
+- Existing bookmarked conditions refine the same object with AND, including repeated labels and numeric intervals; preserve exact counts and the View data list
 - Numeric chart boundaries and drillthrough must share exact Decimal comparisons, retain original extrema and never lose observations after Fahrenheit conversion
 - Convert temperatures only from explicit supported units to Kelvin; exclude missing, invalid, unknown-unit and below-zero temperatures instead of using zero
 - Grain counts are phase observations, with distinct-object counts for navigation; recognize grain_count and the explicit grain_number alias within orientation, unwrap scalar wrappers and exclude conflicting alternative values
 - Availability includes all supported mechanical components and supplied equivalent arrays; calculated equivalents require an absent equivalent field and all six components, following detail-page behavior
-- Charts is a dataset coverage and discovery page: show separate materials/microstructure and simulation setup category charts, condition distributions and output availability; each selection narrows the same accessible objects and leads to their detail pages
+- Charts is a dataset coverage and discovery page: show separate materials/microstructure and simulation setup category charts, condition distributions and output availability; View data opens the accessible objects and their detail pages
 - Keep individual stress–strain plots and curve downloads on the detail page; do not duplicate a single object's response or infer scientific comparability from aggregate metadata
 - Count matching stress–strain availability only when the same component is available in both groups, including supplied or eligible calculated equivalents; keep the legacy result=paired filter's both-groups meaning
 - Use a disjoint, exhaustive matching/without_matching stress–strain coverage pie chart; overlapping phase, software, model and output counts use bars or tables with percentages of selected objects, never misleading pie proportions
 - Charts omits per-card Data table sections; preserve exact counts, hover details, and expandable charts for remaining categories and loading combinations
 - Use equal-width numeric histogram intervals with empty bins and an inclusive final maximum; constant temperatures use one frequency column and constant grain counts use one point; distinguish observations from distinct objects
-- Render aggregate charts as server-side SVG that remains visible without JavaScript; retain units, distinguishable ticks and exact numerical interval links, with each category's coverage and observation denominator visible
+- Render aggregate charts as server-side SVG that remains visible without JavaScript; retain units, distinguishable ticks and exact numerical intervals in hover details, with each category's coverage and observation denominator visible
 - Do not infer physical comparability, combine mixed-unit mechanical extrema, or describe metadata and array availability as a validation pass
 - Preserve active filters and permissions in the object list and pagination; invalid filters show errors and no records, never a broader selection
 - Keep classification counts, distribution units and denominators visible; preserve empty states, long labels, expandable categories, keyboard operation and ordinary GET navigation without JavaScript
