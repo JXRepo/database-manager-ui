@@ -2,15 +2,38 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts introduction shortened and enlarged; data actions and statistical explanations clarified; see git log)
-next_topic: Review Charts page clarity and workflow; continue according to the user's next request
+code_base: main (application baseline ecd35e7; Charts review completed; see git log for the latest handoff update)
+next_topic: Discuss Ronak's new modification feedback with the user; specific material has not yet been provided
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 本轮：完善 Charts 的用途说明和后续操作
+### 新聊天先看：接下来讨论 Ronak 发来的修改
+
+- 用户明确要新开聊天，接下来讨论 Ronak 发来的一些修改内容。当前 Charts 的逐卡梳理和
+  整页可用性调整已完成；下一轮以 Ronak 的本次反馈为主题，不自动重新从 Phase 开始。
+- 本轮尚未收到 Ronak 本次反馈的原文、截图或文件，也未核对具体修改。新聊天先接住用户
+  提供的材料，逐条用白话解释建议的含义、当前平台的行为和实际需要改的地方。
+  下面关于 Ronak 的上传、编号、Schema 和详情曲线记录属于历史，不当作本次新反馈。
+- 最新应用代码基线是 `ecd35e7`，分支 main，已推送。近期三个提交：`abe579b` 删除
+  Charts 顶部筛选条并修复即时悬停；`788f1da` 完善查看／搜索入口及统计说明；
+  `ecd35e7` 将顶部说明缩为一句，字号改为 14px 并加深颜色。Render 部署未确认。
+- 八张图形保留，图形只显示悬停信息；View data 查看当前范围对象，Search data 打开
+  所有可访问对象的详细搜索条件。空范围隐藏 View data。顶部目前只有一句
+  `Overview of materials and simulation data.`，不要恢复两行小字说明或图表点击筛选。
+- 最近一次应用验证是 59 项 Charts 测试通过，无跳过，包含真实 Chromium 的
+  1280／1440／1920 桌面、长名称、空数据、即时悬停、范围权限、搜索和无 JavaScript
+  操作；此前连同小助手 FAQ 的验证为 69 项通过。不是本次仅更新交接时重跑的测试。
+  日志 `/tmp/charts-short-intro-tests.log`、截图 `/tmp/charts-short-intro-qa` 只在本机，
+  不随 Git 同步。
+- 新聊天先读 AGENTS 和相关 README，检查 Git 状态及最新提交，再按实际修改范围读取代码。
+  保留用户偏好：简短中文沟通、英文 UI；明确请求和审查中发现的必要修正直接处理，
+  不反复确认常规步骤；完成并验证后检查差异、提交和推送。原始 JSON、导出和访问权限
+  继续按现有规则处理。
+
+### 最近已完成：Charts 的用途说明和后续操作
 
 - 用户要求从网页用户角度审视整页，并明确让我们直接修改需要改的地方。
   原先增加两行用途／操作说明，用户指出字小且文字多；已缩为一行
@@ -23,7 +46,7 @@ next_topic: Review Charts page clarity and workflow; continue according to the u
   说明每个相贡献一个晶粒数量，继续保留相数与不同对象数。空范围隐藏 View data，
   不让用户进入空列表；本人公开数据为空时提示包含私有数据、切换范围或上传。
 - 统计口径、访问权限、原始 JSON、八张图形和即时悬停保持已有行为。README 和
-  小助手说明已同步。验证后按用户长期偏好提交并推送，最新提交以 git log 为准；
+  小助手说明已同步。修改已验证、提交并推送，最新提交以 git log 为准；
   Render 部署状态未确认。
 - 上轮 69 项测试通过，无跳过（59 项 Charts、10 项小助手 FAQ）。真实 Chromium 验证
   1280／1440／1920、长名称和空范围；从 Search data 用键盘进入详细条件并查找 Copper，
@@ -35,7 +58,7 @@ next_topic: Review Charts page clarity and workflow; continue according to the u
 
 ### 上轮：八张 Charts 卡片和悬停已逐张梳理
 
-- 用户正在挨个讨论 Charts 卡片。前四张已讨论，Loading types & modes 已按用户要求
+- 用户此前已逐张讨论 Charts 卡片，Loading types & modes 已按用户要求
   改为同一条加载设置内的类型／模式配对，Type／Mode 到各自名称的间距也已统一。
   第五张 Temperature 的字号、轴标题位置、温度范围和可用对象数说明已调整，用户已认可。
   第六张 Grain number 的单值短线／盒子说明、最小最大值和可用对象数说明已调整，用户已认可。
@@ -1729,11 +1752,11 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 ## 下一步
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
-2. **下一轮逐张梳理 Charts 卡片。** 先读最上面的新聊天交接和八卡片列表，
-   用户未另指定时从 Phase 开始；简单解释这一张的用途，按具体反馈逐张调整。
-   不将“挨个卡片屡屡”扩大成全页重构，不恢复已删除的 Data table。
-3. 上传最新界面调整已完成、验证并推送，不重复实现。新反馈涉及上传时，沿用当前字段识别、
-   原始数据保留、按文件保存和精简提示规则；不要自动修改 Ronak 的原文件来凑齐字段。
+2. **下一轮讨论 Ronak 本次发来的修改内容。** 具体材料尚未在本轮提供，先根据用户在新聊天
+   发来的建议逐条解释，再按讨论推进。历史 Ronak 记录作为背景，不替代本次反馈。
+   Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
+3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前
+   字段识别、原始数据保留、按文件保存和精简提示规则；不要自动修改原文件来凑齐字段。
 4. 如核对线上问题，先确认 Render 部署提交。Git push 成功不证明部署完成，也不证明线上行为成功。
 5. 本机 `/tmp` 下日志和截图只是上轮验证证据，不随 Git 同步。新聊天或新电脑需重新核实环境和数据。
 6. 科学公式、扩容入口、索引搜索、收费基础设施、AI 和知识图谱没有新修改指令，勿自行展开。
