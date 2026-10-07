@@ -9,6 +9,14 @@
 {% block charts_scope_controls %}
   <div class="charts-heading-actions"><span class="charts-metric-total"><strong>{{ total_objects }}</strong> data object{{ total_objects|pluralize }}</span><a class="charts-button" href="{{ overview_url }}">Back to Charts</a></div>
 {% endblock %}
+{% block charts_selection_controls %}
+  {% if active_filters %}
+    <nav class="charts-filter-strip" aria-label="Selected statistics">
+      {% for item in active_filters %}<a class="charts-filter" href="{{ item.url }}" title="Remove {{ item.label }}"><span>{{ item.label }}</span><span aria-hidden="true">×</span><span class="visually-hidden">Remove filter</span></a>{% endfor %}
+      <a href="{{ clear_url }}&amp;show=objects" class="charts-clear charts-selection-clear">Clear</a>
+    </nav>
+  {% endif %}
+{% endblock %}
 {% block charts_workspace %}
   {% if total_objects %}
     <section class="charts-records" id="objects" aria-label="Matching data objects">

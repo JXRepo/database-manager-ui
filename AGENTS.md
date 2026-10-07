@@ -141,12 +141,13 @@ Current priority:
 ## Charts rules
 
 - Charts defaults to Public database (all access_type="all" objects); My data includes only the current user's public uploads unless Include private data is selected, which adds their own private uploads; received private shares are excluded from these two scopes
-- Validate a single include_private=0/1 value, reset filters and pagination on scope changes while preserving chart preferences, and preserve valid private inclusion in drillthrough and clearing; valid old all/shared scope links redirect to Public database
+- Validate a single include_private=0/1 value, reset pagination on scope changes, and preserve valid private inclusion in the object list; valid old all/shared scope links redirect to Public database
 - Use the shared metadata compatibility view, keep raw JSON out of retained statistical summaries, and never change stored data or exports while computing statistics
 - Count each object once per case-insensitive category label; multiple phases, models, descriptions or loading conditions may contribute to multiple labels
 - Loading heatmap pairs require nonempty text loading_type and loading_mode in the same mechanical_BC entry; deduplicate each pair per object, exclude incomplete or ambiguous pairs from cells and axes, and retain existing object-level loading bookmarks
-- Chart marks, category labels and the coverage legend show hover information only; clicking them must not navigate, add filters or reload the page, including without JavaScript
-- Existing bookmarked conditions refine the same object with AND, including repeated labels and numeric intervals; preserve exact counts and the View data list
+- Chart marks, category labels and the coverage legend show visible immediate tooltips with JavaScript and native descriptions without JavaScript; keyboard focus shows the same information, and leaving, scrolling or Escape clears the tooltip; clicking must not navigate, add filters or reload the page
+- Charts has no chart selection strip; old overview condition and preference URLs clear those values and pagination while preserving scope and private-inclusion arguments, including repeated or invalid ones
+- Existing bookmarked conditions remain supported only on the separate show=objects list and refine the same object with AND, including repeated labels and numeric intervals; returning to Charts restores the scoped overview
 - Numeric chart boundaries and drillthrough must share exact Decimal comparisons, retain original extrema and never lose observations after Fahrenheit conversion
 - Convert temperatures only from explicit supported units to Kelvin; exclude missing, invalid, unknown-unit and below-zero temperatures instead of using zero
 - Grain counts are phase observations, with distinct-object counts for navigation; recognize grain_count and the explicit grain_number alias within orientation, unwrap scalar wrappers and exclude conflicting alternative values

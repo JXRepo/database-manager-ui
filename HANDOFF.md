@@ -2,8 +2,8 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts card coverage wording unified; see git log)
-next_topic: Review the unified card headers; continue according to the user's next request
+code_base: main (Charts overview selections removed and visible hover tooltips added; see git log)
+next_topic: Review the corrected Charts hover behavior; continue according to the user's next request
 ---
 
 # Project handoff
@@ -18,12 +18,16 @@ next_topic: Review the unified card headers; continue according to the user's ne
   第六张 Grain number 的单值短线／盒子说明、最小最大值和可用对象数说明已调整，用户已认可。
   第七张 Texture types 的覆盖数量和圆大小说明已调整，用户已继续到最后一张。
   第八张 Software 已解释各软件名称对应多少对象，并明确右上角覆盖数量。
-  用户随后指出各卡片数量前的文字有时有、有时没有；本轮统一为 With data，覆盖图用 Total。
-  八张卡片都已逐张梳理，数量说明已统一并验证。按用户接下来的指示继续，
+  用户随后指出各卡片数量前的文字有时有、有时没有；上轮统一为 With data，覆盖图用 Total。
+  本轮用户要求删除顶部偶尔出现的图表筛选标签，并修复图形有响应却不显示悬停信息的问题。
+  Charts 顶部筛选条已删除，旧图表地址清理残留条件；八张图改为页面内即时悬停提示。
+  八张卡片都已逐张梳理，当前修改已验证。按用户接下来的指示继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
 - 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
-  保留原生悬停提示、键盘焦点、More categories／More combinations 展开和 View data。
+  JavaScript 运行时显示页面内即时悬停浮层，键盘焦点显示同样内容；移开、滚动或 Escape
+  清除浮层。无 JavaScript 时保留原生 title 描述。More categories／More combinations
+  展开和 View data 保留。
 - 回答要简单、直接、白话，用中文；应用界面保持英文。用户最新明确要求：以后发现明确
   有必要的问题直接改，不再等用户单独说“改”。保持当前审查范围，验证后提交并推送，
   不反复确认常规步骤。不要一次重新设计全部卡片或自行增加功能。
@@ -32,7 +36,8 @@ next_topic: Review the unified card headers; continue according to the user's ne
   `4daac9b` 修正加载配对统计，`73ef19b` 调整轴标题方向，`c97a89b` 统一热图间距，
   `d3f376a` 整理 Temperature，`3503b76` 整理 Grain number 单值显示和说明，均已推送。
   `27c5d60` 明确 Texture types 覆盖和圆大小说明，并记录直接修正审查问题的偏好，已推送。
-  `27d472d` 明确 Software 的对象覆盖，已推送。本轮统一八张卡片的数量说明；
+  `27d472d` 明确 Software 的对象覆盖，`d8f90a0` 统一八卡片的数量说明，均已推送。
+  本轮删除 Charts 顶部筛选条、清理旧图表条件并修复实际悬停显示；
   权限、统计口径、存储 JSON
   和导出未改变。最新提交见 git log，
   Render 是否完成部署仍未确认。
@@ -52,6 +57,16 @@ next_topic: Review the unified card headers; continue according to the user's ne
 
 最近已明确的页面决定和刚讨论的内容：
 
+- Charts 只按 Data scope 和 Include private data 统计，顶部不再显示分类／数值筛选标签。
+  包含旧条件或图表偏好的 overview 地址自动跳回同范围页面，清理旧条件和页码；保留
+  scope／include_private 原始参数，包括重复和无效值，随后仍显示范围错误并保持零记录。
+  单独的 `show=objects` 对象列表继续兼容已有书签筛选和移除条件，返回 Charts 恢复整个
+  数据范围。View data 从 Charts 打开当前范围的对象，不携带旧图表条件。
+- 八张图、完整类别名称、覆盖图例和右上角数量均支持页面内即时提示，使用已有统计
+  描述展示名称、对象数、占比或精确数值；文本通过 textContent 显示，不解析上传的 HTML。
+  提示限制在可视窗口内，鼠标移开、滚动、失焦或 Escape 清除；图形点击仍不导航。
+  之前仅检查原生 title 文字存在，没有验证实际显示，现已通过真实鼠标移动验证可见浮层、
+  内容、边界、移开清除和键盘焦点，展开后的类别也已验证。
 - 用户希望图形丰富、好看，同时内容对材料模拟数据用户有用。现在八张图均保留；
   已回答“饼图啥的都有是吗”，其中饼图采用环形形式。
 - Phase 已按用户要求在圆点旁显示数量和占比，例如 `1 (100%)`；百分比分母是当前
@@ -67,7 +82,7 @@ next_topic: Review the unified card headers; continue according to the user's ne
 - 第四张只统计原数据同一条加载设置内实际报告的类型／模式组合，忽略大小写和首尾空白，
   重复条目不重复计对象。缺失、空白、多值列表和非文字标签不构成配对，不进入热图坐标轴；
   已识别的字段拼写和单值包装仍通过共享元数据视图处理，thermal_BC 不参与。
-  原先各自按 loading_type／loading_mode 匹配整个对象的书签语义保留；热图没有筛选链接，
+  单独对象列表按 loading_type／loading_mode 匹配整个对象的旧书签语义保留；热图没有筛选链接，
   不把两个独立条件书签当作精确配对数量。More combinations 也只包含实际配对。
 - 热图 Mode 在列名称上方居中，Type 在左侧竖排居中。类型名称留在标题与格子之间，
   两个标题到各自名称共用 12px 间距（随 SVG 缩放）。类型名称列按文字宽度排，
@@ -96,8 +111,9 @@ next_topic: Review the unified card headers; continue according to the user's ne
   Objects with stress–strain data。后者计具有匹配分量的数据对象，不是曲线条数。
 - 范围只保留 Public database 和 My data。My data 默认只计本人公开上传，
   Include private data 加入本人私有上传；收到的私有分享不进入这两个范围。
-- 已保存的筛选书签仍按同一对象上的 AND 条件更新统计，保留移除条件和 Clear。
-  View data 打开相同选择的独立对象列表；Additional statistics、内联 Source records 和
+- 已保存的筛选书签仅在独立 `show=objects` 列表按同一对象上的 AND 条件匹配，保留移除
+  条件和 Clear。Charts 不再通过书签条件收窄统计；View data 打开当前范围的对象列表。
+  Additional statistics、内联 Source records 和
   独立 Filters 表单继续不显示。单对象曲线与下载仍在详情页。
 - 科学口径不能随外观改动：类别可能重叠，不能当作互斥饼图；加载热图只配同一条
   边界设置；Grain number 是晶粒数量，不是晶粒尺寸；缺失值不伪造为零。
@@ -111,17 +127,20 @@ next_topic: Review the unified card headers; continue according to the user's ne
 - 验证：`apps/charts/tests.py`、`apps/charts/test_browser.py`、
   `tests/browser/charts.cjs`。改 Charts 后按 AGENTS 用 DEBUG=True 和本机项目解释器
   运行相关测试，真实 Chromium 验证不能跳过；重点检查悬停、点击不跳转、桌面布局、
-  已保存条件和私有权限。
+  旧图表条件清理、对象列表的已保存条件和私有权限。
 - 用户常用样例是 `example_json_files/a46fde6c.json`。上一轮已验证 Copper、
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
-本轮验证：57 项 Charts 测试通过，无跳过；真实 Chromium 核对 1280／1440／1920 桌面、
+本轮验证：69 项测试通过，无跳过，包括 59 项 Charts 和 10 项小助手 FAQ。
+真实 Chromium 核对 1280／1440／1920 桌面、
 单个软件、多个软件、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
-展开入口和无 JavaScript 操作。全部卡片标题与数量的间距均通过真实浏览器检查，
-已查看 Copper 样例完整八卡片和缺失元数据截图；右上角数量说明一致且没有文字重叠或裁切。
+展开入口和无 JavaScript 操作。全部卡片标题与数量的间距、真实悬停浮层和清除行为均通过
+真实浏览器检查；旧图表筛选地址回到完整范围，同时保留无效／重复范围的错误。
+已查看 Copper／Abaqus CAE／343 grains 的实际悬停截图，提示可见且完整，没有裁切。
+旧的精确书签检查针对单独对象列表；小范围数值和加载配对通过独立用户范围验证。
 温度、晶粒数量、织构、加载配对和热图间距回归仍通过，用户样例 JSON 未改变；之前配对修改
 还通过了 19 项小助手测试。
-日志 `/tmp/charts-card-headers-tests.log`，截图 `/tmp/charts-card-headers-qa`；这些路径
+日志 `/tmp/charts-visible-hover-final-tests.log`，截图 `/tmp/charts-visible-hover-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

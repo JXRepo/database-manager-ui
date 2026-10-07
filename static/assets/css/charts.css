@@ -50,6 +50,8 @@
 .charts-panel { display: flex; flex-direction: column; padding: 16px 20px; border: 1px solid var(--charts-rule); border-radius: 8px; background: #fff; }
 .charts-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin-bottom: 10px; }
 .charts-context-label { font-size: 11px; color: var(--charts-muted); white-space: nowrap; }
+.charts-tooltip { position: fixed; z-index: 1100; max-width: min(360px, calc(100vw - 24px)); padding: 8px 10px; border: 1px solid #cbd8e4; border-radius: 5px; background: #fff; color: #284664; box-shadow: 0 3px 12px #28466426; font: 12px/1.5 Arial, sans-serif; white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; }
+.charts-tooltip[hidden] { display: none; }
 .charts-plot-stage { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 225px; }
 .charts-bar-svg { display: block; width: 100%; max-width: 360px; height: auto; }
 .charts-lollipop-svg { max-width: 420px; }

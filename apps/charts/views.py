@@ -201,13 +201,16 @@ def index(request):
     Parameters
     ----------
     request : HttpRequest
-        Authenticated request with optional chart selections.
+        Authenticated request with a data scope or a selection in the legacy object list.
 
     Returns
     -------
     HttpResponse
         Rendered statistical workspace with ordinary GET navigation.
     """
+    if request.GET.get("show") != "objects" and any(key in request.GET for key in (*FILTER_KEYS, *VIEW_KEYS)):
+        scope_query = {key: request.GET.getlist(key) for key in ("scope", "include_private") if key in request.GET}
+        return redirect(chart_url(scope_query))
     query, errors, intervals = parse_filters(request.GET)
     if not errors and query.get("scope") in LEGACY_SCOPES:
         return redirect(chart_url(query, {"scope": "public", "include_private": None}))
@@ -367,7 +370,7 @@ def index(request):
         "active_filters": active_filters, "filter_errors": errors, "clear_url": clear_url,
         "objects_page": page,
         "records_url": chart_url(retained_query, objects=True),
-        "overview_url": chart_url(retained_query, {"show": None}),
+        "overview_url": chart_url(retained_query, {key: None for key in (*FILTER_KEYS, *VIEW_KEYS, "show")}),
         "previous_url": chart_url(query, {"page": page.previous_page_number()}, objects=True) if page.has_previous() else "",
         "next_url": chart_url(query, {"page": page.next_page_number()}, objects=True) if page.has_next() else "",
         "material_options": [(key, CATEGORY_TITLES[key]) for key in MATERIAL_GROUPS],

@@ -428,21 +428,24 @@ Eight cards are visible directly, in four pairs:
 - **Software** compares reported software names with vertical columns.
   The header labels objects reporting software out of all selected objects.
 
-There is no independent Filters form or chart-category selector. Chart marks,
-category labels and the coverage legend show information on hover. Clicking them
-does not navigate, add conditions or reload the page. Existing bookmarked
-conditions appear with individual removal links and **Clear selection**.
-Bookmarked conditions combine with AND on the same accessible object, including
-repeated labels within one category and numeric intervals. All charts describe
-the resulting selection.
-Scope changes reset conditions and pagination. Valid private inclusion survives
-bookmarked navigation, removal, clearing and pagination. Existing category, range,
-result and note bookmarks retain their original filtering semantics; invalid
-conditions show errors and no records rather than broadening the selection.
-Loading type and mode bookmarks still match labels across the same object;
-heatmap counts require the labels together in one boundary entry.
-Invalid numeric intervals are also individually removable. Repeated scope or
-private-inclusion parameters stay invalid when removing another condition.
+The dashboard has no chart filter strip, Filters form or category selector.
+Old overview URLs containing chart conditions or preferences redirect to the
+overview for the same data scope, clearing those conditions and pagination.
+Explicit private inclusion is preserved; repeated or invalid scope arguments
+remain invalid. All eight charts describe the selected data scope.
+Chart marks, category labels and the coverage legend show an immediate floating
+tooltip with JavaScript. Keyboard focus shows the same information; moving away,
+scrolling or pressing Escape clears the tooltip. Clicking a chart does not
+navigate, add conditions or reload the page. Without JavaScript, the SVG charts,
+native hover descriptions and ordinary controls remain available.
+
+**View data** opens a separate object list for the current scope. Saved selections
+remain supported only on that list (`show=objects`), combining conditions with AND
+on the same accessible object. Invalid conditions show errors and no records;
+individual removal links and clearing remain available there. Loading type and
+mode bookmarks match labels across the same object, while heatmap counts require
+them together in one boundary entry. Returning to Charts restores the scoped
+overview. Private inclusion and access checks remain intact through pagination.
 
 Each chart retains its denominator and units. Per-card **Data table** sections
 are omitted. Hover over marks or labels to read full category names, exact

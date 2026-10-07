@@ -915,17 +915,17 @@ TOPICS += (
         "examples": ("Why don't the bars add up to the object total?", "Is grain count based on phases or whole records?", "分类数量加起来为什么比对象总数多？"),
     },
     {
-        "id": "charts.filters", "question": "How do Charts selections and scopes work?",
+        "id": "charts.filters", "question": "How do Charts data scopes work?",
         "patterns": ("chart filters", "chart scope", "图表筛选", "统计范围"),
         "answer": "Choose Public database for all public platform records, or My data for your own "
                   "public uploads. In My data, Include private data also includes your own private "
                   "uploads. Received private shares remain available through Search, outside these "
                   "statistics. Chart marks and labels show information on hover; clicking them does "
-                  "not add filters or navigate. View data opens the matching objects. Existing bookmarked conditions must "
-                  "match the same object, including two "
-                  "labels in one category. Remove individual filters or clear them; changing scope resets "
-                  "the filters while retaining your chart grouping and measure. Invalid filters show an "
-                  "error instead of broadening the selection.",
+                  "not add filters or navigate. The dashboard has no chart selection strip. Old chart "
+                  "selection URLs return to the overview for your data scope, preserving explicit private "
+                  "inclusion. View data opens the objects in that scope. Saved selections remain supported "
+                  "on the separate object list. Invalid scope choices show an error instead of exposing "
+                  "a broader set of data.",
         "route": "charts", "link": "Open Charts",
         "related": ("charts.overview", "charts.counts", "sharing.access"),
         "examples": ("Can statistics include only my own uploads?", "What happens when I hover over a chart?", "统计图鼠标移上去会显示什么？"),

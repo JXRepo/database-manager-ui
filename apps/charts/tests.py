@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.pages.models import JSONData
+from .views import FILTER_KEYS, VIEW_KEYS
 
 
 class ChartsTests(TestCase):
@@ -71,31 +72,54 @@ class ChartsTests(TestCase):
         data.update(changes)
         return JSONData.objects.create(owner=owner or self.viewer, data=data, access_type=access)
 
-    def dashboard(self, **query):
+    def statistics(self, **query):
         """
-        Request the real route and require the new statistics contract
+        Read scoped Charts statistics or a selection in the legacy object list
 
         Parameters
         ----------
         **query : str
-            GET filters for the page.
+            Scope values or conditions for a legacy object list.
 
         Returns
         -------
         HttpResponse
-            Rendered dashboard response.
+            Rendered statistics context.
         """
-        response = self.client.get(reverse("charts"), query)
+        response = self.get_statistics(reverse("charts"), query)
         self.assertEqual(response.status_code, 200)
         self.assertIn("distributions", response.context)
         return response
+
+    def get_statistics(self, path, data=None):
+        """
+        Use the object list route for saved selection compatibility checks
+
+        Parameters
+        ----------
+        path : str
+            Local Charts URL.
+        data : dict, optional
+            Scope or selection parameters.
+
+        Returns
+        -------
+        HttpResponse
+            Scoped overview or legacy object list response.
+        """
+        parts = urlsplit(path)
+        query = parse_qs(parts.query, keep_blank_values=True)
+        query.update(data or {})
+        if any(key in query for key in (*FILTER_KEYS, *VIEW_KEYS)):
+            query.setdefault("show", "objects")
+        return self.client.get(parts.path, query)
 
     def test_dashboard_prioritizes_eight_charts_without_a_filter_form(self):
         """
         The default page presents the dataset directly instead of a search form
         """
         self.create_object()
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["software_count"], 1)
         self.assertEqual(len(response.context["output_plot"]["rows"]), 3)
         self.assertEqual([item["key"] for item in response.context["primary_distributions"]],
@@ -116,6 +140,45 @@ class ChartsTests(TestCase):
         self.assertNotContains(response, "Data table")
         self.assertNotContains(response, 'class="charts-more-categories"')
 
+    def test_dashboard_clears_retired_chart_conditions_in_old_urls(self):
+        """
+        Old chart selections cannot leave hidden filters on the scoped overview
+        """
+        self.create_object("copper")
+        self.create_object("nickel", phase=[{"phase_name": "Nickel"}], software="Other solver")
+        self.create_object("own-private", access="c")
+        shared = self.create_object("received-private", owner=self.other, access="c")
+        shared.shared_users.add(self.viewer)
+        for scope, private, total in (("public", "0", 2), ("mine", "0", 2), ("mine", "1", 3)):
+            with self.subTest(scope=scope, include_private=private):
+                response = self.client.get(reverse("charts"), {
+                    "scope": scope, "include_private": private,
+                    "plastic_model": "Crystal Plasticity", "elastic_model": "Anisotropic Elasticity",
+                    "coverage": "matching", "range": "temperature:298:298:1",
+                    "phase": ["Copper", "Nickel"], "page": "4",
+                }, follow=True)
+                self.assertTrue(response.redirect_chain)
+                self.assertEqual(response.context["total_objects"], total)
+                self.assertNotContains(response, 'aria-label="Selected statistics"')
+                self.assertNotContains(response, 'class="charts-filter"')
+                self.assertNotIn("phase", parse_qs(urlsplit(response.redirect_chain[-1][0]).query))
+                self.assertNotIn("range", parse_qs(urlsplit(response.redirect_chain[-1][0]).query))
+                self.assertNotIn("page", parse_qs(urlsplit(response.redirect_chain[-1][0]).query))
+                self.assertNotContains(response, "received-private")
+
+    def test_retired_chart_conditions_do_not_repair_invalid_private_scope(self):
+        """
+        Clearing obsolete conditions preserves repeated or invalid scope choices
+        """
+        self.create_object("private", access="c")
+        for private in (["1", "0"], "yes"):
+            with self.subTest(include_private=private):
+                response = self.client.get(reverse("charts"), {
+                    "scope": "mine", "include_private": private, "phase": "Copper",
+                }, follow=True)
+                self.assertTrue(response.context["filter_errors"])
+                self.assertEqual(response.context["total_objects"], 0)
+
     def test_model_families_count_objects_without_combining_their_proportions(self):
         """
         Model rows retain family identity and exact links across overlapping phases
@@ -127,13 +190,13 @@ class ChartsTests(TestCase):
         self.create_object("elastic-only", phase=[{"phase_name": "Steel", "constitutive_model": {"elastic_model_name": "Model A"}}])
         self.create_object("unnamed", phase=[])
         self.create_object("private-model", access="c")
-        response = self.dashboard()
+        response = self.statistics()
         category = response.context["model_category"]
         self.assertEqual(category["available"], 2)
         self.assertEqual({row["label"]: row["count"] for row in category["rows"]},
                          {"Model A (Elastic)": 2, "Model A (Plastic)": 1, "Model B (Plastic)": 1})
         for row in category["rows"]:
-            linked = self.client.get(row["url"])
+            linked = self.get_statistics(row["url"])
             self.assertEqual(linked.context["total_objects"], row["count"])
             self.assertAlmostEqual(row["percent"], row["count"] * 100 / 3, places=1)
             self.assertIn(wanted.pk, [record["id"] for record in linked.context["objects_page"]])
@@ -152,7 +215,7 @@ class ChartsTests(TestCase):
         self.create_object("unpaired-labels", mechanical_BC=[{"loading_type": "force"}, {"loading_mode": "static"}])
         shared = self.create_object("received-share", owner=self.other, access="c")
         shared.shared_users.add(self.viewer)
-        response = self.dashboard(scope="mine", include_private="1", loading_type="force")
+        response = self.statistics(scope="mine", include_private="1", loading_type="force")
         matrix = response.context["loading_matrix"]
         self.assertEqual((matrix["available"], matrix["missing"]), (2, 2))
         counts = {(row["type"].casefold(), row["mode"].casefold()): row["count"] for row in matrix["pairs"]}
@@ -164,11 +227,11 @@ class ChartsTests(TestCase):
                                 ("displacement", "cyclic"): 0, ("displacement", "static"): 1})
         for row in matrix["pairs"]:
             self.assertEqual(row["percent"], 25)
-        bookmarked = self.dashboard(scope="mine", include_private="1", loading_type="force", loading_mode="static")
+        bookmarked = self.statistics(scope="mine", include_private="1", loading_type="force", loading_mode="static")
         self.assertEqual(bookmarked.context["total_objects"], 3)
         separate.refresh_from_db()
         self.assertEqual(len(separate.data["mechanical_BC"]), 3)
-        public = self.dashboard()
+        public = self.statistics()
         self.assertEqual(public.context["loading_matrix"]["available"], 1)
         self.assertEqual(len(public.context["loading_matrix"]["pairs"]), 1)
 
@@ -183,7 +246,7 @@ class ChartsTests(TestCase):
         self.create_object("alias-conflict", mechanical_BC=[
             {"loading_type": "force", "Loading Type": "displacement", "loading_mode": "static"},
         ])
-        response = self.dashboard()
+        response = self.statistics()
         matrix = response.context["loading_matrix"]
         self.assertEqual((matrix["available"], matrix["missing"]), (1, 1))
         self.assertEqual([(row["type"], row["mode"], row["count"], row["percent"]) for row in matrix["pairs"]],
@@ -206,7 +269,7 @@ class ChartsTests(TestCase):
         ]):
             self.create_object(f"unusable-pair-{index}", mechanical_BC=conditions,
                                thermal_BC=[{"loading_type": "force", "loading_mode": "cyclic"}])
-        response = self.dashboard()
+        response = self.statistics()
         matrix = response.context["loading_matrix"]
         self.assertEqual((matrix["available"], matrix["missing"]), (0, 5))
         self.assertEqual(matrix["pairs"], [])
@@ -222,12 +285,12 @@ class ChartsTests(TestCase):
                                                         for value in (10, 20, 30)])
         self.create_object("large-phase", phase=[{"phase_name": "Nickel", "orientation": {"grain_count": 100}}])
         self.create_object("private-grains", access="c")
-        response = self.dashboard()
+        response = self.statistics()
         grains = response.context["primary_distributions"][1]
         box = grains["box"]
         self.assertEqual(box["values"], [Decimal(value) for value in ("10", "17.5", "25", "47.5", "100")])
         self.assertEqual((box["count"], box["object_count"]), (2, 1))
-        linked = self.client.get(box["url"])
+        linked = self.get_statistics(box["url"])
         self.assertEqual([record["id"] for record in linked.context["objects_page"]], [multi.pk])
         self.assertEqual(grains["observation_count"], 4)
         self.assertEqual(sum(bucket["count"] for bucket in grains["bins"]), 4)
@@ -242,17 +305,17 @@ class ChartsTests(TestCase):
         base = 10 ** 50
         first = self.create_object("large-a", phase=[{"phase_name": "Copper", "orientation": {"grain_count": base}}])
         self.create_object("large-b", phase=[{"phase_name": "Copper", "orientation": {"grain_count": base + 1}}])
-        response = self.dashboard()
+        response = self.statistics()
         box = response.context["primary_distributions"][1]["box"]
         self.assertEqual(box["values"], [Decimal(str(base)), Decimal(f"{base}.25"), Decimal(f"{base}.5"),
                                          Decimal(f"{base}.75"), Decimal(str(base + 1))])
         self.assertEqual((box["count"], box["object_count"]), (0, 0))
         self.assertNotContains(response, 'class="charts-box-selection"')
-        singleton = self.dashboard(range=f"grain_count:{base}:{base}:1")
+        singleton = self.statistics(range=f"grain_count:{base}:{base}:1")
         grains = singleton.context["primary_distributions"][1]
         self.assertTrue(grains["box_plot"]["constant"])
         self.assertEqual(grains["box"]["object_count"], 1)
-        self.assertEqual([record["id"] for record in self.client.get(grains["box"]["url"]).context["objects_page"]], [first.pk])
+        self.assertEqual([record["id"] for record in self.get_statistics(grains["box"]["url"]).context["objects_page"]], [first.pk])
 
     def test_texture_bubbles_preserve_overlapping_categories_and_full_names(self):
         """
@@ -263,13 +326,13 @@ class ChartsTests(TestCase):
                                                   {"phase_name": "Nickel", "orientation": {"texture_type": "Random"}},
                                                   {"phase_name": "Steel", "orientation": {"texture_type": "goss"}}])
         self.create_object("long-texture", phase=[{"phase_name": "Copper", "orientation": {"texture_type": long_name}}])
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["texture_category"]["available"], 2)
         self.assertEqual(len(response.context["texture_plot"]["rows"]), 3)
         self.assertContains(response, long_name.strip())
         for row in response.context["texture_category"]["rows"]:
             self.assertEqual(row["count"], 1)
-            self.assertEqual(self.client.get(row["url"]).context["total_objects"], 1)
+            self.assertEqual(self.get_statistics(row["url"]).context["total_objects"], 1)
 
     def test_statistics_totals_count_distinct_categories_and_selected_objects(self):
         """
@@ -283,7 +346,7 @@ class ChartsTests(TestCase):
                            phase=[{"phase_name": "Nickel", "orientation": {"grain_count": 343, "texture_type": "Random"}}])
         self.create_object("private", access="c", global_temperature=1500,
                            phase=[{"phase_name": "Private phase", "orientation": {"grain_count": 500}}])
-        response = self.dashboard()
+        response = self.statistics()
         phases = response.context["categories"]["phase"]
         textures = response.context["categories"]["texture"]
         self.assertEqual({row["label"] for row in phases["rows"]}, {"Copper", "Nickel"})
@@ -294,7 +357,7 @@ class ChartsTests(TestCase):
         self.assertEqual((temperature["minimum"], temperature["maximum"]), ("298.15", "373.15"))
         self.assertEqual((grains["minimum"], grains["maximum"], grains["observation_count"]), ("0", "343", 3))
         self.assertNotContains(response, "Private phase")
-        selected = self.dashboard(phase="Copper")
+        selected = self.statistics(phase="Copper")
         temperature, grains = selected.context["primary_distributions"]
         self.assertEqual((temperature["minimum"], temperature["maximum"]), ("298.15", "298.15"))
         self.assertEqual((grains["minimum"], grains["maximum"]), ("0", "200"))
@@ -311,27 +374,28 @@ class ChartsTests(TestCase):
         self.create_object("public-other", owner=self.other)
         shared = self.create_object("shared", owner=self.other, access="c")
         shared.shared_users.add(self.viewer)
-        response = self.dashboard(scope="mine", include_private="1", software="Abaqus CAE",
+        response = self.statistics(scope="mine", include_private="1", software="Abaqus CAE",
                                   range="temperature:298:298:1", result="matching_response")
-        records = self.client.get(response.context["records_url"])
+        records = self.get_statistics(response.context["records_url"])
         self.assertTemplateUsed(records, "charts/records.html")
         self.assertEqual([row["id"] for row in records.context["objects_page"]], [wanted.pk])
         self.assertContains(records, 'class="charts-records"')
         self.assertNotContains(records, 'class="charts-dashboard-grid"')
         self.assertNotContains(records, "Source records")
-        overview = self.client.get(records.context["overview_url"])
+        overview = self.get_statistics(records.context["overview_url"])
         self.assertTemplateUsed(overview, "charts/index.html")
-        self.assertEqual(overview.context["total_objects"], 1)
-        self.assertEqual(overview.context["active_filters"], response.context["active_filters"])
+        self.assertEqual(overview.context["total_objects"], 2)
+        self.assertEqual(overview.context["active_filters"], [])
+        self.assertNotContains(overview, 'aria-label="Selected statistics"')
         for query in ({"scope": ["mine", "public"]}, {"scope": ""},
                       {"scope": "mine", "include_private": ["1", "0"]},
                       {"scope": "mine", "include_private": ""}):
             with self.subTest(query=query):
-                invalid = self.dashboard(**query)
-                records = self.client.get(invalid.context["records_url"])
+                invalid = self.statistics(**query)
+                records = self.get_statistics(invalid.context["records_url"])
                 self.assertTrue(records.context["filter_errors"])
                 self.assertEqual(records.context["total_objects"], 0)
-                self.assertEqual(self.client.get(records.context["overview_url"]).context["total_objects"], 0)
+                self.assertEqual(self.get_statistics(records.context["overview_url"]).context["total_objects"], 0)
 
     def test_fixed_statistics_respect_scope_and_chart_selection(self):
         """
@@ -351,12 +415,12 @@ class ChartsTests(TestCase):
                  ({"scope": "mine", "include_private": "1"}, {"Abaqus CAE", "Private solver"})]
         for query, expected in cases:
             with self.subTest(query=query):
-                response = self.dashboard(**query)
+                response = self.statistics(**query)
                 self.assertEqual({row["label"] for row in response.context["software_category"]["rows"]}, expected)
                 self.assertNotContains(response, 'id="charts-filter-form"')
                 self.assertNotContains(response, "Shared secret")
                 self.assertNotContains(response, "Hidden secret")
-        self.assertEqual(self.dashboard(phase="Copper").context["total_objects"], 1)
+        self.assertEqual(self.statistics(phase="Copper").context["total_objects"], 1)
 
     def test_selection_chips_retain_repeated_conditions_and_preferences(self):
         """
@@ -369,7 +433,7 @@ class ChartsTests(TestCase):
                  "range": ["temperature:298:298:1", "grain_count:340:350:1"], "note": "temperature_excluded",
                  "material_group": "texture", "group": "loading_mode", "measure": "grain_count",
                  "page": "3", "show": "objects"}
-        response = self.dashboard(**query)
+        response = self.statistics(**query)
         chips = response.context["active_filters"]
         self.assertEqual(len(chips), 10)
         for chip in chips:
@@ -389,7 +453,7 @@ class ChartsTests(TestCase):
         """
         self.create_object()
         label = 'Unknown"><script>alert(1)</script>'
-        response = self.dashboard(software=label, coverage="invalid", range="temperature:broken")
+        response = self.statistics(software=label, coverage="invalid", range="temperature:broken")
         self.assertEqual(response.context["total_objects"], 0)
         self.assertEqual(response.context["base_count"], 1)
         self.assertTrue(response.context["filter_errors"])
@@ -397,12 +461,12 @@ class ChartsTests(TestCase):
         self.assertEqual(len(chips), 3)
         self.assertNotContains(response, "<script>alert(1)</script>")
         for chip in chips:
-            selected = self.client.get(chip["url"])
+            selected = self.get_statistics(chip["url"])
             self.assertEqual(selected.context["total_objects"], 0)
-        interval = self.client.get(chips[-1]["url"])
+        interval = self.get_statistics(chips[-1]["url"])
         self.assertNotIn("range", parse_qs(urlsplit(chips[-1]["url"]).query))
         self.assertTrue(interval.context["filter_errors"])
-        cleared = self.client.get(response.context["clear_url"])
+        cleared = self.get_statistics(response.context["clear_url"])
         self.assertEqual(cleared.context["total_objects"], 1)
 
     def test_fixed_charts_count_records_separately_from_phase_observations(self):
@@ -417,7 +481,7 @@ class ChartsTests(TestCase):
         self.create_object("own-private", access="c", software="Private solver")
         shared = self.create_object("shared", owner=self.other, access="c", software="Shared solver")
         shared.shared_users.add(self.viewer)
-        response = self.dashboard()
+        response = self.statistics()
         software = {row["label"]: row["count"] for row in response.context["software_category"]["rows"]}
         self.assertEqual(software, {"Abaqus CAE": 3, "DAMASK": 1})
         temperature, grains = response.context["primary_distributions"]
@@ -426,7 +490,7 @@ class ChartsTests(TestCase):
         self.assertEqual([(bucket["count"], bucket["object_count"]) for bucket in grains["bins"]], [(2, 1)])
         self.assertNotContains(response, "Private solver")
         self.assertNotContains(response, "Shared solver")
-        selected = self.dashboard(software="DAMASK")
+        selected = self.statistics(software="DAMASK")
         self.assertEqual(selected.context["total_objects"], 1)
         self.assertEqual({row["count"] for row in selected.context["software_category"]["rows"]}, {1})
 
@@ -435,17 +499,17 @@ class ChartsTests(TestCase):
         Missing optional metadata cannot hide a scientific distribution or invent a value
         """
         self.create_object(phase=[{"phase_name": "Copper"}], global_temperature=None, mechanical_BC=[])
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["texture_count"], 0)
         for item in response.context["primary_distributions"]:
             self.assertEqual(item["object_count"], 0)
             self.assertEqual(item["plot"]["columns"], [])
         self.assertContains(response, 'data-statistic="temperature"')
         self.assertContains(response, 'data-statistic="grain_count"')
-        selected = self.dashboard(texture="Goss")
+        selected = self.statistics(texture="Goss")
         self.assertEqual(selected.context["total_objects"], 0)
         self.assertEqual([chip["label"] for chip in selected.context["active_filters"]], ["Texture: Goss"])
-        self.assertEqual(self.client.get(selected.context["active_filters"][0]["url"]).context["total_objects"], 1)
+        self.assertEqual(self.get_statistics(selected.context["active_filters"][0]["url"]).context["total_objects"], 1)
 
     def test_large_constant_grain_number_keeps_exact_bounds_and_a_readable_tick(self):
         """
@@ -453,14 +517,14 @@ class ChartsTests(TestCase):
         """
         count = 10 ** 80 + 123
         self.create_object(phase=[{"phase_name": "Copper", "orientation": {"grain_count": count}}])
-        response = self.dashboard()
+        response = self.statistics()
         item = response.context["primary_distributions"][1]
         self.assertEqual(Decimal(item["minimum"]), count)
         self.assertEqual(Decimal(item["maximum"]), count)
         self.assertLessEqual(len(item["plot"]["x_ticks"][0]["label"]), 14)
         bucket = item["bins"][0]
         self.assertEqual((Decimal(bucket["low"]), Decimal(bucket["high"])), (count, count))
-        selected = self.client.get(bucket["url"])
+        selected = self.get_statistics(bucket["url"])
         self.assertEqual(selected.context["total_objects"], 1)
 
     def test_pie_and_output_bars_preserve_exact_combined_filtering(self):
@@ -470,7 +534,7 @@ class ChartsTests(TestCase):
         self.create_object("matching")
         self.create_object("different-components", stress={"stress_11": [0, 1]},
                            total_strain={"strain_22": [0, .01]}, plastic_strain={})
-        response = self.dashboard(coverage="all")
+        response = self.statistics(coverage="all")
         self.assertEqual(response.context["total_objects"], 2)
         self.assertFalse(response.context["filter_errors"])
         self.assertEqual(response.context["active_filters"], [])
@@ -480,9 +544,9 @@ class ChartsTests(TestCase):
         for query, count in (({"coverage": "matching", "result": "plastic_strain"}, 1),
                              ({"coverage": "without_matching", "result": "plastic_strain"}, 0),
                              ({"coverage": "all", "result": "plastic_strain"}, 1)):
-            self.assertEqual(self.dashboard(**query).context["total_objects"], count)
+            self.assertEqual(self.statistics(**query).context["total_objects"], count)
         for value in (["all", "matching"], ["all", "invalid"], ""):
-            selected = self.dashboard(coverage=value)
+            selected = self.statistics(coverage=value)
             self.assertTrue(selected.context["filter_errors"])
             self.assertEqual(selected.context["total_objects"], 0)
             self.assertEqual(selected.context["base_count"], 2)
@@ -499,12 +563,12 @@ class ChartsTests(TestCase):
                  {"scope": "mine", "include_private": ["1", "0"]})
         for query in cases:
             with self.subTest(query=query):
-                response = self.dashboard(phase="Copper", **query)
+                response = self.statistics(phase="Copper", **query)
                 self.assertTrue(response.context["filter_errors"])
                 self.assertEqual(response.context["total_objects"], 0)
                 self.assertEqual(response.context["base_count"], 0)
                 self.assertNotContains(response, "Private solver")
-                removed = self.client.get(response.context["active_filters"][0]["url"])
+                removed = self.get_statistics(response.context["active_filters"][0]["url"])
                 self.assertTrue(removed.context["filter_errors"])
                 self.assertEqual(removed.context["total_objects"], 0)
                 self.assertEqual(removed.context["base_count"], 0)
@@ -517,13 +581,13 @@ class ChartsTests(TestCase):
         query = {"scope": "mine", "include_private": "1", "range": ["discretization_count:2744:2744:1", "unknown:0:1:1"],
                  "note": ["temperature_excluded", "invalid"], "material_group": "texture",
                  "group": "loading_mode", "measure": "grain_count", "page": "2"}
-        response = self.dashboard(**query)
+        response = self.statistics(**query)
         self.assertEqual(response.context["total_objects"], 0)
         interval_chip = next(chip for chip in response.context["active_filters"] if chip["label"].startswith("Discretization count:"))
         preserved = parse_qs(urlsplit(interval_chip["url"]).query)
         self.assertEqual(preserved["range"], ["unknown:0:1:1"])
         self.assertEqual(preserved["note"], query["note"])
-        cleared = self.client.get(response.context["clear_url"])
+        cleared = self.get_statistics(response.context["clear_url"])
         self.assertEqual(cleared.context["total_objects"], 1)
         self.assertTrue(cleared.context["include_private"])
         for key in ("material_group", "group"):
@@ -547,23 +611,23 @@ class ChartsTests(TestCase):
                  ({"scope": "mine", "include_private": "1"}, {own.pk, own_public.pk})]
         for query, ids in cases:
             with self.subTest(query=query):
-                response = self.dashboard(**query)
+                response = self.statistics(**query)
                 self.assertEqual(response.context["total_objects"], len(ids))
                 self.assertEqual({row["id"] for row in response.context["objects_page"]}, ids)
                 self.assertNotContains(response, "Secret solver")
                 self.assertNotContains(response, "Shared solver")
-                matching = self.client.get(response.context["matching_url"])
+                matching = self.get_statistics(response.context["matching_url"])
                 self.assertEqual(matching.context["total_objects"], response.context["matching_count"])
                 self.assertEqual({row["id"] for row in matching.context["objects_page"]}, ids)
                 for row in response.context["categories"]["software"]["rows"]:
-                    selected = self.client.get(row["url"])
+                    selected = self.get_statistics(row["url"])
                     self.assertEqual(selected.context["total_objects"], row["count"])
                     self.assertTrue({item["id"] for item in selected.context["objects_page"]} <= ids)
-        self.assertEqual(self.dashboard(software="Secret solver").context["total_objects"], 0)
-        self.assertEqual(self.dashboard(software="Own solver").context["total_objects"], 0)
-        self.assertEqual(self.dashboard(scope="mine", include_private="1", software="Shared solver").context["total_objects"], 0)
+        self.assertEqual(self.statistics(software="Secret solver").context["total_objects"], 0)
+        self.assertEqual(self.statistics(software="Own solver").context["total_objects"], 0)
+        self.assertEqual(self.statistics(scope="mine", include_private="1", software="Shared solver").context["total_objects"], 0)
         self.client.logout()
-        self.assertEqual(self.client.get(reverse("charts")).status_code, 302)
+        self.assertEqual(self.get_statistics(reverse("charts")).status_code, 302)
 
     def test_multiple_phases_and_descriptions_count_each_object_once(self):
         """
@@ -574,7 +638,7 @@ class ChartsTests(TestCase):
         obj.data["phase"] = [phase, copy.deepcopy(phase), {"phase_name": "Nickel"}]
         obj.save()
         self.create_object("two", software="ABAQUS CAE")
-        response = self.dashboard()
+        response = self.statistics()
         phases = {row["label"]: row["count"] for row in response.context["categories"]["phase"]["rows"]}
         software = {row["label"].casefold(): row["count"] for row in response.context["categories"]["software"]["rows"]}
         self.assertEqual(phases, {"Copper": 2, "Nickel": 1})
@@ -590,9 +654,9 @@ class ChartsTests(TestCase):
         wanted = self.create_object("wanted")
         self.create_object("other-software", software="DAMASK")
         self.create_object("other-phase", phase=[{"phase_name": "Copper oxide"}])
-        response = self.dashboard(phase=" copper ", software="ABAQUS CAE")
+        response = self.statistics(phase=" copper ", software="ABAQUS CAE")
         self.assertEqual([row["id"] for row in response.context["objects_page"]], [wanted.pk])
-        self.assertEqual(self.dashboard(phase="Copper", software="aba").context["total_objects"], 0)
+        self.assertEqual(self.statistics(phase="Copper", software="aba").context["total_objects"], 0)
         for chip in response.context["active_filters"]:
             query = parse_qs(urlsplit(chip["url"]).query)
             self.assertEqual(len(set(query) & {"phase", "software"}), 1)
@@ -613,7 +677,7 @@ class ChartsTests(TestCase):
         del raw["total_strain"]
         obj.data = raw
         obj.save()
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["matching_count"], 1)
         self.assertEqual(response.context["distributions"][0]["median"], "298")
         self.assertEqual(response.context["categories"]["software"]["rows"][0]["count"], 1)
@@ -626,7 +690,7 @@ class ChartsTests(TestCase):
         """
         self.create_object(phase=[{"phase_name": "Copper", "phase_identifier": "Old copper"},
                                   {"phase_identifier": "Legacy nickel"}, {"phase_id": 42}])
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual({row["label"] for row in response.context["categories"]["phase"]["rows"]},
                          {"Copper", "Legacy nickel"})
 
@@ -637,13 +701,13 @@ class ChartsTests(TestCase):
         self.create_object("kelvin")
         self.create_object("celsius", global_temperature=24.85, units={"Temperature": "Celsius"})
         self.create_object("fahrenheit", global_temperature=76.73, units={"Temperature": "Fahrenheit"})
-        response = self.dashboard()
+        response = self.statistics()
         temperature = response.context["distributions"][0]
         self.assertEqual((temperature["minimum"], temperature["maximum"], temperature["median"]),
                          ("298", "298", "298"))
         self.assertEqual(temperature["observation_count"], 3)
         self.assertEqual(len(temperature["bins"]), 1)
-        selected = self.client.get(temperature["bins"][0]["url"])
+        selected = self.get_statistics(temperature["bins"][0]["url"])
         self.assertEqual(selected.context["total_objects"], 3)
 
     def test_invalid_temperatures_and_count_values_are_excluded_not_zero(self):
@@ -655,7 +719,7 @@ class ChartsTests(TestCase):
             self.create_object(str(index), global_temperature=value,
                                units={"Temperature": unit}, discretization_count=True,
                                phase=[{"phase_name": "Copper", "orientation": {"grain_count": False}}])
-        response = self.dashboard()
+        response = self.statistics()
         for distribution in response.context["distributions"]:
             self.assertEqual(distribution["observation_count"], 0)
             self.assertEqual(distribution["bins"], [])
@@ -670,7 +734,7 @@ class ChartsTests(TestCase):
             {"phase_name": "Nickel", "orientation": {"grain_count": 10}},
             {"phase_name": "Iron", "orientation": {"grain_number": "30"}},
         ])
-        response = self.dashboard()
+        response = self.statistics()
         grains = response.context["distributions"][1]
         self.assertEqual(grains["observation_count"], 3)
         self.assertEqual(grains["object_count"], 1)
@@ -678,7 +742,7 @@ class ChartsTests(TestCase):
         self.assertFalse(grains["constant"])
         self.assertEqual(grains["bins"][0]["count"], 2)
         self.assertEqual(grains["bins"][0]["object_count"], 1)
-        selected = self.client.get(grains["bins"][0]["url"])
+        selected = self.get_statistics(grains["bins"][0]["url"])
         self.assertEqual([row["id"] for row in selected.context["objects_page"]], [obj.pk])
 
     def test_histogram_boundaries_do_not_drop_or_double_count_values(self):
@@ -687,13 +751,13 @@ class ChartsTests(TestCase):
         """
         for index in range(21):
             self.create_object(str(index), global_temperature=index * 10)
-        response = self.dashboard()
+        response = self.statistics()
         bins = response.context["distributions"][0]["bins"]
         self.assertLessEqual(len(bins), 8)
         self.assertEqual(sum(item["count"] for item in bins), 21)
         seen = set()
         for item in bins:
-            selected = self.client.get(item["url"])
+            selected = self.get_statistics(item["url"])
             ids = {row["id"] for row in selected.context["objects_page"]}
             self.assertEqual(selected.context["total_objects"], item["count"])
             self.assertFalse(seen & ids)
@@ -719,7 +783,7 @@ class ChartsTests(TestCase):
                  {"curve": "-1"}, {"curve": "1e2"}, {"curve": "1" * 5000}]
         for query in cases:
             with self.subTest(query=query):
-                response = self.dashboard(**query)
+                response = self.statistics(**query)
                 self.assertTrue(response.context["filter_errors"])
                 self.assertEqual(response.context["total_objects"], 0)
 
@@ -728,15 +792,15 @@ class ChartsTests(TestCase):
         A removal link deletes its own interval even after a malformed parameter
         """
         self.create_object()
-        response = self.dashboard(range=["bad", "temperature:298:298:1", "grain_count:343:343:1"])
+        response = self.statistics(range=["bad", "temperature:298:298:1", "grain_count:343:343:1"])
         for index, chip in enumerate(response.context["active_filters"][:2]):
             query = parse_qs(urlsplit(chip["url"]).query)
             self.assertEqual(query["range"][0], "bad")
             self.assertNotIn(("temperature:298:298:1", "grain_count:343:343:1")[index], query["range"])
-            selected = self.client.get(chip["url"])
+            selected = self.get_statistics(chip["url"])
             self.assertTrue(selected.context["filter_errors"])
             self.assertEqual(selected.context["total_objects"], 0)
-        corrected = self.client.get(response.context["active_filters"][-1]["url"])
+        corrected = self.get_statistics(response.context["active_filters"][-1]["url"])
         self.assertFalse(corrected.context["filter_errors"])
         self.assertEqual(corrected.context["total_objects"], 1)
 
@@ -750,19 +814,19 @@ class ChartsTests(TestCase):
         ])
         self.create_object("other", global_temperature=500,
                            phase=[{"phase_name": "Nickel", "orientation": {"grain_count": 30}}])
-        response = self.dashboard(phase="Copper")
+        response = self.statistics(phase="Copper")
         nickel = next(row for row in response.context["categories"]["phase"]["rows"] if row["label"] == "Nickel")
-        selected = self.client.get(nickel["url"])
+        selected = self.get_statistics(nickel["url"])
         self.assertEqual(selected.context["total_objects"], nickel["count"])
         self.assertEqual(len(selected.context["active_filters"]), 2)
         for chip in selected.context["active_filters"]:
             self.assertEqual(len(parse_qs(urlsplit(chip["url"]).query)["phase"]), 1)
-        response = self.dashboard(measure="temperature", lo="298", hi="298")
+        response = self.statistics(measure="temperature", lo="298", hi="298")
         for value in ("10", "30"):
             grains = response.context["distributions"][1]
             bucket = next(item for item in grains["bins"]
                           if Decimal(item["low"]) <= Decimal(value) <= Decimal(item["high"]))
-            response = self.client.get(bucket["url"])
+            response = self.get_statistics(bucket["url"])
             self.assertEqual(response.context["total_objects"], bucket["object_count"])
             self.assertEqual([row["id"] for row in response.context["objects_page"]], [wanted.pk])
         self.assertEqual(len(response.context["active_filters"]), 3)
@@ -774,11 +838,11 @@ class ChartsTests(TestCase):
         self.create_object("both", stress={"stress_33": [0]}, units={})
         self.create_object("strain-only", stress={}, units={})
         self.create_object("lengths-only", stress={"stress_33": [0]})
-        response = self.dashboard(result="stress", note="result_units")
+        response = self.statistics(result="stress", note="result_units")
         for key, rows in (("total_strain", response.context["result_rows"]),
                           ("unequal_lengths", response.context["note_rows"])):
             row = next(item for item in rows if item["key"] == key)
-            selected = self.client.get(row["url"])
+            selected = self.get_statistics(row["url"])
             self.assertEqual(selected.context["total_objects"], row["count"])
             self.assertEqual(selected.context["total_objects"], 1)
 
@@ -788,11 +852,11 @@ class ChartsTests(TestCase):
         """
         for value in range(1, 10):
             self.create_object(str(value), global_temperature=value, units={"Temperature": "F"})
-        response = self.dashboard()
+        response = self.statistics()
         distribution = response.context["distributions"][0]
         self.assertEqual(sum(item["count"] for item in distribution["bins"]), 9)
         for bucket in distribution["bins"]:
-            selected = self.client.get(bucket["url"])
+            selected = self.get_statistics(bucket["url"])
             self.assertEqual(selected.context["total_objects"], bucket["count"])
 
     def test_close_temperatures_keep_distinct_visible_bounds(self):
@@ -801,7 +865,7 @@ class ChartsTests(TestCase):
         """
         for index in range(9):
             self.create_object(str(index), global_temperature=298 + index / 100000000)
-        response = self.dashboard()
+        response = self.statistics()
         distribution = response.context["distributions"][0]
         self.assertNotEqual(distribution["minimum"], distribution["maximum"])
         self.assertEqual(len({item["label"] for item in distribution["bins"]}), 8)
@@ -820,7 +884,7 @@ class ChartsTests(TestCase):
             {"grain_count": 10, "Grain Number": 30},
         ]):
             self.create_object(str(index), phase=[{"phase_name": "Copper", "orientation": orientation}])
-        response = self.dashboard()
+        response = self.statistics()
         grains = response.context["distributions"][1]
         self.assertEqual(grains["observation_count"], 2)
         self.assertEqual(grains["minimum"], "10")
@@ -835,7 +899,7 @@ class ChartsTests(TestCase):
         self.create_object("component-33")
         self.create_object("equivalents", stress={"equivalent_stress": [0, 100]},
                            total_strain={"equivalent_strain": [0, 0.1]}, plastic_strain={})
-        response = self.dashboard()
+        response = self.statistics()
         counts = {row["key"]: row["count"] for row in response.context["result_rows"]}
         self.assertEqual(response.context["matching_count"], 2)
         self.assertEqual(counts["stress"], 2)
@@ -850,7 +914,7 @@ class ChartsTests(TestCase):
         stress = {f"stress_{key}": [0, 1] for key in ("11", "22", "33", "12", "13", "23")}
         self.create_object("derived", stress=stress)
         self.create_object("explicit-empty", stress={**stress, "equivalent_stress": []})
-        response = self.dashboard(result="calculated_equivalent")
+        response = self.statistics(result="calculated_equivalent")
         self.assertEqual(response.context["total_objects"], 1)
         self.assertEqual(response.context["objects_page"][0]["identifier"], "derived")
 
@@ -859,13 +923,13 @@ class ChartsTests(TestCase):
         Different curve lengths remain inspectable with precise availability notes
         """
         obj = self.create_object(stress={"stress_33": [0, 1], "stress_23": [0]}, units={})
-        response = self.dashboard()
+        response = self.statistics()
         counts = {row["key"]: row["count"] for row in response.context["note_rows"]}
         self.assertEqual(counts["unequal_lengths"], 1)
         self.assertEqual(counts["result_units"], 1)
         self.assertEqual(response.context["matching_count"], 1)
         notes = [row for row in response.context["note_rows"] if row["key"] == "unequal_lengths"]
-        selected = self.client.get(notes[0]["url"])
+        selected = self.get_statistics(notes[0]["url"])
         self.assertEqual(selected.context["objects_page"][0]["id"], obj.pk)
         self.assertNotContains(response, "Comparable")
 
@@ -875,7 +939,7 @@ class ChartsTests(TestCase):
         """
         self.create_object(stress={"stress_11": [False, True], "stress_22": ["NaN", 1]},
                            total_strain={"strain_11": [0, None]}, plastic_strain={})
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["matching_count"], 0)
         counts = {row["key"]: row["count"] for row in response.context["result_rows"]}
         self.assertEqual(counts["stress"], 0)
@@ -886,7 +950,7 @@ class ChartsTests(TestCase):
         Legacy conflicts remain accessible but do not drive statistics
         """
         self.create_object(**{"Global Temperature": 500})
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["total_objects"], 1)
         self.assertEqual(response.context["distributions"][0]["observation_count"], 0)
         notes = {row["key"]: row["count"] for row in response.context["note_rows"]}
@@ -899,7 +963,7 @@ class ChartsTests(TestCase):
         hostile = '<img src=x onerror="alert(1)">'
         for index in range(12):
             self.create_object(str(index), software=hostile if index == 0 else f"Software {index}")
-        response = self.dashboard(group="software")
+        response = self.statistics()
         self.assertEqual(len(response.context["categories"]["software"]["rows"]), 12)
         self.assertNotContains(response, hostile)
         self.assertContains(response, "&lt;img")
@@ -911,7 +975,7 @@ class ChartsTests(TestCase):
         """
         for index in range(25):
             self.create_object(str(index))
-        response = self.dashboard(phase="Copper", scope="mine")
+        response = self.statistics(phase="Copper", scope="mine")
         page = response.context["objects_page"]
         self.assertEqual(page.paginator.count, 25)
         self.assertLess(len(page), 25)
@@ -919,7 +983,7 @@ class ChartsTests(TestCase):
         query = parse_qs(urlsplit(next_url).query)
         self.assertEqual(query["phase"], ["Copper"])
         self.assertEqual(query["scope"], ["mine"])
-        second = self.client.get(next_url)
+        second = self.get_statistics(next_url)
         self.assertFalse({row["id"] for row in page} & {row["id"] for row in second.context["objects_page"]})
         self.assertEqual(second.context["total_objects"], 25)
 
@@ -927,7 +991,7 @@ class ChartsTests(TestCase):
         """
         Empty data remains a useful starting point with no fabricated percentages
         """
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["total_objects"], 0)
         self.assertEqual(response.context["phase_count"], 0)
         self.assertContains(response, 'name="scope"')
@@ -940,7 +1004,7 @@ class ChartsTests(TestCase):
         Materials and simulation setup expose separate aggregate selections
         """
         self.create_object()
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["material_group"], "phase")
         self.assertEqual(response.context["material_category"]["rows"][0]["label"], "Copper")
         self.assertEqual(response.context["group"], "software")
@@ -948,14 +1012,14 @@ class ChartsTests(TestCase):
         self.assertEqual(dict(response.context["material_options"]), {"phase": "Phase", "texture": "Texture"})
         self.assertEqual(set(dict(response.context["group_options"])),
                          {"software", "elastic_model", "plastic_model", "loading_type", "loading_mode"})
-        selected = self.dashboard(material_group="texture", group="loading_mode")
+        selected = self.statistics(material_group="texture", group="loading_mode")
         self.assertEqual(selected.context["material_category"]["rows"][0]["label"], "Goss")
         self.assertEqual(selected.context["material_plot"]["rows"][0]["count"], 1)
         self.assertEqual(selected.context["selected_category"]["rows"][0]["label"], "static")
         self.assertEqual(selected.context["category_plot"]["rows"][0]["count"], 1)
         for category in (selected.context["material_category"], selected.context["selected_category"]):
             row = category["rows"][0]
-            drilled = self.client.get(row["url"])
+            drilled = self.get_statistics(row["url"])
             self.assertEqual(drilled.context["total_objects"], row["count"])
             self.assertEqual(drilled.context["material_group"], "texture")
             self.assertEqual(drilled.context["group"], "loading_mode")
@@ -967,11 +1031,11 @@ class ChartsTests(TestCase):
         self.create_object()
         for group in ("phase", "texture"):
             with self.subTest(group=group):
-                response = self.dashboard(group=group)
+                response = self.statistics(group=group)
                 self.assertFalse(response.context["filter_errors"])
                 self.assertEqual(response.context["material_group"], group)
                 self.assertEqual(response.context["group"], "software")
-        response = self.dashboard(group="texture", material_group="phase")
+        response = self.statistics(group="texture", material_group="phase")
         self.assertEqual(response.context["material_group"], "phase")
         self.assertEqual(response.context["group"], "software")
 
@@ -987,15 +1051,15 @@ class ChartsTests(TestCase):
             "material_group": "texture", "group": "loading_mode", "measure": "grain_count",
             "curve": "999", "component": "33", "show": "objects", "page": "2",
         }
-        response = self.dashboard(**query)
+        response = self.statistics(**query)
         self.assertEqual(response.context["total_objects"], 1)
         self.assertEqual(len(response.context["active_filters"]), 8)
         self.assertEqual(dict(response.context["control_params"]["scope"]),
                          {"material_group": "texture", "group": "loading_mode", "measure": "grain_count"})
-        changed = self.dashboard(scope="public", **dict(response.context["control_params"]["scope"]))
+        changed = self.statistics(scope="public", **dict(response.context["control_params"]["scope"]))
         self.assertEqual(changed.context["active_filters"], [])
         self.assertEqual(changed.context["total_objects"], 1)
-        invalid = self.dashboard(group="unknown", measure="unknown")
+        invalid = self.statistics(group="unknown", measure="unknown")
         self.assertEqual(invalid.context["control_params"]["scope"], [])
 
     def test_matching_components_count_real_pairs_and_preserve_legacy_groups(self):
@@ -1012,7 +1076,7 @@ class ChartsTests(TestCase):
         mixed = self.create_object("mixed", stress=stress, total_strain={"equivalent_strain": [0, .01]})
         self.create_object("explicit-empty", stress={**stress, "equivalent_stress": []},
                            total_strain={"equivalent_strain": [0, .01]})
-        response = self.dashboard()
+        response = self.statistics()
         self.assertEqual(response.context["matching_count"], 4)
         self.assertEqual({row["key"] for row in response.context["output_rows"]},
                          {"stress", "total_strain", "plastic_strain"})
@@ -1020,11 +1084,11 @@ class ChartsTests(TestCase):
                          {"supplied_equivalent", "calculated_equivalent"})
         row = next(item for item in response.context["result_rows"] if item["key"] == "matching_response")
         self.assertEqual(row["count"], 4)
-        selected = self.client.get(response.context["matching_url"])
+        selected = self.get_statistics(response.context["matching_url"])
         self.assertEqual({item["id"] for item in selected.context["objects_page"]},
                          {direct.pk, supplied.pk, calculated.pk, mixed.pk})
-        self.assertEqual(self.dashboard(result="paired").context["total_objects"], 6)
-        legacy = self.dashboard(result=["paired", "matching_response"])
+        self.assertEqual(self.statistics(result="paired").context["total_objects"], 6)
+        legacy = self.statistics(result=["paired", "matching_response"])
         self.assertEqual(legacy.context["total_objects"], 4)
         for obj in (supplied, calculated, mixed):
             original = copy.deepcopy(obj.data)
@@ -1040,7 +1104,7 @@ class ChartsTests(TestCase):
         nickel = self.create_object("nickel", phase=[{"phase_name": "Nickel"}])
         hidden = self.create_object("hidden-curve", owner=self.other, access="c", stress={"stress_33": [0, 9876543]})
         for curve in (copper.pk, hidden.pk):
-            response = self.dashboard(phase="Nickel", curve=str(curve), component="33")
+            response = self.statistics(phase="Nickel", curve=str(curve), component="33")
             self.assertEqual([row["id"] for row in response.context["objects_page"]], [nickel.pk])
             self.assertNotIn("curve", response.context)
             self.assertNotIn("curve_objects", response.context)
@@ -1058,7 +1122,7 @@ class ChartsTests(TestCase):
         obj = self.create_object(stress={"stress_33": values},
                                  total_strain={"strain_33": list(range(12002))})
         original = copy.deepcopy(obj.data)
-        response = self.dashboard(result="matching_response")
+        response = self.statistics(result="matching_response")
         self.assertEqual(response.context["matching_count"], 1)
         self.assertEqual(response.context["objects_page"][0]["points"], "3–12,002 points")
         self.assertNotIn("curve", response.context)
@@ -1075,7 +1139,7 @@ class ChartsTests(TestCase):
         public = self.create_object("public")
         self.create_object("private", access="c")
         for scope in ("all", "shared"):
-            response = self.client.get(reverse("charts"), {
+            response = self.get_statistics(reverse("charts"), {
                 "scope": scope, "include_private": "1", "phase": "Copper", "result": "stress",
                 "coverage": "matching", "group": "loading_mode", "material_group": "texture",
                 "measure": "grain_count", "range": ["temperature:298:298:1", "grain_count:343:343:1"],
@@ -1089,11 +1153,11 @@ class ChartsTests(TestCase):
             self.assertEqual(query["phase"], ["Copper"])
             self.assertEqual(query["material_group"], ["texture"])
             self.assertEqual(query["group"], ["loading_mode"])
-            selected = self.client.get(response["Location"])
+            selected = self.get_statistics(response["Location"])
             self.assertEqual([row["id"] for row in selected.context["objects_page"]], [public.pk])
         for query in ({"scope": "all", "include_private": "yes"},
                       {"scope": "shared", "result": "unknown"}, {"scope": ["all", "shared"]}):
-            response = self.dashboard(**query)
+            response = self.statistics(**query)
             self.assertTrue(response.context["filter_errors"])
             self.assertEqual(response.context["total_objects"], 0)
 
@@ -1105,7 +1169,7 @@ class ChartsTests(TestCase):
             self.create_object(str(index), access="c")
         self.create_object("other-public", owner=self.other)
         query = {"scope": "mine", "include_private": "1", "phase": "Copper"}
-        response = self.dashboard(**query)
+        response = self.statistics(**query)
         self.assertEqual(response.context["total_objects"], 12)
         self.assertTrue(response.context["include_private"])
         self.assertEqual(response.context["base_count"], 12)
@@ -1118,10 +1182,10 @@ class ChartsTests(TestCase):
             params = parse_qs(urlsplit(url).query)
             self.assertEqual(params["scope"], ["mine"])
             self.assertEqual(params["include_private"], ["1"])
-            selected = self.client.get(url)
+            selected = self.get_statistics(url)
             self.assertEqual(selected.context["total_objects"], 12)
             self.assertTrue(all(row["identifier"] != "other-public" for row in selected.context["objects_page"]))
-        self.assertEqual(self.dashboard(scope="mine").context["total_objects"], 0)
+        self.assertEqual(self.statistics(scope="mine").context["total_objects"], 0)
 
     def test_coverage_pie_is_exhaustive_and_links_preserve_the_selection(self):
         """
@@ -1135,14 +1199,14 @@ class ChartsTests(TestCase):
         absent = self.create_object("absent", stress={}, total_strain={}, plastic_strain={})
         conflict = self.create_object("conflict", **{"Global Temperature": 400})
         originals = {obj.pk: copy.deepcopy(obj.data) for obj in (matched, equivalent, unmatched, absent, conflict)}
-        response = self.dashboard(scope="mine", software="Abaqus CAE", material_group="texture")
+        response = self.statistics(scope="mine", software="Abaqus CAE", material_group="texture")
         rows = {row["key"]: row for row in response.context["coverage_rows"]}
         self.assertEqual((rows["matching"]["count"], rows["without_matching"]["count"]), (2, 2))
         self.assertEqual(sum(row["count"] for row in rows.values()), response.context["total_objects"])
         self.assertEqual(sum(row["percent"] for row in rows.values()), 100)
         for key, ids in (("matching", {matched.pk, equivalent.pk}), ("without_matching", {unmatched.pk, absent.pk})):
             row = rows[key]
-            selected = self.client.get(row["url"])
+            selected = self.get_statistics(row["url"])
             self.assertEqual(selected.context["total_objects"], row["count"])
             self.assertEqual({item["id"] for item in selected.context["objects_page"]}, ids)
             params = parse_qs(urlsplit(row["url"]).query)
@@ -1153,9 +1217,9 @@ class ChartsTests(TestCase):
             self.assertTrue(selected.context["coverage_plot"]["slices"][0]["full_circle"])
         self.assertEqual(len(response.context["coverage_plot"]["slices"]), 2)
         self.assertTrue(all(not item["full_circle"] for item in response.context["coverage_plot"]["slices"]))
-        self.assertEqual(self.dashboard().context["total_objects"], 5)
-        self.assertEqual(self.dashboard().context["coverage_rows"][1]["count"], 3)
-        empty = self.dashboard(coverage=["matching", "without_matching"])
+        self.assertEqual(self.statistics().context["total_objects"], 5)
+        self.assertEqual(self.statistics().context["coverage_rows"][1]["count"], 3)
+        empty = self.statistics(coverage=["matching", "without_matching"])
         self.assertFalse(empty.context["filter_errors"])
         self.assertEqual(empty.context["total_objects"], 0)
         self.assertEqual(empty.context["coverage_plot"]["slices"], [])
@@ -1163,7 +1227,7 @@ class ChartsTests(TestCase):
         for obj in (matched, equivalent, unmatched, absent, conflict):
             obj.refresh_from_db()
             self.assertEqual(obj.data, originals[obj.pk])
-        without = self.dashboard(coverage="without_matching")
+        without = self.statistics(coverage="without_matching")
         absent_row = next(row for row in without.context["objects_page"] if row["id"] == absent.pk)
         self.assertEqual(absent_row["result_label"], "No mechanical results")
 
@@ -1173,7 +1237,7 @@ class ChartsTests(TestCase):
         """
         for value in (1, 2, 100):
             self.create_object(str(value), global_temperature=value)
-        response = self.dashboard()
+        response = self.statistics()
         distribution = response.context["distributions"][0]
         self.assertFalse(distribution["constant"])
         self.assertEqual([bucket["count"] for bucket in distribution["bins"]], [2, 0, 1])
@@ -1184,19 +1248,19 @@ class ChartsTests(TestCase):
         self.assertAlmostEqual(columns[0]["width"], 322 / 3 - 1, places=2)
         self.assertEqual(columns[1]["plot_height"], 0)
         for bucket in distribution["bins"]:
-            selected = self.client.get(bucket["url"])
+            selected = self.get_statistics(bucket["url"])
             self.assertEqual(selected.context["total_objects"], bucket["object_count"])
 
     def test_constant_histogram_and_empty_pie_never_invent_observations(self):
         """
         Empty and identical values remain factual special cases for statistical charts
         """
-        empty = self.dashboard()
+        empty = self.statistics()
         self.assertEqual(empty.context["coverage_plot"]["total"], 0)
         self.assertEqual(empty.context["coverage_plot"]["slices"], [])
         self.create_object()
         self.create_object("same-temperature")
-        response = self.dashboard()
+        response = self.statistics()
         distribution = response.context["distributions"][0]
         self.assertTrue(distribution["constant"])
         self.assertEqual(len(distribution["bins"]), 1)
@@ -1213,7 +1277,7 @@ class ChartsTests(TestCase):
         """
         baseline = 10 ** 50
         objects = [self.create_object(str(index), discretization_count=baseline + index) for index in range(3)]
-        response = self.dashboard(measure="discretization_count")
+        response = self.statistics(measure="discretization_count")
         item = response.context["selected_distribution"]
         self.assertEqual(tuple(Decimal(item[key]) for key in ("minimum", "maximum", "median")),
                          (baseline, baseline + 2, baseline + 1))
@@ -1228,7 +1292,7 @@ class ChartsTests(TestCase):
         self.assertEqual(len({(column["low_label"], column["high_label"]) for column in columns}), 3)
         self.assertTrue(all(len(column["low_label"]) < 20 for column in columns))
         for bucket in item["bins"]:
-            selected = self.client.get(bucket["url"])
+            selected = self.get_statistics(bucket["url"])
             self.assertEqual(selected.context["total_objects"], bucket["object_count"])
         for index, obj in enumerate(objects):
             obj.refresh_from_db()
@@ -1241,7 +1305,7 @@ class ChartsTests(TestCase):
         baseline = 10 ** 50
         self.create_object("first", discretization_count=baseline)
         self.create_object("second", discretization_count=baseline + 1)
-        response = self.dashboard(measure="discretization_count")
+        response = self.statistics(measure="discretization_count")
         item = response.context["selected_distribution"]
         self.assertEqual(item["median"], f"{baseline}.5")
         self.assertEqual(Decimal(item["minimum"]), baseline)

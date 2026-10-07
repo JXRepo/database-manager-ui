@@ -33,7 +33,9 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         empty = User.objects.create_user(username="charts-browser-empty")
         sparse = User.objects.create_user(username="charts-browser-sparse")
         diverse = User.objects.create_user(username="charts-browser-diverse")
-        for user in (viewer, empty, sparse, diverse):
+        narrow = User.objects.create_user(username="charts-browser-narrow")
+        paired = User.objects.create_user(username="charts-browser-paired")
+        for user in (viewer, empty, sparse, diverse, narrow, paired):
             AccountProfile.objects.create(user=user, getting_started_dismissed_at=timezone.now())
         for index in range(24):
             phase = ("Copper", "Nickel", "Steel")[index % 3]
@@ -57,6 +59,8 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
                 data["discretization_count"] = 10 ** 50 + (1 if index == 20 else 0)
                 data["phase"][0]["orientation"]["grain_count"] = data["discretization_count"]
             JSONData.objects.create(owner=viewer, data=data, access_type="all" if index % 2 == 0 else "c")
+            if index in (8, 20):
+                JSONData.objects.create(owner=narrow, data=data, access_type="c")
         long_data = valid_upload_object(
             identifier="long-identifier-" * 25,
             title="A detailed simulation title with long metadata " * 15,
@@ -93,6 +97,8 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
                     {"loading_type": "Force", "loading_mode": "CYCLIC"},
                 ])
             JSONData.objects.create(owner=diverse, data=data, access_type="c")
+            if index == 0:
+                JSONData.objects.create(owner=paired, data=data, access_type="c")
         sample_path = settings.BASE_DIR / "example_json_files" / "a46fde6c.json"
         sample_source = None
         sample_object = None
@@ -112,12 +118,18 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         sparse_client.force_login(sparse)
         diverse_client = Client()
         diverse_client.force_login(diverse)
+        narrow_client = Client()
+        narrow_client.force_login(narrow)
+        paired_client = Client()
+        paired_client.force_login(paired)
         self.client.force_login(viewer)
         environment = dict(os.environ, CHARTS_BASE_URL=self.live_server_url,
                            CHARTS_SESSION=self.client.cookies[settings.SESSION_COOKIE_NAME].value,
                            CHARTS_EMPTY_SESSION=empty_cookie, CHARTS_COOKIE_NAME=settings.SESSION_COOKIE_NAME,
                            CHARTS_SPARSE_SESSION=sparse_client.cookies[settings.SESSION_COOKIE_NAME].value,
-                           CHARTS_DIVERSE_SESSION=diverse_client.cookies[settings.SESSION_COOKIE_NAME].value)
+                           CHARTS_DIVERSE_SESSION=diverse_client.cookies[settings.SESSION_COOKIE_NAME].value,
+                           CHARTS_NARROW_SESSION=narrow_client.cookies[settings.SESSION_COOKIE_NAME].value,
+                           CHARTS_PAIRED_SESSION=paired_client.cookies[settings.SESSION_COOKIE_NAME].value)
         if sample_cookie:
             environment.update(CHARTS_SAMPLE_SESSION=sample_cookie,
                                CHARTS_SAMPLE_DETAIL_URL=reverse("json_data_detail", args=[sample_object.pk]))

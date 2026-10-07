@@ -32,12 +32,7 @@
       </div>{% endblock %}
     </header>
 
-    {% if active_filters %}
-      <nav class="charts-filter-strip" aria-label="Selected statistics">
-        {% for item in active_filters %}<a class="charts-filter" href="{{ item.url }}" title="Remove {{ item.label }}"><span>{{ item.label }}</span><span aria-hidden="true">×</span><span class="visually-hidden">Remove filter</span></a>{% endfor %}
-        <a href="{{ clear_url }}" class="charts-clear charts-selection-clear">Clear</a>
-      </nav>
-    {% endif %}
+    {% block charts_selection_controls %}{% endblock %}
     {% if filter_errors %}<div class="alert alert-warning charts-errors" role="alert">{% for error in filter_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
 
     {% block charts_workspace %}{% if total_objects %}
@@ -120,7 +115,7 @@
       </div>
 
     {% else %}
-      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if filter_errors %}Correct the selection to view statistics{% elif active_filters %}No objects match this selection{% else %}No data in this scope{% endif %}</h2><p>{% if filter_errors %}Clear the selection or choose a valid data scope.{% elif active_filters %}Remove a selection or change the data scope.{% elif scope == 'mine' and not include_private %}Include private data to see all your uploads.{% else %}Choose another scope or upload data.{% endif %}</p><div>{% if active_filters or filter_errors %}<a class="charts-button charts-button-primary charts-clear charts-selection-clear" href="{{ clear_url }}">Clear selection</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
+      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if filter_errors %}Correct the data scope to view statistics{% else %}No data in this scope{% endif %}</h2><p>{% if filter_errors %}Choose a valid data scope.{% elif scope == 'mine' and not include_private %}Include private data to see all your uploads.{% else %}Choose another scope or upload data.{% endif %}</p><div>{% if filter_errors %}<a class="charts-button charts-button-primary charts-clear" href="{{ clear_url }}">Reset scope</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
     {% endif %}{% endblock charts_workspace %}
   </div>
 </main>
