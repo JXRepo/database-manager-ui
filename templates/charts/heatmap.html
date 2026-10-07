@@ -1,8 +1,16 @@
 <svg class="charts-heatmap-svg" viewBox="0 0 390 280" role="group" aria-label="Loading type and mode from the same mechanical boundary entry; counts are distinct objects" xmlns="http://www.w3.org/2000/svg">
-  <text x="240.5" y="16" text-anchor="middle" class="charts-axis-text">Mode</text>
-  <text x="12" y="130.5" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90 12 130.5)" class="charts-axis-text">Type</text>
-  {% for row in loading_plot.modes %}<foreignObject x="{{ row.x }}" y="24" width="{{ row.width }}" height="20"><div xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" title="{{ row.label }}">{{ row.label }}</div></foreignObject>{% endfor %}
-  {% for row in loading_plot.types %}<foreignObject x="28" y="{{ row.y }}" width="80" height="20"><div xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-end" title="{{ row.label }}">{{ row.label }}</div></foreignObject>{% endfor %}
+  <foreignObject x="116" y="4" width="249" height="40">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="charts-heatmap-mode-axis">
+      <span class="charts-heatmap-axis-title">Mode</span>
+      <div class="charts-heatmap-mode-labels">{% for row in loading_plot.modes %}<div class="charts-svg-label charts-svg-label-center" title="{{ row.label }}">{{ row.label }}</div>{% endfor %}</div>
+    </div>
+  </foreignObject>
+  <foreignObject x="0" y="48" width="108" height="165">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="charts-heatmap-type-axis">
+      <span class="charts-heatmap-axis-title charts-heatmap-type-title">Type</span>
+      <div class="charts-heatmap-type-labels">{% for row in loading_plot.types %}<div class="charts-svg-label charts-svg-label-end" title="{{ row.label }}">{{ row.label }}</div>{% endfor %}</div>
+    </div>
+  </foreignObject>
   {% for cell in loading_plot.cells %}
     <g class="charts-heatmap-cell" role="img" tabindex="0" data-type="{{ cell.type }}" data-mode="{{ cell.mode }}" data-count="{{ cell.count }}" aria-label="{{ cell.type }} and {{ cell.mode }}: {{ cell.count }} object{{ cell.count|pluralize }}, {{ cell.percent|floatformat:'1u' }}% of selected objects.">
       <title>{{ cell.type }} and {{ cell.mode }}: {{ cell.count }} object{{ cell.count|pluralize }}{% if cell.count %} ({{ cell.percent|floatformat:'1u' }}%){% endif %}</title>

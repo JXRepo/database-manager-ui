@@ -334,6 +334,23 @@ function exactEighths(value) {
             const rect = text.getBoundingClientRect();
             return {left: rect.left, right: rect.right, label: text.textContent};
           }),
+          heatmapSpacing: graphs.filter(svg => svg.classList.contains('charts-heatmap-svg')).map(svg => {
+            const textBounds = element => {
+              const region = element.getBoundingClientRect();
+              const range = document.createRange();
+              range.selectNodeContents(element);
+              const rect = range.getBoundingClientRect();
+              return {left: Math.max(rect.left, region.left), right: Math.min(rect.right, region.right),
+                top: Math.max(rect.top, region.top), bottom: Math.min(rect.bottom, region.bottom)};
+            };
+            const titles = [...svg.querySelectorAll('.charts-axis-text, .charts-heatmap-axis-title')];
+            const type = textBounds(titles.find(title => title.textContent.trim() === 'Type'));
+            const mode = textBounds(titles.find(title => title.textContent.trim() === 'Mode'));
+            const types = [...svg.querySelectorAll('.charts-svg-label-end')].map(textBounds);
+            const modes = [...svg.querySelectorAll('.charts-svg-label-center')].map(textBounds);
+            return {typeGap: Math.min(...types.map(rect => rect.left)) - type.right,
+              modeGap: Math.min(...modes.map(rect => rect.top)) - mode.bottom};
+          }),
           categoryLabels: graphs.flatMap((svg, chart) => [...svg.querySelectorAll('.charts-svg-label')].map(label => {
             const rect = label.getBoundingClientRect(), bounds = svg.getBoundingClientRect(), style = getComputedStyle(label);
             return {chart, text: label.textContent, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
@@ -389,6 +406,10 @@ function exactEighths(value) {
         assert.ok(!index || tick.left > metrics.boxTicks[index - 1].right + 3,
           `${label}: box axis labels overlap at ${width}: ${JSON.stringify(metrics.boxTicks)}`);
       });
+      for (const spacing of metrics.heatmapSpacing) {
+        assert.ok(spacing.typeGap > 0 && spacing.modeGap > 0 && Math.abs(spacing.typeGap - spacing.modeGap) <= 1,
+          `${label}: Type and Mode need the same visible gap from their names at ${width}: ${JSON.stringify(spacing)}`);
+      }
       metrics.categoryLabels.forEach((label, index) => {
         assert.ok(label.bounded && !label.clipped && label.fontSize >= 9.5,
           `${label}: category label must fit its region at ${width}: ${JSON.stringify(label)}`);
@@ -412,10 +433,21 @@ function exactEighths(value) {
         mkdirSync(process.env.CHARTS_SCREENSHOT_DIR, {recursive: true});
         const viewport = await command('Page.captureScreenshot', {format: 'png'});
         writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-viewport.png'), Buffer.from(viewport.data, 'base64'));
+        writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-axis-spacing.json'), JSON.stringify(metrics.heatmapSpacing, null, 2));
         await command('Emulation.setDeviceMetricsOverride', {width, height: Math.min(metrics.height, 4500), deviceScaleFactor: 1, mobile: false});
         await settleLayout();
         const shot = await command('Page.captureScreenshot', {format: 'png'});
         writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '.png'), Buffer.from(shot.data, 'base64'));
+        const loadingCard = await evaluate(`(() => {
+          const card = document.querySelector('[data-statistic=loading]');
+          if (!card) return null;
+          const rect = card.getBoundingClientRect();
+          return {x: rect.left + scrollX, y: rect.top + scrollY, width: rect.width, height: rect.height, scale: 1};
+        })()`);
+        if (loadingCard) {
+          const loadingShot = await command('Page.captureScreenshot', {format: 'png', clip: loadingCard, captureBeyondViewport: false});
+          writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-loading.png'), Buffer.from(loadingShot.data, 'base64'));
+        }
         await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
         await settleLayout();
       }
