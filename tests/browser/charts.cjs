@@ -487,7 +487,7 @@ function exactEighths(value) {
         await settleLayout();
         const shot = await command('Page.captureScreenshot', {format: 'png'});
         writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '.png'), Buffer.from(shot.data, 'base64'));
-        for (const statistic of ['loading', 'temperature']) {
+        for (const statistic of ['loading', 'temperature', 'grain_count']) {
           const cardBounds = await evaluate(`(() => {
             const card = document.querySelector('[data-statistic="${statistic}"]');
             if (!card) return null;

@@ -2,8 +2,8 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts loading pairs, equal heatmap spacing and compact temperature labels; see git log)
-next_topic: Review the corrected Temperature card, then continue with Grain number
+code_base: main (Charts grain number single-point display and clear coverage; see git log)
+next_topic: Review the corrected Grain number card, then continue with Texture types
 ---
 
 # Project handoff
@@ -14,8 +14,9 @@ next_topic: Review the corrected Temperature card, then continue with Grain numb
 
 - 用户正在挨个讨论 Charts 卡片。前四张已讨论，Loading types & modes 已按用户要求
   改为同一条加载设置内的类型／模式配对，Type／Mode 到各自名称的间距也已统一。
-  当前是第五张 Temperature，用户指出字号问题并要求按已讨论的四处问题修改。
-  字号、轴标题位置、温度范围和可用温度对象数说明已调整。按用户指定的卡片继续，
+  第五张 Temperature 的字号、轴标题位置、温度范围和可用对象数说明已调整，用户已认可。
+  当前是第六张 Grain number，用户已了解按相统计晶粒数，并要求修改三处显示问题。
+  单值短线／盒子说明、最小最大值和可用晶粒数对象说明已调整。按用户指定的卡片继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
 - 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
@@ -25,7 +26,8 @@ next_topic: Review the corrected Temperature card, then continue with Grain numb
 - 当前分支是 main。`233a409` 实现八张卡片，`e958725` 删除各卡片的 Data table，
   `2052c62` 为 Phase 圆点旁增加对象占比，`b12dcf4` 取消图形点击筛选，均已推送。
   `4daac9b` 修正加载配对统计，`73ef19b` 调整轴标题方向，`c97a89b` 统一热图间距，
-  均已推送。本轮整理 Temperature 排版和说明；权限、统计口径、存储 JSON
+  `d3f376a` 整理 Temperature 排版和说明，均已推送。本轮整理 Grain number 单值显示和说明；
+  权限、统计口径、存储 JSON
   和导出未改变。最新提交见 git log，
   Render 是否完成部署仍未确认。
 
@@ -65,6 +67,10 @@ next_topic: Review the corrected Temperature card, then continue with Grain numb
   两轴标题到刻度共用 12px 间距（随 SVG 缩放）。右上角明确写 Usable temperature，
   表示有可用温度的对象／当前选中对象；Median 和 Min–max 带 K，最小最大值相同也
   显示两个端点，如 298–298 K。单值仍画一根真实频数柱，精确区间和计数未改变。
+- Grain number 只有一个不同数值时只画一个点，不画上下短线或显示盒子说明；
+  多个相报告相同值也沿用这种显示。不同数值仍保留箱线图和说明。右上角明确写
+  Usable grain number，表示有可用晶粒数的对象／当前选中对象；Min–max 始终显示
+  两个端点，如 343–343。底部保留相观测数来自多少对象，悬停和原有字号不变。
 - 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
   悬停提示保留，点击筛选已取消；类别超过六项时出现 More categories，热图还有组合时
   出现 More combinations，展开后仍是图形。环形图旁两行数量／百分比图例保留。
@@ -92,13 +98,13 @@ next_topic: Review the corrected Temperature card, then continue with Grain numb
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
 本轮验证：57 项 Charts 测试通过，无跳过；真实 Chromium 核对 1280／1440／1920 桌面、
-温度单柱／多柱、长名称、空数据、悬停和点击不跳转、私有权限、精确书签区间、展开入口和
-无 JavaScript 操作。浏览器回归先复现旧版 Objects 位置错误，再验证图中文字实际字号、
-轴标题方向、两边间距相同、标题和覆盖数量不重叠、刻度完整且不重叠。
-1440px 下实测温度图文字 12px、两个轴标题间距均为 12px，已查看样例、公开和多类别
-温度卡片截图。加载配对和热图间距回归仍通过，用户样例 JSON 未改变；之前配对修改
+单值、不同晶粒数、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
+展开入口和无 JavaScript 操作。已查看 Grain number 样例、公开、多类别和缺失值截图：
+样例只留 343 处一个点，显示 Min–max 343–343，没有短线或盒子说明；有不同值时
+仍显示箱线图，覆盖数量和相／对象数量完整。温度、加载配对和热图间距回归仍通过，
+用户样例 JSON 未改变；之前配对修改
 还通过了 19 项小助手测试。
-日志 `/tmp/charts-temperature-tests.log`，截图与实测排版 `/tmp/charts-temperature-final-qa`；这些路径
+日志 `/tmp/charts-grain-number-tests.log`，截图 `/tmp/charts-grain-number-final-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

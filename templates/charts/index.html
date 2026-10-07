@@ -90,9 +90,12 @@
 
         {% for item in primary_distributions %}
           <section class="charts-panel charts-distributions" data-statistic="{{ item.key }}" aria-labelledby="{{ item.key }}-heading">
-            <div class="charts-panel-heading"><h2 id="{{ item.key }}-heading">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</h2><span class="charts-context-label"{% if item.key == 'temperature' %} title="Objects with a usable temperature / selected objects"{% endif %}>{% if item.key == 'temperature' %}Usable temperature: {% endif %}{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+            <div class="charts-panel-heading">
+              <h2 id="{{ item.key }}-heading">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</h2>
+              <span class="charts-context-label"{% if item.key == 'temperature' %} title="Objects with a usable temperature / selected objects"{% elif item.key == 'grain_count' %} title="Objects with a usable grain number / selected objects"{% endif %}>{% if item.key == 'temperature' %}Usable temperature: {% elif item.key == 'grain_count' %}Usable grain number: {% endif %}{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span>
+            </div>
             {% if item.observation_count %}
-              <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}{% if item.key == 'temperature' %} K{% endif %}</strong></span><span>{% if item.key == 'temperature' %}Min–max{% else %}Range{% endif %} <strong>{{ item.minimum }}{% if item.key == 'temperature' or item.minimum != item.maximum %}–{{ item.maximum }}{% endif %}{% if item.key == 'temperature' %} K{% endif %}</strong></span></div>
+              <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}{% if item.key == 'temperature' %} K{% endif %}</strong></span><span>Min–max <strong>{{ item.minimum }}–{{ item.maximum }}{% if item.key == 'temperature' %} K{% endif %}</strong></span></div>
               <div class="charts-plot-stage">{% if item.key == 'grain_count' %}{% include 'charts/box.html' with box=item.box_plot %}{% else %}{% include 'charts/histogram.html' with histogram=item.plot %}{% endif %}</div>
               {% if item.observation_unit == 'phases' %}<p class="charts-distribution-caption">{{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</p>{% endif %}
             {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>{% if item.key == 'temperature' %}No usable temperature{% else %}No usable grain number{% endif %}</strong></div></div>{% endif %}

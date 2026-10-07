@@ -412,8 +412,11 @@ Eight cards are visible directly, in four pairs:
   interpolation at positions `(n - 1) × p`, where `p` is 0.25 or 0.75; the median
   is the central observation or the mean of the two central observations.
   Whiskers show the actual minimum and maximum, with no outlier classification.
-  A constant value is shown as one point. Hover details report the quartiles,
-  median, actual extrema and observation counts.
+  A constant value is shown as one point, with no whiskers or box legend.
+  The header shows objects with a usable grain number out of all selected objects;
+  the caption keeps the phase and object counts distinct. Min–max displays both
+  extrema, including `343–343` for a constant value. Hover details report the
+  quartiles, median, actual extrema and observation counts.
 - **Texture types** uses independently sized bubbles; circle area is
   proportional to object count, rather than a share of a disjoint whole.
 - **Software** compares reported software names with vertical columns.
