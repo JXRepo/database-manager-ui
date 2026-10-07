@@ -58,7 +58,7 @@
 
       <div class="charts-dashboard-grid">
         <section class="charts-panel" data-statistic="phase" aria-labelledby="phase-heading">
-          <div class="charts-panel-heading"><h2 id="phase-heading">Phase</h2><span class="charts-context-label">{{ phase_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="phase-heading">Phase</h2><span class="charts-context-label" title="Objects reporting a phase name / selected objects">With data: {{ phase_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">
             {% if phase_category.rows %}{% include 'charts/category.html' with plot=phase_plot category=phase_category lollipop=True %}{% else %}<div class="charts-plot-empty"><strong>No phase reported</strong></div>{% endif %}
           </div>
@@ -66,12 +66,12 @@
         </section>
 
         <section class="charts-panel charts-results" data-statistic="results" aria-labelledby="results-heading">
-          <div class="charts-panel-heading"><h2 id="results-heading">Stress–strain coverage</h2><span class="charts-context-label">{{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="results-heading">Stress–strain coverage</h2><span class="charts-context-label" title="All objects in the current selection">Total: {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">{% include 'charts/pie.html' %}</div>
         </section>
 
         <section class="charts-panel" data-statistic="models" aria-labelledby="models-heading">
-          <div class="charts-panel-heading"><h2 id="models-heading">Constitutive models</h2><span class="charts-context-label">{{ model_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="models-heading">Constitutive models</h2><span class="charts-context-label" title="Objects reporting an elastic or plastic model / selected objects">With data: {{ model_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           {% if model_category.rows %}<div class="charts-model-key"><span><i class="charts-key-elastic" aria-hidden="true"></i>Elastic</span><span><i class="charts-key-plastic" aria-hidden="true"></i>Plastic</span></div>{% endif %}
           <div class="charts-plot-stage">
             {% if model_category.rows %}{% include 'charts/category.html' with plot=model_plot category=model_category %}{% else %}<div class="charts-plot-empty"><strong>No constitutive models reported</strong></div>{% endif %}
@@ -80,7 +80,7 @@
         </section>
 
         <section class="charts-panel" data-statistic="loading" aria-labelledby="loading-heading">
-          <div class="charts-panel-heading"><h2 id="loading-heading">Loading types &amp; modes</h2><span class="charts-context-label">{{ loading_matrix.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="loading-heading">Loading types &amp; modes</h2><span class="charts-context-label" title="Objects reporting a complete type and mode pair in the same mechanical boundary entry / selected objects">With data: {{ loading_matrix.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           {% if loading_matrix.pairs %}
             <p class="charts-distribution-caption charts-loading-caption">Objects with each loading combination</p>
             <div class="charts-plot-stage">{% include 'charts/heatmap.html' %}</div>
@@ -92,7 +92,7 @@
           <section class="charts-panel charts-distributions" data-statistic="{{ item.key }}" aria-labelledby="{{ item.key }}-heading">
             <div class="charts-panel-heading">
               <h2 id="{{ item.key }}-heading">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</h2>
-              <span class="charts-context-label"{% if item.key == 'temperature' %} title="Objects with a usable temperature / selected objects"{% elif item.key == 'grain_count' %} title="Objects with a usable grain number / selected objects"{% endif %}>{% if item.key == 'temperature' %}Usable temperature: {% elif item.key == 'grain_count' %}Usable grain number: {% endif %}{{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span>
+              <span class="charts-context-label"{% if item.key == 'temperature' %} title="Objects with a usable temperature / selected objects"{% elif item.key == 'grain_count' %} title="Objects with a usable grain number / selected objects"{% endif %}>With data: {{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span>
             </div>
             {% if item.observation_count %}
               <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}{% if item.key == 'temperature' %} K{% endif %}</strong></span><span>Min–max <strong>{{ item.minimum }}–{{ item.maximum }}{% if item.key == 'temperature' %} K{% endif %}</strong></span></div>
@@ -103,7 +103,7 @@
         {% endfor %}
 
         <section class="charts-panel" data-statistic="texture" aria-labelledby="texture-heading">
-          <div class="charts-panel-heading"><h2 id="texture-heading">Texture types</h2><span class="charts-context-label" title="Objects reporting a texture type / selected objects">Texture reported: {{ texture_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="texture-heading">Texture types</h2><span class="charts-context-label" title="Objects reporting a texture type / selected objects">With data: {{ texture_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">
             {% if texture_category.rows %}{% include 'charts/bubble.html' with plot=texture_plot %}{% else %}<div class="charts-plot-empty"><strong>No texture type reported</strong></div>{% endif %}
           </div>
@@ -111,7 +111,7 @@
         </section>
 
         <section class="charts-panel" data-statistic="software" aria-labelledby="software-heading">
-          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label" title="Objects reporting software / selected objects">Software reported: {{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label" title="Objects reporting software / selected objects">With data: {{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">
             {% if software_category.rows %}{% include 'charts/columns.html' with plot=software_plot %}{% else %}<div class="charts-plot-empty"><strong>No software reported</strong></div>{% endif %}
           </div>

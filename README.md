@@ -386,6 +386,10 @@ than phase observations. Stress–strain availability counts objects with matchi
 components, not individual curves. All four totals describe the current
 accessible selection; missing names contribute no category. **View data** beside
 Data scope links to a separate page of matching objects.
+Card headers use **With data: n / total objects** for the number of distinct
+objects contributing to that card out of all selected objects. Hover over the
+count for the specific inclusion rule. The stress–strain coverage card shows
+**Total: n objects**, since its two classes cover the entire selection.
 Eight cards are visible directly, in four pairs:
 
 - **Phase** counts objects for each phase name with a horizontal lollipop chart:

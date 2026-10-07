@@ -2,8 +2,8 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts Software object coverage clarified; see git log)
-next_topic: Review the corrected Software card; continue according to the user's next request
+code_base: main (Charts card coverage wording unified; see git log)
+next_topic: Review the unified card headers; continue according to the user's next request
 ---
 
 # Project handoff
@@ -17,8 +17,9 @@ next_topic: Review the corrected Software card; continue according to the user's
   第五张 Temperature 的字号、轴标题位置、温度范围和可用对象数说明已调整，用户已认可。
   第六张 Grain number 的单值短线／盒子说明、最小最大值和可用对象数说明已调整，用户已认可。
   第七张 Texture types 的覆盖数量和圆大小说明已调整，用户已继续到最后一张。
-  当前是第八张 Software，已解释各软件名称对应多少对象，并直接明确右上角覆盖数量。
-  八张卡片都已逐张梳理，最后一张已调整并验证。按用户接下来的指示继续，
+  第八张 Software 已解释各软件名称对应多少对象，并明确右上角覆盖数量。
+  用户随后指出各卡片数量前的文字有时有、有时没有；本轮统一为 With data，覆盖图用 Total。
+  八张卡片都已逐张梳理，数量说明已统一并验证。按用户接下来的指示继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
 - 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
@@ -31,7 +32,7 @@ next_topic: Review the corrected Software card; continue according to the user's
   `4daac9b` 修正加载配对统计，`73ef19b` 调整轴标题方向，`c97a89b` 统一热图间距，
   `d3f376a` 整理 Temperature，`3503b76` 整理 Grain number 单值显示和说明，均已推送。
   `27c5d60` 明确 Texture types 覆盖和圆大小说明，并记录直接修正审查问题的偏好，已推送。
-  本轮明确 Software 的对象覆盖；
+  `27d472d` 明确 Software 的对象覆盖，已推送。本轮统一八张卡片的数量说明；
   权限、统计口径、存储 JSON
   和导出未改变。最新提交见 git log，
   Render 是否完成部署仍未确认。
@@ -55,6 +56,11 @@ next_topic: Review the corrected Software card; continue according to the user's
   已回答“饼图啥的都有是吗”，其中饼图采用环形形式。
 - Phase 已按用户要求在圆点旁显示数量和占比，例如 `1 (100%)`；百分比分母是当前
   选中的对象总数。多相对象会分别计入各相，类别百分比之和可能超过 100%。
+- 七张卡片右上角统一为 `With data: n / total objects`：分子是能进入该图统计的
+  不同对象数，分母是当前选中对象数。悬停说明具体条件：报告相名称、弹性或塑性模型、
+  同一 mechanical_BC 条目的完整类型／模式配对、可用温度、可用晶粒数、织构名称或软件。
+  第二张覆盖图的两类涵盖全部选中对象，右上角用 `Total: n objects`。之前前缀有无
+  不一致是逐张调整时没有统一措辞，不代表额外的统计区别；计数规则未变。
 - 第二张环形图已解释并获得用户认可：Available／Not available 按是否有匹配应力与
   总应变分量划分，互斥且覆盖全部对象；不表示上传验证通过或材料可直接比较。
 - 第三张已解释：统计每个弹性／塑性本构模型对应多少个对象，同一对象可同时报告两类。
@@ -69,19 +75,19 @@ next_topic: Review the corrected Software card; continue according to the user's
   单格和多格均沿用同一排版，原生 HTML／CSS 排版不依赖 JavaScript。
 - Temperature 图宽最多 420px，轴标题、刻度和柱顶数字在最大图宽下均为 12px，
   小于 15px 卡片标题；Objects 在纵轴旁竖排居中，Temperature (K) 在横轴下方居中，
-  两轴标题到刻度共用 12px 间距（随 SVG 缩放）。右上角明确写 Usable temperature，
+  两轴标题到刻度共用 12px 间距（随 SVG 缩放）。右上角统一写 With data，
   表示有可用温度的对象／当前选中对象；Median 和 Min–max 带 K，最小最大值相同也
   显示两个端点，如 298–298 K。单值仍画一根真实频数柱，精确区间和计数未改变。
 - Grain number 只有一个不同数值时只画一个点，不画上下短线或显示盒子说明；
   多个相报告相同值也沿用这种显示。不同数值仍保留箱线图和说明。右上角明确写
-  Usable grain number，表示有可用晶粒数的对象／当前选中对象；Min–max 始终显示
+  With data，表示有可用晶粒数的对象／当前选中对象；Min–max 始终显示
   两个端点，如 343–343。底部保留相观测数来自多少对象，悬停和原有字号不变。
-- Texture types 右上角明确写 Texture reported，表示报告了织构类型的对象／当前选中对象；
+- Texture types 右上角统一写 With data，表示报告了织构类型的对象／当前选中对象；
   悬停该数量可看完整分子分母含义。底部说明改成 Larger circles = more objects。
   圆面积仍与对象数成比例，同一对象在同一织构名称下只计一次，可以报告多个不同名称，
   名称、数量、对象占比悬停及 More categories 都保留。
 - Software 统计报告各软件名称的对象数，用户样例是 Abaqus CAE 对应 1 个对象。
-  右上角明确写 Software reported，表示报告了软件的对象／当前选中对象，悬停可查看
+  右上角统一写 With data，表示报告了软件的对象／当前选中对象，悬停可查看
   完整分子分母含义。原来的柱图、字号、完整名称和占比悬停、More categories 保留。
 - 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
   悬停提示保留，点击筛选已取消；类别超过六项时出现 More categories，热图还有组合时
@@ -111,11 +117,11 @@ next_topic: Review the corrected Software card; continue according to the user's
 
 本轮验证：57 项 Charts 测试通过，无跳过；真实 Chromium 核对 1280／1440／1920 桌面、
 单个软件、多个软件、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
-展开入口和无 JavaScript 操作。已查看 Software 样例和多类别长名称截图：
-右上角覆盖数量完整，没有文字重叠或裁切；Abaqus CAE 显示 1 个对象，长名称保留完整悬停。
+展开入口和无 JavaScript 操作。全部卡片标题与数量的间距均通过真实浏览器检查，
+已查看 Copper 样例完整八卡片和缺失元数据截图；右上角数量说明一致且没有文字重叠或裁切。
 温度、晶粒数量、织构、加载配对和热图间距回归仍通过，用户样例 JSON 未改变；之前配对修改
 还通过了 19 项小助手测试。
-日志 `/tmp/charts-software-tests.log`，截图 `/tmp/charts-software-final-qa`；这些路径
+日志 `/tmp/charts-card-headers-tests.log`，截图 `/tmp/charts-card-headers-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

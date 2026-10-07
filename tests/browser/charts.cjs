@@ -299,7 +299,10 @@ function exactEighths(value) {
           height: document.documentElement.scrollHeight,
           cards: panels.map(panel => {
             const rect = panel.getBoundingClientRect();
-            return {key: panel.dataset.statistic, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom};
+            const heading = panel.querySelector('h2').getBoundingClientRect();
+            const coverage = panel.querySelector('.charts-context-label').getBoundingClientRect();
+            return {key: panel.dataset.statistic, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              headingGap: coverage.left - heading.right};
           }),
           primary: graphs.filter(svg => ['phase', 'results'].includes(svg.closest('[data-statistic]').dataset.statistic))
             .map(svg => ({top: svg.getBoundingClientRect().top, bottom: svg.getBoundingClientRect().bottom})),
@@ -418,6 +421,7 @@ function exactEighths(value) {
         assert.equal(metrics.cards.length, 8);
         for (const card of metrics.cards) {
           assert.ok(card.left >= metrics.mainLeft && card.right <= width, `${label}: card outside desktop ${JSON.stringify(card)}`);
+          assert.ok(card.headingGap >= 11, `${label}: card title and coverage need space at ${width}: ${JSON.stringify(card)}`);
         }
       }
       if (expectedGraphs === 8) assert.deepEqual(metrics.graphTypes,
@@ -451,7 +455,7 @@ function exactEighths(value) {
         assert.ok(temperature.yGap > 0 && temperature.xGap > 0 && Math.abs(temperature.yGap - temperature.xGap) <= 1,
           `${label}: temperature axis titles need equal visible gaps at ${width}: ${JSON.stringify(temperature)}`);
         assert.ok(!temperature.headingOverlap, `${label}: temperature heading and coverage overlap at ${width}`);
-        assert.match(temperature.coverage, /^Usable temperature:/);
+        assert.match(temperature.coverage, /^With data:/);
         assert.match(temperature.summary, /Min–max/);
         temperature.xLabels.forEach((tick, index) => {
           assert.ok(!index || tick.left > temperature.xLabels[index - 1].right + 3,
@@ -487,7 +491,7 @@ function exactEighths(value) {
         await settleLayout();
         const shot = await command('Page.captureScreenshot', {format: 'png'});
         writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '.png'), Buffer.from(shot.data, 'base64'));
-        for (const statistic of ['loading', 'temperature', 'grain_count', 'texture', 'software']) {
+        for (const statistic of ['phase', 'results', 'models', 'loading', 'temperature', 'grain_count', 'texture', 'software']) {
           const cardBounds = await evaluate(`(() => {
             const card = document.querySelector('[data-statistic="${statistic}"]');
             if (!card) return null;
@@ -823,7 +827,7 @@ function exactEighths(value) {
       assert.equal((await categorySummary('software', 'Abaqus CAE')).count, 1);
       assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Median\s+298/);
       assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Min–max\s+298–298 K/);
-      assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-context-label").textContent'), /Usable temperature:\s+1 \/ 1 object/);
+      assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-context-label").textContent'), /With data:\s+1 \/ 1 object/);
       assert.ok(await evaluate('document.querySelector("[data-statistic=temperature] h2").textContent.includes("(K)")'));
       assert.deepEqual(await evaluate(`[...document.querySelectorAll('.charts-metric dd')]
         .map(value => value.textContent.trim())`), ['1', '1', '1', '1']);
