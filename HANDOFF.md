@@ -2,8 +2,8 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts grain number single-point display and clear coverage; see git log)
-next_topic: Review the corrected Grain number card, then continue with Texture types
+code_base: main (Charts Texture types coverage and circle explanation; see git log)
+next_topic: Review the corrected Texture types card, then continue with Software
 ---
 
 # Project handoff
@@ -15,18 +15,21 @@ next_topic: Review the corrected Grain number card, then continue with Texture t
 - 用户正在挨个讨论 Charts 卡片。前四张已讨论，Loading types & modes 已按用户要求
   改为同一条加载设置内的类型／模式配对，Type／Mode 到各自名称的间距也已统一。
   第五张 Temperature 的字号、轴标题位置、温度范围和可用对象数说明已调整，用户已认可。
-  当前是第六张 Grain number，用户已了解按相统计晶粒数，并要求修改三处显示问题。
-  单值短线／盒子说明、最小最大值和可用晶粒数对象说明已调整。按用户指定的卡片继续，
+  第六张 Grain number 的单值短线／盒子说明、最小最大值和可用对象数说明已调整，用户已认可。
+  当前是第七张 Texture types，用户已了解各织构名称对应多少对象，并要求明确覆盖数量和圆大小说明。
+  右上角数量含义和底部说明已调整。按用户指定的卡片继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
 - 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
   保留原生悬停提示、键盘焦点、More categories／More combinations 展开和 View data。
-- 回答要简单、直接、白话，用中文；应用界面保持英文。明确要求修改时直接实施，
-  验证后提交并推送，不反复确认常规步骤。不要一次重新设计全部卡片或自行增加功能。
+- 回答要简单、直接、白话，用中文；应用界面保持英文。用户最新明确要求：以后发现明确
+  有必要的问题直接改，不再等用户单独说“改”。保持当前审查范围，验证后提交并推送，
+  不反复确认常规步骤。不要一次重新设计全部卡片或自行增加功能。
 - 当前分支是 main。`233a409` 实现八张卡片，`e958725` 删除各卡片的 Data table，
   `2052c62` 为 Phase 圆点旁增加对象占比，`b12dcf4` 取消图形点击筛选，均已推送。
   `4daac9b` 修正加载配对统计，`73ef19b` 调整轴标题方向，`c97a89b` 统一热图间距，
-  `d3f376a` 整理 Temperature 排版和说明，均已推送。本轮整理 Grain number 单值显示和说明；
+  `d3f376a` 整理 Temperature，`3503b76` 整理 Grain number 单值显示和说明，均已推送。
+  本轮明确 Texture types 的对象覆盖和圆大小说明，并在 AGENTS.md 记录直接修正审查问题的偏好；
   权限、统计口径、存储 JSON
   和导出未改变。最新提交见 git log，
   Render 是否完成部署仍未确认。
@@ -71,6 +74,10 @@ next_topic: Review the corrected Grain number card, then continue with Texture t
   多个相报告相同值也沿用这种显示。不同数值仍保留箱线图和说明。右上角明确写
   Usable grain number，表示有可用晶粒数的对象／当前选中对象；Min–max 始终显示
   两个端点，如 343–343。底部保留相观测数来自多少对象，悬停和原有字号不变。
+- Texture types 右上角明确写 Texture reported，表示报告了织构类型的对象／当前选中对象；
+  悬停该数量可看完整分子分母含义。底部说明改成 Larger circles = more objects。
+  圆面积仍与对象数成比例，同一对象在同一织构名称下只计一次，可以报告多个不同名称，
+  名称、数量、对象占比悬停及 More categories 都保留。
 - 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
   悬停提示保留，点击筛选已取消；类别超过六项时出现 More categories，热图还有组合时
   出现 More combinations，展开后仍是图形。环形图旁两行数量／百分比图例保留。
@@ -98,13 +105,12 @@ next_topic: Review the corrected Grain number card, then continue with Texture t
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
 本轮验证：57 项 Charts 测试通过，无跳过；真实 Chromium 核对 1280／1440／1920 桌面、
-单值、不同晶粒数、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
-展开入口和无 JavaScript 操作。已查看 Grain number 样例、公开、多类别和缺失值截图：
-样例只留 343 处一个点，显示 Min–max 343–343，没有短线或盒子说明；有不同值时
-仍显示箱线图，覆盖数量和相／对象数量完整。温度、加载配对和热图间距回归仍通过，
-用户样例 JSON 未改变；之前配对修改
+单个织构、多个织构、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
+展开入口和无 JavaScript 操作。已查看 Texture types 样例、多类别和缺失值截图：
+右上角覆盖数量和底部圆大小说明完整，没有文字重叠或裁切。温度、晶粒数量、加载配对
+和热图间距回归仍通过，用户样例 JSON 未改变；之前配对修改
 还通过了 19 项小助手测试。
-日志 `/tmp/charts-grain-number-tests.log`，截图 `/tmp/charts-grain-number-final-qa`；这些路径
+日志 `/tmp/charts-texture-types-tests.log`，截图 `/tmp/charts-texture-types-final-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

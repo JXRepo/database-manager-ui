@@ -103,7 +103,7 @@
         {% endfor %}
 
         <section class="charts-panel" data-statistic="texture" aria-labelledby="texture-heading">
-          <div class="charts-panel-heading"><h2 id="texture-heading">Texture types</h2><span class="charts-context-label">{{ texture_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="texture-heading">Texture types</h2><span class="charts-context-label" title="Objects reporting a texture type / selected objects">Texture reported: {{ texture_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">
             {% if texture_category.rows %}{% include 'charts/bubble.html' with plot=texture_plot %}{% else %}<div class="charts-plot-empty"><strong>No texture type reported</strong></div>{% endif %}
           </div>

@@ -9,5 +9,5 @@
     <foreignObject x="{{ row.label_x }}" y="{{ row.label_y }}" width="108" height="20"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)">{{ row.label }}</span></foreignObject>
     </g>
   {% endfor %}
-  <text x="180" y="{{ plot.height|add:'-8' }}" text-anchor="middle" class="charts-axis-text">Circle area: data objects</text>
+  <text x="180" y="{{ plot.height|add:'-8' }}" text-anchor="middle" class="charts-axis-text">Larger circles = more objects</text>
 </svg>

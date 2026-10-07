@@ -419,6 +419,8 @@ Eight cards are visible directly, in four pairs:
   quartiles, median, actual extrema and observation counts.
 - **Texture types** uses independently sized bubbles; circle area is
   proportional to object count, rather than a share of a disjoint whole.
+  The header labels objects reporting a texture type out of all selected objects;
+  the chart explains the sizes with “Larger circles = more objects”.
 - **Software** compares reported software names with vertical columns.
 
 There is no independent Filters form or chart-category selector. Chart marks,

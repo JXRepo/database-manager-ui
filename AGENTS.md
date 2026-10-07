@@ -221,7 +221,7 @@ When explaining changes:
 ## Collaboration
 
 - Explain work to the user in concise Chinese; keep application UI text in English
-- The user prefers direct implementation of clearly requested changes, without approval at every routine step; still ask about material ambiguity or destructive actions
+- The user prefers direct implementation of clearly requested changes and clear necessary fixes found during reviews, without approval at every routine step; still ask about material ambiguity or destructive actions
 - After requested changes are complete and verified, the user wants `git add .`, a meaningful commit, and `git push`; inspect the diff first and do not include secrets or unrelated changes
 - Never force push or discard another computer's uncommitted work to resolve a sync problem
 - A successful push is not proof that Render has finished deployment; distinguish those states when reporting
