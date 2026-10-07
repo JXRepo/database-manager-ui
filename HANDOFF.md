@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts hover information and loading pairs within one boundary entry; see git log)
+code_base: main (Charts loading pairs and centered heatmap axis titles; see git log)
 next_topic: Review the corrected Loading types & modes card, then continue with Temperature
 ---
 
@@ -14,7 +14,7 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
 
 - 用户正在挨个讨论 Charts 卡片。前三张 Phase、Stress–strain coverage 和
   Constitutive models 已解释并认可。第四张 Loading types & modes 已按用户要求改为
-  同一条加载设置内的类型／模式配对。按用户指定的卡片继续，
+  同一条加载设置内的类型／模式配对，Type／Mode 标题位置也已调整。按用户指定的卡片继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
 - 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
@@ -23,7 +23,8 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
   验证后提交并推送，不反复确认常规步骤。不要一次重新设计全部卡片或自行增加功能。
 - 当前分支是 main。`233a409` 实现八张卡片，`e958725` 删除各卡片的 Data table，
   `2052c62` 为 Phase 圆点旁增加对象占比，`b12dcf4` 取消图形点击筛选，均已推送。
-  本轮修正热图的加载配对统计；权限、存储 JSON 和导出未改变。最新提交见 git log，
+  `4daac9b` 修正加载配对统计，已推送。本轮调整热图轴标题；权限、统计口径、存储 JSON
+  和导出未改变。最新提交见 git log，
   Render 是否完成部署仍未确认。
 
 八张卡片目前按桌面两列、四行排列，阅读顺序为每行从左到右：
@@ -53,6 +54,8 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
   已识别的字段拼写和单值包装仍通过共享元数据视图处理，thermal_BC 不参与。
   原先各自按 loading_type／loading_mode 匹配整个对象的书签语义保留；热图没有筛选链接，
   不把两个独立条件书签当作精确配对数量。More combinations 也只包含实际配对。
+- 热图 Mode 在列名称上方居中，Type 在左侧竖排居中。类型名称留在标题与格子之间，
+  长名称仍省略显示并保留完整悬停提示；单格和多格均沿用同一排版。
 - 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
   悬停提示保留，点击筛选已取消；类别超过六项时出现 More categories，热图还有组合时
   出现 More combinations，展开后仍是图形。环形图旁两行数量／百分比图例保留。
@@ -79,11 +82,11 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
 - 用户常用样例是 `example_json_files/a46fde6c.json`。上一轮已验证 Copper、
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
-本轮验证：76 项测试通过，无跳过，包含 57 项 Charts 和 19 项小助手测试。三个加载
-回归测试先复现旧问题再通过；真实 Chromium 核对实际组合为 1、跨条目组合为 0、
-重复配对只计一次，以及八种图形悬停和点击不跳转、1280／1440／1920 桌面、私有权限、
-精确书签区间、展开入口和无 JavaScript 操作。用户样例 JSON 未改变。
-日志 `/tmp/charts-loading-pairs-tests.log`，截图 `/tmp/charts-loading-pairs-qa`；这些路径
+本轮验证：57 项 Charts 测试通过，无跳过；真实 Chromium 核对 1280／1440／1920 桌面、
+单格／多格、长名称、空数据、悬停和点击不跳转、私有权限、精确书签区间、展开入口和
+无 JavaScript 操作。已查看单格、三列和长名称截图，两个轴标题及类别名称不重叠。
+加载配对回归仍通过，用户样例 JSON 未改变；上轮配对修改还通过了 19 项小助手测试。
+日志 `/tmp/charts-loading-axis-titles-tests.log`，截图 `/tmp/charts-loading-axis-titles-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

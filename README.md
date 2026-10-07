@@ -400,6 +400,7 @@ Eight cards are visible directly, in four pairs:
   together in the same mechanical boundary entry. Each object counts once per
   combination, even when several entries repeat it. Incomplete or nontext pairs
   do not enter the matrix or its axes. Hover over a cell to read the pair and its count.
+  Mode is centered above the columns; Type is vertical and centered beside the rows.
 - **Temperature** shows a histogram in kelvin.
 - **Grain number** shows a box plot of phase observations. Quartiles use linear
   interpolation at positions `(n - 1) × p`, where `p` is 0.25 or 0.75; the median
