@@ -2,22 +2,23 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts Texture types coverage and circle explanation; see git log)
-next_topic: Review the corrected Texture types card, then continue with Software
+code_base: main (Charts Software object coverage clarified; see git log)
+next_topic: Review the corrected Software card; continue according to the user's next request
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 新聊天先看这里：继续逐张梳理 Charts 卡片
+### 新聊天先看这里：Charts 已梳理到最后一张卡片
 
 - 用户正在挨个讨论 Charts 卡片。前四张已讨论，Loading types & modes 已按用户要求
   改为同一条加载设置内的类型／模式配对，Type／Mode 到各自名称的间距也已统一。
   第五张 Temperature 的字号、轴标题位置、温度范围和可用对象数说明已调整，用户已认可。
   第六张 Grain number 的单值短线／盒子说明、最小最大值和可用对象数说明已调整，用户已认可。
-  当前是第七张 Texture types，用户已了解各织构名称对应多少对象，并要求明确覆盖数量和圆大小说明。
-  右上角数量含义和底部说明已调整。按用户指定的卡片继续，
+  第七张 Texture types 的覆盖数量和圆大小说明已调整，用户已继续到最后一张。
+  当前是第八张 Software，已解释各软件名称对应多少对象，并直接明确右上角覆盖数量。
+  八张卡片都已逐张梳理，最后一张已调整并验证。按用户接下来的指示继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
 - 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
@@ -29,7 +30,8 @@ next_topic: Review the corrected Texture types card, then continue with Software
   `2052c62` 为 Phase 圆点旁增加对象占比，`b12dcf4` 取消图形点击筛选，均已推送。
   `4daac9b` 修正加载配对统计，`73ef19b` 调整轴标题方向，`c97a89b` 统一热图间距，
   `d3f376a` 整理 Temperature，`3503b76` 整理 Grain number 单值显示和说明，均已推送。
-  本轮明确 Texture types 的对象覆盖和圆大小说明，并在 AGENTS.md 记录直接修正审查问题的偏好；
+  `27c5d60` 明确 Texture types 覆盖和圆大小说明，并记录直接修正审查问题的偏好，已推送。
+  本轮明确 Software 的对象覆盖；
   权限、统计口径、存储 JSON
   和导出未改变。最新提交见 git log，
   Render 是否完成部署仍未确认。
@@ -78,6 +80,9 @@ next_topic: Review the corrected Texture types card, then continue with Software
   悬停该数量可看完整分子分母含义。底部说明改成 Larger circles = more objects。
   圆面积仍与对象数成比例，同一对象在同一织构名称下只计一次，可以报告多个不同名称，
   名称、数量、对象占比悬停及 More categories 都保留。
+- Software 统计报告各软件名称的对象数，用户样例是 Abaqus CAE 对应 1 个对象。
+  右上角明确写 Software reported，表示报告了软件的对象／当前选中对象，悬停可查看
+  完整分子分母含义。原来的柱图、字号、完整名称和占比悬停、More categories 保留。
 - 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
   悬停提示保留，点击筛选已取消；类别超过六项时出现 More categories，热图还有组合时
   出现 More combinations，展开后仍是图形。环形图旁两行数量／百分比图例保留。
@@ -105,12 +110,12 @@ next_topic: Review the corrected Texture types card, then continue with Software
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
 本轮验证：57 项 Charts 测试通过，无跳过；真实 Chromium 核对 1280／1440／1920 桌面、
-单个织构、多个织构、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
-展开入口和无 JavaScript 操作。已查看 Texture types 样例、多类别和缺失值截图：
-右上角覆盖数量和底部圆大小说明完整，没有文字重叠或裁切。温度、晶粒数量、加载配对
-和热图间距回归仍通过，用户样例 JSON 未改变；之前配对修改
+单个软件、多个软件、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
+展开入口和无 JavaScript 操作。已查看 Software 样例和多类别长名称截图：
+右上角覆盖数量完整，没有文字重叠或裁切；Abaqus CAE 显示 1 个对象，长名称保留完整悬停。
+温度、晶粒数量、织构、加载配对和热图间距回归仍通过，用户样例 JSON 未改变；之前配对修改
 还通过了 19 项小助手测试。
-日志 `/tmp/charts-texture-types-tests.log`，截图 `/tmp/charts-texture-types-final-qa`；这些路径
+日志 `/tmp/charts-software-tests.log`，截图 `/tmp/charts-software-final-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

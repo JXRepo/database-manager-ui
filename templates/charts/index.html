@@ -111,7 +111,7 @@
         </section>
 
         <section class="charts-panel" data-statistic="software" aria-labelledby="software-heading">
-          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label">{{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label" title="Objects reporting software / selected objects">Software reported: {{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">
             {% if software_category.rows %}{% include 'charts/columns.html' with plot=software_plot %}{% else %}<div class="charts-plot-empty"><strong>No software reported</strong></div>{% endif %}
           </div>

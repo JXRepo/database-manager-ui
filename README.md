@@ -422,6 +422,7 @@ Eight cards are visible directly, in four pairs:
   The header labels objects reporting a texture type out of all selected objects;
   the chart explains the sizes with “Larger circles = more objects”.
 - **Software** compares reported software names with vertical columns.
+  The header labels objects reporting software out of all selected objects.
 
 There is no independent Filters form or chart-category selector. Chart marks,
 category labels and the coverage legend show information on hover. Clicking them
