@@ -384,8 +384,8 @@ The overview shows four simple totals: **Data objects**,
 Phase and texture totals count distinct reported names, ignoring case, rather
 than phase observations. Stress–strain availability counts objects with matching
 components, not individual curves. All four totals describe the current
-data scope; missing names contribute no category. A short introduction explains
-the page's purpose and presents two actions: **View data** opens the objects in
+data scope; missing names contribute no category. A one-line introduction explains
+the page's purpose beside two actions: **View data** opens the objects in
 that scope, while **Search data** opens the existing detailed Search filters for
 all accessible objects, including received private shares. It starts a new
 search rather than carrying the Charts scope into Search. **View data** appears

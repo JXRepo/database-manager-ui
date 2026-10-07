@@ -36,10 +36,10 @@
 
     {% block charts_workspace %}
       <div class="charts-intro">
-        <p>Explore materials, simulation settings and available stress–strain data in this scope.<span>{% if total_objects %}View these objects, or search{% else %}Search{% endif %} all accessible data using detailed filters.</span></p>
+        <p>Overview of materials and simulation data.</p>
         <div class="charts-intro-actions">
-          {% if total_objects %}<a class="charts-record-link charts-button charts-button-primary" href="{{ records_url }}">View data</a>{% endif %}
-          <a class="charts-search-link charts-button" href="{% url 'search' %}?advanced=1">Search data</a>
+          {% if total_objects %}<a class="charts-record-link charts-button charts-button-primary" href="{{ records_url }}" title="View objects in this scope">View data</a>{% endif %}
+          <a class="charts-search-link charts-button" href="{% url 'search' %}?advanced=1" title="Search all accessible data">Search data</a>
         </div>
       </div>
       {% if total_objects %}

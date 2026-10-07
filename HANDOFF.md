@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts purpose, data actions and statistical explanations clarified; see git log)
+code_base: main (Charts introduction shortened and enlarged; data actions and statistical explanations clarified; see git log)
 next_topic: Review Charts page clarity and workflow; continue according to the user's next request
 ---
 
@@ -13,19 +13,25 @@ next_topic: Review Charts page clarity and workflow; continue according to the u
 ### 本轮：完善 Charts 的用途说明和后续操作
 
 - 用户要求从网页用户角度审视整页，并明确让我们直接修改需要改的地方。
-  页面增加两行简短用途／操作说明；View data 改为显眼的蓝色按钮，打开当前范围的对象；
+  原先增加两行用途／操作说明，用户指出字小且文字多；已缩为一行
+  Overview of materials and simulation data.，字号从 12px 改为 14px，使用更深的正文颜色。
+  View data 改为显眼的蓝色按钮，打开当前范围的对象；
   Search data 打开现有 Search 的详细条件，面向全部可访问对象，包括收到的私有分享。
-  界面明确说明搜索面向所有可访问数据，不继承 Charts 范围，不新增搜索功能或图表点击。
+  两个按钮的悬停说明区分当前范围与所有可访问数据；搜索不继承 Charts 范围，
+  不新增搜索功能或图表点击。
 - 应力–应变覆盖图下直接说明 Available 要求同一分量的应力与总应变；Grain number 下
   说明每个相贡献一个晶粒数量，继续保留相数与不同对象数。空范围隐藏 View data，
   不让用户进入空列表；本人公开数据为空时提示包含私有数据、切换范围或上传。
 - 统计口径、访问权限、原始 JSON、八张图形和即时悬停保持已有行为。README 和
   小助手说明已同步。验证后按用户长期偏好提交并推送，最新提交以 git log 为准；
   Render 部署状态未确认。
-- 本轮 69 项测试通过，无跳过（59 项 Charts、10 项小助手 FAQ）。真实 Chromium 验证
+- 上轮 69 项测试通过，无跳过（59 项 Charts、10 项小助手 FAQ）。真实 Chromium 验证
   1280／1440／1920、长名称和空范围；从 Search data 用键盘进入详细条件并查找 Copper，
   得到 8 个可访问对象，有无 JavaScript 都通过。日志 `/tmp/charts-page-clarity-tests.log`，
   截图 `/tmp/charts-page-clarity-qa`；已查看用途说明、两个按钮、覆盖说明和晶粒数量说明。
+- 本轮精简文字后，59 项 Charts 测试通过，无跳过；真实 Chromium 检查三种桌面宽度、
+  长名称、空范围、搜索和无 JavaScript 操作。已查看单行说明的实际截图，文字变大、变深，
+  按钮没有重叠。日志 `/tmp/charts-short-intro-tests.log`，截图 `/tmp/charts-short-intro-qa`。
 
 ### 上轮：八张 Charts 卡片和悬停已逐张梳理
 
