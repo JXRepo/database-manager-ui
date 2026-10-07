@@ -21,7 +21,11 @@
 .charts-heading { justify-content: space-between; gap: 24px; }
 .charts-heading-actions { gap: 20px; }
 .charts-record-link { font-size: 12px; white-space: nowrap; }
-.charts-record-link:hover { text-decoration: underline; }
+.charts-record-link:hover { text-decoration: none; }
+.charts-intro { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 12px; }
+.charts-intro p { color: var(--charts-muted); font-size: 12px; line-height: 1.6; }
+.charts-intro p > span { display: block; }
+.charts-intro-actions { display: flex; flex-shrink: 0; gap: 10px; }
 .charts-scope-form { gap: 10px; flex-shrink: 0; }
 .charts-scope-form > label { color: var(--charts-muted); font-size: 12px; white-space: nowrap; }
 .charts-scope-form .charts-private-option { display: inline-flex; align-items: center; gap: 6px; color: var(--charts-ink); }

@@ -272,6 +272,26 @@ function exactEighths(value) {
         text: row.textContent,
       }))`);
     }
+    async function searchData(enhanced = true) {
+      const overview = await evaluate('location.pathname + location.search');
+      stage = `Search data from Charts${enhanced ? '' : ' without JavaScript'}`;
+      await evaluate('document.querySelector(".charts-search-link").focus()');
+      await pressKey('Enter', 'Enter', 13);
+      await until('location.pathname === "/search/" && document.readyState === "complete" && !!document.querySelector("#advancedSearchForm")');
+      assert.ok(await evaluate('document.querySelector("#advancedSearchPanel").checkVisibility()'),
+        'Search data must open the detailed filters');
+      assert.equal(await evaluate('document.querySelector("#id_access").value'), '',
+        'Search data covers all accessible objects');
+      await evaluate(`(() => {
+        document.querySelector('#id_phase').value = 'Copper';
+        document.querySelector('#advancedSearchForm').requestSubmit();
+      })()`);
+      await until('document.readyState === "complete" && !!document.querySelector("#searchResultCount")');
+      assert.equal(await evaluate('document.querySelector("#searchResultCount").textContent.trim()'), '8 total');
+      assert.equal(await evaluate('document.querySelectorAll("#searchResultAccordion > .accordion-item").length'), 8);
+      assert.equal(await evaluate('document.querySelector("#searchResultAccordion").textContent.includes("hidden-private-marker")'), false);
+      await navigate(overview, enhanced);
+    }
     async function assertLegacyListCount(link, enhanced = true) {
       const saved = new URL(link.path, process.env.CHARTS_BASE_URL);
       saved.searchParams.set('show', 'objects');
@@ -348,6 +368,11 @@ function exactEighths(value) {
             const title = document.querySelector('.charts-heading h1'), rect = title.getBoundingClientRect();
             return title.contains(document.elementFromPoint(rect.left + 10, rect.top + 10));
           })(),
+          intro: [...document.querySelectorAll('.charts-intro p, .charts-intro a')].map(element => {
+            const rect = element.getBoundingClientRect();
+            return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              visible: element.checkVisibility()};
+          }),
           height: document.documentElement.scrollHeight,
           cards: panels.map(panel => {
             const rect = panel.getBoundingClientRect();
@@ -460,6 +485,11 @@ function exactEighths(value) {
       assert.ok(metrics.documentWidth <= width, `${label} overflows at ${width}: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.mainLeft >= metrics.sidebarRight - 1, `${label} under sidebar: ${JSON.stringify(metrics)}`);
       assert.ok(metrics.titleVisible && metrics.titleTop >= metrics.headerBottom, `${label} title under navigation: ${JSON.stringify(metrics)}`);
+      for (const [index, item] of metrics.intro.entries()) {
+        assert.ok(item.visible && item.left >= metrics.mainLeft && item.right <= width
+          && (!index || metrics.intro[index - 1].right + 8 <= item.left),
+          `${label}: introduction and data actions must stay readable at ${width}: ${JSON.stringify(metrics.intro)}`);
+      }
       assert.equal(metrics.graphCount, expectedGraphs, `${label}: main dashboard chart count at ${width}`);
       if (metrics.overview.length) {
         assert.equal(metrics.overview.length, 4);
@@ -595,6 +625,7 @@ function exactEighths(value) {
       await layout('dashboard-overview', width);
       await comparePageHeadings(width);
     }
+    await searchData();
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-more-categories").length'), 0);
     await inspectCharts(['.charts-lollipop-dot', '[data-statistic=models] .charts-bar', '.charts-pie-slice',
       '.charts-heatmap-cell', '.charts-bin', '.charts-box-selection', '.charts-bubble', '.charts-column',
@@ -684,6 +715,7 @@ function exactEighths(value) {
     await navigate('/charts/?scope=mine', false);
     assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
     assert.ok(await evaluate('getComputedStyle(document.querySelector(".charts-scope-form .charts-apply")).display !== "none"'));
+    await searchData(false);
     await evaluate('window.scrollTo(0, 0)');
     const visible = await evaluate(`(() => {
       const graphs = [...document.querySelectorAll('[data-statistic="phase"] .charts-bar-svg, [data-statistic="results"] .charts-pie-svg')];

@@ -377,15 +377,19 @@ includes only the signed-in user's public uploads; **Include private data** adds
 that user's private uploads. Received private shares are excluded. Public access
 still requires a platform account. Other users' private records never contribute
 to statistics or linked lists. Old scope=all and scope=shared bookmarks redirect
-to Public database while preserving valid selections.
+to Public database; saved selections are retained only on the separate object list.
 
-The default page starts with four simple totals: **Data objects**,
+The overview shows four simple totals: **Data objects**,
 **Material phases**, **Texture types** and **Objects with stress–strain data**.
 Phase and texture totals count distinct reported names, ignoring case, rather
 than phase observations. Stress–strain availability counts objects with matching
 components, not individual curves. All four totals describe the current
-accessible selection; missing names contribute no category. **View data** beside
-Data scope links to a separate page of matching objects.
+data scope; missing names contribute no category. A short introduction explains
+the page's purpose and presents two actions: **View data** opens the objects in
+that scope, while **Search data** opens the existing detailed Search filters for
+all accessible objects, including received private shares. It starts a new
+search rather than carrying the Charts scope into Search. **View data** appears
+only when the scope contains objects; empty scopes keep search and upload guidance.
 Card headers use **With data: n / total objects** for the number of distinct
 objects contributing to that card out of all selected objects. Hover over the
 count for the specific inclusion rule. The stress–strain coverage card shows
@@ -418,8 +422,9 @@ Eight cards are visible directly, in four pairs:
   Whiskers show the actual minimum and maximum, with no outlier classification.
   A constant value is shown as one point, with no whiskers or box legend.
   The header shows objects with a usable grain number out of all selected objects;
-  the caption keeps the phase and object counts distinct. Min–max displays both
-  extrema, including `343–343` for a constant value. Hover details report the
+  the caption explains that counts are per phase and keeps the phase and object
+  counts distinct. Min–max displays both extrema, including `343–343` for a
+  constant value. Hover details report the
   quartiles, median, actual extrema and observation counts.
 - **Texture types** uses independently sized bubbles; circle area is
   proportional to object count, rather than a share of a disjoint whole.
@@ -454,14 +459,13 @@ has more than six labels; it expands a bounded scrolling chart of the remaining
 categories. Loading initially shows up to six types and four modes;
 **More combinations** shows observed combinations outside that initial matrix.
 These expansions and hover details work without JavaScript. The compact coverage
-legend beside the donut retains its two counts and percentages. The dashboard has no
-Additional statistics or Source records sections. **View data** opens
-**Data objects**, with the same exact
-selection, scope, private inclusion and pagination; object titles open detail
-pages, and **Back to Charts** returns to the selected statistics. Existing
-show=objects links use this page. Historical model, loading, discretization,
-equivalent-output and note filters remain valid in bookmarked URLs. Data with
-no usable temperature or grain number retain explicit empty
+legend beside the donut retains its two counts and percentages, with a visible
+explanation that availability requires stress and total strain for the same
+component. The dashboard has no Additional statistics or Source records sections.
+Object titles on **Data objects** open detail pages; **Back to Charts** returns
+to the complete data scope. Historical model, loading, discretization,
+equivalent-output and note filters remain valid on bookmarked `show=objects`
+lists. Data with no usable temperature or grain number retain explicit empty
 chart cards instead of a fabricated value.
 
 Category counts deduplicate each object per case-insensitive label. Multiple

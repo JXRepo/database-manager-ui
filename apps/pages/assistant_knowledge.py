@@ -193,8 +193,9 @@ TOPICS = (
                   "and modes, temperature, grain number, software and stress-strain coverage. Hover over "
                   "chart marks or labels for full names, exact counts, percentages and numeric intervals. "
                   "Clicking a chart does not filter or navigate. More categories or More combinations shows "
-                  "remaining categories when present. View data opens the matching objects; open one for its curves "
-                  "and downloads. Counts do not establish physical comparability or scientific validity.",
+                  "remaining categories when present. View data opens the objects in the selected scope; "
+                  "open one for its curves and downloads. Search data opens the detailed Search filters "
+                  "for all accessible objects. Counts do not establish physical comparability or scientific validity.",
         "route": "charts", "link": "Open Charts",
     },
     {

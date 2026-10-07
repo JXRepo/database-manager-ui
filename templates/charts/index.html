@@ -21,7 +21,6 @@
         </div>
       </div>
       {% block charts_scope_controls %}<div class="charts-heading-actions">
-      <a class="charts-record-link" href="{{ records_url }}">View data</a>
       <form method="get" action="{% url 'charts' %}" class="charts-scope-form" data-auto-submit>
         {% for key, value in control_params.scope %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
         <label for="charts-scope">Data scope</label>
@@ -35,7 +34,15 @@
     {% block charts_selection_controls %}{% endblock %}
     {% if filter_errors %}<div class="alert alert-warning charts-errors" role="alert">{% for error in filter_errors %}<p>{{ error }}</p>{% endfor %}</div>{% endif %}
 
-    {% block charts_workspace %}{% if total_objects %}
+    {% block charts_workspace %}
+      <div class="charts-intro">
+        <p>Explore materials, simulation settings and available stress–strain data in this scope.<span>{% if total_objects %}View these objects, or search{% else %}Search{% endif %} all accessible data using detailed filters.</span></p>
+        <div class="charts-intro-actions">
+          {% if total_objects %}<a class="charts-record-link charts-button charts-button-primary" href="{{ records_url }}">View data</a>{% endif %}
+          <a class="charts-search-link charts-button" href="{% url 'search' %}?advanced=1">Search data</a>
+        </div>
+      </div>
+      {% if total_objects %}
       <dl class="charts-metrics" aria-label="Dataset statistics">
         <div class="charts-metric charts-metric-total" data-overview="objects">
           <dt>Data objects</dt><dd><strong>{{ total_objects }}</strong></dd>
@@ -63,6 +70,7 @@
         <section class="charts-panel charts-results" data-statistic="results" aria-labelledby="results-heading">
           <div class="charts-panel-heading"><h2 id="results-heading">Stress–strain coverage</h2><span class="charts-context-label" title="All objects in the current selection">Total: {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           <div class="charts-plot-stage">{% include 'charts/pie.html' %}</div>
+          <p class="charts-distribution-caption">Available = stress and total strain for the same component.</p>
         </section>
 
         <section class="charts-panel" data-statistic="models" aria-labelledby="models-heading">
@@ -92,7 +100,7 @@
             {% if item.observation_count %}
               <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}{% if item.key == 'temperature' %} K{% endif %}</strong></span><span>Min–max <strong>{{ item.minimum }}–{{ item.maximum }}{% if item.key == 'temperature' %} K{% endif %}</strong></span></div>
               <div class="charts-plot-stage">{% if item.key == 'grain_count' %}{% include 'charts/box.html' with box=item.box_plot %}{% else %}{% include 'charts/histogram.html' with histogram=item.plot %}{% endif %}</div>
-              {% if item.observation_unit == 'phases' %}<p class="charts-distribution-caption">{{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</p>{% endif %}
+              {% if item.observation_unit == 'phases' %}<p class="charts-distribution-caption">One grain number per phase · {{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</p>{% endif %}
             {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>{% if item.key == 'temperature' %}No usable temperature{% else %}No usable grain number{% endif %}</strong></div></div>{% endif %}
           </section>
         {% endfor %}
@@ -115,7 +123,7 @@
       </div>
 
     {% else %}
-      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if filter_errors %}Correct the data scope to view statistics{% else %}No data in this scope{% endif %}</h2><p>{% if filter_errors %}Choose a valid data scope.{% elif scope == 'mine' and not include_private %}Include private data to see all your uploads.{% else %}Choose another scope or upload data.{% endif %}</p><div>{% if filter_errors %}<a class="charts-button charts-button-primary charts-clear" href="{{ clear_url }}">Reset scope</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
+      <section class="charts-empty"><div class="charts-empty-symbol" aria-hidden="true"><i data-feather="bar-chart-2"></i></div><h2>{% if filter_errors %}Correct the data scope to view statistics{% else %}No data in this scope{% endif %}</h2><p>{% if filter_errors %}Choose a valid data scope.{% elif scope == 'mine' and not include_private %}Include private data, choose another scope or upload data.{% else %}Choose another scope or upload data.{% endif %}</p><div>{% if filter_errors %}<a class="charts-button charts-button-primary charts-clear" href="{{ clear_url }}">Reset scope</a>{% else %}<a class="charts-button charts-button-primary" href="{% url 'upload_json' %}">Upload data</a><a class="charts-button" href="{% url 'search' %}">Browse data</a>{% endif %}</div></section>
     {% endif %}{% endblock charts_workspace %}
   </div>
 </main>

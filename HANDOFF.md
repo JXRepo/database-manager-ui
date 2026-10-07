@@ -2,15 +2,32 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts overview selections removed and visible hover tooltips added; see git log)
-next_topic: Review the corrected Charts hover behavior; continue according to the user's next request
+code_base: main (Charts purpose, data actions and statistical explanations clarified; see git log)
+next_topic: Review Charts page clarity and workflow; continue according to the user's next request
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 新聊天先看这里：Charts 已梳理到最后一张卡片
+### 本轮：完善 Charts 的用途说明和后续操作
+
+- 用户要求从网页用户角度审视整页，并明确让我们直接修改需要改的地方。
+  页面增加两行简短用途／操作说明；View data 改为显眼的蓝色按钮，打开当前范围的对象；
+  Search data 打开现有 Search 的详细条件，面向全部可访问对象，包括收到的私有分享。
+  界面明确说明搜索面向所有可访问数据，不继承 Charts 范围，不新增搜索功能或图表点击。
+- 应力–应变覆盖图下直接说明 Available 要求同一分量的应力与总应变；Grain number 下
+  说明每个相贡献一个晶粒数量，继续保留相数与不同对象数。空范围隐藏 View data，
+  不让用户进入空列表；本人公开数据为空时提示包含私有数据、切换范围或上传。
+- 统计口径、访问权限、原始 JSON、八张图形和即时悬停保持已有行为。README 和
+  小助手说明已同步。验证后按用户长期偏好提交并推送，最新提交以 git log 为准；
+  Render 部署状态未确认。
+- 本轮 69 项测试通过，无跳过（59 项 Charts、10 项小助手 FAQ）。真实 Chromium 验证
+  1280／1440／1920、长名称和空范围；从 Search data 用键盘进入详细条件并查找 Copper，
+  得到 8 个可访问对象，有无 JavaScript 都通过。日志 `/tmp/charts-page-clarity-tests.log`，
+  截图 `/tmp/charts-page-clarity-qa`；已查看用途说明、两个按钮、覆盖说明和晶粒数量说明。
+
+### 上轮：八张 Charts 卡片和悬停已逐张梳理
 
 - 用户正在挨个讨论 Charts 卡片。前四张已讨论，Loading types & modes 已按用户要求
   改为同一条加载设置内的类型／模式配对，Type／Mode 到各自名称的间距也已统一。
@@ -131,7 +148,7 @@ next_topic: Review the corrected Charts hover behavior; continue according to th
 - 用户常用样例是 `example_json_files/a46fde6c.json`。上一轮已验证 Copper、
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
-本轮验证：69 项测试通过，无跳过，包括 59 项 Charts 和 10 项小助手 FAQ。
+上轮验证：69 项测试通过，无跳过，包括 59 项 Charts 和 10 项小助手 FAQ。
 真实 Chromium 核对 1280／1440／1920 桌面、
 单个软件、多个软件、长名称、大整数、空数据、悬停和点击不跳转、私有权限、精确书签区间、
 展开入口和无 JavaScript 操作。全部卡片标题与数量的间距、真实悬停浮层和清除行为均通过
