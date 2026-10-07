@@ -403,7 +403,11 @@ Eight cards are visible directly, in four pairs:
   Mode is centered above the columns; Type is vertical and centered beside the rows.
   Both titles use the same gap from the names. The type label column fits its text
   so short names do not leave a large blank area beside Type.
-- **Temperature** shows a histogram in kelvin.
+- **Temperature** shows a histogram in kelvin. The header shows objects with a
+  usable temperature out of all selected objects. Median and Min–max include the
+  K unit; Min–max displays both extrema, including `298–298 K` for a constant value.
+  The chart uses 12px text at its maximum width of 420px, with Objects vertical
+  beside the count axis and equal gaps between the two axis titles and their ticks.
 - **Grain number** shows a box plot of phase observations. Quartiles use linear
   interpolation at positions `(n - 1) × p`, where `p` is 0.25 or 0.75; the median
   is the central observation or the mean of the two central observations.

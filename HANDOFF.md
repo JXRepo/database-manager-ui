@@ -2,8 +2,8 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-07
-code_base: main (Charts loading pairs and equal heatmap axis title spacing; see git log)
-next_topic: Review the corrected Loading types & modes card, then continue with Temperature
+code_base: main (Charts loading pairs, equal heatmap spacing and compact temperature labels; see git log)
+next_topic: Review the corrected Temperature card, then continue with Grain number
 ---
 
 # Project handoff
@@ -12,9 +12,10 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
 
 ### 新聊天先看这里：继续逐张梳理 Charts 卡片
 
-- 用户正在挨个讨论 Charts 卡片。前三张 Phase、Stress–strain coverage 和
-  Constitutive models 已解释并认可。第四张 Loading types & modes 已按用户要求改为
-  同一条加载设置内的类型／模式配对，Type／Mode 到各自名称的间距也已统一。按用户指定的卡片继续，
+- 用户正在挨个讨论 Charts 卡片。前四张已讨论，Loading types & modes 已按用户要求
+  改为同一条加载设置内的类型／模式配对，Type／Mode 到各自名称的间距也已统一。
+  当前是第五张 Temperature，用户指出字号问题并要求按已讨论的四处问题修改。
+  字号、轴标题位置、温度范围和可用温度对象数说明已调整。按用户指定的卡片继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
 - 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
@@ -23,7 +24,8 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
   验证后提交并推送，不反复确认常规步骤。不要一次重新设计全部卡片或自行增加功能。
 - 当前分支是 main。`233a409` 实现八张卡片，`e958725` 删除各卡片的 Data table，
   `2052c62` 为 Phase 圆点旁增加对象占比，`b12dcf4` 取消图形点击筛选，均已推送。
-  `4daac9b` 修正加载配对统计，`73ef19b` 调整轴标题方向，均已推送。本轮统一热图标题间距；权限、统计口径、存储 JSON
+  `4daac9b` 修正加载配对统计，`73ef19b` 调整轴标题方向，`c97a89b` 统一热图间距，
+  均已推送。本轮整理 Temperature 排版和说明；权限、统计口径、存储 JSON
   和导出未改变。最新提交见 git log，
   Render 是否完成部署仍未确认。
 
@@ -58,6 +60,11 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
   两个标题到各自名称共用 12px 间距（随 SVG 缩放）。类型名称列按文字宽度排，
   避免短名称 force 旁边留一大块空白。长名称仍省略显示并保留完整悬停提示；
   单格和多格均沿用同一排版，原生 HTML／CSS 排版不依赖 JavaScript。
+- Temperature 图宽最多 420px，轴标题、刻度和柱顶数字在最大图宽下均为 12px，
+  小于 15px 卡片标题；Objects 在纵轴旁竖排居中，Temperature (K) 在横轴下方居中，
+  两轴标题到刻度共用 12px 间距（随 SVG 缩放）。右上角明确写 Usable temperature，
+  表示有可用温度的对象／当前选中对象；Median 和 Min–max 带 K，最小最大值相同也
+  显示两个端点，如 298–298 K。单值仍画一根真实频数柱，精确区间和计数未改变。
 - 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
   悬停提示保留，点击筛选已取消；类别超过六项时出现 More categories，热图还有组合时
   出现 More combinations，展开后仍是图形。环形图旁两行数量／百分比图例保留。
@@ -85,12 +92,13 @@ next_topic: Review the corrected Loading types & modes card, then continue with 
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
 本轮验证：57 项 Charts 测试通过，无跳过；真实 Chromium 核对 1280／1440／1920 桌面、
-单格／多格、长名称、空数据、悬停和点击不跳转、私有权限、精确书签区间、展开入口和
-无 JavaScript 操作。浏览器回归先复现旧版 Type 间距约 63px、Mode 间距 8px，
-再验证各桌面宽度的两个实际文字间距一致。1440px 下单格、多格和长名称均实测 12px；
-已查看三张完整卡片截图，两个轴标题及类别名称不重叠。
-加载配对回归仍通过，用户样例 JSON 未改变；上轮配对修改还通过了 19 项小助手测试。
-日志 `/tmp/charts-equal-axis-gap-final-tests.log`，截图与实测间距 `/tmp/charts-equal-axis-gap-final-qa`；这些路径
+温度单柱／多柱、长名称、空数据、悬停和点击不跳转、私有权限、精确书签区间、展开入口和
+无 JavaScript 操作。浏览器回归先复现旧版 Objects 位置错误，再验证图中文字实际字号、
+轴标题方向、两边间距相同、标题和覆盖数量不重叠、刻度完整且不重叠。
+1440px 下实测温度图文字 12px、两个轴标题间距均为 12px，已查看样例、公开和多类别
+温度卡片截图。加载配对和热图间距回归仍通过，用户样例 JSON 未改变；之前配对修改
+还通过了 19 项小助手测试。
+日志 `/tmp/charts-temperature-tests.log`，截图与实测排版 `/tmp/charts-temperature-final-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

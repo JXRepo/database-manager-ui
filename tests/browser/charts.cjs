@@ -351,6 +351,38 @@ function exactEighths(value) {
             return {typeGap: Math.min(...types.map(rect => rect.left)) - type.right,
               modeGap: Math.min(...modes.map(rect => rect.top)) - mode.bottom};
           }),
+          temperature: (() => {
+            const panel = document.querySelector('[data-statistic=temperature]');
+            const svg = panel?.querySelector('svg');
+            if (!svg) return null;
+            const bounds = svg.getBoundingClientRect();
+            const textBounds = element => {
+              const range = document.createRange();
+              range.selectNodeContents(element);
+              const rect = range.getBoundingClientRect();
+              return {left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+                width: rect.width, height: rect.height};
+            };
+            const titles = [...svg.querySelectorAll('.charts-axis-text, .charts-histogram-axis-title')];
+            const yTitle = textBounds(titles.find(title => title.textContent.trim() === 'Objects'));
+            const xTitle = textBounds(titles.find(title => title.textContent.trim() === 'Temperature (K)'));
+            const yLabels = [...svg.querySelectorAll('.charts-histogram-y-labels .charts-histogram-tick, text.charts-axis-text')]
+              .filter(element => /^\\d+$/.test(element.textContent.trim())).map(textBounds);
+            const xLabels = [...svg.querySelectorAll('.charts-bin-label')].map(textBounds);
+            const texts = [...svg.querySelectorAll('text, .charts-histogram-tick, .charts-histogram-axis-title')].map(element => {
+              const rect = textBounds(element);
+              return {text: element.textContent.trim(), fontSize: parseFloat(getComputedStyle(element).fontSize) * svg.getScreenCTM().a,
+                clipped: rect.left < bounds.left - 1 || rect.right > bounds.right + 1 || rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1};
+            });
+            const heading = panel.querySelector('h2').getBoundingClientRect();
+            const coverage = panel.querySelector('.charts-context-label').getBoundingClientRect();
+            return {yTitle, xTitle, xLabels, texts,
+              yGap: Math.min(...yLabels.map(rect => rect.left)) - yTitle.right,
+              xGap: xTitle.top - Math.max(...xLabels.map(rect => rect.bottom)),
+              headingOverlap: heading.right > coverage.left,
+              coverage: panel.querySelector('.charts-context-label').textContent.trim(),
+              summary: panel.querySelector('.charts-distribution-summary').textContent.trim()};
+          })(),
           categoryLabels: graphs.flatMap((svg, chart) => [...svg.querySelectorAll('.charts-svg-label')].map(label => {
             const rect = label.getBoundingClientRect(), bounds = svg.getBoundingClientRect(), style = getComputedStyle(label);
             return {chart, text: label.textContent, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
@@ -410,6 +442,22 @@ function exactEighths(value) {
         assert.ok(spacing.typeGap > 0 && spacing.modeGap > 0 && Math.abs(spacing.typeGap - spacing.modeGap) <= 1,
           `${label}: Type and Mode need the same visible gap from their names at ${width}: ${JSON.stringify(spacing)}`);
       }
+      if (metrics.temperature) {
+        const temperature = metrics.temperature;
+        assert.ok(temperature.texts.every(text => text.fontSize >= 9.5 && text.fontSize <= 13 && !text.clipped),
+          `${label}: temperature text must stay readable and smaller than the card title at ${width}: ${JSON.stringify(temperature.texts)}`);
+        assert.ok(temperature.yTitle.height > temperature.yTitle.width,
+          `${label}: Objects belongs vertically beside the count axis at ${width}`);
+        assert.ok(temperature.yGap > 0 && temperature.xGap > 0 && Math.abs(temperature.yGap - temperature.xGap) <= 1,
+          `${label}: temperature axis titles need equal visible gaps at ${width}: ${JSON.stringify(temperature)}`);
+        assert.ok(!temperature.headingOverlap, `${label}: temperature heading and coverage overlap at ${width}`);
+        assert.match(temperature.coverage, /^Usable temperature:/);
+        assert.match(temperature.summary, /Min–max/);
+        temperature.xLabels.forEach((tick, index) => {
+          assert.ok(!index || tick.left > temperature.xLabels[index - 1].right + 3,
+            `${label}: temperature interval labels overlap at ${width}: ${JSON.stringify(temperature.xLabels)}`);
+        });
+      }
       metrics.categoryLabels.forEach((label, index) => {
         assert.ok(label.bounded && !label.clipped && label.fontSize >= 9.5,
           `${label}: category label must fit its region at ${width}: ${JSON.stringify(label)}`);
@@ -434,19 +482,22 @@ function exactEighths(value) {
         const viewport = await command('Page.captureScreenshot', {format: 'png'});
         writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-viewport.png'), Buffer.from(viewport.data, 'base64'));
         writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-axis-spacing.json'), JSON.stringify(metrics.heatmapSpacing, null, 2));
+        writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-temperature-layout.json'), JSON.stringify(metrics.temperature, null, 2));
         await command('Emulation.setDeviceMetricsOverride', {width, height: Math.min(metrics.height, 4500), deviceScaleFactor: 1, mobile: false});
         await settleLayout();
         const shot = await command('Page.captureScreenshot', {format: 'png'});
         writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '.png'), Buffer.from(shot.data, 'base64'));
-        const loadingCard = await evaluate(`(() => {
-          const card = document.querySelector('[data-statistic=loading]');
-          if (!card) return null;
-          const rect = card.getBoundingClientRect();
-          return {x: rect.left + scrollX, y: rect.top + scrollY, width: rect.width, height: rect.height, scale: 1};
-        })()`);
-        if (loadingCard) {
-          const loadingShot = await command('Page.captureScreenshot', {format: 'png', clip: loadingCard, captureBeyondViewport: false});
-          writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-loading.png'), Buffer.from(loadingShot.data, 'base64'));
+        for (const statistic of ['loading', 'temperature']) {
+          const cardBounds = await evaluate(`(() => {
+            const card = document.querySelector('[data-statistic="${statistic}"]');
+            if (!card) return null;
+            const rect = card.getBoundingClientRect();
+            return {x: rect.left + scrollX, y: rect.top + scrollY, width: rect.width, height: rect.height, scale: 1};
+          })()`);
+          if (cardBounds) {
+            const cardShot = await command('Page.captureScreenshot', {format: 'png', clip: cardBounds, captureBeyondViewport: false});
+            writeFileSync(join(process.env.CHARTS_SCREENSHOT_DIR, label + '-' + statistic + '.png'), Buffer.from(cardShot.data, 'base64'));
+          }
         }
         await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
         await settleLayout();
@@ -771,6 +822,8 @@ function exactEighths(value) {
       assert.equal((await categorySummary('phase', 'Copper')).count, 1);
       assert.equal((await categorySummary('software', 'Abaqus CAE')).count, 1);
       assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Median\s+298/);
+      assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Min–max\s+298–298 K/);
+      assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-context-label").textContent'), /Usable temperature:\s+1 \/ 1 object/);
       assert.ok(await evaluate('document.querySelector("[data-statistic=temperature] h2").textContent.includes("(K)")'));
       assert.deepEqual(await evaluate(`[...document.querySelectorAll('.charts-metric dd')]
         .map(value => value.textContent.trim())`), ['1', '1', '1', '1']);

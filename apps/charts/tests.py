@@ -1181,7 +1181,7 @@ class ChartsTests(TestCase):
                          {Decimal(33)})
         self.assertEqual([bucket["inclusive"] for bucket in distribution["bins"]], [False, False, True])
         columns = response.context["histogram"]["columns"]
-        self.assertAlmostEqual(columns[0]["width"], 574 / 3 - 1, places=2)
+        self.assertAlmostEqual(columns[0]["width"], 322 / 3 - 1, places=2)
         self.assertEqual(columns[1]["plot_height"], 0)
         for bucket in distribution["bins"]:
             selected = self.client.get(bucket["url"])
@@ -1203,7 +1203,7 @@ class ChartsTests(TestCase):
         self.assertEqual(distribution["bins"][0]["low"], "298")
         self.assertEqual(distribution["bins"][0]["high"], "298")
         self.assertEqual(distribution["bins"][0]["count"], 2)
-        self.assertEqual(response.context["histogram"]["columns"][0]["width"], 108)
+        self.assertEqual(response.context["histogram"]["columns"][0]["width"], 72)
         self.assertEqual(len(response.context["coverage_plot"]["slices"]), 1)
         self.assertTrue(response.context["coverage_plot"]["slices"][0]["full_circle"])
 

@@ -99,12 +99,12 @@ def histogram_plot(distribution):
     """
     bins = distribution["bins"]
     scale = axis_scale([bucket["count"] for bucket in bins], counts=True)
-    slot = 574 / max(len(bins), 1)
+    slot = 322 / max(len(bins), 1)
     columns = []
     for index, bucket in enumerate(bins):
-        height = float(Decimal(bucket["count"]) / scale["maximum"]) * 146
-        width = min(slot * .66, 108) if distribution["constant"] else slot - 1
-        center = 62 + slot * (index + .5)
+        height = float(Decimal(bucket["count"]) / scale["maximum"]) * 126
+        width = min(slot * .66, 72) if distribution["constant"] else slot - 1
+        center = 74 + slot * (index + .5)
         columns.append({**bucket, "x": round(center - width / 2, 2), "center": round(center, 2),
                         "y": round(174 - height, 2), "width": round(width, 2),
                         "plot_height": round(height, 2), "count_y": round(167 - height, 2),
@@ -120,9 +120,9 @@ def histogram_plot(distribution):
             for index in indices:
                 label = bins[index]["display_low"] if index < len(bins) else bins[-1]["display_high"]
                 anchor = "start" if index == 0 else "end" if index == len(bins) else "middle"
-                x_ticks.append({"label": label, "x": round(62 + slot * index, 2), "anchor": anchor})
+                x_ticks.append({"label": label, "x": round(74 + slot * index, 2), "anchor": anchor})
     return {"columns": columns, "x_ticks": x_ticks,
-            "ticks": [{**tick, "y": round(174 - tick["position"] * 146, 2)} for tick in scale["ticks"]]}
+            "ticks": [{**tick, "y": round(174 - tick["position"] * 126, 2)} for tick in scale["ticks"]]}
 
 
 def pie_plot(rows, inner_radius=0):

@@ -1,15 +1,22 @@
-<svg class="charts-histogram-svg" data-measure="{{ item.key }}" viewBox="0 0 660 270" role="group" aria-label="{{ item.title }} distribution{% if item.unit %} in {{ item.unit }}{% endif %}; counts are {{ item.observation_unit }}" xmlns="http://www.w3.org/2000/svg">
-  <text x="62" y="18" class="charts-axis-text">{{ item.observation_unit|capfirst }}</text>
-  {% if item.offset %}<text x="636" y="18" text-anchor="end" class="charts-axis-text">Interval offset: {{ item.offset }}</text>{% endif %}
-  <g transform="translate(0,24)">
-  {% for tick in histogram.ticks %}<line x1="62" x2="636" y1="{{ tick.y }}" y2="{{ tick.y }}" class="charts-grid-line"/><text x="49" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
+<svg class="charts-histogram-svg" data-measure="{{ item.key }}" viewBox="0 0 420 246" role="group" aria-label="{{ item.title }} distribution{% if item.unit %} in {{ item.unit }}{% endif %}; counts are {{ item.observation_unit }}" xmlns="http://www.w3.org/2000/svg">
+  {% if item.offset %}<text x="396" y="18" text-anchor="end" class="charts-axis-text">Interval offset: {{ item.offset }}</text>{% endif %}
+  <foreignObject x="0" y="41" width="66" height="140">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="charts-histogram-y-axis">
+      <span class="charts-histogram-axis-title">{{ item.observation_unit|capfirst }}</span>
+      <div class="charts-histogram-y-labels">{% for tick in histogram.ticks %}<span class="charts-histogram-tick">{{ tick.label }}</span>{% endfor %}</div>
+    </div>
+  </foreignObject>
+  {% for tick in histogram.ticks %}<line x1="74" x2="396" y1="{{ tick.y }}" y2="{{ tick.y }}" class="charts-grid-line"/>{% endfor %}
   {% for bin in histogram.columns %}
     <g class="charts-bin" role="img" tabindex="0" data-object-count="{{ bin.object_count }}" data-observation-count="{{ bin.count }}" aria-label="{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }} from {{ bin.object_count }} object{{ bin.object_count|pluralize }}."><title>{{ bin.label }}{% if item.unit %} {{ item.unit }}{% endif %}: {{ bin.count }} {{ item.observation_unit }} from {{ bin.object_count }} object{{ bin.object_count|pluralize }}</title>
       <rect x="{{ bin.x }}" y="{{ bin.y }}" width="{{ bin.width }}" height="{{ bin.plot_height }}" rx="3" class="charts-bin-mark"/>
       <text x="{{ bin.center }}" y="{{ bin.count_y }}" text-anchor="middle" class="charts-bin-count">{{ bin.count }}</text>
     </g>
   {% endfor %}
-  {% for tick in histogram.x_ticks %}<text x="{{ tick.x }}" y="207" text-anchor="{{ tick.anchor }}" class="charts-bin-label">{{ tick.label }}</text>{% endfor %}
-  <text x="349" y="235" text-anchor="middle" class="charts-axis-text">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</text>
-  </g>
+  <foreignObject x="0" y="190" width="420" height="40">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="charts-histogram-x-axis">
+      <div class="charts-histogram-x-labels">{% for tick in histogram.x_ticks %}<span class="charts-bin-label charts-histogram-tick" data-anchor="{{ tick.anchor }}" style="left: {{ tick.x }}px;">{{ tick.label }}</span>{% endfor %}</div>
+      <span class="charts-histogram-axis-title charts-histogram-x-title">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</span>
+    </div>
+  </foreignObject>
 </svg>
