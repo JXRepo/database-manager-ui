@@ -396,9 +396,10 @@ Eight cards are visible directly, in four pairs:
 - **Constitutive models** compares reported elastic and plastic model names
   with separately colored horizontal bars. Each family counts objects per name;
   the coverage denominator counts objects reporting either family.
-- **Loading types & modes** uses a heatmap of objects reporting both labels.
-  This is object-level co-occurrence: the type and mode can belong to separate
-  mechanical boundary entries. Hover over a cell to read both labels and their count.
+- **Loading types & modes** uses a heatmap of type and mode combinations reported
+  together in the same mechanical boundary entry. Each object counts once per
+  combination, even when several entries repeat it. Incomplete or nontext pairs
+  do not enter the matrix or its axes. Hover over a cell to read the pair and its count.
 - **Temperature** shows a histogram in kelvin.
 - **Grain number** shows a box plot of phase observations. Quartiles use linear
   interpolation at positions `(n - 1) × p`, where `p` is 0.25 or 0.75; the median
@@ -421,6 +422,8 @@ Scope changes reset conditions and pagination. Valid private inclusion survives
 bookmarked navigation, removal, clearing and pagination. Existing category, range,
 result and note bookmarks retain their original filtering semantics; invalid
 conditions show errors and no records rather than broadening the selection.
+Loading type and mode bookmarks still match labels across the same object;
+heatmap counts require the labels together in one boundary entry.
 Invalid numeric intervals are also individually removable. Repeated scope or
 private-inclusion parameters stay invalid when removing another condition.
 

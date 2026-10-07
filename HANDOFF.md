@@ -1,9 +1,9 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-10-06
-code_base: main (Phase percentages and hover-only Charts graphics; see git log)
-next_topic: Continue reviewing Constitutive models and the remaining Charts cards with the user
+timestamp: 2026-10-07
+code_base: main (Charts hover information and loading pairs within one boundary entry; see git log)
+next_topic: Review the corrected Loading types & modes card, then continue with Temperature
 ---
 
 # Project handoff
@@ -12,17 +12,19 @@ next_topic: Continue reviewing Constitutive models and the remaining Charts card
 
 ### 新聊天先看这里：继续逐张梳理 Charts 卡片
 
-- 用户正在挨个讨论 Charts 卡片。Phase 和 Stress–strain coverage 已解释，第三张
-  Constitutive models 已说明其统计含义，还没有具体修改要求。按用户指定的卡片继续，
+- 用户正在挨个讨论 Charts 卡片。前三张 Phase、Stress–strain coverage 和
+  Constitutive models 已解释并认可。第四张 Loading types & modes 已按用户要求改为
+  同一条加载设置内的类型／模式配对。按用户指定的卡片继续，
   先简单说清它表示什么，再按反馈调整，不重新从 Phase 开始。
-- 用户最近明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
+- 用户此前明确要求所有卡片图形**不能点击筛选，只在鼠标移上去时显示相关信息**。
   八张图、类别名称和覆盖图例已取消链接；点击或按回车不会新增条件、刷新或跳到顶部。
   保留原生悬停提示、键盘焦点、More categories／More combinations 展开和 View data。
 - 回答要简单、直接、白话，用中文；应用界面保持英文。明确要求修改时直接实施，
   验证后提交并推送，不反复确认常规步骤。不要一次重新设计全部卡片或自行增加功能。
 - 当前分支是 main。`233a409` 实现八张卡片，`e958725` 删除各卡片的 Data table，
-  `2052c62` 为 Phase 圆点旁增加对象占比，均已推送。本轮取消图形点击筛选，统计算法、
-  权限、存储 JSON 和导出未改变；最新提交见 git log，Render 是否完成部署仍未确认。
+  `2052c62` 为 Phase 圆点旁增加对象占比，`b12dcf4` 取消图形点击筛选，均已推送。
+  本轮修正热图的加载配对统计；权限、存储 JSON 和导出未改变。最新提交见 git log，
+  Render 是否完成部署仍未确认。
 
 八张卡片目前按桌面两列、四行排列，阅读顺序为每行从左到右：
 
@@ -31,7 +33,7 @@ next_topic: Continue reviewing Constitutive models and the remaining Charts card
 | 1 | Phase | 棒棒糖图 | 每个材料相名称的对象数量和占当前对象的百分比；同一对象在同一名称下只计一次 |
 | 2 | Stress–strain coverage | 环形饼图 | 有／没有匹配应力–应变分量的对象占比，两个部分互斥且覆盖全部选中对象 |
 | 3 | Constitutive models | 水平条形图 | 各弹性／塑性模型名称对应的对象数量，两类用不同颜色 |
-| 4 | Loading types & modes | 热力图 | 同一对象同时报告指定加载类型和模式的数量，标签可能来自不同边界条目 |
+| 4 | Loading types & modes | 热力图 | 加载类型和模式必须来自同一条 mechanical_BC；同一对象在同一组合下只计一次 |
 | 5 | Temperature (K) | 直方图 | 可用温度换算成 Kelvin 后的分布，并显示中位数和范围 |
 | 6 | Grain number | 箱线图 | 晶粒数量的相观测分布，显示四分位、中位数和实际最小／最大值 |
 | 7 | Texture types | 气泡图 | 各织构名称对应的对象数量，圆的面积与数量成比例 |
@@ -46,6 +48,11 @@ next_topic: Continue reviewing Constitutive models and the remaining Charts card
 - 第二张环形图已解释并获得用户认可：Available／Not available 按是否有匹配应力与
   总应变分量划分，互斥且覆盖全部对象；不表示上传验证通过或材料可直接比较。
 - 第三张已解释：统计每个弹性／塑性本构模型对应多少个对象，同一对象可同时报告两类。
+- 第四张只统计原数据同一条加载设置内实际报告的类型／模式组合，忽略大小写和首尾空白，
+  重复条目不重复计对象。缺失、空白、多值列表和非文字标签不构成配对，不进入热图坐标轴；
+  已识别的字段拼写和单值包装仍通过共享元数据视图处理，thermal_BC 不参与。
+  原先各自按 loading_type／loading_mode 匹配整个对象的书签语义保留；热图没有筛选链接，
+  不把两个独立条件书签当作精确配对数量。More combinations 也只包含实际配对。
 - 各卡片下的 **Data table 已删除**，不要按下面历史记录把它恢复。数字、完整名称
   悬停提示保留，点击筛选已取消；类别超过六项时出现 More categories，热图还有组合时
   出现 More combinations，展开后仍是图形。环形图旁两行数量／百分比图例保留。
@@ -56,8 +63,8 @@ next_topic: Continue reviewing Constitutive models and the remaining Charts card
 - 已保存的筛选书签仍按同一对象上的 AND 条件更新统计，保留移除条件和 Clear。
   View data 打开相同选择的独立对象列表；Additional statistics、内联 Source records 和
   独立 Filters 表单继续不显示。单对象曲线与下载仍在详情页。
-- 科学口径不能随外观改动：类别可能重叠，不能当作互斥饼图；加载热图不保证同一
-  边界条目配对；Grain number 是晶粒数量，不是晶粒尺寸；缺失值不伪造为零。
+- 科学口径不能随外观改动：类别可能重叠，不能当作互斥饼图；加载热图只配同一条
+  边界设置；Grain number 是晶粒数量，不是晶粒尺寸；缺失值不伪造为零。
 
 接手时主要读这些文件：
 
@@ -72,10 +79,11 @@ next_topic: Continue reviewing Constitutive models and the remaining Charts card
 - 用户常用样例是 `example_json_files/a46fde6c.json`。上一轮已验证 Copper、
   Abaqus CAE、Goss、298 K、343 grains 和 2,744 cells；不要改写样例或存储的 JSON。
 
-本轮验证：74 项测试通过，无跳过，包含 55 项 Charts 和 19 项小助手测试；真实
-Chromium 核对八种图形的悬停信息与鼠标／回车不跳转，1280／1440／1920 桌面、
-私有权限、精确书签区间、展开入口和无 JavaScript 操作，用户样例 JSON 未改变。
-日志 `/tmp/charts-hover-only-tests.log`，截图 `/tmp/charts-hover-only-qa`；这些路径
+本轮验证：76 项测试通过，无跳过，包含 57 项 Charts 和 19 项小助手测试。三个加载
+回归测试先复现旧问题再通过；真实 Chromium 核对实际组合为 1、跨条目组合为 0、
+重复配对只计一次，以及八种图形悬停和点击不跳转、1280／1440／1920 桌面、私有权限、
+精确书签区间、展开入口和无 JavaScript 操作。用户样例 JSON 未改变。
+日志 `/tmp/charts-loading-pairs-tests.log`，截图 `/tmp/charts-loading-pairs-qa`；这些路径
 只在当前电脑有效，不随 Git 同步。下面是历史工作记录，当前状态以上面的交接为准。
 
 **Charts 负责了解数据覆盖并找到研究需要的对象；单条应力–应变曲线及下载保留在详情页。**

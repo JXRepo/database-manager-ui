@@ -676,6 +676,18 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-bar").length'), 9);
     assert.equal(await evaluate('document.querySelectorAll(".charts-heatmap-svg g > .charts-heatmap-mark").length') > 0, true);
     for (const width of [1280, 1440, 1920]) await layout('varied-long-categories', width);
+    await navigate('/charts/?scope=mine&include_private=1&loading_type=force');
+    assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
+    const loadingCells = await evaluate(`Object.fromEntries([...document.querySelectorAll('.charts-heatmap-cell')]
+      .filter(cell => ['force', 'displacement'].includes(cell.dataset.type)
+        && ['cyclic', 'static'].includes(cell.dataset.mode))
+      .map(cell => [cell.dataset.type + '/' + cell.dataset.mode, Number(cell.dataset.count)]))`);
+    assert.deepEqual(loadingCells, {'force/cyclic': 1, 'force/static': 0, 'displacement/cyclic': 0, 'displacement/static': 1});
+    for (const width of [1280, 1440, 1920]) await layout('paired-loading-conditions', width);
+    await inspectCharts(['.charts-heatmap-cell[data-type="force"][data-mode="cyclic"]',
+      '.charts-heatmap-cell[data-type="force"][data-mode="static"]']);
+    assert.match(await evaluate('document.querySelector(".charts-heatmap-cell[data-type=force][data-mode=cyclic] title").textContent'), /1 object.*100/);
+    await clearSelection();
     await evaluate('document.querySelector("[data-statistic=phase] .charts-more-categories > summary").focus()');
     await pressKey('Enter', 'Enter', 13);
     for (const width of [1280, 1440, 1920]) await layout('expanded-phases', width);

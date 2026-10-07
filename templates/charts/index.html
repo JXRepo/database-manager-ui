@@ -82,10 +82,10 @@
         <section class="charts-panel" data-statistic="loading" aria-labelledby="loading-heading">
           <div class="charts-panel-heading"><h2 id="loading-heading">Loading types &amp; modes</h2><span class="charts-context-label">{{ loading_matrix.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
           {% if loading_matrix.pairs %}
-            <p class="charts-distribution-caption charts-loading-caption">Objects reporting both labels</p>
+            <p class="charts-distribution-caption charts-loading-caption">Objects with each loading combination</p>
             <div class="charts-plot-stage">{% include 'charts/heatmap.html' %}</div>
             {% include 'charts/more_categories.html' with category=loading_matrix %}
-          {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>No loading type and mode reported</strong></div></div>{% endif %}
+          {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>No complete loading combinations reported</strong></div></div>{% endif %}
         </section>
 
         {% for item in primary_distributions %}

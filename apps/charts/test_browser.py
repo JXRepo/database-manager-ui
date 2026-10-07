@@ -86,6 +86,12 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
                 mechanical_BC=[{"loading_type": f"{index % 7 + 1} {wide_label}",
                                 "loading_mode": f"{index % 5 + 1} {wide_label}"}],
             )
+            if index == 0:
+                data["mechanical_BC"].extend([
+                    {"loading_type": "force", "loading_mode": "cyclic"},
+                    {"loading_type": "displacement", "loading_mode": "static"},
+                    {"loading_type": "Force", "loading_mode": "CYCLIC"},
+                ])
             JSONData.objects.create(owner=diverse, data=data, access_type="c")
         sample_path = settings.BASE_DIR / "example_json_files" / "a46fde6c.json"
         sample_source = None

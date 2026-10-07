@@ -138,37 +138,81 @@ class ChartsTests(TestCase):
             self.assertAlmostEqual(row["percent"], row["count"] * 100 / 3, places=1)
             self.assertIn(wanted.pk, [record["id"] for record in linked.context["objects_page"]])
 
-    def test_loading_heatmap_counts_object_cooccurrence_with_existing_and_filters(self):
+    def test_loading_heatmap_pairs_within_boundary_entries_and_deduplicates_objects(self):
         """
-        Heatmap cells deduplicate objects and preserve private scope and repeated selections
+        Separate boundary entries cannot create unreported loading combinations
         """
         separate = self.create_object("separate-entries", access="c", mechanical_BC=[
             {"loading_type": "force", "loading_mode": "cyclic"},
             {"loading_type": "displacement", "loading_mode": "static"},
             {"loading_type": "Force", "loading_mode": "CYCLIC"},
         ])
-        together = self.create_object("one-entry", mechanical_BC=[{"loading_type": "force", "loading_mode": "static"}])
+        self.create_object("one-entry", mechanical_BC=[{"loading_type": "force", "loading_mode": "static"}])
         self.create_object("no-mode", mechanical_BC=[{"loading_type": "force"}], thermal_BC=[{"loading_mode": "static"}])
+        self.create_object("unpaired-labels", mechanical_BC=[{"loading_type": "force"}, {"loading_mode": "static"}])
         shared = self.create_object("received-share", owner=self.other, access="c")
         shared.shared_users.add(self.viewer)
         response = self.dashboard(scope="mine", include_private="1", loading_type="force")
         matrix = response.context["loading_matrix"]
-        self.assertEqual(matrix["available"], 2)
+        self.assertEqual((matrix["available"], matrix["missing"]), (2, 2))
         counts = {(row["type"].casefold(), row["mode"].casefold()): row["count"] for row in matrix["pairs"]}
-        self.assertEqual(counts, {("force", "cyclic"): 1, ("force", "static"): 2,
-                                 ("displacement", "cyclic"): 1, ("displacement", "static"): 1})
-        self.assertContains(response, "Objects reporting both labels")
+        self.assertEqual(counts, {("force", "cyclic"): 1, ("force", "static"): 1,
+                                 ("displacement", "static"): 1})
+        cells = {(cell["type"].casefold(), cell["mode"].casefold()): cell["count"]
+                 for cell in response.context["loading_plot"]["cells"]}
+        self.assertEqual(cells, {("force", "cyclic"): 1, ("force", "static"): 1,
+                                ("displacement", "cyclic"): 0, ("displacement", "static"): 1})
         for row in matrix["pairs"]:
-            params = parse_qs(urlsplit(row["url"]).query)
-            self.assertEqual(params["include_private"], ["1"])
-            self.assertEqual(len(params["loading_type"]), 1 if row["type"].casefold() == "force" else 2)
-            linked = self.client.get(row["url"])
-            self.assertEqual(linked.context["total_objects"], row["count"])
-            ids = {record["id"] for record in linked.context["objects_page"]}
-            self.assertEqual(ids, {separate.pk, together.pk} if row["count"] == 2 else {separate.pk})
+            self.assertEqual(row["percent"], 25)
+        bookmarked = self.dashboard(scope="mine", include_private="1", loading_type="force", loading_mode="static")
+        self.assertEqual(bookmarked.context["total_objects"], 3)
+        separate.refresh_from_db()
+        self.assertEqual(len(separate.data["mechanical_BC"]), 3)
         public = self.dashboard()
         self.assertEqual(public.context["loading_matrix"]["available"], 1)
         self.assertEqual(len(public.context["loading_matrix"]["pairs"]), 1)
+
+    def test_loading_heatmap_recognizes_wrapped_pairs_without_changing_json(self):
+        """
+        Recognized field spellings retain their boundary entry and original values
+        """
+        wrapped = self.create_object("wrapped-pair", mechanical_BC=[[
+            {"Loading-Type": [[" Force "]], "Loading Mode": [[" Cyclic "]]},
+        ], {"loading_type": "strain"}])
+        source = copy.deepcopy(wrapped.data)
+        self.create_object("alias-conflict", mechanical_BC=[
+            {"loading_type": "force", "Loading Type": "displacement", "loading_mode": "static"},
+        ])
+        response = self.dashboard()
+        matrix = response.context["loading_matrix"]
+        self.assertEqual((matrix["available"], matrix["missing"]), (1, 1))
+        self.assertEqual([(row["type"], row["mode"], row["count"], row["percent"]) for row in matrix["pairs"]],
+                         [("force", "cyclic", 1, 50)])
+        self.assertEqual([row["label"] for row in matrix["types"]], ["force"])
+        self.assertEqual([row["label"] for row in matrix["modes"]], ["cyclic"])
+        wrapped.refresh_from_db()
+        self.assertEqual(wrapped.data, source)
+
+    def test_loading_heatmap_excludes_incomplete_or_nontext_pairs(self):
+        """
+        Missing labels and ambiguous functional arrays never form a loading pair
+        """
+        for index, conditions in enumerate([
+            [{"loading_type": "force"}, {"loading_mode": "cyclic"}],
+            [{"loading_type": "force", "loading_mode": " "}],
+            [{"loading_type": ["force", "displacement"], "loading_mode": "static"}],
+            [{"loading_type": "force", "loading_mode": {"name": "cyclic"}}],
+            [{"loading_type": "force", "loading_mode": True}],
+        ]):
+            self.create_object(f"unusable-pair-{index}", mechanical_BC=conditions,
+                               thermal_BC=[{"loading_type": "force", "loading_mode": "cyclic"}])
+        response = self.dashboard()
+        matrix = response.context["loading_matrix"]
+        self.assertEqual((matrix["available"], matrix["missing"]), (0, 5))
+        self.assertEqual(matrix["pairs"], [])
+        self.assertEqual(matrix["types"], [])
+        self.assertEqual(matrix["modes"], [])
+        self.assertEqual(response.context["loading_plot"]["cells"], [])
 
     def test_grain_box_uses_phase_quartiles_and_distinct_objects_for_navigation(self):
         """

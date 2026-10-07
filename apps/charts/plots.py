@@ -249,13 +249,13 @@ def heatmap_plot(matrix, limit=6):
     """
     Color observed loading combinations by their distinct object counts
 
-    Empty cells remain visible and have no navigation link. Full combinations
-    are retained in the HTML table when the visible axes are limited.
+    Empty cells remain visible with zero counts. Remaining reported combinations
+    can be shown in an expanded chart when the visible axes are limited.
 
     Parameters
     ----------
     matrix : dict
-        Counts and URLs for object level loading type and mode combinations.
+        Distinct object counts for type and mode pairs from one boundary entry.
     limit : int, optional
         Maximum categories on each visible axis.
 
@@ -277,6 +277,7 @@ def heatmap_plot(matrix, limit=6):
             color = "#f1f5f8" if not count else "#{:02x}{:02x}{:02x}".format(
                 round(226 - strength * 185), round(237 - strength * 113), round(246 - strength * 79))
             cells.append({**row, "type": type_row["label"], "mode": mode_row["label"], "count": count,
+                          "percent": row.get("percent", 0),
                           "x": round(116 + x_index * width, 2), "y": round(48 + y_index * height, 2),
                           "width": round(width - 3, 2), "height": round(height - 3, 2), "color": color,
                           "center_x": round(116 + (x_index + .5) * width - 1.5, 2),

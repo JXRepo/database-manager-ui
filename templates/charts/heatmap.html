@@ -1,4 +1,4 @@
-<svg class="charts-heatmap-svg" viewBox="0 0 390 280" role="group" aria-label="Loading type and mode coverage by object; labels may belong to separate boundary entries" xmlns="http://www.w3.org/2000/svg">
+<svg class="charts-heatmap-svg" viewBox="0 0 390 280" role="group" aria-label="Loading type and mode from the same mechanical boundary entry; counts are distinct objects" xmlns="http://www.w3.org/2000/svg">
   <text x="116" y="16" class="charts-axis-text">Mode</text>
   <text x="5" y="37" class="charts-axis-text">Type</text>
   {% for row in loading_plot.modes %}<foreignObject x="{{ row.x }}" y="24" width="{{ row.width }}" height="20"><div xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" title="{{ row.label }}">{{ row.label }}</div></foreignObject>{% endfor %}

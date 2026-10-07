@@ -228,7 +228,7 @@ def summarize_object(obj):
     Returns
     -------
     dict
-        Identity, labels, numeric observations and result availability.
+        Identity, labels, loading pairs, numeric observations and result availability.
     """
     conflicts = []
     data = metadata_view(obj.data, conflicts)
@@ -265,9 +265,17 @@ def summarize_object(obj):
                 numeric["grain_count"].append(counts.pop())
     if not phases:
         categories["phase"] = text_values(data.get("phase"))
+    loading_pairs = {}
     for condition in dictionaries(data.get("mechanical_BC")):
         for key in ("loading_type", "loading_mode"):
             categories[key].extend(text_values(condition.get(key)))
+        loading_type = condition.get("loading_type")
+        loading_mode = condition.get("loading_mode")
+        if not isinstance(loading_type, str) or not isinstance(loading_mode, str):
+            continue
+        loading_type, loading_mode = loading_type.strip(), loading_mode.strip()
+        if loading_type and loading_mode:
+            loading_pairs.setdefault((loading_type.casefold(), loading_mode.casefold()), (loading_type, loading_mode))
     categories = {key: text_values(values) for key, values in categories.items()}
     units = data.get("units")
     units = units if isinstance(units, dict) else {}
@@ -293,7 +301,8 @@ def summarize_object(obj):
                     "Results supplied" if available else "No mechanical results")
     return {
         "id": obj.pk, "title": title, "identifier": identifier or f"Object {obj.pk}",
-        "categories": categories, "numeric": numeric, "results": available, "notes": notes,
+        "categories": categories, "loading_pairs": list(loading_pairs.values()),
+        "numeric": numeric, "results": available, "notes": notes,
         "curve_components": paired_components,
         "phase_label": " / ".join(categories["phase"]) or "Not supplied",
         "software_label": " / ".join(categories["software"]) or "Not supplied",
@@ -470,10 +479,10 @@ def distribution(records, measure):
 
 def loading_matrix(records):
     """
-    Count objects reporting each combination of loading type and mode
+    Count loading combinations reported together in one boundary entry
 
-    Labels may belong to different boundary entries in the same object. The
-    matrix represents object coverage, rather than paired boundary conditions.
+    Each object contributes once per pair, even when several entries repeat it.
+    Incomplete entries do not supply either axis label for this matrix.
 
     Parameters
     ----------
@@ -485,17 +494,21 @@ def loading_matrix(records):
     dict
         Observed combinations, axis categories and their object denominator.
     """
-    available = [record for record in records
-                 if record["categories"]["loading_type"] and record["categories"]["loading_mode"]]
+    available = []
+    counts = Counter()
+    for record in records:
+        pairs = record["loading_pairs"]
+        if not pairs:
+            continue
+        counts.update({(loading_type.casefold(), loading_mode.casefold()) for loading_type, loading_mode in pairs})
+        available.append({"categories": {
+            "loading_type": text_values([loading_type for loading_type, _ in pairs]),
+            "loading_mode": text_values([loading_mode for _, loading_mode in pairs]),
+        }})
     types = category_rows(available, "loading_type")["rows"]
     modes = category_rows(available, "loading_mode")["rows"]
     type_labels = {row["label"].casefold(): row["label"] for row in types}
     mode_labels = {row["label"].casefold(): row["label"] for row in modes}
-    counts = Counter()
-    for record in available:
-        type_keys = {label.casefold() for label in record["categories"]["loading_type"]}
-        mode_keys = {label.casefold() for label in record["categories"]["loading_mode"]}
-        counts.update((type_key, mode_key) for type_key in type_keys for mode_key in mode_keys)
     pairs = [{"type": type_labels[type_key], "mode": mode_labels[mode_key], "count": count,
               "percent": round(count * 100 / len(records), 1)}
              for (type_key, mode_key), count in counts.items()]

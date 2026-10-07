@@ -266,13 +266,6 @@ def index(request):
                          for record in records),
     }
     loading = loading_matrix(records)
-    for row in loading["pairs"]:
-        selected = dict(query)
-        for key, value in (("loading_type", row["type"]), ("loading_mode", row["mode"])):
-            values = selected.get(key, [])
-            if value.casefold() not in {item.casefold() for item in values}:
-                selected[key] = [*values, value]
-        row["url"] = chart_url(selected, {"curve": None, "component": None, "show": None})
     for category in (categories["phase"], categories["texture"], categories["software"], model_category):
         remaining = category["rows"][6:]
         if remaining:
