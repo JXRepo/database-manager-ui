@@ -682,17 +682,21 @@ and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sm
 
 Scalar point, edge and face force/displacement loads retain their axis display.
 The table groups nonempty targets in the order Points, Edges, Faces, then
-Whole cube, with a labeled divider between groups. The Target column gives
-vertex names two columns, with room to wrap long names. Scalar load values
-appear below their field names. Conditions within each group retain
-their supplied order; grouping does not change the cube's condition indexes,
+Whole cube, with a labeled divider between groups. Empty groups are omitted.
+Unspecified cube corners may appear as free Point rows; whole RVE tensor
+conditions do not add these rows.
+The Boundary Location column shows vertex names in two columns, with room to
+wrap long names. Scalar load values appear below their field names. Conditions
+within each group retain their supplied order; grouping does not change the
+cube's condition indexes,
 tensor load entries, stored JSON, or exports.
 The table labels the combined column `Loading Type / Mode`. X/Y/Z labels stay on
 one line in evenly spaced columns. Load details expand independently below their
 own labels, so multiple panels can stay open together. The row grows to fit the
 panels without moving sibling labels or covering other rows; click a label again
-to close its panel. Table headings align with their columns, and Constraints
-retains the largest column for the three directions and their load details.
+to close its panel. Table headings are centered over their columns, with clear
+vertical separators between columns. Constraints retains the largest column
+for the three directions and their load details.
 Numeric load details,
 including tensor components, display two decimal places with half-up rounding;
 `step` retains its complete integer value. Stored values, arrows, curves, and

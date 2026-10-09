@@ -692,6 +692,13 @@ details[open] > .detail-group-summary {
     .bc-table thead th {
       line-height: 1.4;
       overflow-wrap: normal;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .bc-table thead th + th,
+    .bc-table tbody td + td {
+      border-left: 2px solid #cbd5e1;
     }
 
     .bc-table thead th:first-child {
@@ -1566,7 +1573,7 @@ details[open] > .detail-group-summary {
               <table class="bc-table">
                 <thead>
                   <tr>
-                    <th>Target</th>
+                    <th>Boundary Location</th>
                     <th>Constraints</th>
                     <th>Loading Type / Mode</th>
                   </tr>

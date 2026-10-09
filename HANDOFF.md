@@ -33,7 +33,10 @@ next_topic: Explain mechanical boundary components step by step; discuss resulta
   02 四条边覆盖八角，没有自动补的 Point。临时备份和报告在
   `/tmp/bc-separate-fixtures-hgypfhRp/`。JSON 与目录 README 本机忽略，不随 Git 同步。
 - 本轮右侧表格按 Points → Edges → Faces → Whole cube 排列，仅显示非空组。
-  组间有标题和明显分隔线，列宽约 26%／52%／22%，表头左对齐，顶点名称分成两列。
+  组间有标题和明显分隔线，列宽约 26%／52%／22%，顶点名称分成两列。
+  用户继续要求后，Target 改为 Boundary Location，三个表头水平和垂直居中，列间加
+  2px 竖线；分组逻辑仍只显示有行的组，不添加空类别。未覆盖的角点仍可能自动补 free
+  Point；当前纯边／纯面样例覆盖八角，不会补点。
   各方向的载荷详情仍可同时展开，保持 X／Y／Z 标签同一行并随内容增加行高。
 - 分组仅用于表格：`mechanical_bc_items` 与 JSON script 保持原顺序，张量按钮使用
   原始 source_index，组内顺序和 tensor_loads 的步骤顺序保持原样；存储和导出不改变。
@@ -42,6 +45,11 @@ next_topic: Explain mechanical boundary components step by step; discuss resulta
   后复查四个受影响组合，通过多方向同时展开和第二个张量条件的原索引／step 选择。
   已查看实际截图，字段名保持完整，顶点分两列，无重叠或横向溢出；隔离服务已停止。
   临时截图和报告在 `/tmp/bc-table-qa-t06OmiT3/`，不随 Git 同步；Render 部署未确认。
+- 本次表头居中、改名和竖线：7 项 BC Django 测试、12 项载荷 JavaScript 测试通过，无跳过。
+  真实 Chromium 在 1280／1440／1920 检查新版四样例及混合、长内容、空条件共 21 个场景，
+  折叠／全部展开 42 组布局通过；三列表头居中，2px 列边界清楚，零浏览器异常和溢出。
+  已查看点、边和整体张量截图，原 JSON 导出和第二张量选择不变，隔离服务与浏览器已停止。
+  最新临时报告与截图在 `/tmp/bc-table-header-qa-3TcE5M/`，不随 Git 同步。
 - 已知未处理的几何判断问题：当前平台只按两个／四个不同顶点标 Edge／Face，尚未检查
   两点是否相邻、四点是否组成完整外表面。本轮按请求整理布局，没有扩展上传校验或改变
   这套分类。后续不能宣称已有严格几何检查，也不能把错误顶点组擅自转换为多个点力。
