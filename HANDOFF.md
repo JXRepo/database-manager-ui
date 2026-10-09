@@ -1,7 +1,7 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-10-09
+timestamp: 2026-10-10
 code_base: main (mechanical boundary table grouping; see git log for the latest commit)
 next_topic: Explain mechanical boundary components step by step; discuss resultant forces separately later
 ---
@@ -42,6 +42,10 @@ next_topic: Explain mechanical boundary components step by step; discuss resulta
   单点占首列完整宽度，边／面仍保留两列顶点。载荷格维持顶部对齐，详情独立展开时
   XYZ 标签保持原位置；其他格垂直居中。没有修改数据、分组或张量索引。
   各方向的载荷详情仍可同时展开，保持 X／Y／Z 标签同一行并随内容增加行高。
+- 用户觉得表格像粗糙的 Excel 后，进一步调整为浅蓝表头、1px 浅色连续竖线、小分组
+  标签和点／边／面／立方体图标；XYZ 状态统一为同宽、柔和底色的圆角矩形。顶点名称
+  加深，行悬停／键盘焦点高亮，展开详情增加留白和数字间距。全部内容仍居中，Constraints
+  保持顶部对齐，展开不移动旁边标签。只改详情模板样式和分组图标，不改数据或交互逻辑。
 - 分组仅用于表格：`mechanical_bc_items` 与 JSON script 保持原顺序，张量按钮使用
   原始 source_index，组内顺序和 tensor_loads 的步骤顺序保持原样；存储和导出不改变。
 - 验证：11 项相关 Django 测试和 12 项载荷 JavaScript 测试通过，无跳过。真实 Chromium
@@ -61,6 +65,12 @@ next_topic: Explain mechanical boundary components step by step; discuss resulta
   原始 JSON 导出和第二张量索引保持。已查看实际多点表格与边展开截图，临时服务和
   Chromium 已停止。最新报告 `/tmp/bc-table-centered-qa-Mzi9c3aC/report.json`，表格截图
   在同目录 `screenshots/table-multipoint-1440.png`；这些临时文件不随 Git 同步。
+- 最新表格美化：7 项 BC Django 和 12 项载荷 JavaScript 测试通过，无跳过。最终模板
+  在隔离 SQLite、DEBUG=True、关闭模板缓存的 Chromium 服务上，八例 × 三种桌面宽度
+  共 24 个场景通过，零浏览器异常、控制台错误和溢出；原 JSON 导出和第二张量索引保持。
+  实际 Tab／Enter／Space 操作与禁用页面 JavaScript 的原生展开通过，焦点边框可见。
+  已查看最终多点和边展开截图，临时服务和浏览器已停止；报告与截图在
+  `/tmp/bc-table-polished-qa-wDnm5dwB/`，不随 Git 同步。Render 部署未确认。
 - 已知未处理的几何判断问题：当前平台只按两个／四个不同顶点标 Edge／Face，尚未检查
   两点是否相邻、四点是否组成完整外表面。本轮按请求整理布局，没有扩展上传校验或改变
   这套分类。后续不能宣称已有严格几何检查，也不能把错误顶点组擅自转换为多个点力。

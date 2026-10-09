@@ -697,6 +697,9 @@ panels without moving sibling labels or covering other rows; click a label again
 to close its panel. Headings, vertex names, axis badges, load details and loading
 labels are centered within their columns. Group headings retain the same
 three-column grid, so vertical separators continue through each group.
+The table uses a pale blue header, fine continuous column separators and compact
+group labels with point, edge, face or cube symbols. Axis states use equally
+sized, softly colored badges; hover and keyboard focus highlight the active row.
 Constraints retains the largest column for the three directions and their load
 details; its labels stay at the top while panels expand below them.
 Numeric load details,
