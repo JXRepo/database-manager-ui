@@ -1,37 +1,45 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-10-07
-code_base: main (application baseline ecd35e7; Charts review completed; see git log for the latest handoff update)
-next_topic: Discuss Ronak's new modification feedback with the user; specific material has not yet been provided
+timestamp: 2026-10-09
+code_base: main (mechanical boundary table grouping; see git log for the latest commit)
+next_topic: Explain mechanical boundary components step by step; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 新聊天先看：接下来讨论 Ronak 发来的修改
+### 新聊天先看：受力分量讨论和右侧表格整理
 
-- 用户明确要新开聊天，接下来讨论 Ronak 发来的一些修改内容。当前 Charts 的逐卡梳理和
-  整页可用性调整已完成；下一轮以 Ronak 的本次反馈为主题，不自动重新从 Phase 开始。
-- 本轮尚未收到 Ronak 本次反馈的原文、截图或文件，也未核对具体修改。新聊天先接住用户
-  提供的材料，逐条用白话解释建议的含义、当前平台的行为和实际需要改的地方。
-  下面关于 Ronak 的上传、编号、Schema 和详情曲线记录属于历史，不当作本次新反馈。
-- 最新应用代码基线是 `ecd35e7`，分支 main，已推送。近期三个提交：`abe579b` 删除
-  Charts 顶部筛选条并修复即时悬停；`788f1da` 完善查看／搜索入口及统计说明；
-  `ecd35e7` 将顶部说明缩为一句，字号改为 14px 并加深颜色。Render 部署未确认。
-- 八张图形保留，图形只显示悬停信息；View data 查看当前范围对象，Search data 打开
-  所有可访问对象的详细搜索条件。空范围隐藏 View data。顶部目前只有一句
-  `Overview of materials and simulation data.`，不要恢复两行小字说明或图表点击筛选。
-- 最近一次应用验证是 59 项 Charts 测试通过，无跳过，包含真实 Chromium 的
-  1280／1440／1920 桌面、长名称、空数据、即时悬停、范围权限、搜索和无 JavaScript
-  操作；此前连同小助手 FAQ 的验证为 69 项通过。不是本次仅更新交接时重跑的测试。
-  日志 `/tmp/charts-short-intro-tests.log`、截图 `/tmp/charts-short-intro-qa` 只在本机，
-  不随 Git 同步。
-- 新聊天先读 AGENTS 和相关 README，检查 Git 状态及最新提交，再按实际修改范围读取代码。
-  保留用户偏好：简短中文沟通、英文 UI；明确请求和审查中发现的必要修正直接处理，
-  不反复确认常规步骤；完成并验证后检查差异、提交和推送。原始 JSON、导出和访问权限
-  继续按现有规则处理。
+- 用户不是材料专业，明确要求用简短白话中文、跟着他一步一步讨论。先弄清点、边、面
+  的 X／Y／Z 分量，再单独讨论是否增加合力显示；现在不增加合力箭头。
+- Ronak 的聊天说明面加载也需要支持。GitHub schema 的 vertex_list 描述点／边／面／
+  整个立方体分别使用 1／2／4／8 个顶点；它没有说任选四个角都构成一个外表面。
+  本机学校目录 `/icams_groupstructure/exchange/for_Jun` 不可用，尚未取得 Ronak 实际 JSON。
+- 本机忽略的 `example_json_files/boundary_condition_examples_20261008/` 有四份独立的
+  合成测试数据：铝点拉伸、钢边压缩、钛面循环剪切、铜整体张量加载。它们参考样例格式，
+  不是真实模拟或 Ronak 的计算结果；文件和目录 README 有公式、单位和限制说明。
+  用户要求改为 Public 后四份文件已重新生成编号；已上传的旧私有对象没有自动改变权限。
+- `01_point_tension_aluminium.json` 是点加载加面固定，不能称为所有条件都逐点设置的例子。
+  `a46fde6c.json` 则逐点记录条件。颜色高亮的面可以表示固定面，并不自动表示面加载。
+- 本轮右侧表格按 Points → Edges → Faces → Whole cube 排列，仅显示非空组。
+  组间有标题和明显分隔线，列宽约 26%／52%／22%，表头左对齐，顶点名称分成两列。
+  各方向的载荷详情仍可同时展开，保持 X／Y／Z 标签同一行并随内容增加行高。
+- 分组仅用于表格：`mechanical_bc_items` 与 JSON script 保持原顺序，张量按钮使用
+  原始 source_index，组内顺序和 tensor_loads 的步骤顺序保持原样；存储和导出不改变。
+- 验证：11 项相关 Django 测试和 12 项载荷 JavaScript 测试通过，无跳过。真实 Chromium
+  检查四份样例、混合张量、长内容和空条件在 1280／1440／1920 的布局；最后调整详情间距
+  后复查四个受影响组合，通过多方向同时展开和第二个张量条件的原索引／step 选择。
+  已查看实际截图，字段名保持完整，顶点分两列，无重叠或横向溢出；隔离服务已停止。
+  临时截图和报告在 `/tmp/bc-table-qa-t06OmiT3/`，不随 Git 同步；Render 部署未确认。
+- 已知未处理的几何判断问题：当前平台只按两个／四个不同顶点标 Edge／Face，尚未检查
+  两点是否相邻、四点是否组成完整外表面。本轮按请求整理布局，没有扩展上传校验或改变
+  这套分类。后续不能宣称已有严格几何检查，也不能把错误顶点组擅自转换为多个点力。
+- My Data 下载标签已改为 `Download Stress-Strain Curve as CSV`，之前的提交为 `d76daab`。
+  Charts 的梳理已经完成，下一轮继续当前受力话题，不自动重新逐张审查 Charts。
+- 新聊天先读 AGENTS 和相关 README、检查 Git 状态和最新提交。明确修改直接处理，
+  验证后检查差异、提交和推送；推送成功不等于 Render 已完成部署。
 
 ### 最近已完成：Charts 的用途说明和后续操作
 
@@ -1338,7 +1346,9 @@ Ronak 原始 `Data_Base_Cyclic.json` 现在能拆成 100 条对象，逐条返�
 - 载荷显示按 ROUND_HALF_UP 四舍五入两位小数，step 保持整数；不改原值或导出精度。
 - X/Y/Z 标签保持同一行。各方向的 loaded 详情可同时展开，正常文档流增加该行高度，
   其他方向标签仍停在顶部；不要恢复一次只能开一个或浮层互相遮盖的版本。
-- 三列表宽约 14% / 62% / 24%；cube 与表格采用 2:3 比例和最小宽度约束。
+- 三列表宽约 26% / 52% / 22%；cube 与表格采用 2:3 比例和最小宽度约束。
+  右侧仅对非空类型分组，顺序为 Points、Edges、Faces、Whole cube；每组有标题分隔线，
+  表头左对齐，顶点名称可以逐个换行。分组不改变 cube 的原条件索引和张量步骤顺序。
 - 顶点标签约 14 CSS px，参考轴字 17px；顶点标签向外偏移从 0.22 调到 0.28。
   X 标签已额外拉开与箭头的距离，不要把所有标签推得很远。
 - 顶点命名严格按二进制坐标：Vxyz 的每位 0→-0.5、1→+0.5。V000 的三个相邻点是

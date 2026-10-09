@@ -1,4 +1,5 @@
 import json
+import re
 from copy import deepcopy
 
 from django.contrib.auth.models import User
@@ -161,3 +162,78 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertEqual(exported.json(), data)
         obj.refresh_from_db()
         self.assertEqual(obj.data, data)
+
+    def test_detail_groups_targets_without_changing_tensor_selection_or_data(self):
+        """
+        Group mixed targets while keeping tensor buttons linked to their source
+
+        The table may reorder target categories, but cube selection and exports
+        must retain the original conditions and load entries.
+        """
+        owner = User.objects.create_user(username="grouped-bc-owner")
+        self.client.force_login(owner)
+        data = {"mechanical_BC": [
+            self._tensor_data()["mechanical_BC"][0],
+            {"vertex_list": ["V000", "V010", "V001", "V011"],
+             "constraints": ["fixed", "fixed", "fixed"]},
+            {"vertex_list": ["V111"], "constraints": ["loaded", "free", "free"],
+             "loading_type": "force", "applied_load": [{"magnitude": 32}]},
+            {"vertex_list": ["V010", "V110"], "constraints": ["free", "loaded", "free"],
+             "loading_type": "force", "applied_load": [{"magnitude": -172.8}]},
+            {"vertex_list": ["V001", "V101", "V011", "V111"],
+             "constraints": ["free", "free", "loaded"], "loading_type": "force",
+             "applied_load": [{"magnitude": 405}]},
+            self._tensor_data("strain")["mechanical_BC"][0],
+            {"vertex_list": ["V100"], "constraints": ["fixed", "free", "free"]},
+        ]}
+        original = deepcopy(data)
+        obj = JSONData.objects.create(owner=owner, data=data)
+
+        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        html = response.content.decode()
+        groups = re.findall(r'<tbody data-bc-target-type="([^"]+)">(.*?)</tbody>', html, re.S)
+
+        self.assertEqual([kind for kind, _ in groups], ["Point", "Edge", "Face", "Whole cube"])
+        self.assertEqual(
+            re.findall(r'<span class="bc-target-vertex">([^<]+)</span>', groups[0][1]),
+            ["V111", "V100"],
+        )
+        self.assertEqual(
+            re.findall(r'<span class="bc-target-vertex">([^<]+)</span>', groups[2][1]),
+            ["V000", "V010", "V001", "V011", "V001", "V101", "V011", "V111"],
+        )
+        self.assertEqual(
+            re.findall(r'data-bc-show-tensor="(\d+)".*?data-bc-load-index="(\d+)"', groups[3][1]),
+            [("0", "0"), ("0", "1"), ("5", "0"), ("5", "1")],
+        )
+        script = re.search(r'<script id="mechanical-bc-data"[^>]*>(.*?)</script>', html, re.S)
+        items = json.loads(script.group(1))
+        self.assertEqual([item["target_type"] for item in items],
+                         ["Whole cube", "Face", "Point", "Edge", "Face", "Whole cube", "Point"])
+        self.assertEqual([load["step"] for load in items[5]["tensor_loads"]], [0, 1])
+        self.assertEqual(self.client.get(reverse("json_data_export", args=[obj.pk])).json(), original)
+        obj.refresh_from_db()
+        self.assertEqual(obj.data, original)
+
+    def test_edge_detail_groups_unused_points_and_omits_empty_target_groups(self):
+        """
+        Keep free vertices visible together without adding empty table sections
+        """
+        owner = User.objects.create_user(username="edge-group-owner")
+        self.client.force_login(owner)
+        obj = JSONData.objects.create(owner=owner, data={"mechanical_BC": [
+            {"vertex_list": ["V010", "V110"], "constraints": ["free", "loaded", "free"],
+             "loading_type": "force", "applied_load": [{"magnitude": -172.8}]},
+            {"vertex_list": ["V000", "V100", "V001", "V101"],
+             "constraints": ["fixed", "fixed", "fixed"]},
+        ]})
+
+        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        groups = re.findall(r'<tbody data-bc-target-type="([^"]+)">(.*?)</tbody>',
+                            response.content.decode(), re.S)
+
+        self.assertEqual([kind for kind, _ in groups], ["Point", "Edge", "Face"])
+        self.assertEqual(
+            re.findall(r'<span class="bc-target-vertex">([^<]+)</span>', groups[0][1]),
+            ["V011", "V111"],
+        )

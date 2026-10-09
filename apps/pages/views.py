@@ -4140,6 +4140,39 @@ def _build_mechanical_bc_items(data):
     return items
 
 
+def _group_mechanical_bc_items(items):
+    """
+    Group table rows by target type while retaining cube viewer indexes
+
+    Only the table changes its display order. Each row keeps its original item
+    and index so tensor buttons still select the correct condition.
+
+    Parameters
+    ----------
+    items : list of dict
+        Boundary conditions prepared for the cube viewer.
+
+    Returns
+    -------
+    list of dict
+        Nonempty target groups with their rows in the original relative order.
+    """
+    groups = []
+    for target_type, label in (
+        ("Point", "Points"),
+        ("Edge", "Edges"),
+        ("Face", "Faces"),
+        ("Whole cube", "Whole cube"),
+    ):
+        rows = []
+        for source_index, item in enumerate(items):
+            if item["target_type"] == target_type:
+                rows.append({"item": item, "source_index": source_index})
+        if rows:
+            groups.append({"target_type": target_type, "label": label, "rows": rows})
+    return groups
+
+
 
 
 
@@ -4283,6 +4316,7 @@ def json_data_detail_view(request, pk):
         "detail_rows": display_rows,
         "plot_variables": plot_variables,
         "mechanical_bc_items": mechanical_bc_items,
+        "mechanical_bc_groups": _group_mechanical_bc_items(mechanical_bc_items),
         "shared_users": obj.shared_users.order_by("username"),
         "detail_back_url_name": detail_back_url_name,
         "detail_back_label": detail_back_label,
