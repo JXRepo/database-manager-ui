@@ -694,9 +694,11 @@ The table labels the combined column `Loading Type / Mode`. X/Y/Z labels stay on
 one line in evenly spaced columns. Load details expand independently below their
 own labels, so multiple panels can stay open together. The row grows to fit the
 panels without moving sibling labels or covering other rows; click a label again
-to close its panel. Table headings are centered over their columns, with clear
-vertical separators between columns. Constraints retains the largest column
-for the three directions and their load details.
+to close its panel. Headings, vertex names, axis badges, load details and loading
+labels are centered within their columns. Group headings retain the same
+three-column grid, so vertical separators continue through each group.
+Constraints retains the largest column for the three directions and their load
+details; its labels stay at the top while panels expand below them.
 Numeric load details,
 including tensor components, display two decimal places with half-up rounding;
 `step` retains its complete integer value. Stored values, arrows, curves, and
