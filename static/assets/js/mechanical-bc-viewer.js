@@ -181,9 +181,8 @@ function createMaterials() {
       roughness: 0.3,
       metalness: 0.06,
     }),
-    edgeLineHighlight: new THREE.LineBasicMaterial({
-      color: "#111111",
-      transparent: true,
+    edgeLineHighlight: new THREE.MeshBasicMaterial({
+      color: "#facc15",
       depthWrite: false,
     }),
     faceHighlight: new THREE.MeshBasicMaterial({
@@ -581,15 +580,19 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   }
 
   const tooltip = formatBoundaryConditionHover(item);
-  const geometry = new THREE.BufferGeometry().setFromPoints(points);
   const hasConstraint = (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed");
-  const edge = new THREE.Line(geometry, hasConstraint ? materials.edgeLineHighlight : materials.cubeEdgeLine);
+  const edge = hasConstraint
+    ? makeCylinderBetween(points[0], points[1], 0.01, materials.edgeLineHighlight, 18)
+    : new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), materials.cubeEdgeLine);
   const markerOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
   const edgeVector = points[1].clone().sub(points[0]).normalize();
   const edgeDirection = Object.keys(AXIS_DIRECTIONS).find(direction => Math.abs(edgeVector.dot(AXIS_DIRECTIONS[direction])) > 0.999);
 
-  edge.renderOrder = 4;
-  addMesh(group, edge, tooltip, selectableMeshes);
+  if (edge) {
+    // Keep the thicker edge behind arrows and constraint markers
+    edge.renderOrder = hasConstraint ? -1 : 4;
+    addMesh(group, edge, tooltip, selectableMeshes);
+  }
   drawLoadedAxesAt(markerOrigins, item, materials, group, selectableMeshes, 0.65, 0.45, edgeDirection);
   createClampMarker(markerOrigins[1], item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
 }

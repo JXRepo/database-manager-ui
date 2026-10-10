@@ -681,13 +681,14 @@ and exports are unchanged. These distinctions follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
-Edge loading uses a thin colored edge and three arrows for each displayed
+Edge loading uses a thick yellow edge and three arrows for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
 Parallel and transverse edge arrows use the same shaft length, thickness and
 arrowhead size for the same load sign pattern. Parallel shafts extend back from
 their existing tips, keeping all three arrowheads clear of the endpoint spheres.
-Edges with a loaded or fixed direction use a near-black line. Their matching
+Edges with a loaded or fixed direction use a yellow rod along the entire edge,
+drawn behind the arrows and constraint markers. Their matching
 default outline and halo segments are omitted to avoid overlapping pale-blue
 cube outlines. Free edges retain the cube's default outline color.
 Edge boundaries have no midpoint diamond or dot.
