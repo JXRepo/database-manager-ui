@@ -4140,6 +4140,55 @@ def _build_mechanical_bc_items(data):
     return items
 
 
+def _get_mechanical_target_layout(item):
+    """
+    Prepare connections only for actual cube edges and external faces
+
+    Vertex names and their supplied order remain unchanged. Unknown names or
+    other vertex combinations keep the existing text display.
+
+    Parameters
+    ----------
+    item : dict
+        Normalized boundary condition for the cube viewer.
+
+    Returns
+    -------
+    dict
+        Connection kind and face grid positions, or no connection layout.
+    """
+    vertices = item["vertices"]
+    target_type = item["target_type"]
+    expected_count = {"Edge": 2, "Face": 4}.get(target_type)
+    if len(vertices) != expected_count:
+        return {}
+
+    normalized = [vertex.upper() for vertex in vertices]
+    if len(set(normalized)) != expected_count:
+        return {}
+    if not all(vertex in MECHANICAL_BC_VERTICES for vertex in normalized):
+        return {}
+
+    varying_axes = []
+    for axis in range(1, 4):
+        if len({vertex[axis] for vertex in normalized}) == 2:
+            varying_axes.append(axis)
+
+    if target_type == "Edge" and len(varying_axes) == 1:
+        return {"kind": "edge"}
+    if target_type != "Face" or len(varying_axes) != 2:
+        return {}
+
+    corners = []
+    for name, vertex in zip(vertices, normalized):
+        corners.append({
+            "name": name,
+            "column": 1 + 2 * int(vertex[varying_axes[0]]),
+            "row": 1 + 2 * int(vertex[varying_axes[1]]),
+        })
+    return {"kind": "face", "vertices": corners}
+
+
 def _group_mechanical_bc_items(items):
     """
     Group table rows by target type while retaining cube viewer indexes
@@ -4167,7 +4216,11 @@ def _group_mechanical_bc_items(items):
         rows = []
         for source_index, item in enumerate(items):
             if item["target_type"] == target_type:
-                rows.append({"item": item, "source_index": source_index})
+                rows.append({
+                    "item": item,
+                    "source_index": source_index,
+                    "target_layout": _get_mechanical_target_layout(item),
+                })
         if rows:
             groups.append({"target_type": target_type, "label": label, "rows": rows})
     return groups

@@ -684,12 +684,18 @@ Scalar point, edge and face force/displacement loads retain their axis display.
 Edge loading uses a thin colored edge and three shorter arrows for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
-The table groups nonempty targets in the order Points, Edges, Faces, then
-Whole cube, with a labeled divider between groups. Empty groups are omitted.
+Nonempty targets have separate tables in the order Points, Edges, Faces, then
+Whole cube, each with its group title above the table. Empty groups are omitted.
 Unspecified cube corners may appear as free Point rows; whole RVE tensor
 conditions do not add these rows.
-The Boundary Location column shows vertex names in two columns, with room to
-wrap long names. Scalar load values appear below their field names. Conditions
+The Boundary Location column connects the two endpoint names of a cube edge
+with a line and places the four corners of an external face around a small
+frame. Connections follow the cube geometry even when vertex lists use a
+different order. Unknown names or vertex sets that do not form a cube edge or
+external face retain their text layout without connections; this does not add
+upload validation or change the existing target classification. Whole cube
+rows show `Entire cube` instead of listing eight corners. Long names can wrap.
+Scalar load values appear below their field names. Conditions
 within each group retain their supplied order; grouping does not change the
 cube's condition indexes,
 tensor load entries, stored JSON, or exports.
@@ -698,10 +704,10 @@ one line in evenly spaced columns. Load details expand independently below their
 own labels, so multiple panels can stay open together. The row grows to fit the
 panels without moving sibling labels or covering other rows; click a label again
 to close its panel. Headings, vertex names, axis badges, load details and loading
-labels are centered within their columns. Group headings retain the same
-three-column grid, so vertical separators continue through each group.
+labels are centered within their columns. Vertical separators run continuously
+from the header to the bottom of each table; group titles sit outside its border.
 The table uses a pale blue header, fine continuous column separators and compact
-group labels with point, edge, face or cube symbols. Axis states use equally
+group titles with point, edge, face or cube symbols. Axis states use equally
 sized, softly colored badges; hover and keyboard focus highlight the active row.
 Constraints retains the largest column for the three directions and their load
 details; its labels stay at the top while panels expand below them.

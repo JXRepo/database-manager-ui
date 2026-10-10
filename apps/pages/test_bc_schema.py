@@ -7,7 +7,11 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import JSONData
-from .views import _build_mechanical_bc_items, _normalize_applied_load
+from .views import (
+    _build_mechanical_bc_items,
+    _group_mechanical_bc_items,
+    _normalize_applied_load,
+)
 
 
 class MechanicalBCSchemaTests(TestCase):
@@ -158,6 +162,7 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertNotContains(response, "X: loaded")
         self.assertNotContains(response, "Y: free")
         self.assertNotContains(response, "Z: free")
+        self.assertContains(response, "Entire cube", count=1)
         exported = self.client.get(reverse("json_data_export", args=[obj.pk]))
         self.assertEqual(exported.json(), data)
         obj.refresh_from_db()
@@ -194,12 +199,15 @@ class MechanicalBCSchemaTests(TestCase):
         groups = re.findall(r'<tbody data-bc-target-type="([^"]+)">(.*?)</tbody>', html, re.S)
 
         self.assertEqual([kind for kind, _ in groups], ["Point", "Edge", "Face", "Whole cube"])
+        self.assertContains(response, 'class="bc-table-group"', count=4)
+        self.assertContains(response, 'class="bc-table-frame"', count=4)
+        self.assertNotContains(response, 'class="bc-group-heading"')
         self.assertEqual(
             re.findall(r'<span class="bc-target-vertex">([^<]+)</span>', groups[0][1]),
             ["V111", "V100"],
         )
         self.assertEqual(
-            re.findall(r'<span class="bc-target-vertex">([^<]+)</span>', groups[2][1]),
+            re.findall(r'<span class="bc-target-vertex"[^>]*>([^<]+)</span>', groups[2][1]),
             ["V000", "V010", "V001", "V011", "V001", "V101", "V011", "V111"],
         )
         self.assertEqual(
@@ -214,6 +222,67 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertEqual(self.client.get(reverse("json_data_export", args=[obj.pk])).json(), original)
         obj.refresh_from_db()
         self.assertEqual(obj.data, original)
+
+    def test_face_connections_follow_all_six_surfaces_without_reordering_vertices(self):
+        """
+        Keep real face connections correct for different supplied vertex orders
+
+        Each displayed neighbor must be a cube edge. Display positions must not
+        change the vertex list passed to the viewer or stored in the data.
+        """
+        faces = (
+            ["V000", "V010", "V001", "V011"],
+            ["V100", "V110", "V101", "V111"],
+            ["V000", "V100", "V001", "V101"],
+            ["V010", "V110", "V011", "V111"],
+            ["V000", "V100", "V010", "V110"],
+            ["V001", "V101", "V011", "V111"],
+        )
+        for face in faces:
+            orders = (face, [face[3], face[0], face[2], face[1]], [v.lower() for v in face])
+            for vertices in orders:
+                with self.subTest(vertices=vertices):
+                    data = {"mechanical_BC": [{"vertex_list": vertices}]}
+                    original = deepcopy(data)
+                    items = _build_mechanical_bc_items(data)
+                    group = next(g for g in _group_mechanical_bc_items(items) if g["target_type"] == "Face")
+                    row = group["rows"][0]
+                    layout = row["target_layout"]
+                    self.assertEqual(layout["kind"], "face")
+                    self.assertIs(row["item"], items[0])
+                    self.assertEqual([v["name"] for v in layout["vertices"]], vertices)
+                    corners = {(v["row"], v["column"]): v["name"] for v in layout["vertices"]}
+                    self.assertEqual(set(corners), {(1, 1), (1, 3), (3, 1), (3, 3)})
+                    for start, end in (
+                        ((1, 1), (1, 3)), ((1, 3), (3, 3)),
+                        ((3, 3), (3, 1)), ((3, 1), (1, 1)),
+                    ):
+                        self.assertEqual(sum(a != b for a, b in zip(corners[start], corners[end])), 1)
+                    self.assertEqual(items[0]["vertices"], vertices)
+                    self.assertEqual(data, original)
+
+    def test_connections_do_not_invent_cube_edges_or_external_faces(self):
+        """
+        Leave diagonal, unknown and repeated vertex sets without drawn connections
+
+        The existing target classification is retained for these records while
+        their table display avoids suggesting an unsupported cube surface.
+        """
+        for vertices in (
+            ["V000", "V111"],
+            ["V000", "V001", "V110", "V111"],
+            ["V000", "V110", "V101", "V011"],
+            ["corner-left", "corner-right"],
+            ["corner-a", "corner-b", "corner-c", "corner-d"],
+            ["V000", "V100", "V000"],
+            ["V000", "V100", "V010", "V110", "V000"],
+        ):
+            with self.subTest(vertices=vertices):
+                items = _build_mechanical_bc_items({"mechanical_BC": [{"vertex_list": vertices}]})
+                rows = [row for group in _group_mechanical_bc_items(items) for row in group["rows"]]
+                row = next(row for row in rows if row["source_index"] == 0)
+                self.assertEqual(row["target_layout"], {})
+                self.assertEqual(row["item"]["vertices"], vertices)
 
     def test_edge_detail_groups_unused_points_and_omits_empty_target_groups(self):
         """

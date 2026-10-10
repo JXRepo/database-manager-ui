@@ -2,8 +2,8 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (boundary table styling and edge loading illustration; see git log for the latest commit)
-next_topic: Review edge loading illustration and continue boundary components step by step; discuss resultant forces separately later
+code_base: main (separate boundary tables with connected vertex layouts and edge loading illustration; see git log for the latest commit)
+next_topic: Review the boundary table display and continue boundary components step by step; discuss resultant forces separately later
 ---
 
 # Project handoff
@@ -32,7 +32,22 @@ next_topic: Review edge loading illustration and continue boundary components st
   行数、另一登录用户的 Public 可见性和重复拒绝通过。01 自动补的自由行也都是 Point；
   02 四条边覆盖八角，没有自动补的 Point。临时备份和报告在
   `/tmp/bc-separate-fixtures-hgypfhRp/`。JSON 与目录 README 本机忽略，不随 Git 同步。
-- 本轮右侧表格按 Points → Edges → Faces → Whole cube 排列，仅显示非空组。
+- 最新用户认可表格外的分类标题方案后，要求一起实施：非空的 Points → Edges → Faces →
+  Whole cube 各有独立三列表和上方分类标题，不再用首列分类加两个空单元格的分组行。
+  各表列宽一致，竖线从自身表头连续到底，标题在边框外，所有表格内容仍横向居中。
+  第一列中边用细线连接两个顶点，面用两行两列的四角加连接线表示；Whole cube 只写
+  Entire cube。只改详情展示，JSON 的全部顶点、值、顺序和导出保持。
+  `_get_mechanical_target_layout` 只给表格分组 row 添加展示元数据，不修改 viewer items。
+  标准顶点必须真正组成相邻边或立方体六个外面之一才画连接，未知名称、对角线、斜面、
+  非共面或重复顶点仍显示原文字列表，不擅自造几何。面采用 CSS grid 位置，DOM 顶点顺序
+  仍与输入一致；现有分类、上传校验、原 source_index 和张量步骤逻辑保持原样。
+- 本次独立表格和顶点连线验证：9 项 BC Django 与 12 项载荷 JavaScript 测试通过，无跳过。
+  真实 Chromium 在隔离 SQLite、DEBUG=True、禁模板缓存环境检查四样例、多点、混合、长内容、
+  空条件、六外面及十二边共十例 × 1280／1440／1920，30 个场景全部通过，零控制台错误、
+  浏览器异常和跳过。连接几何和顶点 DOM 原顺序、竖线连续、多方向展开、第二张量索引与
+  载荷选择、原 JSON 导出保持。已查看边、面、整体、混合和长文字截图；最新报告与截图在
+  `/tmp/bc-table-groups-qa-ozIn1E/`，不随 Git 同步；Render 部署未确认。
+- 此前右侧表格按 Points → Edges → Faces → Whole cube 排列，仅显示非空组。
   组间有标题和明显分隔线，列宽约 26%／52%／22%，顶点名称分成两列。
   用户继续要求后，Target 改为 Boundary Location，三个表头水平和垂直居中，列间加
   2px 竖线；分组逻辑仍只显示有行的组，不添加空类别。未覆盖的角点仍可能自动补 free
@@ -86,8 +101,9 @@ next_topic: Review edge loading illustration and continue boundary components st
   已查看最终截图并核对源码摘要一致，临时服务和 Chromium 已停止；报告与截图在
   `/tmp/bc-edge-viewer-qa-ycKRA1TA/`，不随 Git 同步。Render 部署未确认。
 - 已知未处理的几何判断问题：当前平台只按两个／四个不同顶点标 Edge／Face，尚未检查
-  两点是否相邻、四点是否组成完整外表面。本轮按请求整理布局，没有扩展上传校验或改变
-  这套分类。后续不能宣称已有严格几何检查，也不能把错误顶点组擅自转换为多个点力。
+  分类所依据的两点是否相邻、四点是否组成完整外表面。新的表格连接图另行检查真实边／外面，
+  但没有扩展上传校验或改变现有分类与 3D 图。后续不能宣称已有严格几何上传校验，也不能
+  把错误顶点组擅自转换为多个点力。
 - My Data 下载标签已改为 `Download Stress-Strain Curve as CSV`，之前的提交为 `d76daab`。
   Charts 的梳理已经完成，下一轮继续当前受力话题，不自动重新逐张审查 Charts。
 - 新聊天先读 AGENTS 和相关 README、检查 Git 状态和最新提交。明确修改直接处理，
