@@ -10,11 +10,12 @@ next_topic: Review thick yellow highlighted edges and XYZ arrows with the local 
 
 ## 当前状态
 
-### 最新交接：条件边整条加粗，改为黄色
+### 最新交接：黄色条件边进一步加粗
 
 - 用户明确要求高亮边整条加粗，并试用黄色。
+- 用户随后要求再粗一点；圆柱半径从 0.01 增至 0.015，整条边直径增加 50%。
 - `edgeLineHighlight` 改为 `MeshBasicMaterial`，颜色 `#facc15`；loaded／fixed Edge
-  用端点间半径 0.01、18 分段的圆柱显示整条边，复用 `makeCylinderBetween`。
+  用端点间半径 0.015、18 分段的圆柱显示整条边，复用 `makeCylinderBetween`。
   free Edge 仍为原来的浅蓝细线，沿边对应的默认轮廓和 halo 继续排除。
 - 粗边不写深度，先于箭头和蓝 T 绘制（opaque、renderOrder=-1），使沿边红箭身可见。
   退化零长度边的圆柱为 null 时保留安全检查；箭头、固定符号、其他边界类型和 JSON 不改。
@@ -22,9 +23,9 @@ next_topic: Review thick yellow highlighted edges and XYZ arrows with the local 
   373px 正常／旋转实像和隐藏黄色粗边的同相机对照确认三条沿边红杆可见，
   12 个蓝 T 构件均保留核心像素；整边长度、材质、默认轮廓排除、悬停、Reset 和桌面布局通过。
   使用 `DEBUG=True`、隔离 SQLite，未读取 `.env`；临时服务和浏览器已关闭。
-- 本机预览为样例目录内 `edges_yellow_thick_default_20261010.png` 和
-  `edges_yellow_thick_rotated_20261010.png`，默认图已在 PyCharm 打开。
-  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/yellow-thick-report.json`；图和报告不随 Git 同步。
+- 本机预览为样例目录内 `edges_yellow_thicker_default_20261010.png` 和
+  `edges_yellow_thicker_rotated_20261010.png`，默认图已在 PyCharm 打开。
+  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/yellow-thicker-report.json`；图和报告不随 Git 同步。
 
 ### 上一版：近黑条件边，去掉对应浅蓝轮廓重影
 

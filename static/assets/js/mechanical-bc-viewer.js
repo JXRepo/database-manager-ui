@@ -582,7 +582,7 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   const tooltip = formatBoundaryConditionHover(item);
   const hasConstraint = (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed");
   const edge = hasConstraint
-    ? makeCylinderBetween(points[0], points[1], 0.01, materials.edgeLineHighlight, 18)
+    ? makeCylinderBetween(points[0], points[1], 0.015, materials.edgeLineHighlight, 18)
     : new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), materials.cubeEdgeLine);
   const markerOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
   const edgeVector = points[1].clone().sub(points[0]).normalize();
