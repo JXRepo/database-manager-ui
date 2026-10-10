@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (short parallel edge arrows with clearer visible shafts; check git log for the final commit)
+code_base: main (parallel and transverse edge arrows with matching shaft lengths; check git log for the final commit)
 next_topic: Review edge arrows in all three directions with the local XYZ fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
 ---
 
@@ -10,7 +10,27 @@ next_topic: Review edge arrows in all three directions with the local XYZ fixtur
 
 ## 当前状态
 
-### 最新交接：补足沿边短箭头露出的红色箭身
+### 最新交接：沿边箭身与外侧箭身同长
+
+- 用户要求沿边红箭身与其他方向一样长，上一版裸杆仍显短。
+- 沿边与外侧统一使用单向 1／循环 0.82 的长度系数、0.65／0.45 的尺寸和原始起点间距，
+  单向裸杆同为 0.1365，循环同为 0.06291；杆径和头部尺寸也一致。
+- 为保留三尖端的位置与端点球净距，沿边每个 sign 的 origin 克隆后反向平移
+  `0.39 * lengthScale * (arrowSize - min(arrowSize, 0.35))`，单向偏移 0.117，循环 0.03198。
+  头部位置保持，三个箭头仍各在边内；原 20%／50%／80% 用作尖端定位参考，
+  不是离散施力点。正负号依全局 XYZ 方向，反序端点不会改变含义。
+- 移除上一版仅用于短沿边杆的 `startOffset` 参数；其他方向及 Point／Face／Whole
+  使用原始绘制路径。本机 JSON ID 仍为 `22cdfdb0`，面仍暂缓。
+- 验证：12 项既有 Node 测试及 6 项实际 Chromium 检查通过，0 失败／错误／跳过。
+  九箭头裸杆长度一致，单向相邻间距 0.09525，循环两杆起点间距 0.00354、相邻头间距 0.07614；
+  正负／反序、Point 端点净距、1440 桌面和旋转／Reset／悬停均通过。
+  使用 `DEBUG=True`、隔离 SQLite，未读取 `.env`；临时服务和浏览器已关闭。
+- 最新预览为本机样例目录内 `edges_equal_shaft_length_default_20261010.png` 和
+  `edges_equal_shaft_length_rotated_20261010.png`，默认图已在 PyCharm 打开；
+  循环实像为 `edges_equal_shaft_length_cyclic_20261010.png`。
+  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/equal-shaft-report.json`。图和报告不随 Git 同步。
+
+### 上一版：补足沿边短箭头露出的红色箭身
 
 - 用户反馈上一版沿边箭身仍显细。实际同角度 WebGL 对照确认，虽然杆半径一致，
   单向裸杆仅 0.0195，小画布上主要看见红色头部和细橙线，不能只按几何半径宣称视觉已统一。
@@ -2018,7 +2038,7 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
 2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交以 `git log` 为准，本机 02 样例已恢复
-   XYZ 三个加载方向，沿边红箭头缩短、箭身可见部分已补足；蓝色 T 集中在边中点且无独立中点符号。确认边的方案后，再跟着用户
+   XYZ 三个加载方向，沿边箭身与外侧同长且尖端仍在边内；蓝色 T 集中在边中点且无独立中点符号。确认边的方案后，再跟着用户
    讨论面和整个立方体；合力另行讨论，不自动实现。Ronak 的实际 JSON 仍未取得。
    Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
 3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前

@@ -296,9 +296,9 @@ function fixedMarkerOutwardVector(point, direction) {
   return new THREE.Vector3(0, 0, point.z < 0 ? -1 : 1);
 }
 
-function createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale = 1, sizeScale = 1, startOffset = 0.075) {
+function createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale = 1, sizeScale = 1) {
   const direction = directionVector3d(axis.direction).multiplyScalar(sign).normalize();
-  const start = origin.clone().add(direction.clone().multiplyScalar(startOffset * sizeScale));
+  const start = origin.clone().add(direction.clone().multiplyScalar(0.075 * sizeScale));
   const shaftEnd = origin.clone().add(direction.clone().multiplyScalar(0.29 * lengthScale * sizeScale));
   const tip = origin.clone().add(direction.clone().multiplyScalar(0.39 * lengthScale * sizeScale));
   const shaft = makeCylinderBetween(start, shaftEnd, 0.012 * sizeScale, materials.loaded);
@@ -316,15 +316,15 @@ function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, siz
     .forEach(axis => {
       const signs = getLoadDirectionSigns(axis.magnitude);
       const arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
-      let arrowLength = signs.length > 1 ? 0.82 : 1;
-      let startOffset = 0.075;
-      if (axis.direction === edgeDirection) {
-        arrowLength *= Math.min(1, 0.35 / arrowSize);
-        startOffset = 0.015;
-      }
+      const arrowLength = signs.length > 1 ? 0.82 : 1;
+      const originOffset = axis.direction === edgeDirection
+        ? 0.39 * arrowLength * (arrowSize - Math.min(arrowSize, 0.35))
+        : 0;
       origins.forEach(origin => {
         signs.forEach(sign => {
-          createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, arrowLength, arrowSize, startOffset);
+          // Extend parallel shafts back from their tips to keep the heads inside the edge.
+          const arrowOrigin = origin.clone().addScaledVector(directionVector3d(axis.direction), -sign * originOffset);
+          createArrow(arrowOrigin, axis, sign, materials, group, tooltip, selectableMeshes, arrowLength, arrowSize);
         });
       });
     });
