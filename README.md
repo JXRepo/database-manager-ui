@@ -684,11 +684,12 @@ Scalar point, edge and face force/displacement loads retain their axis display.
 Edge loading uses a thin colored edge and three shorter arrows for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
-Boundary edges use the same thin teal line for all states. A small hollow
-diamond at the midpoint identifies the edge boundary and faces the camera;
-it is a display marker for the entire edge. Fixed edge directions share that
-midpoint instead of being spread along the edge. Point and edge constraints
-use blue T markers with one stem and one crossbar per fixed axis. The stem
+Edges with a loaded or fixed direction use a thin orange line; free edges retain
+the cube's default outline color. Edge boundaries have no midpoint diamond.
+Each fixed edge direction uses three blue T markers at 20%, 50% and 80% of the
+edge, matching the red arrow positions. These markers illustrate the constraint
+on the entire edge, without adding constrained points. Point and edge constraints
+use one stem and one crossbar per blue T marker. The stem
 retains its X, Y or Z direction while the crossbar turns with the camera to
 remain perpendicular in the screen projection. An axis viewed directly along
 its length is foreshortened. Face and whole cube markers retain their existing

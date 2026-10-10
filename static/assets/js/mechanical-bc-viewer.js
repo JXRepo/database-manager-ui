@@ -182,7 +182,7 @@ function createMaterials() {
       metalness: 0.06,
     }),
     edgeLineHighlight: new THREE.LineBasicMaterial({
-      color: "#0f766e",
+      color: "#d97706",
       transparent: true,
       depthWrite: false,
     }),
@@ -533,26 +533,17 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   }
 
   const tooltip = formatBoundaryConditionHover(item);
-  const center = averagePoints(points);
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const edge = new THREE.Line(geometry, materials.edgeLineHighlight);
-  const markerGeometry = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(0, 0.035, 0),
-    new THREE.Vector3(0.035, 0, 0),
-    new THREE.Vector3(0, -0.035, 0),
-    new THREE.Vector3(-0.035, 0, 0),
-  ]);
-  const marker = new THREE.LineLoop(markerGeometry, materials.edgeLineHighlight);
-  const arrowOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
+  const hasConstraint = (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed");
+  const edge = new THREE.Line(geometry, hasConstraint ? materials.edgeLineHighlight : materials.cubeEdgeLine);
+  const markerOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
 
   edge.renderOrder = 4;
-  marker.position.copy(center);
-  marker.userData.cameraFacing = true;
-  marker.renderOrder = 5;
   addMesh(group, edge, tooltip, selectableMeshes);
-  addMesh(group, marker, tooltip, selectableMeshes);
-  drawLoadedAxesAt(arrowOrigins, item, materials, group, selectableMeshes, 0.65, 0.45);
-  createClampMarker(center, item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
+  drawLoadedAxesAt(markerOrigins, item, materials, group, selectableMeshes, 0.65, 0.45);
+  markerOrigins.forEach(origin => {
+    createClampMarker(origin, item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
+  });
 }
 
 function drawFaceCondition(item, materials, group, selectableMeshes) {
@@ -841,9 +832,6 @@ function createScene(container) {
     const projectionHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
 
     root.children.forEach(child => {
-      if (child.userData.cameraFacing) {
-        child.quaternion.copy(camera.quaternion);
-      }
       if (child.userData.fixedDirection) {
         // Only the crossbar turns; the stem retains its X, Y or Z direction.
         orientFixedCrossbar(child, camera);

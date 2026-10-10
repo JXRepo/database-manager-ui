@@ -2,15 +2,43 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (latest functional change 38f44a3, pushed; check git log for later documentation commits)
-next_topic: Review the edge midpoint diamond and fixed T markers with the user, then continue face and whole cube components; discuss resultant forces separately later
+code_base: main (orange edge trial with three fixed T markers per direction; check git log for the final commit)
+next_topic: Review orange active edges and three fixed T markers without diamonds, then continue face and whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：先看边中点菱形这一版
+### 最新交接：去掉边菱形，蓝色固定符号也画三个
+
+- 用户看过中点菱形版后提出：自由边不要菱形；条件边和菱形颜色与默认边太近，
+  需要更明显；希望试着去掉菱形，让蓝色固定符号像红箭头一样沿边画三个。
+  已按这次明确要求实施试用版，下一步先听用户对实际效果的反馈，不自动继续改面或整体。
+- Edge 全部去掉中点菱形。含 loaded 或 fixed 方向的边统一用橙色 `#d97706` 细线；
+  全部 free／empty 的边使用默认框线颜色 `#7c9fca`，仍保留该边条件的悬停提示。
+  不加粗，也不按 loaded／fixed／mixed 各自变色。
+- 每个固定方向在边长 20%／50%／80% 各画一个蓝色 T，与红箭头使用相同的三个位置。
+  保留 Edge 的 0.65 大小和一根短杆、一条横杆；横杆仍随相机调整，使屏幕投影垂直。
+  短杆仍沿原 X／Y／Z，延续根据所在位置朝外的规则；沿边自身方向固定时，三个 T
+  可能朝边两侧。它们只示意整条边固定，不新增离散固定点，也不改变原约束或数据。
+- 红箭头位置、尺寸、方向和正负循环保持。Point／Face／Whole 和张量交互未改，
+  不新增合力；面五箭头仍只是提议。代码为 `static/assets/js/mechanical-bc-viewer.js`，
+  当前功能说明同步到 `README.md`。下面的菱形、青绿色和集中 T 都是之前版本。
+- 最新本机截图为
+  `example_json_files/boundary_condition_examples_20261008/edges_three_fixed_markers_preview_20261010.png`
+  与同目录 `edges_three_fixed_markers_viewer_20261010.png`，前者已在 PyCharm 打开。
+  这些图片仍被 Git 忽略，不随拉取同步。PyCharm 不允许直接打开项目外 `/tmp` 的图片，
+  用项目内的这两张图继续讨论；用户尚未明确认可新效果。
+- 本版验证：12 项载荷 JavaScript 测试与 20 个真实 Chromium 场景全部通过，
+  零跳过、异常和控制台错误。覆盖 1280／1440／1920、free／loaded／fixed／mixed、
+  每方向三个 T 的几何和投影、正负循环与多方向红箭头、旋转／Reset／resize／近轴视角、
+  自由边悬停及 Point／Face／Whole 对照；原 JSON 精确导出保持。
+  已实际查看样例、沿边固定和旋转截图，验证初末及当前源码摘要一致；旧版用新要求
+  验证得到预期失败。报告与截图为 `/tmp/bc-edge-distributed-qa-zaVsaNtG/`，
+  隔离 SQLite 服务和 Chromium 均已停止。最新提交以 `git log` 为准；Render 部署未确认。
+
+### 上一版：边中点菱形
 
 - 最新功能提交是 `38f44a3`，已推送到 `main`；Render 部署是否完成尚未确认。
   用户最后要求先做一版看效果，随后要求更新交接文件、去新聊天接着讨论；
@@ -1887,8 +1915,8 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 ## 下一步
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
-2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交为 `38f44a3`，用户尚未明确
-   认可视觉效果；先讨论青绿细线、中点空心菱形和集中蓝色 T。确认边的方案后，再跟着用户
+2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交以 `git log` 为准，用户尚未明确
+   认可橙色条件边、无菱形和每方向三个蓝色 T 的试用效果。确认边的方案后，再跟着用户
    讨论面和整个立方体；合力另行讨论，不自动实现。Ronak 的实际 JSON 仍未取得。
    Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
 3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前
