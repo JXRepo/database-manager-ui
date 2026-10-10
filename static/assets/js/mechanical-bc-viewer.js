@@ -176,11 +176,6 @@ function createMaterials() {
       roughness: 0.42,
       metalness: 0.04,
     }),
-    edgeHighlight: new THREE.MeshStandardMaterial({
-      color: "#0f766e",
-      roughness: 0.3,
-      metalness: 0.06,
-    }),
     edgeLineHighlight: new THREE.MeshBasicMaterial({
       color: "#facc15",
       depthWrite: false,
@@ -597,6 +592,22 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   createClampMarker(markerOrigins[1], item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
 }
 
+function getFaceArrowOrigins(points, direction) {
+  const center = averagePoints(points);
+  const firstTangent = points[1].clone().sub(points[0]);
+  const secondTangent = points[3].clone().sub(points[0]);
+  const normal = new THREE.Vector3().crossVectors(firstTangent, secondTangent).normalize();
+  const spread = new THREE.Vector3().crossVectors(normal, directionVector3d(direction));
+
+  if (spread.lengthSq() < 0.0001) {
+    return [center, ...points.map(point => center.clone().lerp(point, 0.5))];
+  }
+
+  spread.normalize();
+  return [-0.42, -0.21, 0, 0.21, 0.42]
+    .map(offset => center.clone().addScaledVector(spread, offset));
+}
+
 function drawFaceCondition(item, materials, group, selectableMeshes) {
   const points = getOrderedFacePoints(item.vertices);
 
@@ -606,25 +617,19 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
 
   const tooltip = formatBoundaryConditionHover(item);
   const center = averagePoints(points);
-  const tangent = points[1].clone().sub(points[0]).normalize();
-  const arrowOrigins = [
-    center.clone().add(tangent.clone().multiplyScalar(-0.18)),
-    center,
-    center.clone().add(tangent.clone().multiplyScalar(0.18)),
-  ];
-
   addMesh(group, createFaceMesh(points, materials.faceHighlight), tooltip, selectableMeshes);
-  points.forEach((point, index) => {
-    const next = points[(index + 1) % points.length];
-    addMesh(
-      group,
-      makeCylinderBetween(point, next, 0.012, materials.edgeHighlight, 18),
-      tooltip,
-      selectableMeshes
-    );
+  (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
+    const origins = getFaceArrowOrigins(points, axis.direction);
+    const signs = getLoadDirectionSigns(axis.magnitude);
+    const sizeScale = signs.length > 1 ? 0.45 : 0.5;
+    const lengthScale = signs.length > 1 ? 0.82 : 1;
+
+    origins.forEach(origin => {
+      signs.forEach(sign => {
+        createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale, sizeScale);
+      });
+    });
   });
-  createSphere(center, 0.06, materialForItem(item, materials), tooltip, group, selectableMeshes);
-  drawLoadedAxesAt(arrowOrigins, item, materials, group, selectableMeshes);
   createClampMarker(center, item, materials, group, selectableMeshes);
 }
 

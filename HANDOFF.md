@@ -2,15 +2,38 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (thick yellow condition edges without duplicate pale-blue cube outlines; check git log for the final commit)
-next_topic: Review thick yellow highlighted edges and XYZ arrows with the local fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
+code_base: main (face loads use five spread arrows without thick borders or center dots; check git log for the final commit)
+next_topic: Review five spread face arrows and face constraints with the local fixture, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：黄色条件边进一步加粗
+### 最新交接：面去掉粗边和中心圆点，五箭头平铺
+
+- 用户认可黄色边进一步加粗后的效果，接着上传 Face 样例并明确要求：
+  面的四条边不加粗，中心不画圆点，红箭头改为五个且任何方向都平铺，不串成一列。
+- `drawFaceCondition` 去掉四条周界圆柱和中心球，浅色面填充与原蓝色固定符号保留；
+  删除已无引用的旧 `edgeHighlight` 材质。独立 Edge 条件仍按黄色粗边绘制。
+- 新增 `getFaceArrowOrigins`：法向采用中心和四个内缩角点（角点向中心内缩一半）；
+  面内方向通过面法向与全局加载轴的叉积选横向排列，偏移为 -0.42、-0.21、0、0.21、0.42。
+  每个加载方向／符号画五箭头；单向尺寸 0.5／长度系数 1，双向尺寸 0.45／长度系数 0.82。
+  单向尖端距离 0.195 小于间距 0.21，使两面内方向同时加载时也不相交。
+- 全局 XYZ、载荷正负和完整 item 的 hover 保留；`cyclic`／R 值不用于推断额外反向箭头。
+  顶点输入不修改，JSON、Edge、Point 和 Whole cube 路径保持。
+- 本机 `03_face_cyclic_shear_titanium.json` 实际仅有 X 正向 405，显示五个 X 箭头；
+  其他方向和双向用合成 scene 核对，样例 JSON 未改。
+- 验证：12 项既有 Node 测试和 5 项实际 Chromium 检查通过，0 失败／错误／跳过。
+  六个面、XYZ、正负／双向和顶点反序覆盖 234 个几何场景、2280 支箭头；
+  多方向不相交，完整 hover、旋转／Reset、1440 桌面和 Point／Whole／黄色 Edge 原路径通过。
+  使用 `DEBUG=True`、隔离 SQLite，未读取 `.env`；服务和浏览器已关闭。
+- 本机样例目录内 `faces_flat_five_default_20261010.png` 和
+  `faces_flat_five_rotated_20261010.png` 为实际样例；默认图已在 PyCharm 打开。
+  `faces_flat_five_normal_20261010.png` 和 `faces_flat_five_xyz_20261010.png` 为合成方向实像。
+  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/face-flat-five-report.json`；图和报告不随 Git 同步。
+
+### 上一版：黄色条件边进一步加粗
 
 - 用户明确要求高亮边整条加粗，并试用黄色。
 - 用户随后要求再粗一点；圆柱半径从 0.01 增至 0.015，整条边直径增加 50%。

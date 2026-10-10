@@ -699,8 +699,14 @@ without adding constrained points. Point and edge constraints
 use one stem and one crossbar per blue T marker. The stem
 retains its X, Y or Z direction while the crossbar turns with the camera to
 remain perpendicular in the screen projection. An axis viewed directly along
-its length is foreshortened. Face and whole cube markers retain their existing
-style. The table and hover retain the complete X/Y/Z constraints.
+its length is foreshortened. Face and whole cube constraint markers retain their
+existing style. The table and hover retain the complete X/Y/Z constraints.
+Face boundaries use a translucent fill without extra thick perimeter rods or a
+center dot. Each loaded direction and sign uses five arrows. Normal arrows sit
+at the center and four inset corner positions; tangential arrows sit side by side
+across the face, perpendicular to their load direction. Arrow spacing and size
+keep the two tangential directions separate when both are loaded. These positions
+illustrate a face condition, without defining point loads or a spatial distribution.
 Nonempty targets have separate tables in the order Points, Edges, Faces, then
 Whole cube, each with its group title above the table. Empty groups are omitted.
 Unspecified cube corners may appear as free Point rows; whole RVE tensor
