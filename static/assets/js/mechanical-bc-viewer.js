@@ -324,8 +324,8 @@ function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, siz
     });
 }
 
-function createClampMarker(origin, item, materials, group, selectableMeshes, {sizeScale = 1, viewFacing = false, direction = ""} = {}) {
-  const fixedAxes = (item.axes || []).filter(axis => axis.status === "fixed" && (!direction || axis.direction === direction));
+function createClampMarker(origin, item, materials, group, selectableMeshes, {sizeScale = 1, viewFacing = false} = {}) {
+  const fixedAxes = (item.axes || []).filter(axis => axis.status === "fixed");
   const tooltip = formatBoundaryConditionHover(item);
 
   fixedAxes.forEach(axis => {
@@ -541,12 +541,7 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   edge.renderOrder = 4;
   addMesh(group, edge, tooltip, selectableMeshes);
   drawLoadedAxesAt(markerOrigins, item, materials, group, selectableMeshes, 0.65, 0.45);
-  const fixedAxes = (item.axes || []).filter(axis => axis.status === "fixed");
-  fixedAxes.forEach((axis, index) => {
-    const fraction = fixedAxes.length === 1 ? 0.5 : 0.2 + 0.6 * index / (fixedAxes.length - 1);
-    const origin = points[0].clone().lerp(points[1], fraction);
-    createClampMarker(origin, item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true, direction: axis.direction});
-  });
+  createClampMarker(markerOrigins[1], item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
 }
 
 function drawFaceCondition(item, materials, group, selectableMeshes) {

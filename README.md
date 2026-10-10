@@ -685,10 +685,10 @@ Edge loading uses a thin colored edge and three shorter arrows for each displaye
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
 Edges with a loaded or fixed direction use a thin orange line; free edges retain
-the cube's default outline color. Edge boundaries have no midpoint diamond.
-Each fixed edge direction uses one blue T marker. A single direction uses the
-midpoint; two directions use 20% and 80%; three use 20%, 50% and 80% in the
-X/Y/Z axis order. These markers illustrate the constraint on the entire edge,
+the cube's default outline color. Edge boundaries have no midpoint diamond or dot.
+Each fixed edge direction uses one blue T marker. All fixed directions on an
+edge share the midpoint, grouping up to three T markers together.
+These markers illustrate the constraint on the entire edge,
 without adding constrained points. Point and edge constraints
 use one stem and one crossbar per blue T marker. The stem
 retains its X, Y or Z direction while the crossbar turns with the camera to

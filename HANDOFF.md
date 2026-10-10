@@ -2,15 +2,33 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (orange edge trial with one T marker per fixed direction; check git log for the final commit)
-next_topic: Review edges with one fixed T per direction; face changes are deferred until this feedback, then continue whole cube components; discuss resultant forces separately later
+code_base: main (orange edges with fixed T markers grouped at the midpoint; check git log for the final commit)
+next_topic: Review grouped edge T markers without a midpoint symbol; face changes are deferred until this feedback, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：边的每个固定方向只留一个 T
+### 最新交接：边的蓝色 T 集中在一起，不单独标出中点
+
+- 用户看过每方向一个 T 沿边分开的 `86e791c` 版后，明确要求蓝色三个仍放在一起，
+  不单独标出线的中点。现将所有固定方向 T 共用边中点作为起点，不新增菱形、圆点或标签。
+- 每个固定方向仍只有一个 T：XYZ 全固定为三个，两个方向为两个，单方向为一个；
+  自由／空边没有 T。保留 0.65 尺寸、XYZ 原轴短杆及随相机调整的横杆。
+- `drawEdgeCondition` 改为一次调用 `createClampMarker`，传入红箭头三个位置中的中间位置；
+  移除上一版仅用于分开位置的方向筛选选项。完整原 item 仍用于悬停提示。
+- 红箭头三个位置、橙色条件边、默认自由边、原 JSON 和导出保持；面继续暂缓。
+  代码和 README 已同步，下一步看这一版集中排法，再跟着用户反馈继续讨论。
+- 验证：12 项既有 Node 测试（含 Chromium 面板）及 9 项实际浏览器检查通过，
+  覆盖中点同源的单／双／三方向 T、循环红箭头、无中点符号、1280／1440／1920
+  桌面、旋转、Reset、完整悬停和原 JSON 导出；无失败、异常或跳过。
+  使用 `DEBUG=True`、不读取 `.env` 的独立临时 SQLite，测试服务和浏览器已关闭。
+- 本机预览 `example_json_files/boundary_condition_examples_20261008/edges_grouped_T_viewer_20261010.png`
+  已在 PyCharm 打开；为实际 WebGL canvas 原生导出，使用容器浅底基色，不含 DOM 控件，
+  被 Git 忽略。临时报告 `/tmp/bc-face-real-qa-JGPC6S/grouped-report.json` 不随 Git 同步。
+
+### 上一版：边的每个固定方向只留一个 T，沿边分开
 
 - 用户觉得每方向重复三个蓝色 T 太乱。讨论过教材中固定支座的墙边斜线以及方向位移
   约束的表达；当前 T 是平台选择的简化方向标记，不能称为材料学统一标准。
@@ -1940,7 +1958,7 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
 2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交以 `git log` 为准，用户尚未明确
-   认可每个固定方向只画一个蓝色 T、沿边分开的试用效果。确认边的方案后，再跟着用户
+   认可每个固定方向一个蓝色 T、集中在边中点且无独立中点符号的试用效果。确认边的方案后，再跟着用户
    讨论面和整个立方体；合力另行讨论，不自动实现。Ronak 的实际 JSON 仍未取得。
    Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
 3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前
