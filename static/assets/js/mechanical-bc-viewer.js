@@ -182,7 +182,7 @@ function createMaterials() {
       metalness: 0.06,
     }),
     edgeLineHighlight: new THREE.LineBasicMaterial({
-      color: "#15803d",
+      color: "#111111",
       transparent: true,
       depthWrite: false,
     }),
@@ -496,26 +496,68 @@ function addVertexLabels(group, vertices = VERTICES) {
   });
 }
 
-function createCubeWireBox(size, material, renderOrder) {
+function getHighlightedEdgeKeys(items) {
+  const edges = new Set();
+
+  items.forEach(item => {
+    if (item.target_type !== "Edge" || item.is_defined === false || item.is_tensor_load
+      || !(item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed")) {
+      return;
+    }
+
+    const vertices = (Array.isArray(item.vertices) ? item.vertices : [])
+      .map(vertex => String(vertex).toUpperCase());
+    if (vertices.length !== 2 || !vertices.every(vertex => VERTICES.includes(vertex))) {
+      return;
+    }
+
+    const points = vertices.map(vertexCoordinates);
+    const differingAxes = ["x", "y", "z"].filter(axis => points[0][axis] !== points[1][axis]);
+    if (differingAxes.length === 1) {
+      edges.add(vertices.sort().join("|"));
+    }
+  });
+
+  return edges;
+}
+
+function createCubeWireBox(size, material, renderOrder, excludedEdges = new Set()) {
   const geometry = new THREE.EdgesGeometry(new THREE.BoxGeometry(size, size, size));
+  if (excludedEdges.size) {
+    const points = geometry.getAttribute("position");
+    const positions = [];
+
+    for (let index = 0; index < points.count; index += 2) {
+      const key = [index, index + 1].map(pointIndex => {
+        const coordinates = [points.getX(pointIndex), points.getY(pointIndex), points.getZ(pointIndex)];
+        return `V${coordinates.map(coordinate => coordinate > 0 ? "1" : "0").join("")}`;
+      }).sort().join("|");
+
+      if (!excludedEdges.has(key)) {
+        positions.push(...points.array.slice(index * 3, index * 3 + 6));
+      }
+    }
+
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  }
   const edges = new THREE.LineSegments(geometry, material);
 
   edges.renderOrder = renderOrder;
   return edges;
 }
 
-function drawGlassCubeEdges(group, materials) {
-  group.add(createCubeWireBox(1.018, materials.cubeEdgeHalo, 2));
-  group.add(createCubeWireBox(1.006, materials.cubeEdgeLine, 3));
+function drawGlassCubeEdges(group, materials, excludedEdges) {
+  group.add(createCubeWireBox(1.018, materials.cubeEdgeHalo, 2, excludedEdges));
+  group.add(createCubeWireBox(1.006, materials.cubeEdgeLine, 3, excludedEdges));
 }
 
-function drawBaseCube(group, materials) {
+function drawBaseCube(group, materials, items = []) {
   const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), materials.cubeSurface);
   const sheen = new THREE.Mesh(new THREE.BoxGeometry(1.018, 1.018, 1.018), materials.cubeSheen);
 
   group.add(cube);
   group.add(sheen);
-  drawGlassCubeEdges(group, materials);
+  drawGlassCubeEdges(group, materials, getHighlightedEdgeKeys(items));
 
   VERTICES.forEach(vertex => {
     createSphere(vertexCoordinates(vertex), 0.032, materials.vertex, `${vertex}\nNo boundary condition`, group, []);
@@ -907,7 +949,7 @@ function renderMechanicalBcViewer() {
   let tensorPanel = null;
   let highlighted = '';
 
-  drawBaseCube(state.root, materials);
+  drawBaseCube(state.root, materials, scalarItems);
   if (!tensorItems.length) {
     addVertexLabels(state.root);
   } else if (scalarItems.length) {

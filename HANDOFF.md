@@ -2,15 +2,34 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (dark green condition edges and matching arrow shaft lengths; check git log for the final commit)
-next_topic: Review dark green highlighted edges and XYZ arrows with the local fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
+code_base: main (near-black condition edges without duplicate pale-blue cube outlines; check git log for the final commit)
+next_topic: Review near-black highlighted edges and XYZ arrows with the local fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：条件边改为深绿色
+### 最新交接：近黑条件边，去掉对应浅蓝轮廓重影
+
+- 用户指出绿色仍与默认浅蓝边重叠。根因是上一版只换了高亮颜色，
+  同一条件边旁仍绘制 1.006 默认轮廓和 1.018 浅蓝 halo，产生偏移重影。
+- 条件边颜色改为中性近黑 `#111111`。`getHighlightedEdgeKeys` 仅收集有效的 loaded／fixed Edge，
+  要求两个合法立方体顶点、恰好一轴不同，忽略 `is_defined=false` 条件及 tensor；大写无向键兼容反序端点。
+- `drawBaseCube` 接收 scalarItems，两层 `createCubeWireBox` 同时过滤这些边的线段；
+  默认空排除集使 Whole cube 自身轮廓和无 Edge 的图保留原行为。
+  原始顶点数组不修改，自由边和无效／对角目标不会被排除。
+- 本次去除的是默认立方体轮廓；另一个显式 free Edge 或 Face 的合法图元仍按原条件绘制。
+  红箭头、蓝 T、相同箭身长度和本机 `22cdfdb0` 样例保持。
+- 验证：12 项既有 Node 测试及 5 项实际 Chromium 检查通过，0 失败／错误／跳过。
+  样例两层默认轮廓各保留 9 条边，精确去掉三条条件边对应的浅蓝线；
+  正常大小和旋转实像已检查，17 个合成场景覆盖反序、小写、重复、无效目标及其他边界类型。
+  使用 `DEBUG=True`、隔离 SQLite，未读取 `.env`；临时服务和浏览器已关闭。
+- 本机预览为样例目录内 `edges_black_clean_outline_default_20261010.png` 和
+  `edges_black_clean_outline_rotated_20261010.png`，默认图已在 PyCharm 打开。
+  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/black-outline-report.json`；图和报告不随 Git 同步。
+
+### 上一版：条件边改为深绿色
 
 - 用户认为黄橙色边与红箭头太接近，要求边色与红箭头、蓝色 T 及默认边色明显区分。
 - `edgeLineHighlight.color` 从 `#d97706` 改为深绿色 `#15803d`；含 loaded 或 fixed 方向的边
