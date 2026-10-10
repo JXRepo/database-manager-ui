@@ -2,15 +2,44 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (all Face arrow directions use one row of five; local XYZ fixture identifier 1f84367d; check git log for the final commit)
-next_topic: Review the three rows of five Face arrows and face constraints with the local XYZ fixture, then continue whole cube components; discuss resultant forces separately later
+code_base: main (compact Whole RVE controls and red rows of five on opposite faces; check git log for the final commit)
+next_topic: Review the simplified Whole RVE cube and arrow layout with the user; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：面的法向五箭头也改成一排并列
+### 最新交接：整体立方体延续红箭头，详细控件默认折叠
+
+- 用户认为 Whole RVE 右侧张量面板过于复杂，要求继续使用边、面的立方体和箭头风格。
+- 默认右侧只保留载荷类型／单位、Load entry、当前位置和显示状态。
+  仅有一条整体条件时隐藏 Boundary condition 选择，多条时保持原索引选择。
+  原 slider、metadata、法向／剪切筛选、联动分量矩阵、shape illustration 和说明
+  全部进入默认关闭的 Components and display options；折叠不重置显示状态。
+  全部 supplied loads 仍在原表格中，包括无 JavaScript 时。
+- 每个显式非零 ij 分量在对应的 ±j 两个面上分别画五个红箭头，保留 i 方向、正负和真实值。
+  复用 Face 的五起点、0.21 间距和 0.5 尺寸；箭头与面之间保留 0.04 间隙。
+  法向拉伸向外；压缩起点向外移动 0.195，尖端回到面外；剪切沿对应面。
+  各分量仍分别保留，xy／yx 不合并，缺失和零值不补箭头。
+  箭头图例统一红色，面的 ±XYZ 标签使用中性颜色；matrix hover、isolate 和 shape 路径保留。
+  Point／Edge／Face 的图元不变，仅共享 createArrow 新增返回构件供分量联动使用。
+- 本机 `04_whole_cube_tensor_copper.json` 未改，ID 仍为 `dcc6f242`。
+  初始 step 0 全零，因此仍不画箭头；第二个载荷条目的 step 1 有四个非零分量，共四十支箭头。
+  12 个原始载荷条目和精确 step 顺序保持，不自动跳到非零步骤或插值。
+- 12 项既有 tensor／panel Node 测试通过，包含真实 Chromium 的四项面板交互检查，零跳过。
+  面板既有用例增加了实际可见性、展开后操作和折叠保留状态的检查。
+- 另外 8 项实际 Chromium 检查、57 个子场景通过，零失败／异常／跳过。
+  核对真实十二条载荷、分量方向与五箭头大小、九分量九十箭头的实体几何、矩阵联动、
+  多条件和大 step、shape、1280／1440／1920 桌面、旋转／Reset／hover、完整 JSON 导出、
+  无 JavaScript 表格以及 Point／Edge／Face 对照。最终三个源文件 hash 与报告一致。
+  使用 DEBUG=True 和隔离 SQLite，未读取 .env；临时浏览器和服务已关闭。
+- 本机预览在样例目录：`whole_red_five_default_20261010.png`、
+  `whole_red_five_rotated_20261010.png` 和 `whole_red_five_block_1440_20261010.png`。
+  整体区块图已在 PyCharm 打开，正常、旋转及整体布局均已实际查看。
+  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/whole-five-report.json`；图和报告不随 Git 同步。
+
+### 上一版：面的法向五箭头也改成一排并列
 
 - 用户反馈法向的中心＋四内角排法显乱，要求像面内方向一样并列。
 - `getFaceArrowOrigins` 的法向分支改为沿排序后第一条面内边排列；

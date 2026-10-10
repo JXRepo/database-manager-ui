@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import {tensorArrows, TENSOR_COLORS} from './mechanical-bc-tensor.js';
+import {tensorArrows} from './mechanical-bc-tensor.js';
 import {createTensorPanel} from './mechanical-bc-tensor-panel.js';
 
 const VERTICES = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
@@ -300,6 +300,7 @@ function createArrow(origin, axis, sign, materials, group, tooltip, selectableMe
 
   addMesh(group, shaft, tooltip, selectableMeshes);
   addMesh(group, head, tooltip, selectableMeshes);
+  return [shaft, head];
 }
 
 function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, sizeScale = 1, opposingSizeScale = sizeScale, edgeDirection = "") {
@@ -759,34 +760,32 @@ function drawTensorLoading(view, group, selectableMeshes) {
   const componentMaterials = new Map();
   for (const arrow of tensorArrows(view.load?.magnitude, view.filter, view.selected)) {
     if (!componentMaterials.has(arrow.component)) {
-      componentMaterials.set(arrow.component, new THREE.MeshBasicMaterial({
-        color: TENSOR_COLORS[arrow.direction], transparent: true, opacity: 1,
+      componentMaterials.set(arrow.component, new THREE.MeshStandardMaterial({
+        color: STATUS_COLORS.loaded, roughness: 0.34, metalness: 0.06,
+        transparent: true, opacity: 1,
       }));
     }
     const material = componentMaterials.get(arrow.component);
-    const direction = AXIS_DIRECTIONS[arrow.direction.toUpperCase()].clone().multiplyScalar(arrow.sign);
     const normal = AXIS_DIRECTIONS[arrow.normal.toUpperCase()].clone().multiplyScalar(arrow.faceSign);
-    const origin = normal.clone().multiplyScalar(0.57);
-    const shear = arrow.direction !== arrow.normal;
-    if (shear) {
-      const other = ['x', 'y', 'z'].find(axis => axis !== arrow.direction && axis !== arrow.normal);
-      origin[other] = arrow.direction < other ? -0.18 : 0.18;
-      origin[arrow.direction] = -arrow.sign * 0.16;
-    } else if (arrow.value < 0) {
-      origin.add(normal.clone().multiplyScalar(0.32));
-    }
-    const end = origin.clone().add(direction.clone().multiplyScalar(0.32));
-    const shaftEnd = end.clone().sub(direction.clone().multiplyScalar(0.075));
+    const faceVertices = VERTICES.filter(vertex => vertexCoordinates(vertex)[arrow.normal] === arrow.faceSign * 0.5);
+    const points = getOrderedFacePoints(faceVertices);
+    const axis = {direction: arrow.direction.toUpperCase()};
+    const origins = getFaceArrowOrigins(points, axis.direction);
     const tooltip = `${isStrain ? 'Strain guide' : 'Stress component'} ${arrow.component}: ${arrow.value}${view.unit ? ` ${view.unit}` : ''}\n${arrow.faceSign > 0 ? '+' : '-'}${arrow.normal.toUpperCase()} face · ${arrow.sign > 0 ? '+' : '-'}${arrow.direction.toUpperCase()} direction`;
-    const shaft = makeCylinderBetween(origin, shaftEnd, 0.009, material, 12);
-    const head = makeConeAt(end, direction, 0.027, 0.075, material);
-    for (const mesh of [shaft, head]) {
-      if (!mesh) continue;
-      mesh.userData.component = arrow.component;
-      addMesh(group, mesh, tooltip, selectableMeshes);
+    for (const origin of origins) {
+      origin.addScaledVector(normal, 0.04);
+      if (arrow.direction === arrow.normal && arrow.value < 0) {
+        // Compression arrows end outside the face instead of inside the cube
+        origin.addScaledVector(normal, 0.195);
+      }
+      const meshes = createArrow(origin, axis, arrow.sign, {loaded: material}, group,
+        tooltip, selectableMeshes, 1, 0.5);
+      for (const mesh of meshes) {
+        mesh.userData.component = arrow.component;
+      }
     }
     const faceMaterial = new THREE.MeshBasicMaterial({
-      color: TENSOR_COLORS[arrow.direction], transparent: true, opacity: 0.045,
+      color: STATUS_COLORS.loaded, transparent: true, opacity: 0.045,
       side: THREE.DoubleSide, depthWrite: false,
     });
     const face = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), faceMaterial);
@@ -983,7 +982,7 @@ function renderMechanicalBcViewer() {
     state.root.add(tensorGroup);
     for (const axis of ['x', 'y', 'z']) {
       for (const sign of [-1, 1]) {
-        const label = createTextSprite(`${sign > 0 ? '+' : '-'}${axis.toUpperCase()}`, TENSOR_COLORS[axis], 42, 0.13);
+        const label = createTextSprite(`${sign > 0 ? '+' : '-'}${axis.toUpperCase()}`, '#475569', 42, 0.13);
         label.material.sizeAttenuation = false;
         label.userData.textPixelHeight = 12;
         label.userData.faceNormal = AXIS_DIRECTIONS[axis.toUpperCase()].clone().multiplyScalar(sign);
@@ -998,15 +997,10 @@ function renderMechanicalBcViewer() {
     badge.className = 'bc-tensor-badge';
     container.parentElement.appendChild(badge);
     const legend = container.closest('.bc-layout').querySelector('.bc-legend');
-    const scalarLegend = scalarItems.length ? Array.from(legend.children).slice(0, 2) : [];
-    legend.replaceChildren(...scalarLegend);
-    for (const axis of ['x', 'y', 'z']) {
-      const label = document.createElement('span');
-      label.className = 'bc-legend-item';
-      label.style.color = TENSOR_COLORS[axis];
-      label.textContent = `${axis.toUpperCase()} direction`;
-      legend.appendChild(label);
-    }
+    const loadLegend = legend.firstElementChild;
+    const fixedLegend = scalarItems.length ? [legend.children[1]] : [];
+    legend.replaceChildren(loadLegend, ...fixedLegend);
+    loadLegend.querySelectorAll('line').forEach(line => line.setAttribute('stroke', STATUS_COLORS.loaded));
     const caption = document.createElement('div');
     caption.className = 'bc-tensor-caption';
     legend.after(caption);
@@ -1018,6 +1012,9 @@ function renderMechanicalBcViewer() {
       selectableMeshes.splice(staticMeshCount);
       tooltip.style.opacity = '0';
       drawTensorLoading(view, tensorGroup, selectableMeshes);
+      loadLegend.lastChild.textContent = view.item.loading_type === 'strain'
+        ? scalarItems.length ? ' Loaded / strain directions' : ' Strain directions'
+        : ' Loaded';
       badge.textContent = `Whole RVE · ${view.shapeMatrix ? 'shape illustration' : view.item.loading_type === 'strain' ? 'strain guides' : 'stress schematic'}`;
       caption.textContent = view.shapeMatrix
         ? 'Normalized small-strain illustration · not a simulated shape'

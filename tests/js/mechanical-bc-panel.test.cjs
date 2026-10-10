@@ -98,11 +98,21 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
   test('loads, matrix selection, filters and clearing stay synchronized without changing data', async t => {
     const ev = await page(t, [condition()]);
     assert.equal(await ev('document.querySelector("[data-tensor-heading]").textContent'), 'Whole RVE · Stress (MPa)');
+    assert.equal(await ev('document.querySelector("[data-tensor-condition]").closest("label").hidden'), true);
+    assert.equal(await ev('document.querySelector("[data-tensor-options]").open'), false);
+    assert.equal(await ev('document.querySelector("[data-tensor-matrix]").checkVisibility()'), false);
+    assert.equal(await ev('document.querySelector("[data-tensor-load]").closest("details")'), null);
+    await ev('document.querySelector("[data-tensor-options] > summary").click()');
+    assert.equal(await ev('document.querySelector("[data-tensor-matrix]").checkVisibility()'), true);
     assert.equal(await ev('document.querySelector("[data-component=xy] strong").textContent'), '1.01');
     await ev('document.querySelector("[data-component=xy]").click()');
     assert.equal(await ev('view.selected'), 'xy');
     assert.equal(await ev('document.activeElement.dataset.component'), 'xy');
     assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter, view.selected).map(a => a.component)'), ['xy', 'xy']);
+    await ev('document.querySelector("[data-tensor-options] > summary").click()');
+    assert.equal(await ev('view.selected'), 'xy');
+    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /^xy:/);
+    await ev('document.querySelector("[data-tensor-options] > summary").click()');
     await ev('document.querySelector("[data-tensor-filter=normal]").click()');
     assert.equal(await ev('view.selected'), '');
     assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter).map(a => a.component)'), ['xx', 'xx', 'yy', 'yy']);
@@ -118,6 +128,7 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
 
   test('strain shape is explicit, can be disabled, and cannot average conflicting reciprocal values', async t => {
     const ev = await page(t, [condition('strain')]);
+    await ev('document.querySelector("[data-tensor-options] > summary").click()');
     assert.equal(await ev('document.querySelector("[data-tensor-shape]").disabled'), true);
     assert.equal(await ev('view.shapeMatrix'), null);
     await ev('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
@@ -125,6 +136,9 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
     assert.equal(await ev('view.shapeMatrix'), null);
     await ev('document.querySelector("[data-tensor-shape]").click()');
     assert.ok(await ev('view.shapeMatrix[0][0] < 0'));
+    await ev('document.querySelector("[data-tensor-options] > summary").click()');
+    assert.ok(await ev('view.shapeMatrix[0][0] < 0'));
+    assert.equal(await ev('document.querySelector("[data-tensor-shape]").checked'), true);
     assert.match(await ev('document.querySelector("[data-tensor-note]").textContent'), /missing reciprocal entries are mirrored/);
     await ev('document.querySelector("[data-tensor-load]").value="0";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
     assert.equal(await ev('view.shapeMatrix'), null);
@@ -134,6 +148,8 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
 
   test('multiple tensor conditions use their own load entries and units', async t => {
     const ev = await page(t, [{is_defined: true}, condition(), condition('strain', [])]);
+    assert.equal(await ev('document.querySelector("[data-tensor-condition]").closest("label").hidden'), false);
+    await ev('document.querySelector("[data-tensor-options] > summary").click()');
     await ev('document.querySelector("[data-component=xx]").click();document.querySelector("[data-tensor-condition]").value="2";document.querySelector("[data-tensor-condition]").dispatchEvent(new Event("change"))');
     assert.equal(await ev('view.itemIndex'), 2);
     assert.equal(await ev('view.selected'), '');

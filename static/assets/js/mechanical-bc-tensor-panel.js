@@ -128,6 +128,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     conditionSelect.add(new Option(`Whole RVE ${order + 1} · ${item.loading_type}${item.loading_mode ? ` / ${item.loading_mode}` : ''}`, String(index)));
   });
   conditionSelect.disabled = conditions.length === 1;
+  conditionSelect.closest('label').hidden = conditions.length === 1;
   conditionSelect.addEventListener('change', () => selectCondition(conditionSelect.value));
   function selectLoad(index) {
     loadIndex = Number(index);

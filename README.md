@@ -653,19 +653,24 @@ Variable selectors, tooltips, and raw-value summaries use matching mathematical
 italic glyphs for these two symbols; field keys and plotted values are unchanged.
 
 Mechanical boundary conditions include the supplied load `step`. Whole RVE
-stress and strain tensors have a component matrix linked to the cube. Choose a
-boundary condition and load entry, or move the slider through entries in their
-supplied order. This selects recorded entries, without interpolating a loading
-history from frequency or duration. Select a component to isolate it; hover over
-a value or arrow to highlight its counterpart. Normal and shear filters help
-separate pull/push directions from sideways loading. All supplied load details
-remain available in the table, including without JavaScript.
+stress and strain tensors show compact load navigation beside the cube. A
+boundary condition selector appears when there are multiple conditions; the load
+entry selector retains their supplied order and exact steps. Components and
+display options are collapsed by default, including the linked component matrix,
+slider, normal/shear filters, shape illustration and explanation. These controls
+select recorded entries, without interpolating a loading history from frequency
+or duration. Select a component to isolate it; hover over a value or arrow to
+highlight its counterpart. All supplied load details remain available in the
+table, including without JavaScript.
 
 The direction schematic explicitly uses `ij` for direction `i` on faces normal
 to `j`, with outward arrows for positive normal values. It shows supplied
 components independently, including unequal `xy` and `yx`, and does not claim
-to reconstruct the actual tractions on the simulation boundary. Arrow lengths
-are fixed; the matrix and exact values in tooltips carry the magnitudes.
+to reconstruct the actual tractions on the simulation boundary. Each nonzero
+component uses a row of five red arrows on each of its two opposite faces,
+matching the face arrow style. Normal arrows point outward for tension and
+inward for compression; shear arrows run along the corresponding faces. Arrow
+lengths are fixed; the matrix and exact values in tooltips carry the magnitudes.
 Zero values produce no arrows; missing and invalid components are identified
 without being replaced by zero or mirrored. Stress and strain units come from
 the uploaded units metadata; dimensionless strain `1` appears as `(-)`.
