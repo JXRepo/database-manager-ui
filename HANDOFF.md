@@ -1,16 +1,47 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-10-10
-code_base: main (compact Whole RVE controls and red rows of five on opposite faces; check git log for the final commit)
-next_topic: Review the simplified Whole RVE cube and arrow layout with the user; discuss resultant forces separately later
+timestamp: 2026-10-11
+code_base: main (scalar Whole cube markers above the cube; check git log for the final commit)
+next_topic: Review the two Whole cube example files and the floating scalar markers with the user
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：整体立方体延续红箭头，详细控件默认折叠
+### 最新交接：整体数字载荷上移，两份立方体示例
+
+- 用户确认 Whole cube 要区分 force/displacement 的 XYZ 数字形式与 stress/strain 的张量形式。
+  当前 Ronak schema 的 stress/strain 条件要求八个不同顶点、单个 loaded 约束与张量 magnitude；
+  点／边／面沿用 force/displacement 数字形式。每条条件自己的 loading_type 决定画法。
+- 整体 force/displacement 用画面顶部的独立标记组，标明 Whole cube 和加载类型。
+  每个 loaded 方向／符号一支红箭头，每个 fixed 方向一个蓝 T；XYZ 全固定仍为三个 T。
+  不画中心球或整体覆盖层，多条整体数字条件按原索引单独切换，表格保留全部条目。
+- 同一个 WebGL renderer 分两个 viewport。顶部预留 160 CSS px，符号区域 top 26／height 120，
+  下方保留原来的正方形立方体区域，中间留 14 px。整体标记保持画面顶部，方向随主相机旋转。
+  两区各用自己的 camera 和 hover 坐标；蓝 T 横杆支持正交相机，与对应轴的屏幕投影垂直。
+  Reset 与混合张量标题移到下方区域，点／边／面和张量组件画法保留。
+- 本机 ignored 示例目录 `example_json_files/boundary_condition_examples_20261008/` 现有两份整体例子：
+  `04_whole_cube_force_displacement_copper.json`，ID `synthetic-whole-force-copper-20261011`，
+  X 12.5 N／Z -7.5 N loaded、Y fixed，两个红箭头加一个蓝 T。
+  其曲线是明确标注的独立解析参考，未按这份 force 条件计算新响应。
+  `04_whole_cube_tensor_copper.json`，ID `synthetic-whole-stress-copper-one-state-20261011`，
+  仅原 index 1／step 1 的非零张量，完整九分量；21 组曲线同步切为同一记录的一个点。
+  原始十二状态文件字节备份在 `/tmp/whole-cube-examples-2bVB3HzL/04_whole_cube_tensor_copper_original_20261011.json`。
+- 两文件通过当前 required profile；独立核对 force 的 21 组参考数组和 tensor 的 21 个对应采样值。
+  精确 JSON 导出保持；这些本机例子和预览图不随 Git 同步。
+- 验证：12 项既有 Node tensor／panel 测试通过，包括四项实际 Chromium 面板检查，零跳过。
+  另有 7 项 fresh 实际 Chromium 检查、33 个子场景通过，零失败／错误／跳过。
+  覆盖 1280／1440／1920 桌面、轴向和斜向视角、旋转／Reset／hover、14 px 空白间隔，
+  以及 Point／Edge／Face、多个整体数字条件与十二条张量记录的独立切换和完整 JSON 导出。
+  最终 JS／模板 hash 与报告匹配；使用 DEBUG=True 和隔离 SQLite，未读取 .env，临时服务和浏览器已关闭。
+- 四张实际页面预览在样例目录：`whole_force_above_cube_20261011.png`、
+  `whole_force_above_cube_rotated_20261011.png`、`whole_tensor_one_state_20261011.png`、
+  `whole_mixed_above_cube_20261011.png`。两份 JSON 和 force 预览已在 PyCharm 打开。
+  临时最终报告 `/tmp/bc-uniform-arrow-qa-385tHH/whole-floating-report.json`，不随 Git 同步。
+
+### 上一版：整体立方体延续红箭头，详细控件默认折叠
 
 - 用户认为 Whole RVE 右侧张量面板过于复杂，要求继续使用边、面的立方体和箭头风格。
 - 默认右侧只保留载荷类型／单位、Load entry、当前位置和显示状态。

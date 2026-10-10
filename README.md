@@ -686,6 +686,15 @@ and exports are unchanged. These distinctions follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
+Scalar whole cube conditions have a separate marker group above the cube, labeled
+with their loading type. Each loaded direction and sign uses one red arrow;
+each fixed direction uses one blue T. The group stays above the cube during
+rotation, while its X/Y/Z directions follow the same view as the cube. Point,
+edge and face conditions keep their own locations below it. Multiple scalar
+whole cube conditions have a selector and remain separate; their original values
+and all table rows are retained. The cube has no scalar whole cube center dot or
+covering load surface, so local markers remain available for hover. Whole RVE
+stress and strain tensors retain their separate component and face convention.
 Edge loading uses a thick yellow edge and three arrows for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
