@@ -2,15 +2,39 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (orange edge trial with three fixed T markers per direction; check git log for the final commit)
-next_topic: Review orange active edges and three fixed T markers without diamonds, then continue face and whole cube components; discuss resultant forces separately later
+code_base: main (orange edge trial with one T marker per fixed direction; check git log for the final commit)
+next_topic: Review edges with one fixed T per direction; face changes are deferred until this feedback, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：去掉边菱形，蓝色固定符号也画三个
+### 最新交接：边的每个固定方向只留一个 T
+
+- 用户觉得每方向重复三个蓝色 T 太乱。讨论过教材中固定支座的墙边斜线以及方向位移
+  约束的表达；当前 T 是平台选择的简化方向标记，不能称为材料学统一标准。
+  全固定改斜线、合力和新的方向选择控件都只是讨论，没有实施。
+- 用户一度决定保留九 T 版，随后要求先改面；面尚未改动时又要求先改边再看效果。
+  最新授权是试边上每个固定方向一个 T 的排法；面的五箭头和单横杆 T 方案暂缓。
+- XYZ 全固定时总共三个蓝色 T，在边长 20%／50%／80% 按 X/Y/Z 固定方向顺序分开；
+  仅两个方向固定时分别在 20%／80%，一个方向固定时在 50%。位置只用于分开方向符号，
+  仍表示整条边的约束，不新增离散固定点。保留 0.65 大小、原轴短杆和随相机调整的横杆。
+- `createClampMarker` 增加可选方向筛选；仍用完整原 item 生成悬停，因此每个单独 T
+  和边线的提示都保留完整 XYZ 条件。未传筛选的 Point／Face／Whole 路径保持原样。
+- 红箭头仍每个加载方向／符号画三个；含加载或固定的边仍为橙色 `#d97706` 细线，
+  自由边仍为默认颜色，无菱形。原 JSON、值、XYZ 和导出保持，README 已同步。
+  下一步先看这一版边的截图，跟着用户反馈讨论，再继续面和整个立方体。
+- 验证：12 项既有 Node 测试通过（含 4 项 Chromium 面板检查）；独立临时 SQLite、
+  `DEBUG=True` 的实际详情页完成 70 项浏览器检查，覆盖 1280／1440／1920 桌面、
+  单／双／三方向固定、混合和循环载荷、旋转、Reset、完整悬停及原 JSON 导出；
+  Point／Face／Whole smoke 通过，无失败、JS 异常或跳过，测试服务和浏览器已关闭。
+- 本机预览已在 PyCharm 打开：
+  `example_json_files/boundary_condition_examples_20261008/edges_one_T_per_direction_viewer_20261010.png`。
+  它是实际浏览器 WebGL canvas 的原生导出，使用容器浅底基色，不含 Reset 等 DOM 控件；
+  图片被 Git 忽略。临时检查报告：`/tmp/bc-face-real-qa-JGPC6S/report.json`，换电脑不可依赖。
+
+### 上一版：去掉边菱形，每个固定方向画三个 T
 
 - 用户看过中点菱形版后提出：自由边不要菱形；条件边和菱形颜色与默认边太近，
   需要更明显；希望试着去掉菱形，让蓝色固定符号像红箭头一样沿边画三个。
@@ -1916,7 +1940,7 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
 2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交以 `git log` 为准，用户尚未明确
-   认可橙色条件边、无菱形和每方向三个蓝色 T 的试用效果。确认边的方案后，再跟着用户
+   认可每个固定方向只画一个蓝色 T、沿边分开的试用效果。确认边的方案后，再跟着用户
    讨论面和整个立方体；合力另行讨论，不自动实现。Ronak 的实际 JSON 仍未取得。
    Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
 3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前
