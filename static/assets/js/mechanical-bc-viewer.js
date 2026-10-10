@@ -181,6 +181,11 @@ function createMaterials() {
       roughness: 0.3,
       metalness: 0.06,
     }),
+    edgeLineHighlight: new THREE.LineBasicMaterial({
+      color: "#0f766e",
+      transparent: true,
+      depthWrite: false,
+    }),
     faceHighlight: new THREE.MeshBasicMaterial({
       color: "#f59e0b",
       transparent: true,
@@ -291,28 +296,29 @@ function fixedMarkerOutwardVector(point, direction) {
   return new THREE.Vector3(0, 0, point.z < 0 ? -1 : 1);
 }
 
-function createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale = 1) {
+function createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale = 1, sizeScale = 1) {
   const direction = directionVector3d(axis.direction).multiplyScalar(sign).normalize();
-  const start = origin.clone().add(direction.clone().multiplyScalar(0.075));
-  const shaftEnd = origin.clone().add(direction.clone().multiplyScalar(0.29 * lengthScale));
-  const tip = origin.clone().add(direction.clone().multiplyScalar(0.39 * lengthScale));
-  const shaft = makeCylinderBetween(start, shaftEnd, 0.012, materials.loaded);
-  const head = makeConeAt(tip, direction, 0.04, 0.105, materials.loaded);
+  const start = origin.clone().add(direction.clone().multiplyScalar(0.075 * sizeScale));
+  const shaftEnd = origin.clone().add(direction.clone().multiplyScalar(0.29 * lengthScale * sizeScale));
+  const tip = origin.clone().add(direction.clone().multiplyScalar(0.39 * lengthScale * sizeScale));
+  const shaft = makeCylinderBetween(start, shaftEnd, 0.012 * sizeScale, materials.loaded);
+  const head = makeConeAt(tip, direction, 0.04 * sizeScale, 0.105 * sizeScale, materials.loaded);
 
   addMesh(group, shaft, tooltip, selectableMeshes);
   addMesh(group, head, tooltip, selectableMeshes);
 }
 
-function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes) {
+function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, sizeScale = 1, opposingSizeScale = sizeScale) {
   const tooltip = formatBoundaryConditionHover(item);
 
   (item.axes || [])
     .filter(axis => axis.status === "loaded")
     .forEach(axis => {
       const signs = getLoadDirectionSigns(axis.magnitude);
+      const arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
       origins.forEach(origin => {
         signs.forEach(sign => {
-          createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, signs.length > 1 ? 0.82 : 1);
+          createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, signs.length > 1 ? 0.82 : 1, arrowSize);
         });
       });
     });
@@ -505,15 +511,13 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
 
   const tooltip = formatBoundaryConditionHover(item);
   const center = averagePoints(points);
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const edge = new THREE.Line(geometry, materials.edgeLineHighlight);
+  const arrowOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
 
-  addMesh(
-    group,
-    makeCylinderBetween(points[0], points[1], 0.026, materials.edgeHighlight, 24),
-    tooltip,
-    selectableMeshes
-  );
-  createSphere(center, 0.058, materialForItem(item, materials), tooltip, group, selectableMeshes);
-  drawLoadedAxesAt([center], item, materials, group, selectableMeshes);
+  edge.renderOrder = 4;
+  addMesh(group, edge, tooltip, selectableMeshes);
+  drawLoadedAxesAt(arrowOrigins, item, materials, group, selectableMeshes, 0.65, 0.45);
   createClampMarker(center, item, materials, group, selectableMeshes);
 }
 
@@ -607,6 +611,7 @@ function createTooltip(container) {
 
 function setupTooltip(container, camera, selectableMeshes, tooltip, onHighlight = () => {}) {
   const raycaster = new THREE.Raycaster();
+  raycaster.params.Line.threshold = 0.02;
   const pointer = new THREE.Vector2();
 
   container.addEventListener("pointermove", event => {

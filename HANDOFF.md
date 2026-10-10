@@ -2,8 +2,8 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (mechanical boundary table grouping; see git log for the latest commit)
-next_topic: Explain mechanical boundary components step by step; discuss resultant forces separately later
+code_base: main (boundary table styling and edge loading illustration; see git log for the latest commit)
+next_topic: Review edge loading illustration and continue boundary components step by step; discuss resultant forces separately later
 ---
 
 # Project handoff
@@ -71,6 +71,20 @@ next_topic: Explain mechanical boundary components step by step; discuss resulta
   实际 Tab／Enter／Space 操作与禁用页面 JavaScript 的原生展开通过，焦点边框可见。
   已查看最终多点和边展开截图，临时服务和浏览器已停止；报告与截图在
   `/tmp/bc-table-polished-qa-wDnm5dwB/`，不随 Git 同步。Render 部署未确认。
+- 用户认可点 1／边 3／面 5 箭头的示意思路后，明确先只改边，看效果后再继续。
+  `static/assets/js/mechanical-bc-viewer.js` 的 Edge 用与基础边同宽的绿色 Line，不再用
+  粗圆柱；取消中心大球，保留固定约束标记和悬停。每个已显示方向／符号在边长
+  20%／50%／80% 位置画三个箭头；仅 Edge 使用 0.65 整体缩放，含正负值时用 0.45
+  并保留原 0.82 长度比例，避免相邻的相向箭头重叠。细线材质进入透明绘制队列，
+  opacity 仍为 1，renderOrder 4，depthWrite false；Line 拾取阈值为 0.02。
+  多箭头只示意整条边的加载，不新增点力、不拆分数值、不推断均匀分布。点、面和
+  Whole RVE 显示保持原样；面 5 个箭头目前只是提议，尚未实施，也没有新增合力。
+- 本次边图验证：12 项载荷 JavaScript 测试通过，无跳过。真实 Chromium 先记录旧版
+  单箭头／粗圆柱／中心球，再检查新版 8 个边场景（1280／1440 样例、沿边正负方向、
+  XYZ 多方向、循环正负、固定混合和实际拖动旋转）及点／面／整体三个对照，共 11 例
+  通过。箭头头部无相交，细线悬停和清除、表格 step、原 JSON 导出及张量步骤保持。
+  已查看最终截图并核对源码摘要一致，临时服务和 Chromium 已停止；报告与截图在
+  `/tmp/bc-edge-viewer-qa-ycKRA1TA/`，不随 Git 同步。Render 部署未确认。
 - 已知未处理的几何判断问题：当前平台只按两个／四个不同顶点标 Edge／Face，尚未检查
   两点是否相邻、四点是否组成完整外表面。本轮按请求整理布局，没有扩展上传校验或改变
   这套分类。后续不能宣称已有严格几何检查，也不能把错误顶点组擅自转换为多个点力。

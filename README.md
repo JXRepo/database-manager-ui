@@ -681,6 +681,9 @@ and exports are unchanged. These distinctions follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
+Edge loading uses a thin colored edge and three shorter arrows for each displayed
+direction and sign. Their placement illustrates the loaded edge, not the load
+magnitude or its spatial distribution.
 The table groups nonempty targets in the order Points, Edges, Faces, then
 Whole cube, with a labeled divider between groups. Empty groups are omitted.
 Unspecified cube corners may appear as free Point rows; whole RVE tensor
