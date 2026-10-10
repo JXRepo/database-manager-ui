@@ -684,6 +684,12 @@ Scalar point, edge and face force/displacement loads retain their axis display.
 Edge loading uses a thin colored edge and three shorter arrows for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
+Edge colors distinguish loaded (red), fixed (blue), mixed loaded and fixed
+(purple), and free (gray) conditions without increasing line width. Fixed edge
+directions use smaller T markers spaced along the edge, with one stem and one
+crossbar per fixed axis. These positions separate the axis symbols for clarity;
+they do not represent separate fixed points. The table and hover retain the
+complete X/Y/Z constraints.
 Nonempty targets have separate tables in the order Points, Edges, Faces, then
 Whole cube, each with its group title above the table. Empty groups are omitted.
 Unspecified cube corners may appear as free Point rows; whole RVE tensor

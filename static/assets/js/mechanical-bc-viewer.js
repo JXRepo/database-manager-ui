@@ -324,22 +324,24 @@ function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, siz
     });
 }
 
-function createClampMarker(origin, item, materials, group, selectableMeshes) {
+function createClampMarker(origin, item, materials, group, selectableMeshes, {sizeScale = 1, edgePoints = null} = {}) {
   const fixedAxes = (item.axes || []).filter(axis => axis.status === "fixed");
   const tooltip = formatBoundaryConditionHover(item);
 
-  fixedAxes.forEach(axis => {
-    const outward = fixedMarkerOutwardVector(origin, axis.direction).normalize();
+  fixedAxes.forEach((axis, index) => {
+    const anchor = edgePoints
+      ? edgePoints[0].clone().lerp(edgePoints[1], (index + 1) / (fixedAxes.length + 1))
+      : origin;
+    const outward = fixedMarkerOutwardVector(anchor, axis.direction).normalize();
     const tangent = getPerpendicularVector3d(outward);
-    const secondTangent = new THREE.Vector3().crossVectors(outward, tangent).normalize();
-    const guideStart = origin.clone().add(outward.clone().multiplyScalar(0.045));
-    const plateCenter = origin.clone().add(outward.clone().multiplyScalar(0.17));
+    const guideStart = anchor.clone().add(outward.clone().multiplyScalar(0.045 * sizeScale));
+    const plateCenter = anchor.clone().add(outward.clone().multiplyScalar(0.17 * sizeScale));
     const guideEnd = plateCenter.clone();
-    const halfBar = 0.07;
+    const halfBar = 0.07 * sizeScale;
 
     addMesh(
       group,
-      makeCylinderBetween(guideStart, guideEnd, 0.01, materials.fixed, 18),
+      makeCylinderBetween(guideStart, guideEnd, 0.01 * sizeScale, materials.fixed, 18),
       tooltip,
       selectableMeshes
     );
@@ -348,25 +350,28 @@ function createClampMarker(origin, item, materials, group, selectableMeshes) {
       makeCylinderBetween(
         plateCenter.clone().add(tangent.clone().multiplyScalar(-halfBar)),
         plateCenter.clone().add(tangent.clone().multiplyScalar(halfBar)),
-        0.012,
+        0.012 * sizeScale,
         materials.fixed,
         18
       ),
       tooltip,
       selectableMeshes
     );
-    addMesh(
-      group,
-      makeCylinderBetween(
-        plateCenter.clone().add(secondTangent.clone().multiplyScalar(-halfBar * 0.72)),
-        plateCenter.clone().add(secondTangent.clone().multiplyScalar(halfBar * 0.72)),
-        0.01,
-        materials.fixed,
-        18
-      ),
-      tooltip,
-      selectableMeshes
-    );
+    if (!edgePoints) {
+      const secondTangent = new THREE.Vector3().crossVectors(outward, tangent).normalize();
+      addMesh(
+        group,
+        makeCylinderBetween(
+          plateCenter.clone().add(secondTangent.clone().multiplyScalar(-halfBar * 0.72)),
+          plateCenter.clone().add(secondTangent.clone().multiplyScalar(halfBar * 0.72)),
+          0.01 * sizeScale,
+          materials.fixed,
+          18
+        ),
+        tooltip,
+        selectableMeshes
+      );
+    }
   });
 }
 
@@ -512,13 +517,15 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   const tooltip = formatBoundaryConditionHover(item);
   const center = averagePoints(points);
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const edge = new THREE.Line(geometry, materials.edgeLineHighlight);
+  const edgeMaterial = materials.edgeLineHighlight.clone();
+  edgeMaterial.color.set(getBoundaryConditionMarkerColor(item));
+  const edge = new THREE.Line(geometry, edgeMaterial);
   const arrowOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
 
   edge.renderOrder = 4;
   addMesh(group, edge, tooltip, selectableMeshes);
   drawLoadedAxesAt(arrowOrigins, item, materials, group, selectableMeshes, 0.65, 0.45);
-  createClampMarker(center, item, materials, group, selectableMeshes);
+  createClampMarker(center, item, materials, group, selectableMeshes, {sizeScale: 0.65, edgePoints: points});
 }
 
 function drawFaceCondition(item, materials, group, selectableMeshes) {
