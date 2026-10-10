@@ -2,13 +2,39 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (separate boundary tables and edge midpoint diamonds with shared fixed direction markers; see git log for the latest commit)
-next_topic: Review the boundary table display and continue boundary components step by step; discuss resultant forces separately later
+code_base: main (latest functional change 38f44a3, pushed; check git log for later documentation commits)
+next_topic: Review the edge midpoint diamond and fixed T markers with the user, then continue face and whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新交接：先看边中点菱形这一版
+
+- 最新功能提交是 `38f44a3`，已推送到 `main`；Render 部署是否完成尚未确认。
+  用户最后要求先做一版看效果，随后要求更新交接文件、去新聊天接着讨论；
+  用户尚未明确认可这一版效果。新聊天先听用户对边的反馈，不自动继续改面或整个立方体。
+- 当前边始终用深青绿色 `#0f766e` 细线，不加粗，也不随 loaded／fixed／free 改色。
+  边中点是朝向屏幕的小空心菱形，用于标识整条边；不再用容易与真实顶点混淆的中心球。
+  蓝色 X／Y／Z 固定 T 共用边中点，不沿边分散。Point 和 Edge 的固定符号都只有一根短杆
+  加一条横杆；短杆保留原轴方向，横杆随相机调整，使屏幕投影垂直。视线正对某轴时短杆
+  的屏幕投影会缩短，不伪造其他方向。Face／Whole 的固定符号暂未改。
+- 红箭头仍按每个已显示的加载方向和符号在边长 20%／50%／80% 画三个；不新增合力，不推断均匀分布，
+  不拆分载荷数值。用户要求先弄清各分量，之后再单独讨论合力。面用五个箭头仍只是提议。
+- 代码在 `static/assets/js/mechanical-bc-viewer.js`，功能说明已同步 `README.md`。
+  原 JSON、加载值、XYZ、张量步骤、悬停和导出保持。12 项 JavaScript 测试与 20 个真实
+  Chromium 场景全部通过，零跳过、异常和控制台错误；包含三种桌面宽度、真实旋转、Reset、
+  resize、近轴向视角及 Point／Face／Whole 对照。临时浏览器和隔离服务均已停止。
+  完整报告在 `/tmp/bc-edge-diamond-qa-ezyeynvi/report.json`，这些验证不是 Render 线上检查。
+- 已给用户在 PyCharm 打开实际截图：
+  `example_json_files/boundary_condition_examples_20261008/edges_midpoint_diamond_preview_20261010.png`；
+  同目录 `edges_midpoint_diamond_viewer_20261010.png` 是立方体单独截图。
+  这些图和样例 JSON 都仅在本机，已被 Git 忽略，另一电脑不会随拉取获得。
+  如果用户再要看图，用 PyCharm 的 `open_file_in_editor` 打开本机 PNG；此前聊天里的图片
+  和 Markdown 图片多次没有显示，单独发图片链接不可靠。
+- 以下条目保留此前过程；边按状态变色、蓝色 T 沿边分散、中心球等都属于旧版，
+  以本节最新状态和实际代码为准。仍用简短白话中文，跟着用户一步一步讨论。
 
 ### 新聊天先看：受力分量讨论和右侧表格整理
 
@@ -1435,7 +1461,10 @@ Ronak 原始 `Data_Base_Cyclic.json` 现在能拆成 100 条对象，逐条返�
 [test_detail_metadata.py](apps/pages/test_detail_metadata.py)、
 [test_plot_schema.py](apps/pages/test_plot_schema.py)、[test_bc_schema.py](apps/pages/test_bc_schema.py)。
 
-### Mechanical Boundary Condition Cube 和载荷表
+### 历史记录：Mechanical Boundary Condition Cube 和载荷表
+
+以下为早期版本记录。当前表头是 `Boundary Location`，表头与表格内容居中，各类型有独立
+表格和上方标题；边的菱形和蓝色固定符号以顶部最新交接为准，不恢复以下旧布局。
 
 - 表头保持 `Target`、`Constraints`、`Loading Type / Mode`。用户提过 Vortex，未采用；
   target 可能是顶点组合或整个 cube，Vortex 不是顶点的英文。
@@ -1858,8 +1887,9 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 ## 下一步
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
-2. **下一轮讨论 Ronak 本次发来的修改内容。** 具体材料尚未在本轮提供，先根据用户在新聊天
-   发来的建议逐条解释，再按讨论推进。历史 Ronak 记录作为背景，不替代本次反馈。
+2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交为 `38f44a3`，用户尚未明确
+   认可视觉效果；先讨论青绿细线、中点空心菱形和集中蓝色 T。确认边的方案后，再跟着用户
+   讨论面和整个立方体；合力另行讨论，不自动实现。Ronak 的实际 JSON 仍未取得。
    Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
 3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前
    字段识别、原始数据保留、按文件保存和精简提示规则；不要自动修改原文件来凑齐字段。
