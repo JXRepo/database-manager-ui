@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (separate boundary tables with connected vertex layouts and edge loading illustration; see git log for the latest commit)
+code_base: main (separate boundary tables and edge midpoint diamonds with shared fixed direction markers; see git log for the latest commit)
 next_topic: Review the boundary table display and continue boundary components step by step; discuss resultant forces separately later
 ---
 
@@ -112,6 +112,22 @@ next_topic: Review the boundary table display and continue boundary components s
   箭头、XYZ、悬停、原 JSON 导出及点／面／整体对照保持。已查看样例、四种颜色和旋转截图。
   当前源码与测试摘要一致；隔离服务和浏览器已停止。报告与截图在
   `/tmp/bc-edge-status-qa-wAAPlt7I/`，不随 Git 同步；Render 部署未确认。
+- 用户进一步明确边颜色要固定、蓝色固定符号要与点保持一致，并希望恢复边中点集中摆放，
+  将容易与立方体顶点混淆的中心球换成其他符号。获准实施后，最新 Edge 全部使用同一
+  深青绿色细线，中点增加始终朝向相机的小空心菱形，不再按状态改色或沿边分散蓝色符号。
+  每个固定方向的蓝色 T 共用边中点；Point 和 Edge 都采用一根短杆加一条横杆。
+  短杆仍沿原 X／Y／Z，横杆随视角转动，使屏幕上的横杆与短杆投影垂直；相机正对某轴时
+  该轴短杆仍会缩短，不能为了可见而伪造方向。旋转／重置／resize 共用现有 render 入口，
+  没有新增动画循环。Face／Whole 的默认固定符号保持，红箭头布局、尺寸、原载荷和导出保持。
+  菱形只标识整条边的边界条件位置，未新增模拟顶点。
+- 本次中点菱形和统一 T 形验证：先在旧实现上实际检查新要求并得到预期失败，再验证最终版；
+  12 项载荷 JavaScript 测试和 20 个真实 Chromium 场景全部通过，零跳过、异常和控制台错误。
+  覆盖 1280／1440／1920、四状态、单／双／三固定方向、近 X／Y／Z 视角、真实拖动、原生
+  Reset 和宽度变化；菱形朝向屏幕、横杆投影垂直、XYZ 短杆和原箭头保持，Point／Face／Whole
+  对照与原 JSON 导出通过。已查看默认、旋转和 Point 截图，源码摘要一致；临时服务已停止。
+  报告与截图在 `/tmp/bc-edge-diamond-qa-ezyeynvi/`，不随 Git 同步；可供用户查看的本机截图为
+  `example_json_files/boundary_condition_examples_20261008/edges_midpoint_diamond_preview_20261010.png`
+  与同目录 `edges_midpoint_diamond_viewer_20261010.png`，前者已在 PyCharm 打开。Render 部署未确认。
 - 已知未处理的几何判断问题：当前平台只按两个／四个不同顶点标 Edge／Face，尚未检查
   分类所依据的两点是否相邻、四点是否组成完整外表面。新的表格连接图另行检查真实边／外面，
   但没有扩展上传校验或改变现有分类与 3D 图。后续不能宣称已有严格几何上传校验，也不能

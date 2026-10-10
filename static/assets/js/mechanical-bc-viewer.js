@@ -324,14 +324,12 @@ function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, siz
     });
 }
 
-function createClampMarker(origin, item, materials, group, selectableMeshes, {sizeScale = 1, edgePoints = null} = {}) {
+function createClampMarker(origin, item, materials, group, selectableMeshes, {sizeScale = 1, viewFacing = false} = {}) {
   const fixedAxes = (item.axes || []).filter(axis => axis.status === "fixed");
   const tooltip = formatBoundaryConditionHover(item);
 
-  fixedAxes.forEach((axis, index) => {
-    const anchor = edgePoints
-      ? edgePoints[0].clone().lerp(edgePoints[1], (index + 1) / (fixedAxes.length + 1))
-      : origin;
+  fixedAxes.forEach(axis => {
+    const anchor = origin;
     const outward = fixedMarkerOutwardVector(anchor, axis.direction).normalize();
     const tangent = getPerpendicularVector3d(outward);
     const guideStart = anchor.clone().add(outward.clone().multiplyScalar(0.045 * sizeScale));
@@ -345,7 +343,7 @@ function createClampMarker(origin, item, materials, group, selectableMeshes, {si
       tooltip,
       selectableMeshes
     );
-    addMesh(
+    const crossbar = addMesh(
       group,
       makeCylinderBetween(
         plateCenter.clone().add(tangent.clone().multiplyScalar(-halfBar)),
@@ -357,7 +355,9 @@ function createClampMarker(origin, item, materials, group, selectableMeshes, {si
       tooltip,
       selectableMeshes
     );
-    if (!edgePoints) {
+    if (viewFacing) {
+      crossbar.userData.fixedDirection = outward;
+    } else {
       const secondTangent = new THREE.Vector3().crossVectors(outward, tangent).normalize();
       addMesh(
         group,
@@ -373,6 +373,24 @@ function createClampMarker(origin, item, materials, group, selectableMeshes, {si
       );
     }
   });
+}
+
+function orientFixedCrossbar(crossbar, camera) {
+  const start = crossbar.position.clone().project(camera);
+  const end = crossbar.position.clone()
+    .addScaledVector(crossbar.userData.fixedDirection, 0.01)
+    .project(camera);
+  const screenX = (end.x - start.x) * camera.aspect;
+  const screenY = end.y - start.y;
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+  const tangent = right.clone().multiplyScalar(-screenY).addScaledVector(up, screenX);
+
+  if (tangent.lengthSq() < 1e-12) {
+    tangent.copy(right);
+  }
+
+  crossbar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent.normalize());
 }
 
 function getFaceConstantAxis(points) {
@@ -504,7 +522,7 @@ function drawPointCondition(item, materials, group, selectableMeshes) {
 
   createSphere(point, 0.052, materialForItem(item, materials), tooltip, group, selectableMeshes);
   drawLoadedAxesAt([point], item, materials, group, selectableMeshes);
-  createClampMarker(point, item, materials, group, selectableMeshes);
+  createClampMarker(point, item, materials, group, selectableMeshes, {viewFacing: true});
 }
 
 function drawEdgeCondition(item, materials, group, selectableMeshes) {
@@ -517,15 +535,24 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   const tooltip = formatBoundaryConditionHover(item);
   const center = averagePoints(points);
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const edgeMaterial = materials.edgeLineHighlight.clone();
-  edgeMaterial.color.set(getBoundaryConditionMarkerColor(item));
-  const edge = new THREE.Line(geometry, edgeMaterial);
+  const edge = new THREE.Line(geometry, materials.edgeLineHighlight);
+  const markerGeometry = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(0, 0.035, 0),
+    new THREE.Vector3(0.035, 0, 0),
+    new THREE.Vector3(0, -0.035, 0),
+    new THREE.Vector3(-0.035, 0, 0),
+  ]);
+  const marker = new THREE.LineLoop(markerGeometry, materials.edgeLineHighlight);
   const arrowOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
 
   edge.renderOrder = 4;
+  marker.position.copy(center);
+  marker.userData.cameraFacing = true;
+  marker.renderOrder = 5;
   addMesh(group, edge, tooltip, selectableMeshes);
+  addMesh(group, marker, tooltip, selectableMeshes);
   drawLoadedAxesAt(arrowOrigins, item, materials, group, selectableMeshes, 0.65, 0.45);
-  createClampMarker(center, item, materials, group, selectableMeshes, {sizeScale: 0.65, edgePoints: points});
+  createClampMarker(center, item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
 }
 
 function drawFaceCondition(item, materials, group, selectableMeshes) {
@@ -808,11 +835,19 @@ function createScene(container) {
   scene.add(root);
 
   function renderSceneOnce() {
+    camera.updateMatrixWorld();
     // Keep vertex text readable at the same screen size across zoom and resize.
     const viewportHeight = Math.max(container.clientHeight, 1);
     const projectionHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
 
     root.children.forEach(child => {
+      if (child.userData.cameraFacing) {
+        child.quaternion.copy(camera.quaternion);
+      }
+      if (child.userData.fixedDirection) {
+        // Only the crossbar turns; the stem retains its X, Y or Z direction.
+        orientFixedCrossbar(child, camera);
+      }
       if (child.userData.faceNormal) {
         child.visible = child.userData.faceNormal.dot(camera.position.clone().sub(child.position)) > 0;
       }
