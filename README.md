@@ -687,7 +687,7 @@ magnitude or its spatial distribution.
 Parallel and transverse edge arrows use the same shaft length, thickness and
 arrowhead size for the same load sign pattern. Parallel shafts extend back from
 their existing tips, keeping all three arrowheads clear of the endpoint spheres.
-Edges with a loaded or fixed direction use a thin orange line; free edges retain
+Edges with a loaded or fixed direction use a thin dark green line; free edges retain
 the cube's default outline color. Edge boundaries have no midpoint diamond or dot.
 Each fixed edge direction uses one blue T marker. All fixed directions on an
 edge share the midpoint, grouping up to three T markers together.

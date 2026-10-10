@@ -2,15 +2,27 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (parallel and transverse edge arrows with matching shaft lengths; check git log for the final commit)
-next_topic: Review edge arrows in all three directions with the local XYZ fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
+code_base: main (dark green condition edges and matching arrow shaft lengths; check git log for the final commit)
+next_topic: Review dark green highlighted edges and XYZ arrows with the local fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：沿边箭身与外侧箭身同长
+### 最新交接：条件边改为深绿色
+
+- 用户认为黄橙色边与红箭头太接近，要求边色与红箭头、蓝色 T 及默认边色明显区分。
+- `edgeLineHighlight.color` 从 `#d97706` 改为深绿色 `#15803d`；含 loaded 或 fixed 方向的边
+  用这一颜色。自由／默认边仍为浅蓝 `#7c9fca`，红箭头和蓝 T 保留各自颜色。
+- 本次只调整边线配色；沿边与外侧箭身同长的绘制和本机 `22cdfdb0` 样例保持。
+- 两项实际 Chromium 配色及 1440 桌面检查通过，0 失败／错误／跳过；
+  样例三条 loaded／fixed 边为深绿，一条 free 边为浅蓝，红箭头和蓝 T 可分别辨认。
+  使用 `DEBUG=True`、隔离 SQLite，未读取 `.env`；服务和浏览器已关闭。
+- 本机预览 `edges_green_highlight_default_20261010.png` 已在 PyCharm 打开，位于样例目录；
+  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/green-highlight-report.json`。图和报告不随 Git 同步。
+
+### 上一版：沿边箭身与外侧箭身同长
 
 - 用户要求沿边红箭身与其他方向一样长，上一版裸杆仍显短。
 - 沿边与外侧统一使用单向 1／循环 0.82 的长度系数、0.65／0.45 的尺寸和原始起点间距，

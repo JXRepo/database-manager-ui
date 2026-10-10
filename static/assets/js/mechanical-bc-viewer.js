@@ -182,7 +182,7 @@ function createMaterials() {
       metalness: 0.06,
     }),
     edgeLineHighlight: new THREE.LineBasicMaterial({
-      color: "#d97706",
+      color: "#15803d",
       transparent: true,
       depthWrite: false,
     }),
