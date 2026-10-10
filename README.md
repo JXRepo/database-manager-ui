@@ -687,6 +687,7 @@ magnitude or its spatial distribution.
 Arrows parallel to an edge are shorter, keeping all three within the edge and
 clear of the endpoint spheres. Their shafts and arrowheads have the same
 thickness and head size as arrows in other directions.
+Their smaller starting gap keeps the red shafts visible on the short arrows.
 Edges with a loaded or fixed direction use a thin orange line; free edges retain
 the cube's default outline color. Edge boundaries have no midpoint diamond or dot.
 Each fixed edge direction uses one blue T marker. All fixed directions on an
