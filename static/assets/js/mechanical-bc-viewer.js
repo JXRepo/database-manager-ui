@@ -315,13 +315,14 @@ function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, siz
     .filter(axis => axis.status === "loaded")
     .forEach(axis => {
       const signs = getLoadDirectionSigns(axis.magnitude);
-      let arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
+      const arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
+      let arrowLength = signs.length > 1 ? 0.82 : 1;
       if (axis.direction === edgeDirection) {
-        arrowSize = Math.min(arrowSize, 0.35);
+        arrowLength *= Math.min(1, 0.35 / arrowSize);
       }
       origins.forEach(origin => {
         signs.forEach(sign => {
-          createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, signs.length > 1 ? 0.82 : 1, arrowSize);
+          createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, arrowLength, arrowSize);
         });
       });
     });

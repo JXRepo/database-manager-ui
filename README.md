@@ -684,8 +684,9 @@ Scalar point, edge and face force/displacement loads retain their axis display.
 Edge loading uses a thin colored edge and three shorter arrows for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
-Arrows parallel to an edge are smaller, keeping all three within the edge and
-clear of the endpoint spheres. Arrows in other directions retain their size.
+Arrows parallel to an edge are shorter, keeping all three within the edge and
+clear of the endpoint spheres. Their shafts and arrowheads have the same
+thickness and head size as arrows in other directions.
 Edges with a loaded or fixed direction use a thin orange line; free edges retain
 the cube's default outline color. Edge boundaries have no midpoint diamond or dot.
 Each fixed edge direction uses one blue T marker. All fixed directions on an

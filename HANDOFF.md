@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (shorter parallel edge arrows and grouped fixed T markers; check git log for the final commit)
+code_base: main (shorter parallel edge arrows with uniform shaft and head sizes; check git log for the final commit)
 next_topic: Review edge arrows in all three directions with the local XYZ fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
 ---
 
@@ -10,7 +10,23 @@ next_topic: Review edge arrows in all three directions with the local XYZ fixtur
 
 ## 当前状态
 
-### 最新交接：缩短沿边红箭头，样例同时提供 XYZ 载荷
+### 最新交接：沿边短箭头与外侧箭头统一粗细
+
+- 用户指出沿边短红箭头比外侧细，已明确要求统一粗细。
+- 仅在 `drawLoadedAxesAt` 对沿边轴的长度系数乘以 `min(1, 0.35 / arrowSize)`，
+  尺寸保持单向 0.65／循环 0.45，使杆半径和箭头头部半径、高度与外侧一致。
+  `createArrow` 无改动；沿边单向尖端距离仍为 0.1365，循环仍为 0.11193，
+  保留端点球间距和三个基点。短杆与头部相交连通，载荷与方向仍按原数据显示。
+- 本机 02 样例 ID 仍为 `22cdfdb0`；本次仅改绘图，已有对象刷新详情页即可查看。
+  面的修改仍暂缓，继续先听用户对边的反馈。
+- 验证：12 项既有 Node 测试和 6 项实际 Chromium 检查通过，无失败、错误或跳过；
+  核对九箭头杆径和头部尺寸一致、正负／反序／循环、Point 端点净距、短杆连通、
+  1440 桌面和旋转／Reset／悬停。使用 `DEBUG=True` 和隔离 SQLite，未读取 `.env`。
+- 本机实际预览为样例目录内 `edges_uniform_arrow_thickness_default_20261010.png` 和
+  `edges_uniform_arrow_thickness_rotated_20261010.png`，旋转图已在 PyCharm 打开；
+  临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/report.json` 不随 Git 同步。
+
+### 上一版：缩短沿边红箭头，样例同时提供 XYZ 载荷
 
 - 用户在本机 `02_edge_compression_steel.json` 上看过沿边的三个红箭头，发现末端箭头
   被顶点球挡住且伸出边外，已明确要求缩短，并把样例的其他加载方向也加回来。
@@ -1981,7 +1997,7 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
 2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交以 `git log` 为准，本机 02 样例已恢复
-   XYZ 三个加载方向，沿边红箭头缩短以避开端点球；蓝色 T 集中在边中点且无独立中点符号。确认边的方案后，再跟着用户
+   XYZ 三个加载方向，沿边红箭头缩短且与外侧统一粗细；蓝色 T 集中在边中点且无独立中点符号。确认边的方案后，再跟着用户
    讨论面和整个立方体；合力另行讨论，不自动实现。Ronak 的实际 JSON 仍未取得。
    Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
 3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前
