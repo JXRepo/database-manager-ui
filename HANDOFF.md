@@ -2,15 +2,38 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (orange edges with fixed T markers grouped at the midpoint; check git log for the final commit)
-next_topic: Review grouped edge T markers without a midpoint symbol; face changes are deferred until this feedback, then continue whole cube components; discuss resultant forces separately later
+code_base: main (shorter parallel edge arrows and grouped fixed T markers; check git log for the final commit)
+next_topic: Review edge arrows in all three directions with the local XYZ fixture; face changes remain deferred, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：边的蓝色 T 集中在一起，不单独标出中点
+### 最新交接：缩短沿边红箭头，样例同时提供 XYZ 载荷
+
+- 用户在本机 `02_edge_compression_steel.json` 上看过沿边的三个红箭头，发现末端箭头
+  被顶点球挡住且伸出边外，已明确要求缩短，并把样例的其他加载方向也加回来。
+- `drawLoadedAxesAt` 增加可选边方向，仅平行边的箭头大小限制为 0.35；
+  真正平行的 XYZ 轴按边差向量的绝对点积识别，反序顶点同样处理，零长或对角线不匹配。
+  三个基点仍为 20%／50%／80%，短杆和箭头头部一起缩小。单向尖端离端点 0.0635，
+  给基本顶点球半径 0.032 和显式 Point 球半径 0.052 都留出间距。
+- 其他方向仍使用 0.65／循环 0.45；沿边循环保留正负两组、更短的 0.82 长度系数。
+  蓝 T 集中在中点，橙边和原始载荷值、方向、悬停与导出保持；面继续暂缓。
+- 本机被 Git 忽略的 02 样例已将同一条沿 X 的 V010–V110 边设为 XYZ 全 loaded，
+  三个独立载荷分别按 X/Y/Z 记录，用于对比三个方向的箭头。名义曲线保留 X 参考，
+  描述和 recipe 明确不是 combined XYZ 边界问题的求解结果。当前模板 ID 为 `22cdfdb0`，
+  需要重新上传才能看到新数据；原有数据库记录未修改。样例及本机样例 README 不随 Git 同步。
+- 现有 tensor/panel JS 测试 12 项通过，包含真实 Chromium 检查；另有 9 项实际浏览器检查通过，
+  无失败、错误或跳过，覆盖 XYZ 九箭头、正负和反序边、循环、显式 Point 端点净距、
+  1280／1440／1920 桌面布局、旋转／Reset／悬停和完整 JSON 导出（包括负零）。
+  使用 `DEBUG=True`、隔离 SQLite，未读取 `.env`；临时服务和浏览器均已停止。
+- 默认和旋转后的实际 WebGL 预览已保存为样例目录内的
+  `edges_three_axes_short_arrows_viewer_20261010.png` 和
+  `edges_three_axes_short_arrows_rotated_20261010.png`，旋转图和 JSON 已在 PyCharm 打开。
+  临时报告为 `/tmp/bc-face-real-qa-JGPC6S/short-arrows-report.json`；证据不随 Git 同步。
+
+### 上一版：边的蓝色 T 集中在一起，不单独标出中点
 
 - 用户看过每方向一个 T 沿边分开的 `86e791c` 版后，明确要求蓝色三个仍放在一起，
   不单独标出线的中点。现将所有固定方向 T 共用边中点作为起点，不新增菱形、圆点或标签。
@@ -1957,8 +1980,8 @@ Render 是否完成部署仍未确认，参见 [部署说明](docs/deployment/pu
 ## 下一步
 
 1. 阅读本交接和 AGENTS，检查当前 Git 状态；换电脑时安全拉取 main 并重新确认本地环境。
-2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交以 `git log` 为准，用户尚未明确
-   认可每个固定方向一个蓝色 T、集中在边中点且无独立中点符号的试用效果。确认边的方案后，再跟着用户
+2. **先看这版边的实际效果，按用户反馈继续讨论。** 最新功能提交以 `git log` 为准，本机 02 样例已恢复
+   XYZ 三个加载方向，沿边红箭头缩短以避开端点球；蓝色 T 集中在边中点且无独立中点符号。确认边的方案后，再跟着用户
    讨论面和整个立方体；合力另行讨论，不自动实现。Ronak 的实际 JSON 仍未取得。
    Charts 逐卡梳理已完成；保留八张图、只悬停不筛选、单行 14px 用途说明和查看／搜索入口。
 3. 已完成并推送的 Charts、上传和详情调整不重复实现。Ronak 新反馈涉及上传时，沿用当前

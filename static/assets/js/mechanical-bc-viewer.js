@@ -308,14 +308,17 @@ function createArrow(origin, axis, sign, materials, group, tooltip, selectableMe
   addMesh(group, head, tooltip, selectableMeshes);
 }
 
-function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, sizeScale = 1, opposingSizeScale = sizeScale) {
+function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, sizeScale = 1, opposingSizeScale = sizeScale, edgeDirection = "") {
   const tooltip = formatBoundaryConditionHover(item);
 
   (item.axes || [])
     .filter(axis => axis.status === "loaded")
     .forEach(axis => {
       const signs = getLoadDirectionSigns(axis.magnitude);
-      const arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
+      let arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
+      if (axis.direction === edgeDirection) {
+        arrowSize = Math.min(arrowSize, 0.35);
+      }
       origins.forEach(origin => {
         signs.forEach(sign => {
           createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, signs.length > 1 ? 0.82 : 1, arrowSize);
@@ -537,10 +540,12 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   const hasConstraint = (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed");
   const edge = new THREE.Line(geometry, hasConstraint ? materials.edgeLineHighlight : materials.cubeEdgeLine);
   const markerOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
+  const edgeVector = points[1].clone().sub(points[0]).normalize();
+  const edgeDirection = Object.keys(AXIS_DIRECTIONS).find(direction => Math.abs(edgeVector.dot(AXIS_DIRECTIONS[direction])) > 0.999);
 
   edge.renderOrder = 4;
   addMesh(group, edge, tooltip, selectableMeshes);
-  drawLoadedAxesAt(markerOrigins, item, materials, group, selectableMeshes, 0.65, 0.45);
+  drawLoadedAxesAt(markerOrigins, item, materials, group, selectableMeshes, 0.65, 0.45, edgeDirection);
   createClampMarker(markerOrigins[1], item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
 }
 
