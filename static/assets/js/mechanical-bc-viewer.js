@@ -600,7 +600,10 @@ function getFaceArrowOrigins(points, direction) {
   const spread = new THREE.Vector3().crossVectors(normal, directionVector3d(direction));
 
   if (spread.lengthSq() < 0.0001) {
-    return [center, ...points.map(point => center.clone().lerp(point, 0.5))];
+    spread.copy(firstTangent);
+    if (spread.lengthSq() < 0.0001) {
+      spread.copy(secondTangent);
+    }
   }
 
   spread.normalize();

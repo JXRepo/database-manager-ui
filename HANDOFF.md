@@ -2,15 +2,34 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (five spread Face arrows; local XYZ face fixture identifier 1f84367d; check git log for the final commit)
-next_topic: Review the local XYZ face fixture with fifteen red arrows and face constraints, then continue whole cube components; discuss resultant forces separately later
+code_base: main (all Face arrow directions use one row of five; local XYZ fixture identifier 1f84367d; check git log for the final commit)
+next_topic: Review the three rows of five Face arrows and face constraints with the local XYZ fixture, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：本机 Face 样例改为 XYZ 同时加载
+### 最新交接：面的法向五箭头也改成一排并列
+
+- 用户反馈法向的中心＋四内角排法显乱，要求像面内方向一样并列。
+- `getFaceArrowOrigins` 的法向分支改为沿排序后第一条面内边排列；
+  退化第一条边为零时用第二条边，统一使用 -0.42、-0.21、0、0.21、0.42 的五个偏移。
+  六个有效立方体面上的法向五起点因此共线，顶点反序／乱序后集合保持。
+- 原全局 XYZ 箭头方向、正负、尺寸、完整 hover、面内排法、薄轮廓和无中心圆点保持。
+  同一起点上的不同分量仍有各自起点间隙；法向箭身离开面，面内箭头仍留在面上。
+  本机 XYZ 样例仍是 `1f84367d`，JSON 没有再改，已有对象只需刷新绘图。
+- 验证：12 项既有 Node 测试和 5 项实际 Chromium 检查通过，0 失败／错误／跳过。
+  使用 fresh XYZ 样例，实际十五箭头；六面、XYZ、正负／双向及顶点顺序的 234 个几何场景通过。
+  法向起点共线，面内排法保持，多方向仍无实际相交；完整 hover、旋转／Reset、1440 桌面
+  和 Point／Whole／黄色 Edge 原路径通过。正常、旋转和单独法向实像均已查看。
+  使用 `DEBUG=True`、隔离 SQLite，未读取 `.env`；临时服务和浏览器已关闭。
+- 本机预览为样例目录内 `faces_parallel_five_default_20261010.png`、
+  `faces_parallel_five_rotated_20261010.png` 及合成单法向 `faces_parallel_five_normal_20261010.png`。
+  默认图已在 PyCharm 打开，临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/face-parallel-five-report.json`。
+  图和报告不随 Git 同步。
+
+### 上一版：本机 Face 样例改为 XYZ 同时加载
 
 - 用户要求修改 Face JSON，查看多个方向的红箭头。
 - 本机文件为 `example_json_files/boundary_condition_examples_20261008/03_face_cyclic_shear_titanium.json`。

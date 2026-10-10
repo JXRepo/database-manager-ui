@@ -702,9 +702,9 @@ remain perpendicular in the screen projection. An axis viewed directly along
 its length is foreshortened. Face and whole cube constraint markers retain their
 existing style. The table and hover retain the complete X/Y/Z constraints.
 Face boundaries use a translucent fill without extra thick perimeter rods or a
-center dot. Each loaded direction and sign uses five arrows. Normal arrows sit
-at the center and four inset corner positions; tangential arrows sit side by side
-across the face, perpendicular to their load direction. Arrow spacing and size
+center dot. Each loaded direction and sign uses five arrows side by side in one
+row across the face. Normal arrow rows follow a face edge; tangential arrow rows
+run perpendicular to their load direction. Arrow spacing and size
 keep the two tangential directions separate when both are loaded. These positions
 illustrate a face condition, without defining point loads or a spatial distribution.
 Nonempty targets have separate tables in the order Points, Edges, Faces, then
