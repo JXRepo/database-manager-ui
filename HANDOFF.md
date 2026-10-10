@@ -2,15 +2,31 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-10
-code_base: main (face loads use five spread arrows without thick borders or center dots; check git log for the final commit)
-next_topic: Review five spread face arrows and face constraints with the local fixture, then continue whole cube components; discuss resultant forces separately later
+code_base: main (five spread Face arrows; local XYZ face fixture identifier 1f84367d; check git log for the final commit)
+next_topic: Review the local XYZ face fixture with fifteen red arrows and face constraints, then continue whole cube components; discuss resultant forces separately later
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：面去掉粗边和中心圆点，五箭头平铺
+### 最新交接：本机 Face 样例改为 XYZ 同时加载
+
+- 用户要求修改 Face JSON，查看多个方向的红箭头。
+- 本机文件为 `example_json_files/boundary_condition_examples_20261008/03_face_cyclic_shear_titanium.json`。
+  positive Z 面的 constraints 改为 XYZ 均 loaded，applied_load 按 XYZ 顺序提供三条独立
+  405.0 N 记录，frequency=0.5、duration=4.0、R=-1.0、step=1 保留；应显示每轴五箭头，共十五个。
+  opposite Z 面仍为 XYZ fixed，两个 Face 的八个角点和目标位置保持。
+- title、description 和 recipe 的 curve_role／force_convention／shear_convention 明确指出：
+  XYZ 仅用于边界可视化，曲线仍为原始 cyclic X-on-Z 剪切参考，并非 XYZ 合载求解结果。
+  phase、stress、total_strain、plastic_strain 和 recipe.history 原始字节均保持。
+- 标识符按 Ronak 模板更新：`737a285d` → `1f84367d`，方便保留旧对象后重新上传。
+  上传必填规则及 Face XYZ 归一化检查通过，生成值与 supplied ID 一致；
+  使用 `DEBUG=True`、禁用 dotenv、SQLite `:memory:`，未打开数据库连接或改动已上传对象。
+- JSON 已在 PyCharm 打开。样例目录由 `.git/info/exclude` 排除，仅本机修改，不强制加入 Git。
+  临时验证报告 `/tmp/face-xyz-edit-thKUZ1/validation.json`。绘图代码没有再改。
+
+### 上一版：面去掉粗边和中心圆点，五箭头平铺
 
 - 用户认可黄色边进一步加粗后的效果，接着上传 Face 样例并明确要求：
   面的四条边不加粗，中心不画圆点，红箭头改为五个且任何方向都平铺，不串成一列。
