@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (whole cube arrow groups and green T aligned to face center normals; check git log for the final commit)
+code_base: main (f567697 whole cube arrow groups and green T aligned to face center normals; verified live)
 next_topic: Review centered whole cube arrows and green T markers
 ---
 
@@ -30,6 +30,10 @@ next_topic: Review centered whole cube arrows and green T markers
   `/tmp/bc-uniform-arrow-qa-385tHH/whole-centered-report.json` 不随 Git 同步。
 - 三张最终实际截图在 ignored 样例目录：`whole_centered_{default,rotated,mixed}_20261011.png`；
   均已查看，默认图已在 PyCharm 打开。JSON 不需修改或重新上传。
+- 应用提交 `f567697` 已推送；约 101 秒后线上普通 URL、独立 no-cache query 和压缩请求
+  解压内容均精确匹配上述最终源码 SHA-256。Last-Modified 为 2026-10-11 02:24:10 UTC；
+  线上已确认更新，刷新即可。报告 `/tmp/bc-live-whole-centered-report-20261011.json`
+  不随 Git 同步。本条线上核验记录仅改文档，提交使用 `[skip render]`。
 
 ### 上一版：边、面与整体数字箭头统一间距
 
