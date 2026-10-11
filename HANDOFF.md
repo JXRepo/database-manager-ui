@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (professional whole cube tensor display; check git log for the final commit)
+code_base: main at 2b0869a (professional whole cube tensor display, verified live 2026-10-11)
 next_topic: Review professional stress and strain tensor schematics
 ---
 
@@ -49,6 +49,12 @@ next_topic: Review professional stress and strain tensor schematics
 - 四张实际最终截图在 ignored 样例目录：
   `whole_tensor_professional_{stress_default,shear,strain,mixed}_20261011.png`；
   均已逐张查看，默认应力图已在 PyCharm 打开。JSON 不需修改或重新上传。
+- 应用提交 `e1924e4` 与 guide 修正 `2b0869a` 均已推送；最终提交约 101 秒后，三个线上 JS
+  模块的普通 URL、独立 no-cache query 与 Brotli 解压内容都精确匹配上述最终源码 hash。
+  三个 Last-Modified 均为 2026-10-11 17:03:11 UTC；核验完成于 17:04:19 UTC。
+  线上脚本已确认更新，强制刷新即可；线上登录后的详情页未直接做浏览器验证，实际页面
+  检查在隔离本地环境完成。报告 `/tmp/bc-live-professional-tensor-report-20261011.json`
+  不随 Git 同步。本条线上核验记录仅改文档，提交使用 `[skip render]`。
 
 ### 上一版：整体紫箭与绿色 T 正对面中心
 
