@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (shared centered spacing for edge, face and scalar whole cube arrows; check git log for the final commit)
+code_base: main (8cdf29b shared spacing for edge, face and scalar whole cube arrows; verified live)
 next_topic: Review the unified arrow spacing in edge, face and scalar whole cube views
 ---
 
@@ -30,6 +30,11 @@ next_topic: Review the unified arrow spacing in edge, face and scalar whole cube
   `/tmp/bc-uniform-arrow-qa-385tHH/edge-face-whole-spacing-report.json` 不随 Git 同步。
 - 四张最新实际默认图在 ignored 样例目录，名称为
   `edge_face_whole_spacing_{edge,face,whole,mixed}_20261011.png`；均已查看，混合图已在 PyCharm 打开。
+- 应用提交 `8cdf29b` 已推送；约 101 秒后线上普通 URL、独立 no-cache query 与压缩请求
+  解压内容均精确匹配源码 SHA-256 `8fda79be3cb7bb038ec2615f1691cf56077ba7ef03c9a4bb3ec677b566e20b3a`。
+  Last-Modified 为 2026-10-11 02:05:35 UTC；线上已确认更新，刷新即可。
+  报告 `/tmp/bc-live-shared-spacing-report-20261011.json` 不随 Git 同步。
+  本条核验记录仅改文档，提交使用 `[skip render]`。
 
 ### 上一版：面的受力方向统一三个并列箭头
 
