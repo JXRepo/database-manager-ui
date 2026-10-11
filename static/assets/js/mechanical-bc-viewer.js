@@ -635,26 +635,26 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
 
 function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
   const center = new THREE.Vector3(0, 0, 0);
-  drawLoadedAxesAt([center], item, materials, group, selectableMeshes);
-  createClampMarker(center, item, materials, group, selectableMeshes, {viewFacing: true});
-
-  (item.axes || []).filter(axis => axis.status === "loaded" || axis.status === "fixed").forEach(axis => {
-    const signs = axis.status === "loaded" ? getLoadDirectionSigns(axis.magnitude) : [1];
+  const tooltip = formatBoundaryConditionHover(item);
+  (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
+    const direction = directionVector3d(axis.direction);
+    const across = getPerpendicularVector3d(direction);
+    const signs = getLoadDirectionSigns(axis.magnitude);
     signs.forEach(sign => {
-      const label = createTextSprite(axis.direction, "#475569", 42, 0.18);
-      const distance = axis.status === "fixed" ? 0.27 : 0.48;
-      label.position.copy(directionVector3d(axis.direction).multiplyScalar(sign * distance));
-      group.add(label);
+      [-0.18, 0, 0.18].forEach(offset => {
+        const origin = center.clone().addScaledVector(direction, sign * 0.12)
+          .addScaledVector(across, offset);
+        createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes,
+          signs.length > 1 ? 0.82 : 1, 1.8);
+      });
     });
   });
+  createClampMarker(center, item, materials, group, selectableMeshes, {sizeScale: 2.8, viewFacing: true});
 }
 
 function createWholeCubeControls(container, items, state, materials, tooltip) {
   const heading = document.createElement("div");
   heading.className = "bc-whole-heading";
-  const title = document.createElement("span");
-  heading.appendChild(title);
-
   const select = document.createElement("select");
   select.className = "bc-whole-select";
   select.setAttribute("aria-label", "Whole cube boundary condition");
@@ -664,8 +664,10 @@ function createWholeCubeControls(container, items, state, materials, tooltip) {
     option.textContent = `${index + 1} · ${item.loading_type || "constraints"}`;
     select.appendChild(option);
   });
-  if (items.length > 1) heading.appendChild(select);
-  container.appendChild(heading);
+  if (items.length > 1) {
+    heading.appendChild(select);
+    container.appendChild(heading);
+  }
 
   function showCondition(position) {
     state.wholeRoot.traverse(object => {
@@ -678,9 +680,7 @@ function createWholeCubeControls(container, items, state, materials, tooltip) {
     state.wholeRoot.clear();
     state.wholeMeshes.length = 0;
     const {item, index} = items[position];
-    const type = String(item.loading_type || "constraints");
-    title.textContent = `Whole cube · ${type.charAt(0).toUpperCase() + type.slice(1)}`;
-    heading.dataset.sourceIndex = String(index);
+    container.dataset.wholeSourceIndex = String(index);
     drawWholeCubeCondition(item, materials, state.wholeRoot, state.wholeMeshes);
     tooltip.style.opacity = "0";
     state.renderSceneOnce();
@@ -762,6 +762,8 @@ function setupTooltip(container, camera, selectableMeshes, tooltip, onHighlight 
 
     onHighlight(hit.object.userData.component || '');
     tooltip.textContent = hit.object.userData.tooltip;
+    tooltip.style.transform = y >= tooltip.offsetHeight + 12
+      ? "translate(-50%, calc(-100% - 12px))" : "translate(-50%, 12px)";
     tooltip.style.left = `${event.clientX - rect.left}px`;
     tooltip.style.top = `${event.clientY - rect.top}px`;
     tooltip.style.opacity = "1";
@@ -891,17 +893,50 @@ function resetCameraView(camera, controls, root, container, cameraDirection) {
   frameScene(camera, controls, root, container, cameraDirection);
 }
 
+function projectedSceneBounds(group, camera, viewportHeight) {
+  let top = Infinity;
+  let bottom = -Infinity;
+  const point = new THREE.Vector3();
+  group.updateMatrixWorld(true);
+  group.traverseVisible(object => {
+    if (object.isSprite && object.userData.textPixelHeight) {
+      object.getWorldPosition(point).project(camera);
+      const y = (1 - point.y) * viewportHeight / 2;
+      const halfHeight = object.userData.textPixelHeight
+        * object.material.map.image.height / object.userData.fontSize / 2;
+      top = Math.min(top, y - halfHeight);
+      bottom = Math.max(bottom, y + halfHeight);
+      return;
+    }
+    if (!object.geometry) return;
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    const bounds = object.geometry.boundingBox;
+    for (const x of [bounds.min.x, bounds.max.x]) {
+      for (const y of [bounds.min.y, bounds.max.y]) {
+        for (const z of [bounds.min.z, bounds.max.z]) {
+          point.set(x, y, z).applyMatrix4(object.matrixWorld).project(camera);
+          if (!Number.isFinite(point.y)) continue;
+          const screenY = (1 - point.y) * viewportHeight / 2;
+          top = Math.min(top, screenY);
+          bottom = Math.max(bottom, screenY);
+        }
+      }
+    }
+  });
+  return {top, bottom};
+}
+
 function createScene(container, hasWholeMarkers = false) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(31, 1, 0.1, 100);
   camera.up.set(0, 0, 1);
   const wholeScene = new THREE.Scene();
-  const wholeCamera = new THREE.OrthographicCamera(-1, 1, 0.58, -0.58, 0.1, 100);
+  const wholeCamera = new THREE.OrthographicCamera(-1, 1, 0.9, -0.9, 0.1, 100);
   const wholeRoot = new THREE.Group();
   const wholeMeshes = [];
-  const wholeHeight = hasWholeMarkers ? 160 : 0;
+  const wholeHeight = hasWholeMarkers ? 150 : 0;
   const mainViewport = {left: 0, top: wholeHeight, width: 1, height: 1};
-  const wholeViewport = {left: 0, top: 26, width: 1, height: 120};
+  const wholeViewport = {left: 0, top: 0, width: 1, height: 150};
 
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
@@ -959,20 +994,38 @@ function createScene(container, hasWholeMarkers = false) {
         * projectionHeight / viewportHeight;
       child.scale.set(height * texture.width / texture.height, height, 1);
     });
+    if (hasWholeMarkers) {
+      // Crop the scene's empty upper margin, keeping local markers below the whole group.
+      const bounds = projectedSceneBounds(root, camera, mainViewport.height);
+      const crop = Number.isFinite(bounds.top)
+        ? Math.max(0, Math.min(mainViewport.height * 0.3, bounds.top - 12)) : 0;
+      mainViewport.top = wholeHeight - crop;
+    }
     renderer.setScissorTest(false);
     renderer.clear();
     renderer.setScissorTest(true);
-    renderer.setViewport(0, 0, mainViewport.width, mainViewport.height);
-    renderer.setScissor(0, 0, mainViewport.width, mainViewport.height);
+    const mainBottom = container.clientHeight - mainViewport.top - mainViewport.height;
+    renderer.setViewport(0, mainBottom, mainViewport.width, mainViewport.height);
+    renderer.setScissor(0, 0, mainViewport.width, container.clientHeight - wholeHeight);
     renderer.render(scene, camera);
 
     if (hasWholeMarkers) {
       wholeCamera.quaternion.copy(camera.quaternion);
       wholeCamera.position.set(0, 0, 4).applyQuaternion(camera.quaternion);
       wholeCamera.updateMatrixWorld();
+      wholeCamera.top = 0.9;
+      wholeCamera.bottom = -0.9;
+      wholeCamera.updateProjectionMatrix();
       wholeRoot.children.forEach(child => {
         if (child.userData.fixedDirection) orientFixedCrossbar(child, wholeCamera);
       });
+      const bounds = projectedSceneBounds(wholeRoot, wholeCamera, wholeViewport.height);
+      if (Number.isFinite(bounds.bottom)) {
+        const shift = (wholeViewport.height - 6 - bounds.bottom) * 1.8 / wholeViewport.height;
+        wholeCamera.top += shift;
+        wholeCamera.bottom += shift;
+        wholeCamera.updateProjectionMatrix();
+      }
       const bottom = container.clientHeight - wholeViewport.top - wholeViewport.height;
       renderer.setViewport(0, bottom, wholeViewport.width, wholeViewport.height);
       renderer.setScissor(0, bottom, wholeViewport.width, wholeViewport.height);
@@ -988,7 +1041,7 @@ function createScene(container, hasWholeMarkers = false) {
     const width = Math.max(container.clientWidth, 1);
     if (hasWholeMarkers) {
       container.style.aspectRatio = "auto";
-      const height = `${width + wholeHeight}px`;
+      const height = `${width * 0.85 + wholeHeight}px`;
       if (container.style.height !== height) container.style.height = height;
     }
     const height = Math.max(container.clientHeight || width, 1);
@@ -998,7 +1051,7 @@ function createScene(container, hasWholeMarkers = false) {
 
     camera.aspect = width / mainViewport.height;
     camera.updateProjectionMatrix();
-    const halfWidth = 0.58 * width / wholeViewport.height;
+    const halfWidth = 0.9 * width / wholeViewport.height;
     wholeCamera.left = -halfWidth;
     wholeCamera.right = halfWidth;
     wholeCamera.updateProjectionMatrix();
@@ -1097,7 +1150,7 @@ function renderMechanicalBcViewer() {
     }
     const badge = document.createElement('div');
     badge.className = 'bc-tensor-badge';
-    if (wholeItems.length) badge.style.top = `${state.mainViewport.top + 14}px`;
+    if (wholeItems.length) badge.style.top = `${state.wholeViewport.height + 14}px`;
     container.parentElement.appendChild(badge);
     const legend = container.closest('.bc-layout').querySelector('.bc-legend');
     const loadLegend = legend.firstElementChild;
@@ -1134,7 +1187,7 @@ function renderMechanicalBcViewer() {
     : null;
 
   if (resetButton) {
-    if (wholeItems.length) resetButton.style.top = `${state.mainViewport.top + 12}px`;
+    if (wholeItems.length) resetButton.style.top = `${state.wholeViewport.height + 12}px`;
     resetButton.addEventListener("click", state.resetCameraView);
   }
   state.renderSceneOnce();

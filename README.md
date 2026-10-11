@@ -686,9 +686,11 @@ and exports are unchanged. These distinctions follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
-Scalar whole cube conditions have a separate marker group above the cube, labeled
-with their loading type. Each loaded direction and sign uses one red arrow;
-each fixed direction uses one blue T. The group stays above the cube during
+Scalar whole cube conditions have an enlarged marker group close above the cube.
+Each loaded direction and sign uses three parallel red arrows;
+each fixed direction uses one enlarged blue T. The group has no heading or
+X/Y/Z text beside the markers; the table, hover and orientation guide retain
+the directions. The group stays above the cube during
 rotation, while its X/Y/Z directions follow the same view as the cube. Point,
 edge and face conditions keep their own locations below it. Multiple scalar
 whole cube conditions have a selector and remain separate; their original values
@@ -713,7 +715,7 @@ without adding constrained points. Point and edge constraints
 use one stem and one crossbar per blue T marker. The stem
 retains its X, Y or Z direction while the crossbar turns with the camera to
 remain perpendicular in the screen projection. An axis viewed directly along
-its length is foreshortened. Face and whole cube constraint markers retain their
+its length is foreshortened. Face constraint markers retain their
 existing style. The table and hover retain the complete X/Y/Z constraints.
 Face boundaries use a translucent fill without extra thick perimeter rods or a
 center dot. Each loaded direction and sign uses five arrows side by side in one

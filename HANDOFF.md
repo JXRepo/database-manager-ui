@@ -2,15 +2,40 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (scalar Whole cube markers above the cube; check git log for the final commit)
-next_topic: Review the two Whole cube example files and the floating scalar markers with the user
+code_base: main (enlarged scalar Whole cube groups with three parallel arrows; check git log for the final commit)
+next_topic: Review the closer Whole cube marker group without its heading or X/Y/Z labels
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：整体数字载荷上移，两份立方体示例
+### 最新交接：整体数字标记放大，三箭头并列，去掉标题和轴字
+
+- 用户要求整体数字标记去掉标题和箭头旁的 X／Y／Z，放大并靠近立方体，红箭头增加。
+  每个 loaded 方向／符号改为三个并列红箭头，尺寸 1.8，起点横排偏移 -0.18／0／0.18，
+  并沿该符号方向外移 0.12，避免不同轴的箭组在中心真实交叉。
+  每个 fixed 方向仍为一个蓝 T，尺寸 2.8；零载荷和原始正负判断保持。
+- 单个整体数字条件没有顶部文字或控制条；多个条件仅保留选择框，按原索引独立切换。
+  当前索引记在容器 dataset.wholeSourceIndex，完整 XYZ 与载荷数值仍在表格和 hover 中。
+- 整体区高 150 CSS px，正交投影跨度 1.8，按真实几何边界贴近该区下缘。
+  主视区高度为宽度的 0.85，用实际投影边界裁掉上方空白，保留符号组和局部条件的间隔。
+  主 viewport 虚拟起点跟随裁切量；scissor 和 hover 均按固定 150 px 分区，避免混合条件互相覆盖。
+  主相机 aspect 与实际主 viewport 一致，裁去上方空白不会额外截断下方图元。
+  上方空间不足时 hover 显示在指针下方，避免被容器边界截断。
+- 两份本机整体 JSON 没有再改，原对象刷新页面即可查看新的数字标记。
+  stress／strain 张量的面、箭头和步骤显示路径保持。
+- 12 项既有 Node tensor／panel 测试通过，包括四项实际 Chromium 面板检查，零失败／跳过。
+- 7 项 fresh 实际 Chromium 检查、28 个子场景通过，零失败／错误／跳过。
+  覆盖三个桌面宽度、三箭头几何、旋转／Reset、实际间隔、独立条件切换、完整 hover，
+  以及单状态张量与原十二条张量记录的混合和完整 JSON 导出。最终 JS／模板 hash 与报告匹配。
+  使用 DEBUG=True 和隔离 SQLite，未读取 .env；临时浏览器和服务已关闭。
+  临时最终报告 `/tmp/bc-uniform-arrow-qa-385tHH/whole-three-report.json`，不随 Git 同步。
+- 本机实际页面预览在 ignored 样例目录：`whole_three_parallel_force_default_20261011.png`、
+  `whole_three_parallel_force_rotated_20261011.png`、`whole_three_parallel_tensor_20261011.png`、
+  `whole_three_parallel_mixed_20261011.png`。正常、旋转、混合实像已查看，默认 force 图已在 PyCharm 打开。
+
+### 上一版：整体数字载荷上移，两份立方体示例
 
 - 用户确认 Whole cube 要区分 force/displacement 的 XYZ 数字形式与 stress/strain 的张量形式。
   当前 Ronak schema 的 stress/strain 条件要求八个不同顶点、单个 loaded 约束与张量 magnitude；
