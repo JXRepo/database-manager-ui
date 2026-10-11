@@ -2,15 +2,48 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (enlarged scalar Whole cube groups with three parallel arrows; check git log for the final commit)
-next_topic: Review the closer Whole cube marker group without its heading or X/Y/Z labels
+code_base: main (purple scalar Whole cube markers outside local loads; check git log for the final commit)
+next_topic: Review the larger purple Whole cube arrows and T markers outside the corresponding axis faces
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：整体数字标记放大，三箭头并列，去掉标题和轴字
+### 最新交接：整体数字标记改为紫色，放在对应面的外侧
+
+- 用户要求整体 force/displacement 的箭头和 T 放在对应方向面的外侧，预留局部面箭头
+  朝外伸出的空间，并用不同颜色和更大尺寸让整体与点／边／面一眼可辨。
+- 整体 loaded 箭头和 fixed T 统一醒目紫色 `#a21caf`，局部箭头仍为红色、固定仍为蓝色。
+  每个 loaded 方向／符号三个并列箭头，尺寸 1.3；每个 fixed 方向一个 T，尺寸 2。
+  Face 箭头尺寸仍为 0.5，Edge 仍为 0.65；Point／Face T 为 1，Edge T 为 0.65。
+  整体不加标题、轴文字或中心球。
+- 整体轴向 anchor 距中心 1.45（立方体表面为 0.5），给局部朝外箭头和顶点文字留余量。
+  单符号箭身起点 1.5475、尖端 1.957；Face 朝外箭头尖端最远 0.695。
+  T 的 stem 较短，anchor 再外移 0.2 至 1.65，横杆中心为 1.99，避免压到顶点文字。
+  正负载荷在对应正负轴侧显示，fixed 在对应正轴侧显示。这里的外侧位置是整体 XYZ
+  条件的方向示意；原始整体数字条件没有指定某个局部面的载荷。
+- 取消原顶部独立区域和双相机／scissor／裁切，整体标记加入立方体根组，在同一个
+  正方形透视视区内一起旋转。自动取实际图元的径向范围，包含外层整体标记；切换
+  整体条件时重新适配范围并保留当前视角，Reset 恢复原视角。
+- 多个整体数字条件仍按原索引独立选择。wholeMeshes 独立保留并加入同一视区的 hover
+  命中集合，不受张量条件清理影响。表格和 hover 保留完整 XYZ／原数值，图例新增紫色
+  `Whole cube`。stress／strain 张量组件、步骤、面 convention 和原始 JSON／导出保持。
+- 两份本机整体 JSON 本轮没有改，已上传对象刷新页面即可看到新版。预览位于 ignored
+  样例目录：`whole_outside_purple_force_default_20261011.png`、
+  `whole_outside_purple_force_rotated_20261011.png`、`whole_outside_purple_tensor_20261011.png`、
+  `whole_outside_purple_mixed_20261011.png`，图和 JSON 均不随 Git 同步。
+- 12 项既有 Node tensor／panel 测试通过，包含四项实际 Chromium 面板检查，零失败／跳过。
+  JavaScript 模块语法与 diff 检查通过；最终源码经独立只读复核，无阻断问题。
+  默认 force 预览已在 PyCharm 打开。
+- 7 项 fresh 实际 Chromium 检查、28 个子场景通过，零失败／错误／跳过。
+  覆盖三个桌面宽度、紫色材质／三箭头及大 T 几何、局部载荷余量、旋转／Reset、
+  原索引条件切换、完整 hover、单状态与原十二条张量记录及完整 JSON 导出。
+  正常、旋转、混合和张量四张实像已查看，最终 JS／模板 hash 与报告匹配。
+  使用 DEBUG=True 和隔离 SQLite，未读取 .env；临时浏览器和服务已关闭。
+  最终临时报告 `/tmp/bc-uniform-arrow-qa-385tHH/whole-outside-purple-report.json` 不随 Git 同步。
+
+### 上一版：整体数字标记放大，三箭头并列，去掉标题和轴字
 
 - 用户要求整体数字标记去掉标题和箭头旁的 X／Y／Z，放大并靠近立方体，红箭头增加。
   每个 loaded 方向／符号改为三个并列红箭头，尺寸 1.8，起点横排偏移 -0.18／0／0.18，
