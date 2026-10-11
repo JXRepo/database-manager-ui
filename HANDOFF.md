@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (all supplied tensor components by default; check git log for final commit)
+code_base: main at 37d803c (complete tensor display and aligned badges, verified live 2026-10-11)
 next_topic: Review complete tensor component display and aligned load badges
 ---
 
@@ -36,7 +36,13 @@ next_topic: Review complete tensor component display and aligned load badges
   `/tmp/bc-uniform-arrow-qa-385tHH/tensor-all-browser-report.json` 不随 Git 同步。
 - 三张实际最终图在 ignored 样例目录：`whole_tensor_all_stress_default_20261011.png`、
   `whole_tensor_all_mixed_default_20261011.png`、`whole_tensor_all_red_badges_expanded_20261011.png`；
-  均已逐张查看。JSON 不需修改或重新上传。
+  均已逐张查看，默认图已在 PyCharm 打开。JSON 不需修改或重新上传。
+- 应用提交 `37d803c` 已推送；约 130 秒后三个线上 JS 模块的普通 URL、独立 no-cache query
+  及 Brotli 解压内容均精确匹配最终源码 hash。三个 Last-Modified 均为
+  2026-10-11 18:11:02 UTC；核验完成于 18:12:36 UTC。线上脚本已确认更新，强制刷新即可。
+  登录后的线上详情页未直接做浏览器检查，实际页面 QA 在隔离本地环境完成。报告
+  `/tmp/bc-live-tensor-default-all-report-20261011.json` 不随 Git 同步。
+  本条线上核验记录仅改文档，提交使用 `[skip render]`。
 
 ### 上一版：整体 stress／strain 张量专业显示
 
