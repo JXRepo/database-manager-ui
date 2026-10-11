@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (closer purple Whole cube arrows, green T markers and larger default view; check git log for the final commit)
+code_base: main (53e44ff closer Whole cube markers, green T and larger default view; verified live)
 next_topic: Review the closer Whole cube markers and enlarged default cube view
 ---
 
@@ -41,6 +41,11 @@ next_topic: Review the closer Whole cube markers and enlarged default cube view
   模块语法／diff 检查和独立只读复核通过。最终源码 hash `aea9116a...` 与 QA 报告匹配。
   使用 DEBUG=True、隔离 SQLite，未读取 .env；临时浏览器和服务均已关闭。报告
   `/tmp/bc-uniform-arrow-qa-385tHH/whole-close-green-report.json` 不随 Git 同步。
+- 应用提交 `53e44ff` 已推送；约 141 秒后线上普通 URL、no-cache／独立 query 与压缩请求
+  解压字节均精确匹配源码 SHA-256 `aea9116a26a84f5376de1b270b48820a70c728bf5fb07a0baa4323819aa59220`。
+  Last-Modified 为 2026-10-11 01:42:47 UTC；线上静态脚本已确认更新，刷新即可。
+  核验报告 `/tmp/bc-live-close-green-report-20261011.json` 不随 Git 同步。
+  这条部署记录仅改文档，提交带 `[skip render]`，不重新部署同一应用代码。
 
 ### 上一版：重建生成静态目录，线上新版已恢复
 
