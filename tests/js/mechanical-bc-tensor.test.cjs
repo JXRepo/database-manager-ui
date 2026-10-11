@@ -43,22 +43,25 @@ test('filters and component selection do not alter the source tensor', () => {
 });
 
 test('small-strain illustration preserves sign, uses explicit symmetry, and remains bounded', () => {
-  const values = {xx: 1e200, yy: -1e200, zz: 0, xy: 1e200, xz: 0, yz: 0};
+  const values = {xx: 1e200, yy: -1e200, zz: 0, xy: 1e200, yx: 1e200, xz: 0, zx: 0, yz: 0, zy: 0};
+  const original = JSON.stringify(values);
   const result = tensor.strainIllustration(values);
   assert.equal(result.error, '');
   assert.ok(result.matrix[0][0] > 0 && result.matrix[1][1] < 0);
   assert.equal(result.matrix[0][1], result.matrix[1][0]);
   assert.ok(result.matrix.every(row => row.reduce((sum, n) => sum + Math.abs(n), 0) <= 0.24));
-  assert.equal(values.yx, undefined);
+  assert.equal(JSON.stringify(values), original);
 });
 
 test('shape preview refuses incomplete or non-symmetric strain without averaging it', () => {
   assert.ok(tensor.strainIllustration({xx: 1}).error);
-  assert.ok(tensor.strainIllustration({xx: 1, yy: 0, zz: 0, xy: 2, yx: 3, xz: 0, yz: 0}).error);
+  assert.match(tensor.strainIllustration({xx: 1, yy: 0, zz: 0, xy: 2, xz: 0, zx: 0, yz: 0, zy: 0}).error,
+    /all nine numeric strain components; missing components are not inferred/);
+  assert.ok(tensor.strainIllustration({xx: 1, yy: 0, zz: 0, xy: 2, yx: 3, xz: 0, zx: 0, yz: 0, zy: 0}).error);
 });
 
 test('an explicitly zero tensor has a zero shape change', () => {
-  assert.deepEqual(tensor.strainIllustration({xx: 0, yy: 0, zz: 0, xy: 0, xz: 0, yz: 0}).matrix,
+  assert.deepEqual(tensor.strainIllustration({xx: 0, yy: 0, zz: 0, xy: 0, yx: 0, xz: 0, zx: 0, yz: 0, zy: 0}).matrix,
     [[0, 0, 0], [0, 0, 0], [0, 0, 0]]);
 });
 

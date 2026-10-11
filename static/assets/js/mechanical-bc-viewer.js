@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import {tensorArrows} from './mechanical-bc-tensor.js';
+import {tensorArrows, formatTensorValue} from './mechanical-bc-tensor.js';
 import {createTensorPanel} from './mechanical-bc-tensor-panel.js';
 
 const VERTICES = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
@@ -888,7 +888,7 @@ function disposeTensorGroup(group) {
   group.clear();
 }
 
-function drawTensorLoading(view, group, selectableMeshes) {
+function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = false) {
   const isStrain = view.item.loading_type === 'strain';
   if (view.shapeMatrix) {
     const outline = createCubeWireBox(1, new THREE.LineBasicMaterial({color: '#7c3aed'}), 5);
@@ -906,10 +906,13 @@ function drawTensorLoading(view, group, selectableMeshes) {
   }
 
   const componentMaterials = new Map();
+  const sizeScale = 1.3;
+  const tipDistance = 0.39 * sizeScale;
+  const arrowCenter = (0.075 + 0.39) * sizeScale / 2;
   for (const arrow of tensorArrows(view.load?.magnitude, view.filter, view.selected)) {
     if (!componentMaterials.has(arrow.component)) {
       componentMaterials.set(arrow.component, new THREE.MeshStandardMaterial({
-        color: STATUS_COLORS.loaded, roughness: 0.34, metalness: 0.06,
+        color: WHOLE_COLOR, roughness: 0.34, metalness: 0.06,
         transparent: true, opacity: 1,
       }));
     }
@@ -918,22 +921,28 @@ function drawTensorLoading(view, group, selectableMeshes) {
     const faceVertices = VERTICES.filter(vertex => vertexCoordinates(vertex)[arrow.normal] === arrow.faceSign * 0.5);
     const points = getOrderedFacePoints(faceVertices);
     const axis = {direction: arrow.direction.toUpperCase()};
-    const origins = getFaceArrowOrigins(points, axis.direction);
-    const tooltip = `${isStrain ? 'Strain guide' : 'Stress component'} ${arrow.component}: ${arrow.value}${view.unit ? ` ${view.unit}` : ''}\n${arrow.faceSign > 0 ? '+' : '-'}${arrow.normal.toUpperCase()} face · ${arrow.sign > 0 ? '+' : '-'}${arrow.direction.toUpperCase()} direction`;
+    const direction = directionVector3d(axis.direction).multiplyScalar(arrow.sign);
+    const origins = getFaceArrowOrigins(points, axis.direction, THREE_ARROW_OFFSETS);
+    const normalDistance = hasLocalMarkers && arrow.direction !== arrow.normal ? 1.25 : 0.9;
+    const tooltip = `${isStrain ? 'Strain guide' : 'Stress component'} ${arrow.component}: ${formatTensorValue(arrow.value)}${view.unit ? ` ${view.unit}` : ''}\n${arrow.faceSign > 0 ? '+' : '-'}${arrow.normal.toUpperCase()} face · ${arrow.sign > 0 ? '+' : '-'}${arrow.direction.toUpperCase()} direction`;
     for (const origin of origins) {
-      origin.addScaledVector(normal, 0.04);
+      // Keep whole cube components outside the layer used by local face arrows.
+      origin.addScaledVector(normal, normalDistance - 0.5);
       if (arrow.direction === arrow.normal && arrow.value < 0) {
-        // Compression arrows end outside the face instead of inside the cube
-        origin.addScaledVector(normal, 0.195);
+        origin.addScaledVector(normal, tipDistance);
+      } else if (arrow.direction !== arrow.normal) {
+        // Center the full shear arrow on the face normal, including its tip.
+        origin.addScaledVector(direction, -arrowCenter);
       }
       const meshes = createArrow(origin, axis, arrow.sign, {loaded: material}, group,
-        tooltip, selectableMeshes, 1, 0.5);
+        tooltip, selectableMeshes, 1, sizeScale);
       for (const mesh of meshes) {
         mesh.userData.component = arrow.component;
+        mesh.userData.value = arrow.value;
       }
     }
     const faceMaterial = new THREE.MeshBasicMaterial({
-      color: STATUS_COLORS.loaded, transparent: true, opacity: 0.045,
+      color: WHOLE_COLOR, transparent: true, opacity: 0.055,
       side: THREE.DoubleSide, depthWrite: false,
     });
     const face = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), faceMaterial);
@@ -951,7 +960,7 @@ function highlightTensor(group, component) {
     if (!mesh.userData.component) return;
     const active = !component || mesh.userData.component === component;
     mesh.material.opacity = mesh.userData.tensorFace
-      ? (component && active ? 0.26 : 0.045)
+      ? (component && active ? 0.18 : 0.055)
       : (active ? 1 : 0.18);
   });
 }
@@ -1012,6 +1021,7 @@ function createScene(container, hasWholeMarkers = false) {
   camera.up.set(0, 0, 1);
   const wholeRoot = new THREE.Group();
   const wholeMeshes = [];
+  const tensorMeshes = [];
   const mainViewport = {left: 0, top: 0, width: 1, height: 1};
 
   const renderer = new THREE.WebGLRenderer({
@@ -1020,6 +1030,9 @@ function createScene(container, hasWholeMarkers = false) {
     powerPreference: "high-performance",
   });
   const controls = new OrbitControls(camera, renderer.domElement);
+  const axisOverlay = container.parentElement?.querySelector(".bc-axis-overlay");
+  const axisLines = Array.from(axisOverlay?.querySelectorAll("line") || []);
+  const axisLabels = Array.from(axisOverlay?.querySelectorAll("text") || []);
   const root = new THREE.Group();
   root.userData.hasWholeConditions = hasWholeMarkers;
   root.add(wholeRoot);
@@ -1053,6 +1066,23 @@ function createScene(container, hasWholeMarkers = false) {
   function renderSceneOnce() {
     restoreVertexLabelPositions(root);
     camera.updateMatrixWorld();
+    Object.keys(AXIS_DIRECTIONS).forEach((axis, index) => {
+      const line = axisLines[index];
+      const label = axisLabels[index];
+      if (!line || !label) return;
+      const direction = AXIS_DIRECTIONS[axis].clone().transformDirection(camera.matrixWorldInverse);
+      const projectedLength = Math.hypot(direction.x, direction.y);
+      const labelOffset = projectedLength > 0.001 ? 9 / projectedLength : 0;
+      line.setAttribute("x1", "54");
+      line.setAttribute("y1", "48");
+      line.setAttribute("x2", String(54 + direction.x * 28));
+      line.setAttribute("y2", String(48 - direction.y * 28));
+      label.setAttribute("x", String(54 + direction.x * (28 + labelOffset)));
+      label.setAttribute("y", String(projectedLength > 0.001
+        ? 48 - direction.y * (28 + labelOffset) : 62));
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("dominant-baseline", "middle");
+    });
     // Keep vertex text readable at the same screen size across zoom and resize.
     const viewportHeight = mainViewport.height;
     const projectionHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
@@ -1063,7 +1093,8 @@ function createScene(container, hasWholeMarkers = false) {
         orientFixedCrossbar(child, camera);
       }
       if (child.userData.faceNormal) {
-        child.visible = child.userData.faceNormal.dot(camera.position.clone().sub(child.position)) > 0;
+        child.visible = child.userData.tensorFaceSelected !== false
+          && child.userData.faceNormal.dot(camera.position.clone().sub(child.position)) > 0;
       }
       if (!child.userData.textPixelHeight) return;
       const texture = child.material.map.image;
@@ -1072,7 +1103,7 @@ function createScene(container, hasWholeMarkers = false) {
       child.scale.set(height * texture.width / texture.height, height, 1);
     });
     root.updateMatrixWorld(true);
-    avoidWholeCubeLabelOverlap(root, wholeMeshes, camera, mainViewport, container);
+    avoidWholeCubeLabelOverlap(root, [...wholeMeshes, ...tensorMeshes], camera, mainViewport, container);
     renderer.render(scene, camera);
   }
 
@@ -1106,6 +1137,7 @@ function createScene(container, hasWholeMarkers = false) {
     root,
     wholeRoot,
     wholeMeshes,
+    tensorMeshes,
     mainViewport,
     getHoverView(y, meshes) {
       return {...mainViewport, camera, meshes: [...meshes, ...wholeMeshes]};
@@ -1141,6 +1173,8 @@ function renderMechanicalBcViewer() {
   const tooltip = createTooltip(container);
   const tensorItems = items.filter(item => item.is_tensor_load);
   const scalarItems = items.filter(item => !item.is_tensor_load && item.is_defined !== false);
+  const hasLocalMarkers = scalarItems.some(item => item.target_type !== "Whole cube"
+    && (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed"));
   const tensorGroup = new THREE.Group();
   let tensorPanel = null;
   let highlighted = '';
@@ -1167,47 +1201,49 @@ function renderMechanicalBcViewer() {
   }
   if (tensorItems.length) {
     state.root.userData.tensorView = true;
-    state.root.userData.tensorRadius = scalarItems.length ? 1.2 : 1.02;
+    // A fixed envelope keeps the camera stable while components and loads change.
+    state.root.userData.tensorRadius = scalarItems.length ? 1.7 : 1.55;
     state.root.add(tensorGroup);
+    const faceLabels = [];
     for (const axis of ['x', 'y', 'z']) {
       for (const sign of [-1, 1]) {
         const label = createTextSprite(`${sign > 0 ? '+' : '-'}${axis.toUpperCase()}`, '#475569', 42, 0.13);
         label.material.sizeAttenuation = false;
         label.userData.textPixelHeight = 12;
         label.userData.faceNormal = AXIS_DIRECTIONS[axis.toUpperCase()].clone().multiplyScalar(sign);
+        label.userData.tensorFaceAxis = axis;
         label.position[axis] = sign * 0.62;
         for (const other of ['x', 'y', 'z'].filter(other => other !== axis)) {
           label.position[other] = 0.32;
         }
         state.root.add(label);
+        faceLabels.push(label);
       }
     }
-    const badge = document.createElement('div');
-    badge.className = 'bc-tensor-badge';
-    container.parentElement.appendChild(badge);
     const legend = container.closest('.bc-layout').querySelector('.bc-legend');
     const loadLegend = legend.firstElementChild;
-    const fixedLegend = scalarItems.length ? [legend.children[1]] : [];
-    legend.replaceChildren(loadLegend, ...fixedLegend);
     loadLegend.querySelectorAll('line').forEach(line => line.setAttribute('stroke', STATUS_COLORS.loaded));
-    const caption = document.createElement('div');
-    caption.className = 'bc-tensor-caption';
-    legend.after(caption);
+    const tensorLegend = loadLegend.cloneNode(true);
+    tensorLegend.dataset.tensorLegend = '';
+    tensorLegend.querySelectorAll('line').forEach(line => line.setAttribute('stroke', WHOLE_COLOR));
+    if (scalarItems.length) legend.appendChild(tensorLegend);
+    else legend.replaceChildren(tensorLegend);
     const unitsElement = document.getElementById('plot-units-data');
     const units = unitsElement ? JSON.parse(unitsElement.textContent) : {};
     tensorPanel = createTensorPanel(document.querySelector('[data-bc-tensor-panel]'), items, units, view => {
       highlighted = '';
       disposeTensorGroup(tensorGroup);
       selectableMeshes.splice(staticMeshCount);
+      state.tensorMeshes.length = 0;
       tooltip.style.opacity = '0';
-      drawTensorLoading(view, tensorGroup, selectableMeshes);
-      loadLegend.lastChild.textContent = view.item.loading_type === 'strain'
-        ? scalarItems.length ? ' Loaded / strain directions' : ' Strain directions'
-        : ' Loaded';
-      badge.textContent = `Whole RVE · ${view.shapeMatrix ? 'shape illustration' : view.item.loading_type === 'strain' ? 'strain guides' : 'stress schematic'}`;
-      caption.textContent = view.shapeMatrix
-        ? 'Normalized small-strain illustration · not a simulated shape'
-        : 'Direction schematic · arrows not to scale';
+      drawTensorLoading(view, tensorGroup, state.tensorMeshes, hasLocalMarkers);
+      selectableMeshes.push(...state.tensorMeshes);
+      faceLabels.forEach(label => {
+        label.userData.tensorFaceSelected = !view.shapeMatrix
+          && (!view.selected || label.userData.tensorFaceAxis === view.selected[1]);
+      });
+      tensorLegend.lastChild.textContent = view.shapeMatrix ? ' Strain shape illustration'
+        : view.item.loading_type === 'strain' ? ' Whole cube strain guides' : ' Whole cube stress components';
       state.renderSceneOnce();
     }, highlight);
   }

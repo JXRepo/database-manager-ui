@@ -652,35 +652,49 @@ unspecified; stored JSON and CSV exports retain their existing values and format
 Variable selectors, tooltips, and raw-value summaries use matching mathematical
 italic glyphs for these two symbols; field keys and plotted values are unchanged.
 
-Mechanical boundary conditions include the supplied load `step`. Whole RVE
-stress and strain tensors show compact load navigation beside the cube. A
-boundary condition selector appears when there are multiple conditions; the load
-entry selector retains their supplied order and exact steps. Components and
-display options are collapsed by default, including the linked component matrix,
-slider, normal/shear filters, shape illustration and explanation. These controls
-select recorded entries, without interpolating a loading history from frequency
-or duration. Select a component to isolate it; hover over a value or arrow to
-highlight its counterpart. All supplied load details remain available in the
+Mechanical boundary conditions include the supplied load `step`. Whole cube
+stress and strain tensors use a compact panel below the cube with an always
+visible component matrix. Its row and column headings identify direction `i`
+and face normal `j`. The initial view selects the first supplied nonzero numeric
+component in input order, falling back to a supplied numeric zero. Selecting a
+value shows that component; hover and keyboard focus link the value and arrows.
+Load navigation preserves the selected component, even when a later entry omits
+it, and identifies missing or invalid values without drawing arrows. Selectors
+appear only for multiple conditions or load entries and retain their supplied
+order and exact steps. Advanced options contain explicit views of all, normal
+or shear components, the entry slider, shape illustration and explanation.
+These controls select recorded entries without interpolating a loading history
+from frequency or duration. All supplied load details remain available in the
 table, including without JavaScript.
 
 The direction schematic explicitly uses `ij` for direction `i` on faces normal
 to `j`, with outward arrows for positive normal values. It shows supplied
 components independently, including unequal `xy` and `yx`, and does not claim
 to reconstruct the actual tractions on the simulation boundary. Each nonzero
-component uses a row of five red arrows on each of its two opposite faces.
+component uses three larger purple arrows on each of its two opposite faces,
+with the same 0.24 origin spacing as scalar edge, face and whole cube groups.
+The arrows occupy an outer layer that leaves room for local boundary markers;
+mixed views give shear components additional normal distance without moving
+them away from their face centers.
 Normal arrows point outward for tension and inward for compression; shear arrows
-run along the corresponding faces. Arrow
-lengths are fixed; the matrix and exact values in tooltips carry the magnitudes.
+run parallel to the corresponding faces, centered on their face normals. Arrow
+lengths are fixed; the matrix and arrow hover show two decimal places with
+half-up rounding, and value titles retain full precision. A fixed camera
+envelope keeps the cube centered and avoids zoom changes between components.
+The positive X/Y/Z orientation guide follows the camera projection during
+rotation and Reset.
 Zero values produce no arrows; missing and invalid components are identified
 without being replaced by zero or mirrored. Stress and strain units come from
 the uploaded units metadata; dimensionless strain `1` appears as `(-)`.
 
 Strain directions are labeled as guides, not forces. An optional shape
 illustration assumes symmetric small strain with tensor shear and no rigid
-rotation. Only in this explicitly selected preview, omitted reciprocal terms
-are mirrored from the six required components. Conflicting reciprocal values
-or incomplete components disable the shape preview. Deformation is normalized
-for readability, not a calculated or to-scale simulation result; stored values
+rotation. It requires all nine numeric components and equal reciprocal values;
+missing or conflicting reciprocal entries disable the shape preview without
+affecting their independent direction display. Enabling the illustration uses
+all supplied components; selecting a component returns to direction guides.
+Deformation is normalized for readability, not a calculated or to-scale
+simulation result; stored values
 and exports are unchanged. These distinctions follow the difference between
 [stress components](https://www.comsol.com/multiphysics/stress-and-equations-of-motion)
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).

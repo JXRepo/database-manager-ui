@@ -27,13 +27,14 @@ function connect(socket) {
   });
 }
 
-describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath), timeout: 30000}, () => {
+describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
   let browser;
   let profile;
   let socket;
   let send;
 
   before(async () => {
+    assert.ok(existsSync(chromiumPath), `Chromium is required: ${chromiumPath}`);
     profile = mkdtempSync(join(tmpdir(), 'getting-started-test-'));
     browser = spawn(chromiumPath, [
       '--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
@@ -97,21 +98,25 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
 
   test('loads, matrix selection, filters and clearing stay synchronized without changing data', async t => {
     const ev = await page(t, [condition()]);
-    assert.equal(await ev('document.querySelector("[data-tensor-heading]").textContent'), 'Whole RVE · Stress (MPa)');
+    assert.equal(await ev('document.querySelector("[data-tensor-heading]").textContent'), 'Whole cube · Stress (MPa)');
     assert.equal(await ev('document.querySelector("[data-tensor-condition]").closest("label").hidden'), true);
     assert.equal(await ev('document.querySelector("[data-tensor-options]").open'), false);
-    assert.equal(await ev('document.querySelector("[data-tensor-matrix]").checkVisibility()'), false);
-    assert.equal(await ev('document.querySelector("[data-tensor-load]").closest("details")'), null);
-    await ev('document.querySelector("[data-tensor-options] > summary").click()');
     assert.equal(await ev('document.querySelector("[data-tensor-matrix]").checkVisibility()'), true);
+    assert.equal(await ev('view.selected'), 'xx');
+    assert.equal(await ev('document.querySelector("[data-tensor-filter=all]").getAttribute("aria-pressed")'), 'false');
+    assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter, view.selected).map(a => a.component)'), ['xx', 'xx']);
+    assert.equal(await ev('document.querySelector("[data-tensor-description]").textContent'), 'xx · Normal tension · X direction on ±X faces');
+    assert.equal(await ev('document.querySelector("[data-tensor-load]").closest("details")'), null);
     assert.equal(await ev('document.querySelector("[data-component=xy] strong").textContent'), '1.01');
+    assert.equal(await ev('document.querySelector("[data-component=xy]").title'), 'xy: 1.005 MPa');
     await ev('document.querySelector("[data-component=xy]").click()');
     assert.equal(await ev('view.selected'), 'xy');
     assert.equal(await ev('document.activeElement.dataset.component'), 'xy');
     assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter, view.selected).map(a => a.component)'), ['xy', 'xy']);
-    await ev('document.querySelector("[data-tensor-options] > summary").click()');
+    await ev('document.querySelector("[data-component=xy]").click()');
     assert.equal(await ev('view.selected'), 'xy');
     assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /^xy:/);
+    assert.equal(await ev('document.querySelector("[data-tensor-status]").title'), 'xy: 1.005 MPa');
     await ev('document.querySelector("[data-tensor-options] > summary").click()');
     await ev('document.querySelector("[data-tensor-filter=normal]").click()');
     assert.equal(await ev('view.selected'), '');
@@ -119,15 +124,18 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
     await ev('document.querySelector("[data-tensor-slider]").value="1";document.querySelector("[data-tensor-slider]").dispatchEvent(new Event("input"))');
     assert.equal(await ev('view.load.step'), 10001);
     assert.equal(await ev('document.querySelector("[data-tensor-load]").value'), '1');
-    assert.equal(await ev('document.querySelector("[data-component=yx] strong").textContent'), 'Not supplied');
+    assert.equal(await ev('document.querySelector("[data-component=yx] strong").textContent'), '—');
     assert.equal(await ev('document.querySelector("[data-component=yx]").disabled'), true);
     await ev('document.querySelector("[data-component=xx]").click();document.querySelector("[data-tensor-clear]").click()');
     assert.equal(await ev('view.selected'), '');
+    assert.equal(await ev('document.querySelector("[data-tensor-filter=normal]").getAttribute("aria-pressed")'), 'true');
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
   test('strain shape is explicit, can be disabled, and cannot average conflicting reciprocal values', async t => {
-    const ev = await page(t, [condition('strain')]);
+    const strain = condition('strain');
+    strain.tensor_loads[1].magnitude = {xx: -10, yy: 5, zz: 0, xy: 2, yx: 2, yz: 0, zy: 0, xz: 0, zx: 0};
+    const ev = await page(t, [strain]);
     await ev('document.querySelector("[data-tensor-options] > summary").click()');
     assert.equal(await ev('document.querySelector("[data-tensor-shape]").disabled'), true);
     assert.equal(await ev('view.shapeMatrix'), null);
@@ -136,10 +144,22 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
     assert.equal(await ev('view.shapeMatrix'), null);
     await ev('document.querySelector("[data-tensor-shape]").click()');
     assert.ok(await ev('view.shapeMatrix[0][0] < 0'));
+    assert.ok(await ev('view.shapeMatrix[1][1] > 0 && view.shapeMatrix[0][1] > 0'));
+    assert.equal(await ev('view.selected'), '');
+    assert.equal(await ev('view.filter'), 'all');
+    assert.match(await ev('document.querySelector("[data-tensor-kind]").textContent'), /^Normalized small-strain illustration/);
     await ev('document.querySelector("[data-tensor-options] > summary").click()');
     assert.ok(await ev('view.shapeMatrix[0][0] < 0'));
     assert.equal(await ev('document.querySelector("[data-tensor-shape]").checked'), true);
-    assert.match(await ev('document.querySelector("[data-tensor-note]").textContent'), /missing reciprocal entries are mirrored/);
+    assert.match(await ev('document.querySelector("[data-tensor-note]").textContent'), /Assumes tensor shear and symmetry/);
+    await ev('document.querySelector("[data-component=yy]").click()');
+    assert.equal(await ev('view.selected'), 'yy');
+    assert.equal(await ev('view.shapeMatrix'), null);
+    assert.equal(await ev('document.querySelector("[data-tensor-shape]").checked'), false);
+    assert.match(await ev('document.querySelector("[data-tensor-kind]").textContent'), /^Strain direction guides/);
+    await ev('document.querySelector("[data-tensor-options] > summary").click();document.querySelector("[data-tensor-shape]").click();document.querySelector("[data-tensor-shape]").click()');
+    assert.equal(await ev('view.selected'), 'xx');
+    await ev('document.querySelector("[data-tensor-shape]").click()');
     await ev('document.querySelector("[data-tensor-load]").value="0";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
     assert.equal(await ev('view.shapeMatrix'), null);
     assert.equal(await ev('document.querySelector("[data-tensor-shape]").checked'), false);
@@ -153,9 +173,38 @@ describe('whole RVE tensor panel in Chromium', {skip: !existsSync(chromiumPath),
     await ev('document.querySelector("[data-component=xx]").click();document.querySelector("[data-tensor-condition]").value="2";document.querySelector("[data-tensor-condition]").dispatchEvent(new Event("change"))');
     assert.equal(await ev('view.itemIndex'), 2);
     assert.equal(await ev('view.selected'), '');
-    assert.equal(await ev('document.querySelector("[data-tensor-heading]").textContent'), 'Whole RVE · Strain (-)');
+    assert.equal(await ev('document.querySelector("[data-tensor-heading]").textContent'), 'Whole cube · Strain (-)');
     assert.equal(await ev('document.querySelector("[data-tensor-slider]").disabled'), true);
     assert.equal(await ev('document.querySelector("[data-tensor-position]").textContent'), 'No load entries supplied');
+  });
+
+  test('initial selection uses supplied numeric order and remains selected across absent or invalid load values', async t => {
+    const loads = [
+      {magnitude: {yy: 0, yx: -2.345, xx: 10, zz: 0}, step: 7, details: [{key: 'step', display: '7'}]},
+      {magnitude: {xx: -10, zz: 0}, step: 3, details: [{key: 'step', display: '3'}]},
+      {magnitude: {xx: 10, yx: null}, step: 123456789012345, details: [{key: 'step', display: '123456789012345'}]},
+    ];
+    const ev = await page(t, [condition('stress', loads), condition('stress', [{magnitude: {zz: 0, xx: 0}}])]);
+    assert.equal(await ev('view.selected'), 'yx');
+    assert.equal(await ev('document.querySelector("[data-tensor-description]").textContent'), 'yx · Shear · Y direction on ±X faces');
+    assert.equal(await ev('document.querySelector("[data-tensor-status]").title'), 'yx: -2.345 MPa');
+    await ev('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
+    assert.equal(await ev('view.selected'), 'yx');
+    assert.equal(await ev('view.load.step'), 3);
+    assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter, view.selected)'), []);
+    assert.equal(await ev('document.querySelector("[data-component=yx]").getAttribute("aria-pressed")'), 'true');
+    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /Not supplied in this load entry/);
+    await ev('document.querySelector("[data-tensor-load]").value="2";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
+    assert.equal(await ev('view.selected'), 'yx');
+    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /Invalid value/);
+    assert.match(await ev('document.querySelector("[data-tensor-position]").textContent'), /123456789012345$/);
+    assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter, view.selected)'), []);
+    await ev('document.querySelector("[data-tensor-condition]").value="1";document.querySelector("[data-tensor-condition]").dispatchEvent(new Event("change"))');
+    assert.equal(await ev('view.selected'), 'zz');
+    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /zero value, no arrows/);
+    assert.equal(await ev('document.querySelector("[data-tensor-load]").closest("label").hidden'), true);
+    assert.equal(await ev('document.querySelector("[data-tensor-slider]").closest(".bc-tensor-progress").hidden'), true);
+    assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
   test('invalid uploaded objects and markup stay harmless and never become arrows', async t => {

@@ -1,4 +1,4 @@
-import {TENSOR_COMPONENTS, TENSOR_COLORS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows} from './mechanical-bc-tensor.js';
+import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows} from './mechanical-bc-tensor.js';
 
 export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
@@ -14,8 +14,25 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   let current = conditions[0];
   let loadIndex = 0;
   let filter = 'all';
-  let selected = '';
+  let selected = null;
   let cells = [];
+
+  function defaultComponent(magnitude) {
+    const supplied = Object.keys(magnitude || {}).filter(key => TENSOR_COMPONENTS.includes(key)
+      && isTensorNumber(magnitude[key]));
+    return supplied.find(key => magnitude[key] !== 0) || supplied[0] || '';
+  }
+
+  function componentDescription(key, value, isStrain) {
+    if (key[0] !== key[1]) {
+      return `${isStrain ? 'Shear strain' : 'Shear'} · ${key[0].toUpperCase()} direction on ±${key[1].toUpperCase()} faces`;
+    }
+    let kind = 'Normal component';
+    if (isTensorNumber(value) && value !== 0) {
+      kind = value > 0 ? (isStrain ? 'Normal extension' : 'Normal tension') : 'Normal compression';
+    }
+    return `${kind} · ${key[0].toUpperCase()} direction on ±${key[1].toUpperCase()} faces`;
+  }
 
   function highlight(component) {
     cells.forEach(cell => cell.classList.toggle('is-hovered', cell.dataset.component === component));
@@ -35,30 +52,53 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     const unit = isStrain && (rawUnit === 1 || (typeof rawUnit === 'string' && rawUnit.trim() === '1'))
       ? '-' : (typeof rawUnit === 'string' ? rawUnit.trim() : '');
     panel.querySelector('[data-tensor-heading]').textContent =
-      `Whole RVE · ${isStrain ? 'Strain' : 'Stress'}${unit ? ` (${unit})` : ' · unit not supplied'}`;
+      `Whole cube · ${isStrain ? 'Strain' : 'Stress'}${unit ? ` (${unit})` : ' · unit not supplied'}`;
     panel.querySelector('[data-tensor-metadata]').textContent = (load?.details || [])
       .filter(detail => detail.key !== 'magnitude')
       .map(detail => `${detail.key}: ${detail.display}`).join(' · ');
+    const stepDetail = load?.details?.find(detail => detail.key === 'step');
     panel.querySelector('[data-tensor-position]').textContent = loads.length
-      ? `Load ${loadIndex + 1} of ${loads.length}` : 'No load entries supplied';
+      ? `Load ${loadIndex + 1} of ${loads.length}${stepDetail ? ` · step ${stepDetail.display}` : ''}` : 'No load entries supplied';
     loadSelect.value = String(loadIndex);
     slider.value = String(loadIndex);
     slider.setAttribute('aria-valuetext', loadSelect.selectedOptions[0]?.textContent || 'No loads');
     shapeLabel.hidden = !isStrain;
     const preview = strainIllustration(magnitude, filter, selected);
     shape.disabled = !!preview.error;
-    if (!isStrain || preview.error) shape.checked = false;
+    if (!isStrain || preview.error) {
+      if (shape.checked) {
+        selected = defaultComponent(magnitude);
+        filter = 'all';
+      }
+      shape.checked = false;
+    }
+    panel.querySelector('[data-tensor-kind]').textContent = shape.checked
+      ? 'Normalized small-strain illustration · all supplied components'
+      : (isStrain ? 'Strain direction guides · fixed arrow lengths' : 'Stress component directions · fixed arrow lengths');
     shape.title = preview.error;
     matrix.replaceChildren();
     cells = [];
+    for (const text of ['i / j', 'X', 'Y', 'Z']) {
+      const heading = document.createElement('span');
+      heading.className = 'bc-tensor-axis';
+      heading.textContent = text;
+      heading.setAttribute('aria-hidden', 'true');
+      matrix.appendChild(heading);
+    }
     for (const key of TENSOR_COMPONENTS) {
+      if (key[1] === 'x') {
+        const heading = document.createElement('span');
+        heading.className = 'bc-tensor-axis';
+        heading.textContent = key[0].toUpperCase();
+        heading.setAttribute('aria-hidden', 'true');
+        matrix.appendChild(heading);
+      }
       const cell = document.createElement('button');
       const supplied = magnitude && Object.hasOwn(magnitude, key);
       const value = magnitude?.[key];
       cell.type = 'button';
       cell.className = 'bc-tensor-cell';
       cell.dataset.component = key;
-      cell.style.setProperty('--component-color', TENSOR_COLORS[key[0]]);
       cell.disabled = !isTensorNumber(value);
       cell.setAttribute('aria-pressed', String(selected === key));
       cell.classList.toggle('is-filtered', filter !== 'all' && ((key[0] === key[1]) !== (filter === 'normal')));
@@ -67,11 +107,12 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       const label = document.createElement('span');
       label.textContent = key;
       const number = document.createElement('strong');
-      number.textContent = supplied ? formatTensorValue(value) : 'Not supplied';
-      cell.setAttribute('aria-label', `${key}: ${number.textContent}${unit && supplied ? ` ${unit}` : ''}`);
+      number.textContent = supplied ? formatTensorValue(value) : '—';
+      cell.setAttribute('aria-label', `${key}: ${supplied ? number.textContent : 'Not supplied'}${unit && supplied ? ` ${unit}` : ''}`);
       cell.append(label, number);
       cell.addEventListener('click', () => {
-        selected = selected === key ? '' : key;
+        shape.checked = false;
+        selected = key;
         if (filter !== 'all' && ((key[0] === key[1]) !== (filter === 'normal'))) filter = 'all';
         render();
         cells.find(button => button.dataset.component === key)?.focus({preventScroll: true});
@@ -83,17 +124,31 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       matrix.appendChild(cell);
       cells.push(cell);
     }
-    filterButtons.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.tensorFilter === filter)));
+    filterButtons.forEach(button => button.setAttribute('aria-pressed', String(!selected && !shape.checked
+      && button.dataset.tensorFilter === filter)));
     const valid = TENSOR_COMPONENTS.filter(key => isTensorNumber(magnitude?.[key]));
     const invalid = TENSOR_COMPONENTS.filter(key => magnitude && Object.hasOwn(magnitude, key) && !isTensorNumber(magnitude[key]));
-    let status = selected ? `${selected}: ${String(magnitude[selected])}${unit ? ` ${unit}` : ''}`
-      : filter === 'all' ? 'All supplied components' : `Supplied ${filter} components`;
-    if (!valid.length) status = 'No numeric tensor components to visualize. See supplied load details below.';
-    else if (!tensorArrows(magnitude, filter, selected).length) status += ' · no nonzero components in this view';
+    let status = filter === 'all' ? 'All supplied components' : `Supplied ${filter} components`;
+    const description = panel.querySelector('[data-tensor-description]');
+    const statusElement = panel.querySelector('[data-tensor-status]');
+    statusElement.removeAttribute('title');
+    if (selected) {
+      const value = magnitude?.[selected];
+      description.textContent = `${selected} · ${componentDescription(selected, value, isStrain)}`;
+      const supplied = magnitude && Object.hasOwn(magnitude, selected);
+      if (!supplied) status = `${selected}: Not supplied in this load entry · no arrows`;
+      else if (!isTensorNumber(value)) status = `${selected}: Invalid value · no arrows`;
+      else status = `${selected}: ${formatTensorValue(value)}${unit ? ` ${unit}` : ''}${value === 0 ? ' · zero value, no arrows' : ''}`;
+      statusElement.title = cells.find(cell => cell.dataset.component === selected).title;
+    } else {
+      description.textContent = filter === 'all' ? 'All supplied components' : `${filter === 'normal' ? 'Normal' : 'Shear'} components`;
+      if (!valid.length) status = 'No numeric tensor components to visualize. See supplied load details in the table.';
+      else if (!tensorArrows(magnitude, filter).length) status += ' · no nonzero components in this view';
+    }
     if (invalid.length) status += ` · invalid components omitted: ${invalid.join(', ')}`;
-    panel.querySelector('[data-tensor-status]').textContent = status;
+    statusElement.textContent = status;
     panel.querySelector('[data-tensor-note]').textContent = shape.checked
-      ? 'Normalized small-strain illustration, not a simulated shape. Assumes tensor shear and symmetry; missing reciprocal entries are mirrored for this preview only. Blue: original, purple: illustration.'
+      ? 'Normalized small-strain illustration, not a simulated shape. Assumes tensor shear and symmetry; all nine components must be supplied and reciprocal values must agree. Blue: original, purple: illustration.'
       : `${isStrain ? 'Strain direction guides, not forces or a predicted shape.' : 'Stress component schematic, not reconstructed boundary tractions.'} ij means direction i on faces normal to j. Positive normal values point outward. Arrow lengths are fixed; use the values for magnitude. Missing components are not inferred.`;
     panel.querySelector('[data-tensor-preview-note]').textContent = isStrain && preview.error ? preview.error : '';
     onHighlight('');
@@ -102,13 +157,17 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   }
 
   function selectCondition(index, step = 0) {
-    current = conditions.find(entry => entry.index === Number(index)) || conditions[0];
+    const next = conditions.find(entry => entry.index === Number(index)) || conditions[0];
+    const fresh = selected === null || next.index !== current.index;
+    current = next;
     conditionSelect.value = String(current.index);
     const loads = current.item.tensor_loads || [];
     loadIndex = Math.max(0, Math.min(step, loads.length - 1));
-    selected = '';
-    filter = 'all';
-    shape.checked = false;
+    if (fresh) {
+      selected = defaultComponent(loads[loadIndex]?.magnitude);
+      filter = 'all';
+      shape.checked = false;
+    }
     loadSelect.replaceChildren();
     loads.forEach((load, index) => {
       const option = document.createElement('option');
@@ -119,31 +178,38 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     });
     if (!loads.length) loadSelect.add(new Option('No load entries', '0'));
     loadSelect.disabled = loads.length < 2;
+    loadSelect.closest('label').hidden = loads.length < 2;
     slider.max = String(Math.max(0, loads.length - 1));
     slider.disabled = loads.length < 2;
+    slider.closest('.bc-tensor-progress').hidden = loads.length < 2;
     render();
   }
 
   conditions.forEach(({item, index}, order) => {
-    conditionSelect.add(new Option(`Whole RVE ${order + 1} · ${item.loading_type}${item.loading_mode ? ` / ${item.loading_mode}` : ''}`, String(index)));
+    conditionSelect.add(new Option(`Whole cube ${order + 1} · ${item.loading_type}${item.loading_mode ? ` / ${item.loading_mode}` : ''}`, String(index)));
   });
   conditionSelect.disabled = conditions.length === 1;
   conditionSelect.closest('label').hidden = conditions.length === 1;
   conditionSelect.addEventListener('change', () => selectCondition(conditionSelect.value));
   function selectLoad(index) {
     loadIndex = Number(index);
-    selected = '';
     render();
   }
   loadSelect.addEventListener('change', () => selectLoad(loadSelect.value));
   slider.addEventListener('input', () => selectLoad(slider.value));
   filterButtons.forEach(button => button.addEventListener('click', () => {
+    shape.checked = false;
     filter = button.dataset.tensorFilter;
     selected = '';
     render();
   }));
-  shape.addEventListener('change', render);
+  shape.addEventListener('change', () => {
+    filter = 'all';
+    selected = shape.checked ? '' : defaultComponent(current.item.tensor_loads?.[loadIndex]?.magnitude);
+    render();
+  });
   panel.querySelector('[data-tensor-clear]').addEventListener('click', () => {
+    shape.checked = false;
     selected = '';
     render();
   });

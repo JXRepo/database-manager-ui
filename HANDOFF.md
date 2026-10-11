@@ -2,15 +2,54 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (f567697 whole cube arrow groups and green T aligned to face center normals; verified live)
-next_topic: Review centered whole cube arrows and green T markers
+code_base: main (professional whole cube tensor display; check git log for the final commit)
+next_topic: Review professional stress and strain tensor schematics
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：整体紫箭与绿色 T 正对面中心
+### 最新调整：整体 stress／strain 张量专业显示
+
+- 用户批准按白话解释的方案实施第二种整体条件，并要求专业版本。
+- 紧凑张量面板移到立方体下方，常显完整 3×3 分量数值与 i／j 行列含义；默认按输入键序
+  选择首个非零数字，回退已有数字零值。点击选中项保持选择，切换加载记录时保留同一分量；
+  缺失／无效／零值分别明确标注，全部显示与 Normal／Shear 筛选保留在折叠的 Advanced 中。
+- 应力与应变、数值与单位、方向与对应面都明示；真实 step／entry 顺序及独立条件保留。
+  数值和箭头 hover 使用两位 half-up，矩阵 title 保留完整精度；JSON／导出不改变。
+- 每个非零分量在相对两面各三个整体紫色箭头，size 1.3、起点间距 0.24；法向拉伸朝外、
+  压缩朝内且尖端停在外层 0.9，剪切沿面平行且完整箭身／箭尖在面中心法线上居中。
+  固定 tensor 相机包络保持切换稳定，混合顶点文字避让也包含整体张量箭头。
+- 实际混合图发现剪切紫箭投影贴近蓝色局部 T；仅有实际局部标记时把剪切面外法向距离
+  加至 1.25，其他 tensor 仍 0.9，完整箭身仍居中，不再侧向错开。实际 probe 表明
+  1.10／1.15 仍接触、1.25 留白且 cube 大小保持，1.30 没有必要。
+- 原静态 XYZ guide 与负 Y 初始相机及旋转视角不一致；改为按实际 camera matrix 投影
+  既有三个正方向箭头和文字。相机、Point／Edge／Face 与第一种整体几何不改变。
+  独立复核发现近俯视时标签可能超出原 SVG 下缘；guide 中心改为 (54,48)、箭长 28、
+  文字间距 9，最大标签半径 37，保留旋转方向并给 17px 字形留出上下余量。
+- 方向图只显示实际提供的分量，xy／yx 可不同，不补缺、不合并。应变箭头明确是方向提示；
+  opt-in shape 只在九个分量完整且互反相等时启用，明确对称小应变／tensor shear／放大示意。
+  开启 shape 使用全部分量，点击分量回到方向图；不再根据六项补齐缺失互反项。
+- 13 项 Node tensor／panel 测试通过，含五项实际 Chromium 面板检查，零失败／跳过；
+  模块语法、diff 与独立只读复核通过。最终实际页面 QA 11／11 通过，零 console 错误／跳过：
+  正负法向、互异 xy／yx、每侧三箭、零／缺失／无效、原序 step、键盘及 hover 联动、
+  完整／缺失／冲突 shape、混合条件、Orbit／Reset、1280／1440／1920 桌面、无 JS 表格
+  与精确 JSON 导出均检查；第一种 force／displacement 六紫箭和一个绿 T 回归通过。
+  近俯视的两个真实相机方位（正 X／Y 分别向下）中，全部 SVG 文字边界均在 viewBox 内，
+  guide 方向与实际相机投影一致，Reset 正常。
+  混合剪切紫箭与蓝色局部符号的真实投影凸包最小间隙下界为 6.03 CSS px。
+- 最终 viewer SHA-256 为 `f4772c662e6a56b7649e19e70339c69b6bd0964e676cfd19a6671722589ce919`；
+  panel 为 `809f497950ca53f2f40fec551b7e3fc25dc229d6e238fcc6d17660bdd458871e`；
+  helper 为 `406778cf60d233ae226caad297339b6da925c8e54c2f7320c346562500180219`。
+  QA 四个产品文件 hash 与最终源码匹配，使用 DEBUG=True 和隔离 SQLite，未读取 .env。
+  临时 Chromium 与 8027 服务均已关闭，端口实际连接被拒绝，没有遗留浏览器进程或 profile。
+  报告 `/tmp/bc-uniform-arrow-qa-385tHH/professional-tensor-browser-report.json` 不随 Git 同步。
+- 四张实际最终截图在 ignored 样例目录：
+  `whole_tensor_professional_{stress_default,shear,strain,mixed}_20261011.png`；
+  均已逐张查看，默认应力图已在 PyCharm 打开。JSON 不需修改或重新上传。
+
+### 上一版：整体紫箭与绿色 T 正对面中心
 
 - 用户截图指出整体紫色箭头和绿色 T 偏离对应面的正中间。
 - `wholeCubeAnchor3d` 删除用于避开顶点文字的切向偏移（X／Y 的 Z+0.28 和 Z 的 X／Y+0.35），
