@@ -2,15 +2,15 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (purple scalar Whole cube markers outside local loads; check git log for the final commit)
-next_topic: Verify live static delivery, then review the larger purple Whole cube arrows and T markers
+code_base: main (clean static rebuild and purple scalar Whole cube markers; check git log for the final commit)
+next_topic: Review the larger purple Whole cube arrows and T markers now served by Render
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新排查：成功部署后仍返回旧静态脚本
+### 最新交接：重建生成静态目录，线上新版已恢复
 
 - 用户在 Render 的 `/data-list/133/` 仍看到上一版顶部红箭头／蓝 T。后台截图确认
   `e78dc2f` 已 Live；此前“新版尚未部署”的判断已更正，不能用 Git push 或 Live 状态
@@ -27,6 +27,11 @@ next_topic: Verify live static delivery, then review the larger purple Whole cub
 - 修复后五项 deployment artifact 检查全部通过，含上述真实收集回归和 Bash 语法。
   使用 DEBUG=True、隔离设置、临时 SQLite 路径，禁用 .env 加载；无数据库使用或网络构建。
   推送后须再次直接下载线上 viewer 并比较 SHA，不能仅以 Deploys 的 Live 状态判断完成。
+- 修复提交 `b298194` 推送后约 100 秒，公开 viewer 的普通 URL、no-cache／独立 query、
+  压缩请求解压内容全部与当前源文件的 `f8cad5f...` SHA-256 精确一致；
+  Last-Modified 更新为 2026-10-11 01:23:01 UTC，旧输出已被替换。
+  核验报告 `/tmp/bc-live-restored-report-20261011.json` 和公开脚本副本不随 Git 同步。
+  最后这次交接记录仅改文档，提交带 `[skip render]`，无需重新构建同一份应用代码。
 
 ### 上一版：整体数字标记改为紫色，放在对应面的外侧
 
