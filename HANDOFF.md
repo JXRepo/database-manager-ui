@@ -2,7 +2,7 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (three parallel arrows per scalar Face direction; check git log for the final commit)
+code_base: main (239de0e three parallel arrows per scalar Face direction; verified live)
 next_topic: Review the unified three-arrow edge, face and scalar whole cube display
 ---
 
@@ -26,6 +26,11 @@ next_topic: Review the unified three-arrow edge, face and scalar whole cube disp
   `/tmp/bc-uniform-arrow-qa-385tHH/face-parallel-three-report.json` 不随 Git 同步。
 - 最新实际预览在 ignored 样例目录：`faces_parallel_three_default_20261011.png` 和
   `faces_parallel_three_rotated_20261011.png`，均已查看；默认图已在 PyCharm 打开。
+- 应用提交 `239de0e` 已推送；约 141 秒后线上普通 URL、独立 no-cache query 和压缩请求
+  解压内容均精确匹配源码 SHA-256 `29e379367866bdb530e22150420c0c07e3779314381c55023a2f60436edf46fd`。
+  Last-Modified 为 2026-10-11 01:49:50 UTC；线上已确认更新，刷新即可。
+  报告 `/tmp/bc-live-face-three-report-20261011.json` 不随 Git 同步。
+  本条核验记录仅改文档，提交使用 `[skip render]`。
 
 ### 上一版：整体箭头贴近面，默认视图放大，T 改绿色
 
