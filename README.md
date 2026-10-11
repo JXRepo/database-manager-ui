@@ -694,10 +694,12 @@ to the corresponding axis faces, leaving room for local outward arrows.
 Each loaded direction and sign uses three parallel arrows;
 each fixed direction uses one enlarged T. Local load arrows stay red and local
 constraint markers stay blue; the `Whole cube` legend shows the purple arrow and
-green T. The marker groups are slightly offset within their face planes to keep
-local corner labels clear in the default view. The shorter outer offsets and
-reduced view padding make the cube larger on initial display and Reset. Fixed-pixel
-vertex labels are excluded from the whole cube geometry fit. Whole cube conditions
+green T. Each marker group is centered on the normal through its corresponding
+face center. Mixed-view vertex labels move locally in screen space when they
+overlap these outer markers; the marker geometry stays centered. The shorter
+outer offsets and reduced view padding make the cube larger on initial display
+and Reset. Fixed-pixel vertex labels are excluded from the whole cube geometry fit.
+Whole cube conditions
 do not add eight corner labels; mixed views retain the labels needed by local point,
 edge and face targets.
 The outer markers rotate with the cube in the same perspective view, with no heading

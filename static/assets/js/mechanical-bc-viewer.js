@@ -496,7 +496,81 @@ function addVertexLabels(group, vertices = VERTICES) {
     label.renderOrder = 10;
 
     label.position.copy(position.clone().add(offset));
+    label.userData.vertexLabelBase = label.position.clone();
     group.add(label);
+  });
+}
+
+function restoreVertexLabelPositions(group) {
+  group.traverse(label => {
+    if (label.userData.vertexLabelBase) label.position.copy(label.userData.vertexLabelBase);
+  });
+}
+
+function avoidWholeCubeLabelOverlap(root, meshes, camera, viewport, container) {
+  if (!meshes.length) return;
+  const {width, height} = viewport;
+  const overlaps = (first, second) => first.left < second.right && first.right > second.left
+    && first.top < second.bottom && first.bottom > second.top;
+  const rectangle = (x, y, halfWidth, halfHeight) => ({
+    left: x - halfWidth, right: x + halfWidth, top: y - halfHeight, bottom: y + halfHeight,
+  });
+  const obstacles = meshes.map(mesh => {
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const box = mesh.geometry.boundingBox;
+    const bounds = {left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity};
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) {
+          const point = new THREE.Vector3(x, y, z).applyMatrix4(mesh.matrixWorld).project(camera);
+          const screenX = (point.x + 1) * width / 2;
+          const screenY = (1 - point.y) * height / 2;
+          bounds.left = Math.min(bounds.left, screenX - 3);
+          bounds.right = Math.max(bounds.right, screenX + 3);
+          bounds.top = Math.min(bounds.top, screenY - 3);
+          bounds.bottom = Math.max(bounds.bottom, screenY + 3);
+        }
+      }
+    }
+    return bounds;
+  });
+  const containerRect = container.getBoundingClientRect();
+  container.parentElement.querySelectorAll(".bc-axis-overlay, [data-bc-reset], .bc-whole-heading")
+    .forEach(element => {
+      const bounds = element.getBoundingClientRect();
+      obstacles.push({left: bounds.left - containerRect.left - 3, right: bounds.right - containerRect.left + 3,
+        top: bounds.top - containerRect.top - 3, bottom: bounds.bottom - containerRect.top + 3});
+    });
+  const labels = [];
+  root.traverseVisible(label => {
+    if (!label.userData.vertexLabelBase) return;
+    const point = label.getWorldPosition(new THREE.Vector3()).project(camera);
+    const texture = label.material.map.image;
+    const pixels = label.userData.textPixelHeight / label.userData.fontSize;
+    const x = (point.x + 1) * width / 2;
+    const y = (1 - point.y) * height / 2;
+    const halfWidth = texture.width * pixels / 2 + 2;
+    const halfHeight = texture.height * pixels / 2 + 2;
+    labels.push({label, point, x, y, halfWidth, halfHeight, bounds: rectangle(x, y, halfWidth, halfHeight)});
+  });
+  labels.forEach(entry => {
+    const blocked = [...obstacles, ...labels.filter(other => other !== entry).map(other => other.bounds)];
+    const fits = bounds => bounds.left >= 4 && bounds.right <= width - 4 && bounds.top >= 4
+      && bounds.bottom <= height - 4 && !blocked.some(other => overlaps(bounds, other));
+    if (fits(entry.bounds)) return;
+    for (const distance of [12, 24, 36, 48, 60, 72, 84]) {
+      for (let direction = 0; direction < 8; direction += 1) {
+        const angle = direction * Math.PI / 4;
+        const x = Math.max(entry.halfWidth + 4, Math.min(width - entry.halfWidth - 4, entry.x + Math.cos(angle) * distance));
+        const y = Math.max(entry.halfHeight + 4, Math.min(height - entry.halfHeight - 4, entry.y + Math.sin(angle) * distance));
+        const bounds = rectangle(x, y, entry.halfWidth, entry.halfHeight);
+        if (!fits(bounds)) continue;
+        entry.bounds = bounds;
+        const position = new THREE.Vector3(x / width * 2 - 1, 1 - y / height * 2, entry.point.z).unproject(camera);
+        entry.label.position.copy(entry.label.parent.worldToLocal(position));
+        return;
+      }
+    }
   });
 }
 
@@ -649,9 +723,7 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
 }
 
 function wholeCubeAnchor3d(direction, distance) {
-  const faceOffset = direction === "Z"
-    ? new THREE.Vector3(0.35, 0.35, 0) : new THREE.Vector3(0, 0, 0.28);
-  return directionVector3d(direction).multiplyScalar(distance).add(faceOffset);
+  return directionVector3d(direction).multiplyScalar(distance);
 }
 
 function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
@@ -885,6 +957,7 @@ function highlightTensor(group, component) {
 }
 
 function frameScene(camera, controls, root, container, cameraDirection) {
+  restoreVertexLabelPositions(root);
   const bounds = new THREE.Box3().setFromObject(root);
 
   if (bounds.isEmpty()) {
@@ -978,6 +1051,7 @@ function createScene(container, hasWholeMarkers = false) {
   scene.add(root);
 
   function renderSceneOnce() {
+    restoreVertexLabelPositions(root);
     camera.updateMatrixWorld();
     // Keep vertex text readable at the same screen size across zoom and resize.
     const viewportHeight = mainViewport.height;
@@ -997,6 +1071,8 @@ function createScene(container, hasWholeMarkers = false) {
         * projectionHeight / viewportHeight;
       child.scale.set(height * texture.width / texture.height, height, 1);
     });
+    root.updateMatrixWorld(true);
+    avoidWholeCubeLabelOverlap(root, wholeMeshes, camera, mainViewport, container);
     renderer.render(scene, camera);
   }
 

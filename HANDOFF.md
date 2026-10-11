@@ -2,15 +2,36 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (8cdf29b shared spacing for edge, face and scalar whole cube arrows; verified live)
-next_topic: Review the unified arrow spacing in edge, face and scalar whole cube views
+code_base: main (whole cube arrow groups and green T aligned to face center normals; check git log for the final commit)
+next_topic: Review centered whole cube arrows and green T markers
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：边、面与整体数字箭头统一间距
+### 最新调整：整体紫箭与绿色 T 正对面中心
+
+- 用户截图指出整体紫色箭头和绿色 T 偏离对应面的正中间。
+- `wholeCubeAnchor3d` 删除用于避开顶点文字的切向偏移（X／Y 的 Z+0.28 和 Z 的 X／Y+0.35），
+  只保留 axis direction × distance。每个紫色束中点和绿色 T 的杆位于对应面中心法线上。
+- normal anchor 0.9／1.0、共享间距 0.24、三个箭头、大小、颜色、符号、面外余量保持；
+  Edge／Face／tensor 路径及原始 JSON 保持。
+- 混合视图中实际遮挡整体符号的顶点文字在屏幕内就近避让，并避开其他文字、右下
+  orientation guide 和已有按钮；不再通过移动整体符号解决文字遮挡。每次绘制和拟合先
+  恢复基准位置，再按当前视角计算，避免累计漂移；没有整体符号时保留原文字位置。
+- 12 项既有 Node tensor／panel 测试通过，包含四项实际 Chromium 面板检查，零失败／跳过；
+  模块语法和 diff 检查通过。最小实际桌面 QA 3／3 通过、6 个子场景、零失败／错误／跳过：
+  默认和用户相近的旋转视角、Reset、mixed 三个 selector、全部局部与 Whole hover 保持。
+  三个 selector 的七个顶点文字全部保留，没有整体符号投影矩形、画布或右下 guide 冲突，
+  重复绘制不漂移。最终源码 SHA-256 为
+  `0cd9e3021a560328dd0cb5738810bb0849e9fd3670794be2c0ca9d1bfec62eb5`。
+  使用 DEBUG=True、隔离 SQLite，未读取 .env；临时浏览器和 8027 服务已关闭。报告
+  `/tmp/bc-uniform-arrow-qa-385tHH/whole-centered-report.json` 不随 Git 同步。
+- 三张最终实际截图在 ignored 样例目录：`whole_centered_{default,rotated,mixed}_20261011.png`；
+  均已查看，默认图已在 PyCharm 打开。JSON 不需修改或重新上传。
+
+### 上一版：边、面与整体数字箭头统一间距
 
 - 用户希望三个箭头更靠近，并让边、面和整体数字条件的间距相同。
 - 三种路径共用 `THREE_ARROW_OFFSETS = [-0.24, 0, 0.24]`；Edge 用中点和归一化边方向
