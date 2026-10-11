@@ -686,6 +686,9 @@ and exports are unchanged. These distinctions follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
+Edge, face and scalar whole cube groups share the same centered spacing between
+their three arrow origins in cube coordinates. Projected spacing changes with
+the viewing angle.
 Scalar whole cube conditions use larger purple arrows and green T markers close
 to the corresponding axis faces, leaving room for local outward arrows.
 Each loaded direction and sign uses three parallel arrows;

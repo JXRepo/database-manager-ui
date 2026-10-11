@@ -17,6 +17,7 @@ const STATUS_COLORS = {
 };
 const WHOLE_COLOR = "#a21caf";
 const WHOLE_FIXED_COLOR = "#047857";
+const THREE_ARROW_OFFSETS = [-0.24, 0, 0.24];
 
 function readMechanicalBcItems() {
   const script = document.getElementById("mechanical-bc-data");
@@ -588,8 +589,10 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   const edge = hasConstraint
     ? makeCylinderBetween(points[0], points[1], 0.015, materials.edgeLineHighlight, 18)
     : new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), materials.cubeEdgeLine);
-  const markerOrigins = [0.2, 0.5, 0.8].map(fraction => points[0].clone().lerp(points[1], fraction));
   const edgeVector = points[1].clone().sub(points[0]).normalize();
+  const center = averagePoints(points);
+  const markerOrigins = THREE_ARROW_OFFSETS
+    .map(offset => center.clone().addScaledVector(edgeVector, offset));
   const edgeDirection = Object.keys(AXIS_DIRECTIONS).find(direction => Math.abs(edgeVector.dot(AXIS_DIRECTIONS[direction])) > 0.999);
 
   if (edge) {
@@ -631,7 +634,7 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
   const center = averagePoints(points);
   addMesh(group, createFaceMesh(points, materials.faceHighlight), tooltip, selectableMeshes);
   (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
-    const origins = getFaceArrowOrigins(points, axis.direction, [-0.3, 0, 0.3]);
+    const origins = getFaceArrowOrigins(points, axis.direction, THREE_ARROW_OFFSETS);
     const signs = getLoadDirectionSigns(axis.magnitude);
     const sizeScale = signs.length > 1 ? 0.45 : 0.5;
     const lengthScale = signs.length > 1 ? 0.82 : 1;
@@ -661,7 +664,7 @@ function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
     const across = getPerpendicularVector3d(direction);
     const signs = getLoadDirectionSigns(axis.magnitude);
     signs.forEach(sign => {
-      [-0.18, 0, 0.18].forEach(offset => {
+      THREE_ARROW_OFFSETS.forEach(offset => {
         const origin = wholeCubeAnchor3d(axis.direction, sign * distance)
           .addScaledVector(across, offset);
         createArrow(origin, axis, sign, wholeMaterials, group, tooltip, selectableMeshes,

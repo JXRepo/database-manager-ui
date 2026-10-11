@@ -2,15 +2,36 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (239de0e three parallel arrows per scalar Face direction; verified live)
-next_topic: Review the unified three-arrow edge, face and scalar whole cube display
+code_base: main (shared centered spacing for edge, face and scalar whole cube arrows; check git log for the final commit)
+next_topic: Review the unified arrow spacing in edge, face and scalar whole cube views
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：面的受力方向统一三个并列箭头
+### 最新调整：边、面与整体数字箭头统一间距
+
+- 用户希望三个箭头更靠近，并让边、面和整体数字条件的间距相同。
+- 三种路径共用 `THREE_ARROW_OFFSETS = [-0.24, 0, 0.24]`；Edge 用中点和归一化边方向
+  计算起点，Face 作为 shared helper 的显式 offsets，Whole 用于各方向的横排偏移。
+  Edge／Face 原 0.3 的间距收拢 20%；Whole 原 0.18 调至相同的 0.24。
+- 不能直接统一为 0.18／0.22：沿边单向完整箭头跨度 0.20475，循环双向同组跨度
+  0.22386。间距 0.24 保留单向间隙 0.03525、双向相向尖端间隙 0.01614，
+  保持用户此前要求的箭身长度、粗细与沿边串列排法。
+- 统一的是 cube 坐标中的三维起点间距，投影仍随视角变化。数量、方向、正负、颜色、
+  大小、T、hover、局部余量与张量默认五起点保持；JSON 不需修改或重新上传。
+- 12 项既有 Node tensor／panel 测试通过，含四项实际 Chromium 面板检查，零失败／跳过。
+  最小实际页面 QA 6／6 通过、6 个子场景、零失败／错误／跳过：Edge／Face／Whole 每组
+  实测相邻间距均为 0.24，单向与循环沿边箭身、尖端及端点球保持净距，Face 多方向
+  箭身不相交，混合四类 hover 保持独立，实际单状态张量仍四十支。
+  模块语法／diff 检查与独立只读复核通过；源码 SHA `8fda79be...` 和模板 hash 匹配报告。
+  使用 DEBUG=True、隔离 SQLite，未读取 .env，临时浏览器与服务已关闭。报告
+  `/tmp/bc-uniform-arrow-qa-385tHH/edge-face-whole-spacing-report.json` 不随 Git 同步。
+- 四张最新实际默认图在 ignored 样例目录，名称为
+  `edge_face_whole_spacing_{edge,face,whole,mixed}_20261011.png`；均已查看，混合图已在 PyCharm 打开。
+
+### 上一版：面的受力方向统一三个并列箭头
 
 - 用户要求 Face 与 Edge／整体数字条件一样，每个受力方向使用三个箭头。
 - `getFaceArrowOrigins` 增加 offsets 参数；只有 `drawFaceCondition` 传入 -0.3、0、0.3。
