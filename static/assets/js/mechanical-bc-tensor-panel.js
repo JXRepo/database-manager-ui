@@ -17,12 +17,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   let selected = null;
   let cells = [];
 
-  function defaultComponent(magnitude) {
-    const supplied = Object.keys(magnitude || {}).filter(key => TENSOR_COMPONENTS.includes(key)
-      && isTensorNumber(magnitude[key]));
-    return supplied.find(key => magnitude[key] !== 0) || supplied[0] || '';
-  }
-
   function componentDescription(key, value, isStrain) {
     if (key[0] !== key[1]) {
       return `${isStrain ? 'Shear strain' : 'Shear'} · ${key[0].toUpperCase()} direction on ±${key[1].toUpperCase()} faces`;
@@ -67,7 +61,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     shape.disabled = !!preview.error;
     if (!isStrain || preview.error) {
       if (shape.checked) {
-        selected = defaultComponent(magnitude);
+        selected = '';
         filter = 'all';
       }
       shape.checked = false;
@@ -112,8 +106,8 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       cell.append(label, number);
       cell.addEventListener('click', () => {
         shape.checked = false;
-        selected = key;
-        if (filter !== 'all' && ((key[0] === key[1]) !== (filter === 'normal'))) filter = 'all';
+        selected = selected === key ? '' : key;
+        if (!selected || (filter !== 'all' && ((key[0] === key[1]) !== (filter === 'normal')))) filter = 'all';
         render();
         cells.find(button => button.dataset.component === key)?.focus({preventScroll: true});
       });
@@ -164,7 +158,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     const loads = current.item.tensor_loads || [];
     loadIndex = Math.max(0, Math.min(step, loads.length - 1));
     if (fresh) {
-      selected = defaultComponent(loads[loadIndex]?.magnitude);
+      selected = '';
       filter = 'all';
       shape.checked = false;
     }
@@ -205,7 +199,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   }));
   shape.addEventListener('change', () => {
     filter = 'all';
-    selected = shape.checked ? '' : defaultComponent(current.item.tensor_loads?.[loadIndex]?.magnitude);
+    selected = '';
     render();
   });
   panel.querySelector('[data-tensor-clear]').addEventListener('click', () => {

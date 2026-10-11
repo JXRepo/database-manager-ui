@@ -834,6 +834,10 @@ details[open] > .detail-group-summary {
       margin-top: 8px;
     }
 
+    .bc-tensor-loads > .bc-load-detail:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+
     .bc-tensor-panel {
       border: 1px solid #dbe4f0;
       border-radius: 12px;
@@ -1688,7 +1692,7 @@ details[open] > .detail-group-summary {
                 <div class="bc-tensor-description" data-tensor-description></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
                 <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: rows are direction i; columns are face normal j"></div>
-                <div class="bc-tensor-caption">Rows: direction i · columns: face normal j. Select a value to view its directions.<br>Values rounded to two decimals; hover for full precision.</div>
+                <div class="bc-tensor-caption">Rows: direction i · columns: face normal j. Select a value to isolate it; select it again to show all.<br>Values rounded to two decimals; hover for full precision.</div>
                 <details class="bc-tensor-options" data-tensor-options>
                   <summary>Advanced display options</summary>
                   <div class="bc-tensor-progress">

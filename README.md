@@ -655,9 +655,10 @@ italic glyphs for these two symbols; field keys and plotted values are unchanged
 Mechanical boundary conditions include the supplied load `step`. Whole cube
 stress and strain tensors use a compact panel below the cube with an always
 visible component matrix. Its row and column headings identify direction `i`
-and face normal `j`. The initial view selects the first supplied nonzero numeric
-component in input order, falling back to a supplied numeric zero. Selecting a
-value shows that component; hover and keyboard focus link the value and arrows.
+and face normal `j`. The initial view shows all supplied nonzero numeric
+components in the current load entry. Selecting a value isolates that component;
+selecting it again returns to all components. Hover and keyboard focus link the
+value and arrows.
 Load navigation preserves the selected component, even when a later entry omits
 it, and identifies missing or invalid values without drawing arrows. Selectors
 appear only for multiple conditions or load entries and retain their supplied
@@ -694,8 +695,8 @@ missing or conflicting reciprocal entries disable the shape preview without
 affecting their independent direction display. Enabling the illustration uses
 all supplied components; selecting a component returns to direction guides.
 Deformation is normalized for readability, not a calculated or to-scale
-simulation result; stored values
-and exports are unchanged. These distinctions follow the difference between
+simulation result; stored values and exports are unchanged. These distinctions
+follow the difference between
 [stress components](https://www.comsol.com/multiphysics/stress-and-equations-of-motion)
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
@@ -766,6 +767,9 @@ Scalar load values appear below their field names. Conditions
 within each group retain their supplied order; grouping does not change the
 cube's condition indexes,
 tensor load entries, stored JSON, or exports.
+Tensor load labels use two columns; a single label or the last unpaired label
+spans both columns and stays centered beneath the tensor status. Each load's
+details expand beneath its own label.
 The table labels the combined column `Loading Type / Mode`. X/Y/Z labels stay on
 one line in evenly spaced columns. Load details expand independently below their
 own labels, so multiple panels can stay open together. The row grows to fit the

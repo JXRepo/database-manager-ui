@@ -2,15 +2,43 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main at 2b0869a (professional whole cube tensor display, verified live 2026-10-11)
-next_topic: Review professional stress and strain tensor schematics
+code_base: main (all supplied tensor components by default; check git log for final commit)
+next_topic: Review complete tensor component display and aligned load badges
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：整体 stress／strain 张量专业显示
+### 最新调整：默认显示完整张量与加载标签对齐
+
+- 用户确认同一加载记录里已提供的全部非零分量应默认同时画出，不同步骤仍切换查看；
+  同时截图指出 Whole cube 的 Tensor: loaded 与单条 Tensor load 标签没有对齐。
+- 默认与条件切换显示全部分量，关闭 shape 也回全部；hover／键盘联动保留，点击数值
+  临时单项查看，再点同项恢复全部。用户明确选择的单项仍可跨加载记录比较，缺失／无效
+  不补零，真实记录顺序、原始 step、数据与导出保持。
+- 红框根因是 .bc-tensor-loads 固定两列，单条／奇数末条 details 占左半列；1440px 实测
+  status 与 td 中心 X=1062.69，单条／第三条 badge 中心 989.21，左偏 73.48 CSS px。
+  仅让最后一个奇数项横跨两列，单条及奇数末条正对整体状态居中，成对标签保留两列，
+  每条 details 仍在自身标签下方独立展开。
+- 13 项 Node tensor／panel 测试通过，含五项实际 Chromium 面板检查，零失败／跳过；
+  最终 panel 模块语法、diff 与独立只读复核通过。panel SHA-256 为
+  `322ef83c0007717fff32fcfcbb27f0f82eadbd0a148a319b323816a9123ec972`，模板为
+  `78b28526828ec4ccbf8bf144a9b5b34c9f39510d6b3784a1c3863b948091d6d6`。
+  viewer／helper 与上一版保持。
+- 本次最小实际页面 QA 7／7 通过，零失败／console 错误／跳过；实际样例四个非零分量
+  共 24 个紫箭，九个非零分量共 54 个。鼠标／键盘单项及再次点击回全部、真实箭头 hover、
+  step 7→3→123456789012345 原序切换、独立 stress／strain 条件及混合 18 个局部红箭保持。
+  1／3／5 条记录的末条标签居中（中心误差 0.008 CSS px）；两个详情可同时独立展开，
+  长 metadata 与 1280／1440／1920 桌面无溢出；无 JS 表格及精确完整 JSON 导出通过。
+  四个产品文件 hash 与最终源码一致，使用 DEBUG=True 和隔离 SQLite，未读取 .env。
+  临时 Chromium／8027 服务已关闭、端口实际被拒绝、profiles 已清理。报告
+  `/tmp/bc-uniform-arrow-qa-385tHH/tensor-all-browser-report.json` 不随 Git 同步。
+- 三张实际最终图在 ignored 样例目录：`whole_tensor_all_stress_default_20261011.png`、
+  `whole_tensor_all_mixed_default_20261011.png`、`whole_tensor_all_red_badges_expanded_20261011.png`；
+  均已逐张查看。JSON 不需修改或重新上传。
+
+### 上一版：整体 stress／strain 张量专业显示
 
 - 用户批准按白话解释的方案实施第二种整体条件，并要求专业版本。
 - 紧凑张量面板移到立方体下方，常显完整 3×3 分量数值与 i／j 行列含义；默认按输入键序
