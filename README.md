@@ -686,12 +686,18 @@ and exports are unchanged. These distinctions follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
-Scalar whole cube conditions use larger purple markers outside the corresponding
-axis faces, leaving room for local outward arrows and vertex labels.
+Scalar whole cube conditions use larger purple arrows and green T markers close
+to the corresponding axis faces, leaving room for local outward arrows.
 Each loaded direction and sign uses three parallel arrows;
 each fixed direction uses one enlarged T. Local load arrows stay red and local
-constraint markers stay blue; a purple `Whole cube` legend identifies the outer
-markers. They rotate with the cube in the same perspective view, with no heading
+constraint markers stay blue; the `Whole cube` legend shows the purple arrow and
+green T. The marker groups are slightly offset within their face planes to keep
+local corner labels clear in the default view. The shorter outer offsets and
+reduced view padding make the cube larger on initial display and Reset. Fixed-pixel
+vertex labels are excluded from the whole cube geometry fit. Whole cube conditions
+do not add eight corner labels; mixed views retain the labels needed by local point,
+edge and face targets.
+The outer markers rotate with the cube in the same perspective view, with no heading
 or X/Y/Z text beside them. The table, hover and orientation guide retain the
 directions. The side of each arrow group follows its load sign; fixed markers
 use the positive axis side. These positions illustrate the whole cube axis

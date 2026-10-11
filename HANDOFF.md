@@ -2,15 +2,47 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (clean static rebuild and purple scalar Whole cube markers; check git log for the final commit)
-next_topic: Review the larger purple Whole cube arrows and T markers now served by Render
+code_base: main (closer purple Whole cube arrows, green T markers and larger default view; check git log for the final commit)
+next_topic: Review the closer Whole cube markers and enlarged default cube view
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：重建生成静态目录，线上新版已恢复
+### 最新调整：整体箭头贴近面，默认视图放大，T 改绿色
+
+- 用户认为整体箭头离立方体面太远、默认立方体太小，要求箭头更近、打开即更大，
+  并给整体 T 使用另一颜色。
+- 整体箭头 anchor 从 1.45 改至 0.9，单符号箭身起点 0.9975、尖端 1.407；
+  Face 朝外箭头最远 0.695，仍保留外层余量。整体 T anchor 从 1.65 改为 1.0，
+  guide 起点 1.09、横杆中心 1.34。三个并列箭头、箭头尺寸 1.3 和 T 尺寸 2 保持。
+- 整组标记在面内略微错开：X／Y 方向沿 Z 移 0.28，Z 方向沿 X／Y 各移 0.35；
+  正负号仍只控制轴向侧，T 使用相同面内偏移，避免默认视角压到局部顶点文字。
+- 整体箭头仍为紫色 `#a21caf`，整体 T 使用独立深绿材质 `#047857`，图例两色同步。
+  Point／Edge／Face 的红箭头与蓝色固定材质保持。
+- Whole 的拟合 padding 从 1.12 改为 1.06，外层距离缩短后默认立方体自然放大；
+  保留对所有旋转角度有效的径向包络拟合，不引入自动推拉相机。
+- Whole 径向拟合跳过固定屏幕像素的 Sprite 标签。实际混合视图诊断发现它们的共享
+  unit geometry 被算为巨大 3D 球，使 cube 被额外缩小；标签仍正常显示。
+  仅当前实际有整体符号时启用此拟合；选择全 free 的整体条件时恢复普通 bounds／原张量
+  拟合路径，避免没有外层符号的混合视图裁掉局部顶点文字。
+- 整体条件不再因自身八个 vertices 添加八个角点名；混合视图只添加实际局部条件
+  需要的顶点标签。纯 Point／Edge／Face 和纯张量的标签路径保持，原 JSON／表格／hover 保留。
+- 1440px 桌面实际 373px canvas 中，纯整体与混合 cube 主体都约 165 × 176px；
+  上一版约 120px 宽，默认视图明显放大。四张实际截图位于 ignored 样例目录：
+  `whole_close_green_force_default_20261011.png`、`whole_close_green_force_rotated_20261011.png`、
+  `whole_close_green_tensor_20261011.png`、`whole_close_green_mixed_20261011.png`；均已查看，
+  默认 force 图已在 PyCharm 打开。JSON 不需重新上传。
+- 12 项既有 Node tensor／panel 测试通过，包含四项实际 Chromium 面板检查，零失败／跳过。
+  最终 fresh 实际 Chromium 检查 7／7 通过、29 个子场景、零失败／错误／跳过；
+  覆盖三个桌面宽度、旋转／Reset、独立选择、绿色 T 的材质与完整 hover、局部标记、
+  空 Whole 下的局部标签完整范围、单状态与十二状态张量，以及原 JSON 精确导出。
+  模块语法／diff 检查和独立只读复核通过。最终源码 hash `aea9116a...` 与 QA 报告匹配。
+  使用 DEBUG=True、隔离 SQLite，未读取 .env；临时浏览器和服务均已关闭。报告
+  `/tmp/bc-uniform-arrow-qa-385tHH/whole-close-green-report.json` 不随 Git 同步。
+
+### 上一版：重建生成静态目录，线上新版已恢复
 
 - 用户在 Render 的 `/data-list/133/` 仍看到上一版顶部红箭头／蓝 T。后台截图确认
   `e78dc2f` 已 Live；此前“新版尚未部署”的判断已更正，不能用 Git push 或 Live 状态

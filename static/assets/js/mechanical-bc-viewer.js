@@ -16,6 +16,7 @@ const STATUS_COLORS = {
   empty: "#64748b",
 };
 const WHOLE_COLOR = "#a21caf";
+const WHOLE_FIXED_COLOR = "#047857";
 
 function readMechanicalBcItems() {
   const script = document.getElementById("mechanical-bc-data");
@@ -170,6 +171,11 @@ function createMaterials() {
     whole: new THREE.MeshStandardMaterial({
       color: WHOLE_COLOR,
       roughness: 0.34,
+      metalness: 0.06,
+    }),
+    wholeFixed: new THREE.MeshStandardMaterial({
+      color: WHOLE_FIXED_COLOR,
+      roughness: 0.36,
       metalness: 0.06,
     }),
     mixed: new THREE.MeshStandardMaterial({
@@ -639,18 +645,24 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
   createClampMarker(center, item, materials, group, selectableMeshes);
 }
 
+function wholeCubeAnchor3d(direction, distance) {
+  const faceOffset = direction === "Z"
+    ? new THREE.Vector3(0.35, 0.35, 0) : new THREE.Vector3(0, 0, 0.28);
+  return directionVector3d(direction).multiplyScalar(distance).add(faceOffset);
+}
+
 function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
   const tooltip = formatBoundaryConditionHover(item);
-  const wholeMaterials = {loaded: materials.whole, fixed: materials.whole};
+  const wholeMaterials = {loaded: materials.whole, fixed: materials.wholeFixed};
   // The outer layer leaves room for local face, edge and point markers.
-  const distance = 1.45;
+  const distance = 0.9;
   (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
     const direction = directionVector3d(axis.direction);
     const across = getPerpendicularVector3d(direction);
     const signs = getLoadDirectionSigns(axis.magnitude);
     signs.forEach(sign => {
       [-0.18, 0, 0.18].forEach(offset => {
-        const origin = direction.clone().multiplyScalar(sign * distance)
+        const origin = wholeCubeAnchor3d(axis.direction, sign * distance)
           .addScaledVector(across, offset);
         createArrow(origin, axis, sign, wholeMaterials, group, tooltip, selectableMeshes,
           signs.length > 1 ? 0.82 : 1, 1.3);
@@ -658,8 +670,7 @@ function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
     });
   });
   (item.axes || []).filter(axis => axis.status === "fixed").forEach(axis => {
-    // Place the shorter T stem farther out to keep its crossbar clear of vertex labels.
-    const anchor = directionVector3d(axis.direction).multiplyScalar(distance + 0.2);
+    const anchor = wholeCubeAnchor3d(axis.direction, distance + 0.1);
     createClampMarker(anchor, item, wholeMaterials, group, selectableMeshes,
       {sizeScale: 2, viewFacing: true, axes: [axis]});
   });
@@ -695,6 +706,7 @@ function createWholeCubeControls(container, items, state, materials, tooltip) {
     const {item, index} = items[position];
     container.dataset.wholeSourceIndex = String(index);
     drawWholeCubeCondition(item, materials, state.wholeRoot, state.wholeMeshes);
+    state.root.userData.hasWholeGlyphs = state.wholeMeshes.length > 0;
     tooltip.style.opacity = "0";
     state.fitScene();
   }
@@ -882,12 +894,13 @@ function frameScene(camera, controls, root, container, cameraDirection) {
   bounds.getCenter(center);
   bounds.getBoundingSphere(sphere);
 
-  if (root.userData.hasWholeConditions) {
+  if (root.userData.hasWholeGlyphs) {
     center.set(0, 0, 0);
     sphere.radius = 0;
     root.updateMatrixWorld(true);
     root.traverseVisible(object => {
-      if (!object.geometry) return;
+      // Vertex labels use fixed screen pixels, not their shared unit geometry.
+      if (!object.geometry || object.isSprite) return;
       if (!object.geometry.boundingSphere) object.geometry.computeBoundingSphere();
       const extent = object.geometry.boundingSphere.clone().applyMatrix4(object.matrixWorld);
       sphere.radius = Math.max(sphere.radius, extent.center.length() + extent.radius);
@@ -901,7 +914,7 @@ function frameScene(camera, controls, root, container, cameraDirection) {
   const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * camera.aspect);
   const verticalDistance = sphere.radius / Math.tan(verticalFov / 2);
   const horizontalDistance = sphere.radius / Math.tan(horizontalFov / 2);
-  const padding = root.userData.hasWholeConditions ? 1.12
+  const padding = root.userData.hasWholeGlyphs ? 1.06
     : root.userData.tensorView ? 1.06 : container.clientWidth < 460 ? 1.42 : 1.16;
   const distance = Math.max(verticalDistance, horizontalDistance) * padding;
 
@@ -1054,10 +1067,12 @@ function renderMechanicalBcViewer() {
   let highlighted = '';
 
   drawBaseCube(state.root, materials, scalarItems);
-  if (!tensorItems.length) {
+  if (!tensorItems.length && !wholeItems.length) {
     addVertexLabels(state.root);
   } else if (scalarItems.length) {
-    const namedVertices = new Set(scalarItems.flatMap(item => item.vertices || [])
+    const namedVertices = new Set(scalarItems
+      .filter(item => item.target_type !== "Whole cube")
+      .flatMap(item => item.vertices || [])
       .map(vertex => String(vertex).toUpperCase()));
     addVertexLabels(state.root, VERTICES.filter(vertex => namedVertices.has(vertex)));
   }
@@ -1122,8 +1137,10 @@ function renderMechanicalBcViewer() {
     const wholeLegend = document.createElement('span');
     wholeLegend.className = 'bc-legend-item';
     wholeLegend.innerHTML = `<svg width="48" height="16" viewBox="0 0 48 16" aria-hidden="true">
-      <path d="M2 8h17m-6-5 6 5-6 5M27 8h15m0-6v12" fill="none"
+      <path d="M2 8h17m-6-5 6 5-6 5" fill="none"
         stroke="${WHOLE_COLOR}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M27 8h15m0-6v12" fill="none"
+        stroke="${WHOLE_FIXED_COLOR}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
     </svg>`;
     wholeLegend.appendChild(document.createTextNode(' Whole cube'));
     legend.appendChild(wholeLegend);
