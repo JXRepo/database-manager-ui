@@ -2,15 +2,32 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
-code_base: main (53e44ff closer Whole cube markers, green T and larger default view; verified live)
-next_topic: Review the closer Whole cube markers and enlarged default cube view
+code_base: main (three parallel arrows per scalar Face direction; check git log for the final commit)
+next_topic: Review the unified three-arrow edge, face and scalar whole cube display
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：整体箭头贴近面，默认视图放大，T 改绿色
+### 最新调整：面的受力方向统一三个并列箭头
+
+- 用户要求 Face 与 Edge／整体数字条件一样，每个受力方向使用三个箭头。
+- `getFaceArrowOrigins` 增加 offsets 参数；只有 `drawFaceCondition` 传入 -0.3、0、0.3。
+  面内和法向方向均为三个共线起点，每个正负号各三个；尺寸、方向、hover、面填充与 T 保持。
+  边与整体数字箭头原已各三个，未改。共享 helper 的默认五起点保持，张量组件路径保持。
+- README 同步 Face 数量，并删除张量排法与 Face 相同的旧描述。JSON 不需修改或重新上传。
+- 12 项既有 Node tensor／panel 测试通过，含四项实际 Chromium 面板检查，零失败／跳过；
+  最小实际页面 QA 3／3 通过、5 个子场景、零失败／错误／跳过。
+  实际 XYZ 面九支，法向单轴三支，正负双向每侧各三支；旋转／Reset／完整 XYZ hover 正常，
+  共享 helper 的实际单状态张量仍四十支。语法／diff 检查及独立只读复核通过。
+  最终源码 SHA `29e37936...` 和模板 hash 与报告匹配；使用 DEBUG=True、隔离 SQLite，
+  未读取 .env，临时服务与 Chromium 已关闭。报告
+  `/tmp/bc-uniform-arrow-qa-385tHH/face-parallel-three-report.json` 不随 Git 同步。
+- 最新实际预览在 ignored 样例目录：`faces_parallel_three_default_20261011.png` 和
+  `faces_parallel_three_rotated_20261011.png`，均已查看；默认图已在 PyCharm 打开。
+
+### 上一版：整体箭头贴近面，默认视图放大，T 改绿色
 
 - 用户认为整体箭头离立方体面太远、默认立方体太小，要求箭头更近、打开即更大，
   并给整体 T 使用另一颜色。

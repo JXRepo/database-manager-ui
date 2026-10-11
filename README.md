@@ -667,9 +667,9 @@ The direction schematic explicitly uses `ij` for direction `i` on faces normal
 to `j`, with outward arrows for positive normal values. It shows supplied
 components independently, including unequal `xy` and `yx`, and does not claim
 to reconstruct the actual tractions on the simulation boundary. Each nonzero
-component uses a row of five red arrows on each of its two opposite faces,
-matching the face arrow style. Normal arrows point outward for tension and
-inward for compression; shear arrows run along the corresponding faces. Arrow
+component uses a row of five red arrows on each of its two opposite faces.
+Normal arrows point outward for tension and inward for compression; shear arrows
+run along the corresponding faces. Arrow
 lengths are fixed; the matrix and exact values in tooltips carry the magnitudes.
 Zero values produce no arrows; missing and invalid components are identified
 without being replaced by zero or mirrored. Stress and strain units come from
@@ -727,7 +727,7 @@ remain perpendicular in the screen projection. An axis viewed directly along
 its length is foreshortened. Face constraint markers retain their
 existing style. The table and hover retain the complete X/Y/Z constraints.
 Face boundaries use a translucent fill without extra thick perimeter rods or a
-center dot. Each loaded direction and sign uses five arrows side by side in one
+center dot. Each loaded direction and sign uses three arrows side by side in one
 row across the face. Normal arrow rows follow a face edge; tangential arrow rows
 run perpendicular to their load direction. Arrow spacing and size
 keep the two tangential directions separate when both are loaded. These positions

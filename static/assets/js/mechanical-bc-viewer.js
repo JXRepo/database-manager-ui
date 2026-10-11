@@ -601,7 +601,7 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   createClampMarker(markerOrigins[1], item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
 }
 
-function getFaceArrowOrigins(points, direction) {
+function getFaceArrowOrigins(points, direction, offsets = [-0.42, -0.21, 0, 0.21, 0.42]) {
   const center = averagePoints(points);
   const firstTangent = points[1].clone().sub(points[0]);
   const secondTangent = points[3].clone().sub(points[0]);
@@ -616,7 +616,7 @@ function getFaceArrowOrigins(points, direction) {
   }
 
   spread.normalize();
-  return [-0.42, -0.21, 0, 0.21, 0.42]
+  return offsets
     .map(offset => center.clone().addScaledVector(spread, offset));
 }
 
@@ -631,7 +631,7 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
   const center = averagePoints(points);
   addMesh(group, createFaceMesh(points, materials.faceHighlight), tooltip, selectableMeshes);
   (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
-    const origins = getFaceArrowOrigins(points, axis.direction);
+    const origins = getFaceArrowOrigins(points, axis.direction, [-0.3, 0, 0.3]);
     const signs = getLoadDirectionSigns(axis.magnitude);
     const sizeScale = signs.length > 1 ? 0.45 : 0.5;
     const lengthScale = signs.length > 1 ? 0.82 : 1;
