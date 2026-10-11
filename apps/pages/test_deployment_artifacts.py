@@ -144,7 +144,7 @@ class DeploymentArtifactTests(SimpleTestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_build_script_runs_only_install_collectstatic_and_migrate(self):
+    def test_build_script_runs_required_deployment_steps(self):
         """
         Build script runs the required steps without yarn or makemigrations
         """
@@ -160,7 +160,11 @@ class DeploymentArtifactTests(SimpleTestCase):
                 },
                 {
                     "program": "python",
-                    "args": ["manage.py", "collectstatic", "--no-input"],
+                    "args": ["manage.py", "prepare_assistant_model"],
+                },
+                {
+                    "program": "python",
+                    "args": ["manage.py", "collectstatic", "--clear", "--no-input"],
                 },
                 {
                     "program": "python",
@@ -168,6 +172,70 @@ class DeploymentArtifactTests(SimpleTestCase):
                 },
             ],
         )
+
+    def test_build_collection_replaces_newer_cached_static_files(self):
+        """
+        Build collection replaces cached output even when its timestamp is newer
+
+        Execute the build's actual collection arguments with isolated static
+        directories, including obsolete files from a previous deployment.
+        """
+        result, records = self._run_build_script_with_recorders()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        collect_args = next(
+            record["args"][1:]
+            for record in records
+            if record["args"][:2] == ["manage.py", "collectstatic"]
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            source_root = temp_path / "source"
+            output_root = temp_path / "collected"
+            relative_path = Path("assets/js/mechanical-bc-viewer.js")
+            source = source_root / relative_path
+            output = output_root / relative_path
+            source.parent.mkdir(parents=True)
+            output.parent.mkdir(parents=True)
+            shutil.copy2(self.project_root / "static" / relative_path, source)
+            output.write_text("// Previous deployment\n", encoding="utf-8")
+            os.utime(source, (1600000000, 1600000000))
+            os.utime(output, (1700000000, 1700000000))
+            obsolete = output_root / "retired.js"
+            obsolete.write_text("// Removed asset\n", encoding="utf-8")
+            compressed = output.with_suffix(".js.gz")
+            compressed.write_bytes(b"previous compressed output")
+
+            (temp_path / "static_test_settings.py").write_text(
+                textwrap.dedent(f"""\
+                    DEBUG = True
+                    SECRET_KEY = 'isolated-static-test'
+                    INSTALLED_APPS = ['django.contrib.staticfiles']
+                    STATIC_URL = '/static/'
+                    STATIC_ROOT = {str(output_root)!r}
+                    STATICFILES_DIRS = [{str(source_root)!r}]
+                    DATABASES = {{'default': {{
+                        'ENGINE': 'django.db.backends.sqlite3',
+                        'NAME': {str(temp_path / 'test.sqlite3')!r},
+                    }}}}
+                """),
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env["DJANGO_SETTINGS_MODULE"] = "static_test_settings"
+            env["PYTHONPATH"] = str(temp_path)
+            collected = subprocess.run(
+                [sys.executable, "-m", "django", *collect_args],
+                cwd=temp_path,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(collected.returncode, 0, collected.stderr)
+            self.assertEqual(output.read_bytes(), source.read_bytes())
+            self.assertFalse(obsolete.exists())
+            self.assertFalse(compressed.exists())
 
     def _run_build_script_with_recorders(self):
         """

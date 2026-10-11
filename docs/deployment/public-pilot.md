@@ -228,5 +228,6 @@ For later redeploys, repeat the persistence tail and spot checks from steps 8 to
 
 - Production requires `DEBUG=False`, a non-default `SECRET_KEY`, and all required `DB_*` values
 - The application stores parsed data objects in PostgreSQL with SSL required
-- Render build runs dependency install, `collectstatic`, and migrations
+- Render build runs dependency install, model preparation, `collectstatic --clear`, and migrations
+- Static collection clears generated output before copying current sources, so cached timestamps cannot retain old JavaScript or CSS
 - The application should not be used as a long-term archival store during the free pilot

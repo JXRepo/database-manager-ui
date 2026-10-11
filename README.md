@@ -1080,8 +1080,12 @@ deployment environment, not in repository files.
 The hosted service is configured to deploy commits pushed to `main`. Saving or
 committing locally does not update the website. After a push, wait for Render to
 finish deployment before checking the changes. The build installs dependencies,
-collects static files, and applies database migrations; it does not import local
+clears the generated static output before collecting current files, and applies
+database migrations; it does not import local
 accounts or local data.
+Clearing `staticfiles/` prevents cached output with a newer modification time
+from making Django skip changed JavaScript or CSS. The source `static/` directory
+and stored data are separate from this generated output.
 
 The existing Gunicorn command automatically reads [`gunicorn.conf.py`](gunicorn.conf.py),
 which runs an independent upload processor and uses four web threads so pages

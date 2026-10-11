@@ -3,14 +3,32 @@ status: ready_for_continuation
 branch: main
 timestamp: 2026-10-11
 code_base: main (purple scalar Whole cube markers outside local loads; check git log for the final commit)
-next_topic: Review the larger purple Whole cube arrows and T markers outside the corresponding axis faces
+next_topic: Verify live static delivery, then review the larger purple Whole cube arrows and T markers
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新交接：整体数字标记改为紫色，放在对应面的外侧
+### 最新排查：成功部署后仍返回旧静态脚本
+
+- 用户在 Render 的 `/data-list/133/` 仍看到上一版顶部红箭头／蓝 T。后台截图确认
+  `e78dc2f` 已 Live；此前“新版尚未部署”的判断已更正，不能用 Git push 或 Live 状态
+  单独证明浏览器拿到了当前静态内容。
+- 2026-10-11 01:14—01:19 UTC，公开 viewer URL 的原始、gzip／Brotli 解压内容均精确
+  匹配 `a43e3ac`，SHA-256 为 `6b1035fa9356ad4b4aad84697cd8b576ecd60d5f485f5de7c21b36bfa32e2169`。
+  no-cache 和独立 query 请求结果相同；CF 为 DYNAMIC，Last-Modified 为 00:02:52 UTC。
+  当前源文件 SHA-256 为 `f8cad5f16156c96a6939cc70109359ff87b2391786e9869b4c35f8209a2807f9`。
+- 本地实际 Django 复现：collectstatic 只比较修改时间，旧输出时间更晚或同秒时，新内容
+  会被跳过。尚无 Render 构建日志证明此次就是该条件，但这是能解释现象的已复现机制。
+- `build.sh` 改为 `collectstatic --clear --no-input`，只在构建中重建生成的 `staticfiles/`。
+  同步部署步骤断言，补充真实 Django 收集回归：使用构建脚本的实际参数，旧目标时间更晚
+  时也须复制当前 viewer，并删除已废弃及旧压缩输出。测试修复前确实保留旧字节而失败。
+- 修复后五项 deployment artifact 检查全部通过，含上述真实收集回归和 Bash 语法。
+  使用 DEBUG=True、隔离设置、临时 SQLite 路径，禁用 .env 加载；无数据库使用或网络构建。
+  推送后须再次直接下载线上 viewer 并比较 SHA，不能仅以 Deploys 的 Live 状态判断完成。
+
+### 上一版：整体数字标记改为紫色，放在对应面的外侧
 
 - 用户要求整体 force/displacement 的箭头和 T 放在对应方向面的外侧，预留局部面箭头
   朝外伸出的空间，并用不同颜色和更大尺寸让整体与点／边／面一眼可辨。
