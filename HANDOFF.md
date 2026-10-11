@@ -26,8 +26,8 @@ next_topic: Review professional stress and strain tensor schematics
   1.10／1.15 仍接触、1.25 留白且 cube 大小保持，1.30 没有必要。
 - 原静态 XYZ guide 与负 Y 初始相机及旋转视角不一致；改为按实际 camera matrix 投影
   既有三个正方向箭头和文字。相机、Point／Edge／Face 与第一种整体几何不改变。
-  独立复核发现近俯视时标签可能超出原 SVG 下缘；guide 中心改为 (54,48)、箭长 28、
-  文字间距 9，最大标签半径 37，保留旋转方向并给 17px 字形留出上下余量。
+  独立复核发现极端视角标签可能超出原 SVG 边缘；按实际 font bbox 校准 guide 中心
+  (54,50)、箭长 26、文字间距 8，最大标签半径 34，保留方向并给字形留出上下余量。
 - 方向图只显示实际提供的分量，xy／yx 可不同，不补缺、不合并。应变箭头明确是方向提示；
   opt-in shape 只在九个分量完整且互反相等时启用，明确对称小应变／tensor shear／放大示意。
   开启 shape 使用全部分量，点击分量回到方向图；不再根据六项补齐缺失互反项。
@@ -36,10 +36,11 @@ next_topic: Review professional stress and strain tensor schematics
   正负法向、互异 xy／yx、每侧三箭、零／缺失／无效、原序 step、键盘及 hover 联动、
   完整／缺失／冲突 shape、混合条件、Orbit／Reset、1280／1440／1920 桌面、无 JS 表格
   与精确 JSON 导出均检查；第一种 force／displacement 六紫箭和一个绿 T 回归通过。
-  近俯视的两个真实相机方位（正 X／Y 分别向下）中，全部 SVG 文字边界均在 viewBox 内，
+  近俯视的两个真实相机方位（正 X／Y 分别向下）和水平视角（正 Z 完全向上）中，
+  全部 SVG 文字边界均在 viewBox 内；实际顶部最小 2.40、底部最大 93.09（高度 96），
   guide 方向与实际相机投影一致，Reset 正常。
   混合剪切紫箭与蓝色局部符号的真实投影凸包最小间隙下界为 6.03 CSS px。
-- 最终 viewer SHA-256 为 `f4772c662e6a56b7649e19e70339c69b6bd0964e676cfd19a6671722589ce919`；
+- 最终 viewer SHA-256 为 `08f69edd7331c58daa8100f23b050a7788f3710759fe705039249ecfb46d48a2`；
   panel 为 `809f497950ca53f2f40fec551b7e3fc25dc229d6e238fcc6d17660bdd458871e`；
   helper 为 `406778cf60d233ae226caad297339b6da925c8e54c2f7320c346562500180219`。
   QA 四个产品文件 hash 与最终源码匹配，使用 DEBUG=True 和隔离 SQLite，未读取 .env。

@@ -1072,14 +1072,14 @@ function createScene(container, hasWholeMarkers = false) {
       if (!line || !label) return;
       const direction = AXIS_DIRECTIONS[axis].clone().transformDirection(camera.matrixWorldInverse);
       const projectedLength = Math.hypot(direction.x, direction.y);
-      const labelOffset = projectedLength > 0.001 ? 9 / projectedLength : 0;
+      const labelOffset = projectedLength > 0.001 ? 8 / projectedLength : 0;
       line.setAttribute("x1", "54");
-      line.setAttribute("y1", "48");
-      line.setAttribute("x2", String(54 + direction.x * 28));
-      line.setAttribute("y2", String(48 - direction.y * 28));
-      label.setAttribute("x", String(54 + direction.x * (28 + labelOffset)));
+      line.setAttribute("y1", "50");
+      line.setAttribute("x2", String(54 + direction.x * 26));
+      line.setAttribute("y2", String(50 - direction.y * 26));
+      label.setAttribute("x", String(54 + direction.x * (26 + labelOffset)));
       label.setAttribute("y", String(projectedLength > 0.001
-        ? 48 - direction.y * (28 + labelOffset) : 62));
+        ? 50 - direction.y * (26 + labelOffset) : 64));
       label.setAttribute("text-anchor", "middle");
       label.setAttribute("dominant-baseline", "middle");
     });
