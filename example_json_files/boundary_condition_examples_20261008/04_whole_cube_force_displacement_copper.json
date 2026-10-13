@@ -1,0 +1,538 @@
+{
+  "$schema": "https://github.com/Ronakshoghi/MiMeDat/blob/main/microstructure_sensitive_mechanical_metadata_schema.json",
+  "title": "[TEST SYNTHETIC] Whole cube force XYZ display — copper reference curves",
+  "creator": [
+    "Xue, Jun"
+  ],
+  "creator_affiliation": [
+    "Local platform testing"
+  ],
+  "date": "2026-10-11",
+  "shared_with": [
+    {
+      "access_type": "all"
+    }
+  ],
+  "description": "Synthetic display example for the whole cube force/displacement scalar XYZ family. One force condition identifies all eight cube corners: X = 12.5 N and Z = -7.5 N are loaded; Y is fixed. Boundary values demonstrate axis arrows and a fixed marker only. The stress, total strain and plastic strain arrays retain all twelve analytical reference states from the original copper tensor fixture, whose recipe is embedded below. These curves were not recomputed for this force condition and are not its simulated or analytical response. No finite element solver was run.",
+  "rights": "Generated synthetic fixture for local platform testing",
+  "rights_holder": [
+    "Xue, Jun"
+  ],
+  "keywords": [
+    "TEST DATA",
+    "Synthetic boundary display",
+    "Whole cube",
+    "Force/displacement scalar XYZ",
+    "Independent reference curves",
+    "Copper"
+  ],
+  "software": "Synthetic boundary display fixture",
+  "software_version": "1.0",
+  "system": "Linux",
+  "system_version": "5.15.0-133-generic",
+  "processor_specifications": "x86_64; metadata display fixture with retained analytical reference arrays; no finite element solver",
+  "input_path": "embedded:synthetic_recipe",
+  "results_path": "./04_whole_cube_force_displacement_copper.json",
+  "RVE_size": [
+    2,
+    2,
+    2
+  ],
+  "RVE_continuity": true,
+  "discretization_type": "Structured",
+  "discretization_unit_size": [
+    0.1,
+    0.1,
+    0.1
+  ],
+  "discretization_count": 8000,
+  "solid_volume_fraction": 1,
+  "global_temperature": 285,
+  "mechanical_BC": [
+    {
+      "vertex_list": [
+        "V000",
+        "V100",
+        "V010",
+        "V110",
+        "V001",
+        "V101",
+        "V011",
+        "V111"
+      ],
+      "constraints": [
+        "loaded",
+        "fixed",
+        "loaded"
+      ],
+      "loading_type": "force",
+      "loading_mode": "static",
+      "applied_load": [
+        {
+          "magnitude": 12.5,
+          "step": 1
+        },
+        {
+          "magnitude": -7.5,
+          "step": 1
+        }
+      ]
+    }
+  ],
+  "phase": [
+    {
+      "phase_name": "Copper (synthetic reference)",
+      "phase_id": 0,
+      "volume_fraction": 1,
+      "lattice_structure": "FCC",
+      "constitutive_model": {
+        "elastic_model_name": "Isotropic linear elasticity",
+        "elastic_parameters": {
+          "youngs_modulus": 120000,
+          "poisson_ratio": 0.34,
+          "shear_modulus": 44776.119402985074
+        },
+        "plastic_model_name": "No plasticity in this elastic reference",
+        "units": {
+          "Stress": "MPa",
+          "Stiffness": "MPa",
+          "Strain": 1
+        }
+      },
+      "orientation": {
+        "euler_angles": {
+          "Phi1": [
+            0.6863852954665213,
+            0.6878282269103297,
+            0.7604443336879275,
+            0.8256611656321754,
+            0.7083783109848406,
+            0.709488846602498,
+            0.6971831954948811,
+            0.6764077163719097
+          ],
+          "Phi": [
+            1.0321319752281888,
+            1.062677689373551,
+            0.9832105059339511,
+            1.0439953907078536,
+            1.0608960861531525,
+            0.9898026972673833,
+            1.0325410453074593,
+            1.0215441137421775
+          ],
+          "Phi2": [
+            0.40437899894012047,
+            0.4834557556847853,
+            0.6153964576262456,
+            0.5312886581287184,
+            0.5835479006424473,
+            0.5250594453495337,
+            0.4676939000031231,
+            0.5995014799993337
+          ]
+        },
+        "grain_count": 8,
+        "texture_type": "Synthetic preferred orientations",
+        "frame": "lab",
+        "rotation_type": "active",
+        "software": "Python standard library random.Random",
+        "software_version": "3.10.12",
+        "texture_extra_information": {
+          "seed": 404,
+          "convention": "Bunge Euler angles in radians; active rotation from the laboratory frame",
+          "role": "Synthetic metadata only; no grain geometry or anisotropic solver is used"
+        }
+      }
+    }
+  ],
+  "stress": {
+    "equivalent_stress": [
+      0,
+      13.674794331177344,
+      27.349588662354687,
+      37.16180835212409,
+      50.714889332423866,
+      37.881393849751625,
+      0,
+      27.568097504180443,
+      56.418082207746124,
+      32.69556544854363,
+      18.027756377319946,
+      0
+    ],
+    "stress_11": [
+      0,
+      15,
+      30,
+      45,
+      60,
+      30,
+      0,
+      -20,
+      -40,
+      -20,
+      0,
+      0
+    ],
+    "stress_22": [
+      0,
+      5,
+      10,
+      20,
+      30,
+      15,
+      0,
+      -5,
+      -10,
+      5,
+      15,
+      0
+    ],
+    "stress_33": [
+      0,
+      0,
+      0,
+      5,
+      10,
+      5,
+      0,
+      0,
+      5,
+      10,
+      20,
+      0
+    ],
+    "stress_12": [
+      0,
+      2,
+      4,
+      6,
+      8,
+      0,
+      0,
+      -6,
+      -10,
+      -5,
+      0,
+      0
+    ],
+    "stress_13": [
+      0,
+      0,
+      0,
+      4,
+      12,
+      16,
+      0,
+      10,
+      20,
+      8,
+      0,
+      0
+    ],
+    "stress_23": [
+      0,
+      0,
+      0,
+      0,
+      -4,
+      -8,
+      0,
+      3,
+      6,
+      3,
+      0,
+      0
+    ]
+  },
+  "total_strain": {
+    "equivalent_strain": [
+      0,
+      0.00010180124668765356,
+      0.00020360249337530713,
+      0.0002766490177324794,
+      0.0003775441761413777,
+      0.00028200593199259545,
+      0,
+      0.00020522917030889884,
+      0.0004200012786576656,
+      0.00024340032056138037,
+      0.00013420663080893736,
+      0
+    ],
+    "strain_11": [
+      0,
+      0.00011083333333333333,
+      0.00022166666666666667,
+      0.00030416666666666667,
+      0.0003866666666666667,
+      0.00019333333333333336,
+      0,
+      -0.0001525,
+      -0.00031916666666666665,
+      -0.0002091666666666667,
+      -0.00009916666666666667,
+      0
+    ],
+    "strain_22": [
+      0,
+      -8.333333333333378e-7,
+      -0.0000016666666666666756,
+      0.000025,
+      0.00005166666666666669,
+      0.000025833333333333346,
+      0,
+      0.000014999999999999999,
+      0.000015833333333333336,
+      0.00007000000000000001,
+      0.00006833333333333335,
+      0
+    ],
+    "strain_33": [
+      0,
+      -0.00005666666666666667,
+      -0.00011333333333333334,
+      -0.00014250000000000002,
+      -0.00017166666666666667,
+      -0.00008583333333333334,
+      0,
+      0.00007083333333333334,
+      0.00018333333333333334,
+      0.00012583333333333335,
+      0.00012416666666666666,
+      0
+    ],
+    "strain_12": [
+      0,
+      0.000022333333333333335,
+      0.00004466666666666667,
+      0.000067,
+      0.00008933333333333334,
+      0,
+      0,
+      -0.000067,
+      -0.00011166666666666667,
+      -0.00005583333333333333,
+      0,
+      0
+    ],
+    "strain_13": [
+      0,
+      0,
+      0,
+      0.00004466666666666667,
+      0.000134,
+      0.00017866666666666668,
+      0,
+      0.00011166666666666667,
+      0.00022333333333333333,
+      0.00008933333333333334,
+      0,
+      0
+    ],
+    "strain_23": [
+      0,
+      0,
+      0,
+      0,
+      -0.00004466666666666667,
+      -0.00008933333333333334,
+      0,
+      0.0000335,
+      0.000067,
+      0.0000335,
+      0,
+      0
+    ]
+  },
+  "plastic_strain": {
+    "equivalent_plastic_strain": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "plastic_strain_11": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "plastic_strain_22": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "plastic_strain_33": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "plastic_strain_12": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "plastic_strain_13": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "plastic_strain_23": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "units": {
+    "Stress": "MPa",
+    "Strain": 1,
+    "Length": "mm",
+    "Force": "N",
+    "Angle": "Radian",
+    "Temperature": "Kelvin",
+    "Stiffness": "MPa",
+    "Frequency": "Hz",
+    "Time": "s"
+  },
+  "synthetic_recipe": {
+    "purpose": "Upload, whole cube scalar boundary display and exact export testing",
+    "display_family": "Whole cube force/displacement numeric XYZ conditions",
+    "selected_example": "Force only; one condition keeps the initial preview to two loaded directions and one fixed direction",
+    "content_origin": "Synthetic force display values with unchanged analytical reference arrays from the original twelve-state copper tensor fixture",
+    "source_curve_values_copied": true,
+    "finite_element_solver_run": false,
+    "curves_recomputed_for_display_boundary": false,
+    "curve_role": "Independent analytical reference arrays; not a response to this force boundary",
+    "reference_curve_recipe": {
+      "purpose": "Upload, search, boundary viewer, mechanical plots and exact export testing",
+      "content_origin": "All material, geometry, orientation, load and curve values are generated for this fixture",
+      "format_reference": "../a46fde6c.json; field names and structural layout only",
+      "source_curve_values_copied": false,
+      "finite_element_solver_run": false,
+      "assumptions": [
+        "Illustrative material parameters; not fitted properties of a measured alloy",
+        "Small strain with symmetric stress and tensor shear: epsilon_ij = gamma_ij / 2",
+        "Temperature is initial metadata; elastic and plastic parameters are held constant",
+        "Grain orientations and structured grid describe synthetic metadata; no voxel partition or mesh solution is stored"
+      ],
+      "equivalent_definitions": {
+        "stress": "sqrt(3/2 * deviatoric_stress:deviatoric_stress)",
+        "total_strain": "sqrt(2/3 * deviatoric_total_strain:deviatoric_total_strain); instantaneous, not accumulated",
+        "plastic_strain": "Accumulated sqrt(2/3 * d_plastic_strain:d_plastic_strain); nondecreasing"
+      },
+      "mesh_cells_per_axis": [
+        20,
+        20,
+        20
+      ],
+      "model_references": [
+        "https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.026.html"
+      ],
+      "curve_role": "Exact homogeneous small elastic strain reference for each prescribed macroscopic tensor",
+      "tensor_convention": "ij means direction i and face normal j; full reciprocal components are supplied symmetrically",
+      "equations": [
+        "strain_ii = (sigma_ii - nu*(sigma_jj + sigma_kk))/E",
+        "strain_ij = (1+nu)*sigma_ij/E for i != j",
+        "plastic_strain = 0"
+      ],
+      "continuity": "Ideal homogeneous periodic RVE with balancing tractions on opposing faces; the eight vertices identify the whole RVE",
+      "history": {
+        "sample_index": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "prescribed_step": [
+          0,
+          1,
+          2,
+          4,
+          6,
+          7,
+          10,
+          11,
+          14,
+          18,
+          19,
+          20
+        ]
+      },
+      "history_interpretation": "Sample n corresponds exactly to applied_load[n]; steps are ordered labels, with no intermediate steps or physical time invented"
+    },
+    "source_curve_archive": "/tmp/whole-cube-examples-2bVB3HzL/04_whole_cube_tensor_copper_original_20261011.json",
+    "source_curve_identifier": "dcc6f242"
+  },
+  "identifier": "synthetic-whole-force-copper-20261011"
+}

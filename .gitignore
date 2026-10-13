@@ -15,6 +15,13 @@ media/
 staticfiles/
 .assistant-models/
 
+# Local examples and generated previews
+/example_json_files/*
+!/example_json_files/boundary_condition_examples_20261008/
+/example_json_files/boundary_condition_examples_20261008/*
+!/example_json_files/boundary_condition_examples_20261008/*.json
+!/example_json_files/boundary_condition_examples_20261008/README.md
+
 # Environment variables
 .env
 
