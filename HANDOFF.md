@@ -3,14 +3,23 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-26
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Boundary viewer complete; generic reading note and help removed at user request
+next_topic: Boundary viewer complete; local legend simplified at user request
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：移除图下通用读图说明
+### 最新调整：精简局部图例
+
+- 按用户要求删除图例里的 `X/Y/Z directions` 文字，将 `Local loads · Force (N)`
+  简化为 `Local loads`；不再拼接其他载荷类型和单位。相关代码为
+  `templates/pages/data_detail.html` 与 `static/assets/js/mechanical-bc-viewer.js`。
+- 右下角 XYZ 坐标图保留，量名与单位继续显示在边界表格、整体标题及箭头 hover 中。
+- 12 项相关 Django 测试和 16 项 Node 测试通过，零失败／跳过，含真实 Chromium
+  桌面检查；已查看精简后的截图。日志和截图在 `/tmp/boundary-legend-qa-dHrOsO/`。
+
+### 上次调整：移除图下通用读图说明
 
 - 用户明确要求去掉 `Arrows show directions. Use the quantity name, units and load values
   to read their meaning.`，以及 `How to read this diagram` 折叠说明整块。

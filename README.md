@@ -653,9 +653,11 @@ Variable selectors, tooltips, and raw-value summaries use matching mathematical
 italic glyphs for these two symbols; field keys and plotted values are unchanged.
 
 Mechanical boundary conditions show the quantity name and explicitly supplied
-unit in the table, diagram captions and load-arrow hover. Force, displacement,
+unit in the table, whole cube captions and load-arrow hover. Force, displacement,
 stress and strain share direction arrows; the name and unit identify what the
 arrow represents. Missing units are labeled as not supplied.
+The local legend uses `Local loads` and `Fixed constraint` without repeating
+quantity names, units or an `X/Y/Z directions` label.
 Whole cube
 stress and strain tensors use a compact panel below the cube with an always
 visible component matrix. Its row and column headings identify direction `i`

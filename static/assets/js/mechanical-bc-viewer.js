@@ -1172,12 +1172,8 @@ function renderMechanicalBcViewer() {
   const scalarItems = items.filter(item => !item.is_tensor_load && item.is_defined !== false);
   const legend = container.closest('.bc-layout').querySelector('.bc-legend');
   const localItems = scalarItems.filter(item => item.target_type !== 'Whole cube');
-  const localQuantities = [...new Set(localItems
-    .filter(item => (item.axes || []).some(axis => axis.status === 'loaded'))
-    .map(item => item.quantity_label || item.loading_type || 'Load'))];
   const localLoadLegend = legend.firstElementChild;
-  localLoadLegend.lastChild.textContent = ` Local loads${localQuantities.length ? ' · ' + localQuantities.join(', ') : ''}`;
-  localLoadLegend.hidden = !localQuantities.length;
+  localLoadLegend.hidden = !localItems.some(item => (item.axes || []).some(axis => axis.status === 'loaded'));
   legend.children[1].hidden = !localItems.some(item => (item.axes || []).some(axis => axis.status === 'fixed'));
   const hasLocalMarkers = scalarItems.some(item => item.target_type !== "Whole cube"
     && (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed"));
