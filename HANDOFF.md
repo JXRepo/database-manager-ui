@@ -2,8 +2,8 @@
 status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-26
-code_base: Final boundary viewer delivery based on 388bc89; see git log for the delivery commit
-next_topic: Boundary viewer implementation and verification complete; check Render deployment separately
+code_base: main at application commit 7460fb1 (pushed; live static files and health verified)
+next_topic: Boundary viewer delivery complete; see current rules before further changes
 ---
 
 # Project handoff
@@ -44,8 +44,10 @@ next_topic: Boundary viewer implementation and verification complete; check Rend
   隔离目录曾缺本机已有 `.assistant-models`，复用本机模型后相关旧测试也已通过；
   临时模型链接须在 `git add .` 前移除，模型不提交。PyCharm build 返回成功但提示
   诊断能力有限，实际验收以 Django／Node／Chromium 结果为准。
-- 本次交付提交合入 main 并推送的结果见最终回复；**Git push 与 Render 部署是两件事**。
-  提交时尚未核实生产部署，不把本地验收写成线上验收。站点仍为
+- 应用提交 `7460fb1` 已快进合入 main 并推送；**Git push 与 Render 部署是两件事**。
+  2026-10-26 13:49:36 UTC 已核对线上 `/healthz/` HTTP 200，
+  `mechanical-bc-viewer.js` 与 `mechanical-bc-tensor-panel.js` 均与本次文件逐字节一致。
+  桌面交互验收在隔离本地 Chromium 完成，未登录生产详情页，也未改生产数据。站点仍为
   https://fair-materials-data-hub.onrender.com/ 。
 
 ## 历史交接（以下状态已被上面的最终交付替代）

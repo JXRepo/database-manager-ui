@@ -61,7 +61,7 @@ Keep all scalar/tensor and local/whole scenes independent.
   export for the five examples, mixed cases, long content and empty states.
 - [x] Inspect screenshots at all desktop widths and collect evidence in the handoff.
 - [x] Run independent review and fix necessary findings.
-- [ ] Inspect the final diff, commit, integrate into main without discarding work, and push.
+- [x] Inspect the final diff, commit, integrate into main without discarding work, and push.
 
 ## Verification result
 
@@ -74,3 +74,7 @@ JavaScript. Exact JSON exports and fixture bytes are unchanged.
 Independent final read-only review: ready to merge, no unresolved findings.
 PyCharm build reports success with limited diagnostics; executable tests provide
 the validation evidence. Render deployment must be reported separately from push.
+Application commit `7460fb1` was fast-forwarded into main and pushed to origin.
+At 2026-10-26 13:49:36 UTC, the live health endpoint returned 200 and both changed
+JavaScript assets matched the committed files byte for byte. Interactive desktop
+acceptance ran locally against isolated test data; production data was untouched.
