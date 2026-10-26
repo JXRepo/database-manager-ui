@@ -655,8 +655,7 @@ italic glyphs for these two symbols; field keys and plotted values are unchanged
 Mechanical boundary conditions show the quantity name and explicitly supplied
 unit in the table, diagram captions and load-arrow hover. Force, displacement,
 stress and strain share direction arrows; the name and unit identify what the
-arrow represents. Missing units are labeled as not supplied. A short expandable
-guide explains locations, quantities, repeated arrows and load records.
+arrow represents. Missing units are labeled as not supplied.
 Whole cube
 stress and strain tensors use a compact panel below the cube with an always
 visible component matrix. Its row and column headings identify direction `i`

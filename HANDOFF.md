@@ -2,15 +2,25 @@
 status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-26
-code_base: main; see git log for the latest default camera and coordinate guide adjustment
-next_topic: Boundary viewer complete; default XY opening now faces the viewer
+code_base: main; see git log for the latest boundary viewer changes
+next_topic: Boundary viewer complete; generic reading note and help removed at user request
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：默认 XYZ 坐标放大，XY 开口朝向观察者
+### 最新调整：移除图下通用读图说明
+
+- 用户明确要求去掉 `Arrows show directions. Use the quantity name, units and load values
+  to read their meaning.`，以及 `How to read this diagram` 折叠说明整块。
+  已从 `templates/pages/data_detail.html` 移除两处内容和对应的闲置样式。
+- 张量矩阵的方向约定、Advanced display options 与应变示意说明保持；本次仅精简
+  用户指出的通用提示。不要重新加入图下通用说明。
+- 12 项相关 Django 测试通过，含真实 Chromium 桌面检查，零失败／跳过；已查看删后截图。
+  日志和截图在 `/tmp/boundary-help-removal-qa-TfR0ri/`，不随 Git 同步。
+
+### 上次调整：默认 XYZ 坐标放大，XY 开口朝向观察者
 
 - 用户截图指出原先 XY 都朝右，要求默认开口朝外且小坐标稍大。
   默认相机改到 +X／+Y／+Z 一侧，X 朝左下、Y 朝右下、Z 朝上；cube 与小坐标同步，

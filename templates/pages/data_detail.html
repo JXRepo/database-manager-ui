@@ -885,9 +885,6 @@ details[open] > .detail-group-summary {
     .bc-tensor-shape { display: block; margin-top: 10px; }
     .bc-tensor-shape input { margin-right: 5px; }
     .bc-tensor-badge { position: absolute; top: 14px; left: 14px; z-index: 2; color: #5b21b6; font-size: 0.78rem; font-weight: 700; pointer-events: none; }
-    .bc-reading-note, .bc-reading-help { font-size: 0.8rem; color: #536176; line-height: 1.5; margin-top: 10px; }
-    .bc-reading-help summary { color: #334155; font-weight: 600; }
-    .bc-reading-help p { margin: 8px 0; }
     .bc-quantity { font-weight: 600; overflow-wrap: anywhere; }
 
     .bc-table .bc-status,
@@ -1713,15 +1710,6 @@ details[open] > .detail-group-summary {
                   </div>
                 </details>
               </section>
-              <div class="bc-reading-note">Arrows show directions. Use the quantity name, units and load values to read their meaning.</div>
-              <details class="bc-reading-help">
-                <summary>How to read this diagram</summary>
-                <p>Point markers, highlighted edges and shaded faces identify the loaded or fixed region. Whole cube conditions apply to the entire cube. T marks indicate fixed directions.</p>
-                <p><strong>Force</strong> is the supplied force; <strong>displacement</strong> is a prescribed movement. <strong>Stress</strong> describes force per area; <strong>strain</strong> describes relative stretching, compression or shear. Units come from the file.</p>
-                <p>Arrow lengths are schematic. Repeated arrows on an edge or face mark one region; they do not multiply the load. Open the X/Y/Z labels in the table for supplied values.</p>
-                <p>Whole cube stress and strain use a component matrix: normal components act across a face, while shear components run along it. Strain arrows are direction guides. Select a matrix value to inspect its arrows; select it again to restore all components.</p>
-                <p>Load records follow the file's order. A supplied <code>step</code> is shown unchanged as a record label; it is not a time scale. Separate scalar loads may belong to different X/Y/Z directions. Frequency and duration do not create extra records or an animation.</p>
-              </details>
             </div>
 
             <div class="bc-table-wrap">
