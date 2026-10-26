@@ -673,7 +673,7 @@ to `j`, with outward arrows for positive normal values. It shows supplied
 components independently, including unequal `xy` and `yx`, and does not claim
 to reconstruct the actual tractions on the simulation boundary. Each nonzero
 component uses three larger purple arrows on each of its two opposite faces,
-with the same 0.24 origin spacing as scalar edge, face and whole cube groups.
+with the same 0.24 origin spacing as scalar edge and face groups.
 The arrows occupy an outer layer that leaves room for local boundary markers;
 mixed views give shear components additional normal distance without moving
 them away from their face centers.
@@ -701,12 +701,12 @@ follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
-Edge, face and scalar whole cube groups share the same centered spacing between
+Edge and face groups share the same centered spacing between
 their three arrow origins in cube coordinates. Projected spacing changes with
 the viewing angle.
 Scalar whole cube conditions use larger purple arrows and green T markers close
 to the corresponding axis faces, leaving room for local outward arrows.
-Each loaded direction and sign uses three parallel arrows;
+Each loaded direction and sign uses one large arrow;
 each fixed direction uses one enlarged T. Local load arrows stay red and local
 constraint markers stay blue; the `Whole cube` legend shows the purple arrow and
 green T. Each marker group is centered on the normal through its corresponding

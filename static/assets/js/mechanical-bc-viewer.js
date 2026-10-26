@@ -732,16 +732,11 @@ function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
   // The outer layer leaves room for local face, edge and point markers.
   const distance = 0.9;
   (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
-    const direction = directionVector3d(axis.direction);
-    const across = getPerpendicularVector3d(direction);
     const signs = getLoadDirectionSigns(axis.magnitude);
     signs.forEach(sign => {
-      THREE_ARROW_OFFSETS.forEach(offset => {
-        const origin = wholeCubeAnchor3d(axis.direction, sign * distance)
-          .addScaledVector(across, offset);
-        createArrow(origin, axis, sign, wholeMaterials, group, tooltip, selectableMeshes,
-          signs.length > 1 ? 0.82 : 1, 1.3);
-      });
+      const origin = wholeCubeAnchor3d(axis.direction, sign * distance);
+      createArrow(origin, axis, sign, wholeMaterials, group, tooltip, selectableMeshes,
+        signs.length > 1 ? 0.82 : 1, 1.3);
     });
   });
   (item.axes || []).filter(axis => axis.status === "fixed").forEach(axis => {

@@ -1,16 +1,37 @@
 ---
 status: ready_for_continuation
 branch: main
-timestamp: 2026-10-11
-code_base: main at 37d803c (complete tensor display and aligned badges, verified live 2026-10-11)
-next_topic: Review complete tensor component display and aligned load badges
+timestamp: 2026-10-26
+code_base: main with one arrow per scalar whole cube direction and sign
+next_topic: Discuss whole cube stress and strain tensor arrow layout
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 最新调整：默认显示完整张量与加载标签对齐
+### 最新调整：整体力或位移每个加载方向只画一支大箭头
+
+- 用户确认第一类整体 force／displacement 使用一支大箭头即可，并询问第二类
+  stress／strain 的现有画法。这里按每个实际 loaded 轴及符号各一支处理，不合并 XYZ，
+  不推导合力；同时包含正负的循环值仍在两侧各画一支。
+- `drawWholeCubeCondition` 只删除横向三起点的复制循环；保留面中心法线上的 0.9
+  锚点、箭头大小 1.3、原符号与循环长度，以及固定方向大小 2 的绿色 T。
+  Point／Edge／Face 与张量路径沿用现有画法，README 的数量和间距说明同步更新。
+- 第一类测试文件是 `04_whole_cube_force_displacement_copper.json`，X=12.5 N、
+  Z=-7.5 N、Y fixed，现为两支紫箭头和一个绿 T。第二类文件是
+  `04_whole_cube_tensor_copper.json`，xx=15、yy=5、xy=yx=2 MPa，其余为零；
+  现仍为四个非零分量在相对两面各三支，共 24 支箭头及完整矩阵。
+  平台使用首字母为方向 i、次字母为面法向 j 的约定，箭头定长，数值由矩阵和 hover 显示。
+- `node --test tests/js/*.test.cjs` 共 128 项通过，零失败／跳过；独立 Chromium
+  WebGL 检查 7／7 通过，覆盖 1280／1440／1920 的标量、张量和混合局部条件，
+  以及真实鼠标 hover、旋转和 Reset。该检查使用原模块、真实 Three.js 和合成数据的
+  独立页面，未覆盖 Django 登录或详情页集成。额外函数探针核对居中、尺寸和双符号。
+  临时浏览器与服务均已关闭，截图与探针仅在 `/tmp/`，不随 Git 同步。
+- 最终 viewer SHA-256 为 `06b55dbacacba0f4c80d32db99146cda341a0f53f4fa17c7b41f93802b67ac31`。
+  两份原始 JSON 字节保持，未读取 `.env` 或连接生产数据库。推送与线上部署状态须分别核验。
+
+### 上一版：默认显示完整张量与加载标签对齐
 
 - 用户确认同一加载记录里已提供的全部非零分量应默认同时画出，不同步骤仍切换查看；
   同时截图指出 Whole cube 的 Tensor: loaded 与单条 Tensor load 标签没有对齐。
