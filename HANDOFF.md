@@ -2,13 +2,77 @@
 status: ready_for_continuation
 branch: main
 timestamp: 2026-10-26
-code_base: main with one arrow per scalar whole cube direction and sign
-next_topic: Discuss whole cube stress and strain tensor arrow layout
+code_base: main at application commit 6181c6f (pushed; production deployment unverified)
+next_topic: Continue the second whole cube stress and strain diagram discussion
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 新聊天先读：继续第二类整体 cube 张量画法
+
+- 当前用户要求写交接后开新聊天。正在讨论详情页的 Mechanical Boundary Condition Cube，
+  不涉及重做整个平台。用户认为整体应力图箭头拥挤、面板文字杂乱，先询问两类整体
+  边界条件的区别，再明确说“第一类就一个大箭头我觉得就 OK 了，那么第二类你是怎么做的”。
+- 已完成并推送应用提交 `6181c6f`：第一类整体 force／displacement 每个实际加载方向
+  及符号各一支大箭头。绿色 T 保持。这里不是把不同轴合成一支合力箭头。
+  本轮结束时已核实 GitHub `main` 与本地该应用提交一致；尚未核验 Render 是否部署完成。
+- **第二类 stress／strain 尚未重新设计。** 现仍默认同时显示全部已提供的非零分量，
+  点击矩阵数值隔离该分量，再点恢复全部，hover／键盘联动保留。
+  曾建议每个分量每侧面从三支减为一支，使当前样例从 24 支变为 8 支，
+  但用户尚未选定这个方案；不要把第一类的确认自动套用到第二类。
+- 3×3 数值框只属于整体 stress／strain 张量。第一类整体 force／displacement，
+  以及点、边、面的标量条件没有这个张量框，这是数据类型区别。
+  当前面板的 `All supplied components` 确实重复显示两次，只有一条记录时仍显示
+  `Load 1 of 1 · step 1`。这些冗余本轮只定位和解释，尚未修改。
+
+主要测试文件都在 `example_json_files/boundary_condition_examples_20261008/`：
+
+| 用途 | 文件与 Identifier | 当前内容 |
+| --- | --- | --- |
+| 第二类，接下来主要看这份；对应用户结果列表第一项 | `04_whole_cube_tensor_copper.json`；`synthetic-whole-stress-copper-one-state-20261011` | 一条 stress 张量记录；xx=15、yy=5、xy=yx=2 MPa，其余零；四个非零分量 × 两个相对面 × 每面三支，共 24 支紫箭头 |
+| 第一类，保留作对照；对应用户结果列表第二项 | `04_whole_cube_force_displacement_copper.json`；`synthetic-whole-force-copper-20261011` | X=12.5 N、Z=-7.5 N loaded，Y fixed；应用提交后为两紫箭头和一个绿 T |
+
+- 两份原始 JSON 未修改。force 文件保留的铜曲线是独立解析参考，不代表该 force
+  条件的计算响应；不要为了画图重算、改写数据或更换 Identifier。
+- 平台的张量方向约定是首字母为方向 i、次字母为面法向 j：xx 在 ±X 面沿 X，
+  yy 在 ±Y 面沿 Y，xy 在 ±Y 面沿 X，yx 在 ±X 面沿 Y。箭头定长，数值看矩阵或
+  hover；它是分量方向示意，不是重建真实边界牵引或仿真结果。
+- 用户追问过 `step`，应减少在画法讨论中反复强调它。schema 在
+  `mechanical_BC[].applied_load[]` 中只声明 `"step": {"type": "number"}`，
+  该条目的 required 只有 magnitude；step 可选，点／边／面／整体均可填写。
+  schema 没有进一步定义其单位或物理含义，不应当作时间，也不能把数组位置当作 step。
+  本机原始 `a46fde6c.json`、`Data_Base_Cyclic.json` 的机械载荷没有 step；
+  后制作的五份合成样例才都带 step=1。多条标量 applied_load 可能分别对应 XYZ。
+
+继续时优先读取的代码：
+
+- `static/assets/js/mechanical-bc-viewer.js`：`drawWholeCubeCondition` 是第一类；
+  `drawTensorLoading` 是第二类；不要修改共享三箭头间距而顺带改变点／边／面。
+- `static/assets/js/mechanical-bc-tensor.js`：`tensorArrows` 保持独立 xy／yx、正负面方向，
+  零值不画、缺失不补；`strainIllustration` 的对称小应变假设不可省略。
+- `static/assets/js/mechanical-bc-tensor-panel.js`：矩阵、选择与真实载荷记录切换，
+  重复文案在 render 中的 description 和 status 两处。
+- `templates/pages/data_detail.html`：cube、矩阵面板和右侧边界条件表。
+- `apps/pages/views.py`：`_build_mechanical_bc_items`、`_normalize_applied_load`；
+  `apps/dyn_api/schemas/mechanical.json`：实际捆绑 schema。
+
+本轮环境、同步和站点补充：
+
+- `9614771` 已将该目录五份 JSON 与 README 纳入 Git；约 80 张 PNG 是历史浏览器
+  预览，仍忽略。共享 `.gitignore` 只放行这里的 JSON 和 README，其他本地样例仍忽略。
+  `.env`、SQLite、media、模型权重、虚拟环境、工具状态和工作树不推送；新电脑按 README
+  重建环境。不要假设 `/tmp/` 探针、截图或本机路径在新聊天／另一台电脑仍存在。
+- 网站是 https://fair-materials-data-hub.onrender.com/ 。Render 跑程序，Supabase 存数据库。
+  用户本轮遇到长期 Render loading 页；外部访问也取得相同页面与 503。用户随后点击
+  Supabase 恢复，发来的 FAIR Materials Data Hub 项目截图显示 Healthy，之后又发来
+  数据列表和详情截图。未读取生产运行日志，不应认定暂停是故障的唯一原因。
+  如复发先看 Supabase 项目状态和 Render Events／Logs，不能只让用户无限等待。
+- 先读 AGENTS.md 和 README，再查 git 状态与最近提交。用户沟通用简明中文，应用 UI
+  用英文；保持改动局部和桌面优先。实际改动验证后检查 diff，再提交并推送；纯交接
+  文档提交用 `[skip render]`。Python 命令先通过 PyCharm 工具重新解析项目解释器，
+  开发／测试只用 DEBUG=True 和隔离或本地 SQLite，不使用生产数据库凭据。
 
 ### 最新调整：整体力或位移每个加载方向只画一支大箭头
 
@@ -29,7 +93,8 @@ next_topic: Discuss whole cube stress and strain tensor arrow layout
   独立页面，未覆盖 Django 登录或详情页集成。额外函数探针核对居中、尺寸和双符号。
   临时浏览器与服务均已关闭，截图与探针仅在 `/tmp/`，不随 Git 同步。
 - 最终 viewer SHA-256 为 `06b55dbacacba0f4c80d32db99146cda341a0f53f4fa17c7b41f93802b67ac31`。
-  两份原始 JSON 字节保持，未读取 `.env` 或连接生产数据库。推送与线上部署状态须分别核验。
+  两份原始 JSON 字节保持，未读取 `.env` 或连接生产数据库。应用提交 `6181c6f` 已推送，
+  Render 部署及线上脚本版本尚未核验。
 
 ### 上一版：默认显示完整张量与加载标签对齐
 
