@@ -1399,7 +1399,6 @@ class JSONDataSharingTests(TestCase):
         self.assertIn("new THREE.ConeGeometry", viewer)
         self.assertIn("new THREE.CylinderGeometry", viewer)
         self.assertIn("function getLoadDirectionSigns", viewer)
-        self.assertIn("return [-1, 1];", viewer)
         self.assertIn("function drawFaceCondition", viewer)
         self.assertIn("function drawWholeCubeCondition", viewer)
         self.assertIn("createClampMarker", viewer)

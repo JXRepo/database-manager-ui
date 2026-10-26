@@ -452,15 +452,19 @@ details[open] > .detail-group-summary {
     }
 
     .bc-whole-heading {
-      position: absolute;
-      top: 2px;
-      left: 2px;
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin: 10px 0 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      overflow-wrap: anywhere;
     }
 
     .bc-whole-select {
-      max-width: 150px;
+      max-width: 100%;
+      flex: 1;
       min-width: 0;
       padding: 2px 4px;
       border: 1px solid #cbd5e1;
@@ -855,10 +859,7 @@ details[open] > .detail-group-summary {
     .bc-tensor-selects:has(label[hidden]) { grid-template-columns: 1fr; }
     .bc-tensor-panel label { font-size: 0.8rem; font-weight: 600; }
     .bc-tensor-panel select { width: 100%; min-width: 0; font-size: 0.82rem; }
-    .bc-tensor-progress { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
-    .bc-tensor-progress[hidden], .bc-tensor-selects label[hidden] { display: none; }
-    .bc-tensor-progress input { flex: 1; min-width: 0; accent-color: #2563eb; }
-    .bc-tensor-progress output { font-size: 0.78rem; white-space: nowrap; }
+    .bc-tensor-selects label[hidden], .bc-tensor-status[hidden] { display: none; }
     .bc-tensor-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
     .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
     .bc-tensor-matrix { display: grid; grid-template-columns: 24px repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
@@ -884,6 +885,10 @@ details[open] > .detail-group-summary {
     .bc-tensor-shape { display: block; margin-top: 10px; }
     .bc-tensor-shape input { margin-right: 5px; }
     .bc-tensor-badge { position: absolute; top: 14px; left: 14px; z-index: 2; color: #5b21b6; font-size: 0.78rem; font-weight: 700; pointer-events: none; }
+    .bc-reading-note, .bc-reading-help { font-size: 0.8rem; color: #536176; line-height: 1.5; margin-top: 10px; }
+    .bc-reading-help summary { color: #334155; font-weight: 600; }
+    .bc-reading-help p { margin: 8px 0; }
+    .bc-quantity { font-weight: 600; overflow-wrap: anywhere; }
 
     .bc-table .bc-status,
     .bc-load-detail {
@@ -1684,10 +1689,7 @@ details[open] > .detail-group-summary {
                 <div class="bc-tensor-caption" data-tensor-kind></div>
                 <div class="bc-tensor-selects">
                   <label>Boundary condition<select class="form-select" data-tensor-condition></select></label>
-                  <label>Load entry<select class="form-select" data-tensor-load></select></label>
-                </div>
-                <div class="bc-tensor-progress">
-                  <output data-tensor-position></output>
+                  <label>Load record<select class="form-select" data-tensor-load></select></label>
                 </div>
                 <div class="bc-tensor-description" data-tensor-description></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
@@ -1695,9 +1697,6 @@ details[open] > .detail-group-summary {
                 <div class="bc-tensor-caption">Rows: direction i · columns: face normal j. Select a value to isolate it; select it again to show all.<br>Values rounded to two decimals; hover for full precision.</div>
                 <details class="bc-tensor-options" data-tensor-options>
                   <summary>Advanced display options</summary>
-                  <div class="bc-tensor-progress">
-                    <input type="range" min="0" max="0" value="0" step="1" data-tensor-slider aria-label="Load entry">
-                  </div>
                   <div class="bc-tensor-caption" data-tensor-metadata></div>
                   <div class="bc-tensor-filters" role="group" aria-label="Components to show">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="true">Show all</button>
@@ -1714,6 +1713,15 @@ details[open] > .detail-group-summary {
                   </div>
                 </details>
               </section>
+              <div class="bc-reading-note">Arrows show directions. Use the quantity name, units and load values to read their meaning.</div>
+              <details class="bc-reading-help">
+                <summary>How to read this diagram</summary>
+                <p>Point markers, highlighted edges and shaded faces identify the loaded or fixed region. Whole cube conditions apply to the entire cube. T marks indicate fixed directions.</p>
+                <p><strong>Force</strong> is the supplied force; <strong>displacement</strong> is a prescribed movement. <strong>Stress</strong> describes force per area; <strong>strain</strong> describes relative stretching, compression or shear. Units come from the file.</p>
+                <p>Arrow lengths are schematic. Repeated arrows on an edge or face mark one region; they do not multiply the load. Open the X/Y/Z labels in the table for supplied values.</p>
+                <p>Whole cube stress and strain use a component matrix: normal components act across a face, while shear components run along it. Strain arrows are direction guides. Select a matrix value to inspect its arrows; select it again to restore all components.</p>
+                <p>Load records follow the file's order. A supplied <code>step</code> is shown unchanged as a record label; it is not a time scale. Separate scalar loads may belong to different X/Y/Z directions. Frequency and duration do not create extra records or an animation.</p>
+              </details>
             </div>
 
             <div class="bc-table-wrap">
@@ -1777,12 +1785,12 @@ details[open] > .detail-group-summary {
                           </td>
                           <td>
                             {% if item.is_tensor_load %}
-                              <span class="bc-status bc-status-loaded">Tensor: loaded</span>
+                              <span class="bc-status bc-status-loaded">{{ item.loading_type|capfirst }}: loaded</span>
                               <div class="bc-tensor-loads">
                               {% for load in item.tensor_loads %}
                                 <details class="bc-load-detail">
                                   <summary>
-                                    <span class="bc-status bc-status-loaded">Tensor load {{ forloop.counter }}</span>
+                                    <span class="bc-status bc-status-loaded">{% if item.tensor_loads|length > 1 %}Load record {{ forloop.counter }}{% else %}Load details{% endif %}</span>
                                   </summary>
                                   <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bc-show-tensor="{{ row.source_index }}" data-bc-load-index="{{ forloop.counter0 }}" hidden>View in cube</button>
                                   <ul class="bc-load-list">
@@ -1825,7 +1833,7 @@ details[open] > .detail-group-summary {
                             {% endif %}
                           </td>
                           <td>
-                            {{ item.loading_type|default:"-" }}
+                            <span class="bc-quantity">{{ item.quantity_label|default:item.loading_type|default:"-" }}</span>
                             {% if item.loading_mode %} / {{ item.loading_mode }}{% endif %}
                           </td>
                         </tr>

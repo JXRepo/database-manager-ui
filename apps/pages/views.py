@@ -3990,6 +3990,39 @@ def _get_load_for_axis(applied_loads, load_index, is_group_target):
     return {}
 
 
+def _get_mechanical_quantity(loading_type, units):
+    """
+    Label a boundary quantity with its explicitly supplied unit
+
+    Direction arrows can represent different quantities. These labels keep
+    that distinction visible without deriving units from the load values.
+
+    Parameters
+    ----------
+    loading_type : object
+        Supplied mechanical loading type.
+    units : object
+        Unit metadata from the shared compatibility view.
+
+    Returns
+    -------
+    tuple of str
+        Readable quantity label and its unit, or two empty strings when absent.
+    """
+    if not isinstance(loading_type, str) or not loading_type.strip():
+        return "", ""
+
+    unit_key = {"force": "Force", "displacement": "Length", "stress": "Stress", "strain": "Strain"}.get(loading_type)
+    if not unit_key:
+        return loading_type.capitalize(), ""
+    raw_unit = units.get(unit_key) if isinstance(units, dict) and unit_key else None
+    unit = raw_unit.strip() if isinstance(raw_unit, str) else ""
+    if loading_type == "strain" and (unit == "1" or type(raw_unit) in (int, float) and raw_unit == 1):
+        unit = "-"
+    label = loading_type.capitalize()
+    return (f"{label} ({unit})" if unit else f"{label} · unit not supplied"), unit
+
+
 def _build_mechanical_bc_items(data):
     """
     Build normalized mechanical boundary condition items for the cube viewer
@@ -4020,6 +4053,7 @@ def _build_mechanical_bc_items(data):
         vertices = condition.get("vertex_list", [])
         constraints = condition.get("constraints", [])
         applied_loads = condition.get("applied_load", [])
+        quantity_label, unit = _get_mechanical_quantity(condition.get("loading_type"), data.get("units"))
 
         if not isinstance(vertices, list):
             vertices = [vertices]
@@ -4059,6 +4093,8 @@ def _build_mechanical_bc_items(data):
                 "tensor_loads": tensor_loads,
                 "loading_type": condition.get("loading_type", ""),
                 "loading_mode": condition.get("loading_mode", ""),
+                "quantity_label": quantity_label,
+                "unit": unit,
             })
             continue
 
@@ -4097,6 +4133,8 @@ def _build_mechanical_bc_items(data):
                 "axes": axes,
                 "loading_type": condition.get("loading_type", ""),
                 "loading_mode": condition.get("loading_mode", ""),
+                "quantity_label": quantity_label,
+                "unit": unit,
             }
         )
 

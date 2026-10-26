@@ -652,7 +652,12 @@ unspecified; stored JSON and CSV exports retain their existing values and format
 Variable selectors, tooltips, and raw-value summaries use matching mathematical
 italic glyphs for these two symbols; field keys and plotted values are unchanged.
 
-Mechanical boundary conditions include the supplied load `step`. Whole cube
+Mechanical boundary conditions show the quantity name and explicitly supplied
+unit in the table, diagram captions and load-arrow hover. Force, displacement,
+stress and strain share direction arrows; the name and unit identify what the
+arrow represents. Missing units are labeled as not supplied. A short expandable
+guide explains locations, quantities, repeated arrows and load records.
+Whole cube
 stress and strain tensors use a compact panel below the cube with an always
 visible component matrix. Its row and column headings identify direction `i`
 and face normal `j`. The initial view shows all supplied nonzero numeric
@@ -662,23 +667,28 @@ value and arrows.
 Load navigation preserves the selected component, even when a later entry omits
 it, and identifies missing or invalid values without drawing arrows. Selectors
 appear only for multiple conditions or load entries and retain their supplied
-order and exact steps. Advanced options contain explicit views of all, normal
-or shear components, the entry slider, shape illustration and explanation.
-These controls select recorded entries without interpolating a loading history
-from frequency or duration. All supplied load details remain available in the
+order and exact steps. Multiple records use one `Load record` selector; a single
+record has no navigation. The optional `step` is an unchanged record label,
+not a time scale, and is never generated from the array index. Scalar load entries
+may correspond to different X/Y/Z directions and are not treated as a timeline.
+Advanced options contain explicit views of all, normal or shear components,
+shape illustration and explanation. These controls select recorded entries
+without interpolating a loading history from frequency or duration.
+All supplied load details remain available in the
 table, including without JavaScript.
 
 The direction schematic explicitly uses `ij` for direction `i` on faces normal
 to `j`, with outward arrows for positive normal values. It shows supplied
 components independently, including unequal `xy` and `yx`, and does not claim
 to reconstruct the actual tractions on the simulation boundary. Each nonzero
-component uses three larger purple arrows on each of its two opposite faces,
-with the same 0.24 origin spacing as scalar edge and face groups.
+component uses one larger purple arrow on each of its two opposite faces.
+The copper stress example has eight arrows; nine nonzero components have eighteen.
 The arrows occupy an outer layer that leaves room for local boundary markers;
-mixed views give shear components additional normal distance without moving
-them away from their face centers.
+mixed views give shear components additional normal distance.
 Normal arrows point outward for tension and inward for compression; shear arrows
-run parallel to the corresponding faces, centered on their face normals. Arrow
+run parallel to the corresponding faces in separate lanes, keeping both shear
+directions clear of the normal arrow. Their placement is stable when a component
+is selected. Arrow
 lengths are fixed; the matrix and arrow hover show two decimal places with
 half-up rounding, and value titles retain full precision. A fixed camera
 envelope keeps the cube centered and avoids zoom changes between components.
@@ -701,6 +711,9 @@ follow the difference between
 and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
+Scalar zero, missing and invalid magnitudes produce no load arrows; the supplied
+constraint and value remain in the table. Mixed positive/negative scalar arrays
+show both supplied signs without inventing an animation.
 Edge and face groups share the same centered spacing between
 their three arrow origins in cube coordinates. Projected spacing changes with
 the viewing angle.
@@ -723,7 +736,9 @@ directions. The side of each arrow group follows its load sign; fixed markers
 use the positive axis side. These positions illustrate the whole cube axis
 conditions; the uploaded XYZ data do not specify a loaded local face. Multiple scalar
 whole cube conditions have a selector and remain separate; their original values
-and all table rows are retained. The cube has no scalar whole cube center dot or
+and all table rows are retained. A caption below the cube names the active scalar
+quantity and its unit, including for a single condition.
+The cube has no scalar whole cube center dot or
 covering load surface, so local markers remain available for hover. Whole RVE
 stress and strain tensors retain their separate component and face convention.
 Edge loading uses a thick yellow edge and three arrows for each displayed
@@ -784,11 +799,17 @@ Constraints retains the largest column for the three directions and their load
 details; its labels stay at the top while panels expand below them.
 Numeric load details,
 including tensor components, display two decimal places with half-up rounding;
-`step` retains its complete integer value. Stored values, arrows, curves, and
+`step` retains its supplied value, including complete integers and fractional values.
+Stored values, arrows, curves, and
 JSON downloads use the original numbers.
 
 Detail display tests use a synthetic example embedded in the test suite, so they
 do not depend on a local uploaded JSON file or skip when that file is removed.
+The boundary browser regression additionally exercises the five tracked boundary
+examples and synthetic mixed, zero and multi-record cases in real Chromium at
+1280, 1440 and 1920 pixels. Run `DEBUG=True python manage.py test apps.pages.test_bc_schema apps.pages.test_boundary_browser` with the configured
+project interpreter; Chromium and Node with global WebSocket are required.
+`BC_BROWSER_REPORT_DIR` optionally saves desktop screenshots outside the repository.
 
 ## My Data
 

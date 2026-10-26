@@ -127,8 +127,11 @@ Current priority:
 - Detail curve canvases are centered at 720 × 480 CSS pixels on desktop; cap their width at the available panel space, keep status text outside the canvas parent, and let Chart.js resize to the displayed dimensions
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
 - Whole RVE tensor schematics use the explicitly labeled ij direction/face-normal convention, fixed-length component arrows, and linked numeric matrices; preserve distinct xy/yx values and never infer missing components in the direction view
+- Use one tensor arrow per supplied nonzero component on each opposing face, with separate shear lanes; scalar whole cube loads keep one arrow per loaded axis/sign and local point/edge/face marker geometry stays independent
+- Label boundary quantities with their supplied units in tables, captions and arrow hover; zero, missing and invalid scalar magnitudes produce no arrows, and repeated region arrows do not multiply the load
 - Strain shape illustration is opt-in, normalized, and explicitly assumes symmetric small strain with tensor shear; reject incomplete or conflicting reciprocal data for that preview, and never present it as a simulated shape or change stored/exported values
 - Tensor load navigation follows the supplied entry order and exact step values; do not invent intermediate steps, combine separate tensor conditions, or simulate time histories from frequency/duration metadata
+- Show one Load record selector only for multiple tensor records; preserve optional fractional or integer step labels without treating them as time, and never treat separate scalar X/Y/Z entries as a timeline
 - Show boundary load numbers with two decimal places and half-up rounding, retaining full integer step values and original stored/exported numbers; label the combined column Loading Type / Mode
 - Keep X/Y/Z boundary labels on one line in evenly spaced columns; allow independent load panels to stay open together below their own labels, growing the row without shifting sibling labels or overlapping other rows
 - Search result pages should not include delete actions unless explicitly requested

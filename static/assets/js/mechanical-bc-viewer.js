@@ -66,27 +66,9 @@ function directionVector3d(direction) {
 }
 
 function getLoadDirectionSigns(magnitude) {
-  if (Array.isArray(magnitude)) {
-    const values = magnitude
-      .flat(Infinity)
-      .map(value => Number(value))
-      .filter(value => Number.isFinite(value) && value !== 0);
-    const hasPositive = values.some(value => value > 0);
-    const hasNegative = values.some(value => value < 0);
-
-    if (hasPositive && hasNegative) {
-      return [-1, 1];
-    }
-
-    if (hasNegative) {
-      return [-1];
-    }
-
-    return [1];
-  }
-
-  const value = Number(magnitude);
-  return Number.isFinite(value) && value < 0 ? [-1] : [1];
+  const values = (Array.isArray(magnitude) ? magnitude.flat(Infinity) : [magnitude])
+    .filter(value => typeof value === 'number' && Number.isFinite(value) && value !== 0);
+  return [-1, 1].filter(sign => values.some(value => Math.sign(value) === sign));
 }
 
 function getBoundaryConditionMarkerColor(item) {
@@ -119,9 +101,17 @@ function formatBoundaryConditionHover(item) {
     return `${axis.direction}: ${status}`;
   });
 
-  return [item.vertex || item.target_type || "Boundary condition"]
+  return [item.vertex || item.target_type || "Boundary condition", item.quantity_label || '']
     .concat(axes)
+    .filter(Boolean)
     .join("\n");
+}
+
+function formatAxisLoadHover(item, axis) {
+  const location = item.target_type === 'Whole cube' ? 'Whole cube'
+    : `${item.target_type || 'Boundary'} · ${item.vertex || ''}`;
+  return [location, item.quantity_label || item.loading_type || 'Load',
+    `${axis.direction}: ${axis.status}`, axis.load_summary || 'No load value supplied'].join('\n');
 }
 
 function createMaterials() {
@@ -310,11 +300,10 @@ function createArrow(origin, axis, sign, materials, group, tooltip, selectableMe
 }
 
 function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, sizeScale = 1, opposingSizeScale = sizeScale, edgeDirection = "") {
-  const tooltip = formatBoundaryConditionHover(item);
-
   (item.axes || [])
     .filter(axis => axis.status === "loaded")
     .forEach(axis => {
+      const tooltip = formatAxisLoadHover(item, axis);
       const signs = getLoadDirectionSigns(axis.magnitude);
       const arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
       const arrowLength = signs.length > 1 ? 0.82 : 1;
@@ -709,13 +698,14 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
   addMesh(group, createFaceMesh(points, materials.faceHighlight), tooltip, selectableMeshes);
   (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
     const origins = getFaceArrowOrigins(points, axis.direction, THREE_ARROW_OFFSETS);
+    const loadTooltip = formatAxisLoadHover(item, axis);
     const signs = getLoadDirectionSigns(axis.magnitude);
     const sizeScale = signs.length > 1 ? 0.45 : 0.5;
     const lengthScale = signs.length > 1 ? 0.82 : 1;
 
     origins.forEach(origin => {
       signs.forEach(sign => {
-        createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale, sizeScale);
+        createArrow(origin, axis, sign, materials, group, loadTooltip, selectableMeshes, lengthScale, sizeScale);
       });
     });
   });
@@ -727,11 +717,11 @@ function wholeCubeAnchor3d(direction, distance) {
 }
 
 function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
-  const tooltip = formatBoundaryConditionHover(item);
   const wholeMaterials = {loaded: materials.whole, fixed: materials.wholeFixed};
   // The outer layer leaves room for local face, edge and point markers.
   const distance = 0.9;
   (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
+    const tooltip = formatAxisLoadHover(item, axis);
     const signs = getLoadDirectionSigns(axis.magnitude);
     signs.forEach(sign => {
       const origin = wholeCubeAnchor3d(axis.direction, sign * distance);
@@ -747,7 +737,7 @@ function drawWholeCubeCondition(item, materials, group, selectableMeshes) {
 }
 
 function createWholeCubeControls(container, items, state, materials, tooltip) {
-  const heading = document.createElement("div");
+  const heading = document.createElement("label");
   heading.className = "bc-whole-heading";
   const select = document.createElement("select");
   select.className = "bc-whole-select";
@@ -755,13 +745,16 @@ function createWholeCubeControls(container, items, state, materials, tooltip) {
   items.forEach(({item, index}, position) => {
     const option = document.createElement("option");
     option.value = String(position);
-    option.textContent = `${index + 1} · ${item.loading_type || "constraints"}`;
+    option.textContent = `Condition ${position + 1} · ${item.quantity_label || item.loading_type || "constraints"}`;
     select.appendChild(option);
   });
   if (items.length > 1) {
+    heading.appendChild(document.createTextNode('Whole cube '));
     heading.appendChild(select);
-    container.appendChild(heading);
+  } else {
+    heading.textContent = `Whole cube · ${items[0].item.quantity_label || 'Constraints'}`;
   }
+  container.parentElement.insertAdjacentElement('afterend', heading);
 
   function showCondition(position) {
     state.wholeRoot.traverse(object => {
@@ -817,7 +810,8 @@ function createTooltip(container) {
   tooltip.style.background = "#111827";
   tooltip.style.color = "#ffffff";
   tooltip.style.font = "600 12px/1.35 Arial, sans-serif";
-  tooltip.style.whiteSpace = "pre";
+  tooltip.style.whiteSpace = "pre-wrap";
+  tooltip.style.overflowWrap = "anywhere";
   tooltip.style.boxShadow = "0 10px 24px rgba(15, 23, 42, 0.22)";
   tooltip.style.opacity = "0";
   tooltip.style.transform = "translate(-50%, calc(-100% - 12px))";
@@ -831,8 +825,16 @@ function setupTooltip(container, camera, selectableMeshes, tooltip, onHighlight 
   const raycaster = new THREE.Raycaster();
   raycaster.params.Line.threshold = 0.02;
   const pointer = new THREE.Vector2();
+  const clear = () => {
+    tooltip.style.opacity = '0';
+    onHighlight('');
+  };
 
   container.addEventListener("pointermove", event => {
+    if (event.buttons) {
+      clear();
+      return;
+    }
     const rect = container.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -857,16 +859,19 @@ function setupTooltip(container, camera, selectableMeshes, tooltip, onHighlight 
 
     onHighlight(hit.object.userData.component || '');
     tooltip.textContent = hit.object.userData.tooltip;
-    tooltip.style.transform = y >= tooltip.offsetHeight + 12
-      ? "translate(-50%, calc(-100% - 12px))" : "translate(-50%, 12px)";
-    tooltip.style.left = `${event.clientX - rect.left}px`;
-    tooltip.style.top = `${event.clientY - rect.top}px`;
+    tooltip.style.maxWidth = `${Math.max(rect.width - 16, 1)}px`;
+    tooltip.style.transform = 'none';
+    const left = Math.max(8, Math.min(x - tooltip.offsetWidth / 2, rect.width - tooltip.offsetWidth - 8));
+    const top = y >= tooltip.offsetHeight + 12 ? y - tooltip.offsetHeight - 12 : y + 12;
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${Math.max(8, Math.min(top, rect.height - tooltip.offsetHeight - 8))}px`;
     tooltip.style.opacity = "1";
   });
 
-  container.addEventListener("pointerleave", () => {
-    tooltip.style.opacity = "0";
-    onHighlight('');
+  container.addEventListener('pointerleave', clear);
+  window.addEventListener('scroll', clear, true);
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') clear();
   });
 }
 
@@ -904,6 +909,7 @@ function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = fals
   const sizeScale = 1.3;
   const tipDistance = 0.39 * sizeScale;
   const arrowCenter = (0.075 + 0.39) * sizeScale / 2;
+  const shearLaneOffset = 0.28;
   for (const arrow of tensorArrows(view.load?.magnitude, view.filter, view.selected)) {
     if (!componentMaterials.has(arrow.component)) {
       componentMaterials.set(arrow.component, new THREE.MeshStandardMaterial({
@@ -913,28 +919,24 @@ function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = fals
     }
     const material = componentMaterials.get(arrow.component);
     const normal = AXIS_DIRECTIONS[arrow.normal.toUpperCase()].clone().multiplyScalar(arrow.faceSign);
-    const faceVertices = VERTICES.filter(vertex => vertexCoordinates(vertex)[arrow.normal] === arrow.faceSign * 0.5);
-    const points = getOrderedFacePoints(faceVertices);
     const axis = {direction: arrow.direction.toUpperCase()};
     const direction = directionVector3d(axis.direction).multiplyScalar(arrow.sign);
-    const origins = getFaceArrowOrigins(points, axis.direction, THREE_ARROW_OFFSETS);
     const normalDistance = hasLocalMarkers && arrow.direction !== arrow.normal ? 1.25 : 0.9;
+    const origin = normal.clone().multiplyScalar(normalDistance);
     const tooltip = `${isStrain ? 'Strain guide' : 'Stress component'} ${arrow.component}: ${formatTensorValue(arrow.value)}${view.unit ? ` ${view.unit}` : ''}\n${arrow.faceSign > 0 ? '+' : '-'}${arrow.normal.toUpperCase()} face · ${arrow.sign > 0 ? '+' : '-'}${arrow.direction.toUpperCase()} direction`;
-    for (const origin of origins) {
-      // Keep whole cube components outside the layer used by local face arrows.
-      origin.addScaledVector(normal, normalDistance - 0.5);
-      if (arrow.direction === arrow.normal && arrow.value < 0) {
-        origin.addScaledVector(normal, tipDistance);
-      } else if (arrow.direction !== arrow.normal) {
-        // Center the full shear arrow on the face normal, including its tip.
-        origin.addScaledVector(direction, -arrowCenter);
-      }
-      const meshes = createArrow(origin, axis, arrow.sign, {loaded: material}, group,
-        tooltip, selectableMeshes, 1, sizeScale);
-      for (const mesh of meshes) {
-        mesh.userData.component = arrow.component;
-        mesh.userData.value = arrow.value;
-      }
+    if (arrow.direction === arrow.normal && arrow.value < 0) {
+      origin.addScaledVector(normal, tipDistance);
+    } else if (arrow.direction !== arrow.normal) {
+      // Separate both shear directions from each other and the normal arrow
+      const laneAxis = ['x', 'y', 'z'].find(key => key !== arrow.direction && key !== arrow.normal);
+      origin[laneAxis] = shearLaneOffset * arrow.faceSign;
+      origin.addScaledVector(direction, -arrowCenter);
+    }
+    const meshes = createArrow(origin, axis, arrow.sign, {loaded: material}, group,
+      tooltip, selectableMeshes, 1, sizeScale);
+    for (const mesh of meshes) {
+      mesh.userData.component = arrow.component;
+      mesh.userData.value = arrow.value;
     }
     const faceMaterial = new THREE.MeshBasicMaterial({
       color: WHOLE_COLOR, transparent: true, opacity: 0.055,
@@ -1168,6 +1170,15 @@ function renderMechanicalBcViewer() {
   const tooltip = createTooltip(container);
   const tensorItems = items.filter(item => item.is_tensor_load);
   const scalarItems = items.filter(item => !item.is_tensor_load && item.is_defined !== false);
+  const legend = container.closest('.bc-layout').querySelector('.bc-legend');
+  const localItems = scalarItems.filter(item => item.target_type !== 'Whole cube');
+  const localQuantities = [...new Set(localItems
+    .filter(item => (item.axes || []).some(axis => axis.status === 'loaded'))
+    .map(item => item.quantity_label || item.loading_type || 'Load'))];
+  const localLoadLegend = legend.firstElementChild;
+  localLoadLegend.lastChild.textContent = ` Local loads${localQuantities.length ? ' · ' + localQuantities.join(', ') : ''}`;
+  localLoadLegend.hidden = !localQuantities.length;
+  legend.children[1].hidden = !localItems.some(item => (item.axes || []).some(axis => axis.status === 'fixed'));
   const hasLocalMarkers = scalarItems.some(item => item.target_type !== "Whole cube"
     && (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed"));
   const tensorGroup = new THREE.Group();
@@ -1219,6 +1230,7 @@ function renderMechanicalBcViewer() {
     const loadLegend = legend.firstElementChild;
     loadLegend.querySelectorAll('line').forEach(line => line.setAttribute('stroke', STATUS_COLORS.loaded));
     const tensorLegend = loadLegend.cloneNode(true);
+    tensorLegend.hidden = false;
     tensorLegend.dataset.tensorLegend = '';
     tensorLegend.querySelectorAll('line').forEach(line => line.setAttribute('stroke', WHOLE_COLOR));
     if (scalarItems.length) legend.appendChild(tensorLegend);

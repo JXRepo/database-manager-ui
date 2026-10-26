@@ -71,6 +71,53 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertEqual([(detail["key"], detail["value"]) for detail in details], [("magnitude", -4), ("step", 10001)])
         self.assertEqual(details[1]["display"], "10001")
 
+    def test_boundary_quantities_use_only_uploaded_units_and_keep_data_intact(self):
+        """
+        Distinguish quantities without guessing missing or invalid units
+
+        The same direction arrow can describe different quantities, so its
+        prepared label must carry the uploaded unit and leave the data intact.
+        """
+        for kind, units, expected, unit in (
+            ("force", {"Force": "N"}, "Force (N)", "N"),
+            ("displacement", {"Length": "mm"}, "Displacement (mm)", "mm"),
+            ("stress", {"Stress": "MPa"}, "Stress (MPa)", "MPa"),
+            ("strain", {"Strain": 1}, "Strain (-)", "-"),
+            ("strain", {"Strain": True}, "Strain · unit not supplied", ""),
+            ("force", {"Stress": "MPa"}, "Force · unit not supplied", ""),
+            ("force", None, "Force · unit not supplied", ""),
+            ("none", {}, "None", ""),
+        ):
+            with self.subTest(kind=kind, units=units):
+                data = self._tensor_data(kind)
+                data["units"] = units
+                original = deepcopy(data)
+                item = _build_mechanical_bc_items(data)[0]
+                self.assertEqual(item["quantity_label"], expected)
+                self.assertEqual(item["unit"], unit)
+                self.assertEqual(data, original)
+
+    def test_single_tensor_record_has_details_without_a_numbered_load_badge(self):
+        """
+        Show a supplied step precisely without suggesting a load history
+
+        A single record needs its values and units, but no redundant numbered
+        load label. Uploaded text must remain escaped in the rendered page.
+        """
+        owner = User.objects.create_user(username="single-bc-owner")
+        self.client.force_login(owner)
+        data = self._tensor_data()
+        data["mechanical_BC"][0]["applied_load"] = [{"magnitude": {"xx": 15}, "step": 0.0123456789}]
+        data["units"] = {"Stress": '<img src=x onerror="alert(1)">'}
+        obj = JSONData.objects.create(owner=owner, data=data)
+        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        self.assertContains(response, "Load details")
+        self.assertNotContains(response, "Tensor load 1")
+        self.assertContains(response, "0.0123456789")
+        self.assertContains(response, "Stress (&lt;img")
+        self.assertNotContains(response, '<img src=x onerror="alert(1)">')
+        self.assertEqual(self.client.get(reverse("json_data_export", args=[obj.pk])).json(), data)
+
     def test_load_values_round_half_up_without_changing_stored_values(self):
         """
         Round load details to two decimals while keeping full values and step numbers
@@ -153,8 +200,8 @@ class MechanicalBCSchemaTests(TestCase):
         response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue("Tensor load 1" in response.content.decode(), "Missing tensor load display")
-        self.assertContains(response, "Tensor load 2")
+        self.assertTrue("Load record 1" in response.content.decode(), "Missing tensor load display")
+        self.assertContains(response, "Load record 2")
         self.assertContains(response, 'class="bc-load-key">step</span>:', count=2)
         self.assertContains(response, "<th>Loading Type / Mode</th>", html=True)
         self.assertContains(response, "&quot;xx&quot;: -1.23,")

@@ -6,7 +6,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
 
   const conditionSelect = panel.querySelector('[data-tensor-condition]');
   const loadSelect = panel.querySelector('[data-tensor-load]');
-  const slider = panel.querySelector('[data-tensor-slider]');
   const matrix = panel.querySelector('[data-tensor-matrix]');
   const shape = panel.querySelector('[data-tensor-shape]');
   const shapeLabel = panel.querySelector('[data-tensor-shape-label]');
@@ -50,12 +49,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     panel.querySelector('[data-tensor-metadata]').textContent = (load?.details || [])
       .filter(detail => detail.key !== 'magnitude')
       .map(detail => `${detail.key}: ${detail.display}`).join(' · ');
-    const stepDetail = load?.details?.find(detail => detail.key === 'step');
-    panel.querySelector('[data-tensor-position]').textContent = loads.length
-      ? `Load ${loadIndex + 1} of ${loads.length}${stepDetail ? ` · step ${stepDetail.display}` : ''}` : 'No load entries supplied';
     loadSelect.value = String(loadIndex);
-    slider.value = String(loadIndex);
-    slider.setAttribute('aria-valuetext', loadSelect.selectedOptions[0]?.textContent || 'No loads');
     shapeLabel.hidden = !isStrain;
     const preview = strainIllustration(magnitude, filter, selected);
     shape.disabled = !!preview.error;
@@ -122,7 +116,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       && button.dataset.tensorFilter === filter)));
     const valid = TENSOR_COMPONENTS.filter(key => isTensorNumber(magnitude?.[key]));
     const invalid = TENSOR_COMPONENTS.filter(key => magnitude && Object.hasOwn(magnitude, key) && !isTensorNumber(magnitude[key]));
-    let status = filter === 'all' ? 'All supplied components' : `Supplied ${filter} components`;
+    let status = '';
     const description = panel.querySelector('[data-tensor-description]');
     const statusElement = panel.querySelector('[data-tensor-status]');
     statusElement.removeAttribute('title');
@@ -137,10 +131,11 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     } else {
       description.textContent = filter === 'all' ? 'All supplied components' : `${filter === 'normal' ? 'Normal' : 'Shear'} components`;
       if (!valid.length) status = 'No numeric tensor components to visualize. See supplied load details in the table.';
-      else if (!tensorArrows(magnitude, filter).length) status += ' · no nonzero components in this view';
+      else if (!tensorArrows(magnitude, filter).length) status = 'No nonzero components in this view';
     }
-    if (invalid.length) status += ` · invalid components omitted: ${invalid.join(', ')}`;
+    if (invalid.length) status += `${status ? ' · ' : ''}Invalid components omitted: ${invalid.join(', ')}`;
     statusElement.textContent = status;
+    statusElement.hidden = !status;
     panel.querySelector('[data-tensor-note]').textContent = shape.checked
       ? 'Normalized small-strain illustration, not a simulated shape. Assumes tensor shear and symmetry; all nine components must be supplied and reciprocal values must agree. Blue: original, purple: illustration.'
       : `${isStrain ? 'Strain direction guides, not forces or a predicted shape.' : 'Stress component schematic, not reconstructed boundary tractions.'} ij means direction i on faces normal to j. Positive normal values point outward. Arrow lengths are fixed; use the values for magnitude. Missing components are not inferred.`;
@@ -167,15 +162,12 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       const option = document.createElement('option');
       option.value = String(index);
       const stepDetail = load.details?.find(detail => detail.key === 'step');
-      option.textContent = `Load ${index + 1}${stepDetail ? ` · step ${stepDetail.display}` : ''}`;
+      option.textContent = `Record ${index + 1} of ${loads.length}${stepDetail ? ` · step ${stepDetail.display}` : ''}`;
       loadSelect.appendChild(option);
     });
     if (!loads.length) loadSelect.add(new Option('No load entries', '0'));
     loadSelect.disabled = loads.length < 2;
     loadSelect.closest('label').hidden = loads.length < 2;
-    slider.max = String(Math.max(0, loads.length - 1));
-    slider.disabled = loads.length < 2;
-    slider.closest('.bc-tensor-progress').hidden = loads.length < 2;
     render();
   }
 
@@ -190,7 +182,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     render();
   }
   loadSelect.addEventListener('change', () => selectLoad(loadSelect.value));
-  slider.addEventListener('input', () => selectLoad(slider.value));
   filterButtons.forEach(button => button.addEventListener('click', () => {
     shape.checked = false;
     filter = button.dataset.tensorFilter;

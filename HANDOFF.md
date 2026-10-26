@@ -1,16 +1,56 @@
 ---
-status: ready_for_continuation
+status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-26
-code_base: main at application commit 6181c6f (pushed; production deployment unverified)
-next_topic: Continue the second whole cube stress and strain diagram discussion
+code_base: Final boundary viewer delivery based on 388bc89; see git log for the delivery commit
+next_topic: Boundary viewer implementation and verification complete; check Render deployment separately
 ---
 
 # Project handoff
 
 ## 当前状态
 
-### 新聊天先读：继续第二类整体 cube 张量画法
+### 2026-10-26：边界条件图最终交付
+
+- 用户已明确授权收敛最终方案并完成实现，范围为点、边、面、整体 force/displacement、
+  整体 stress/strain，以及真实载荷记录。不要再次把第二类当作尚待用户选方案。
+- 位置标记回答“作用在哪里”，量名与上传单位回答“施加什么”，箭头回答方向。
+  点／边／面的既有几何保留；第一类整体仍为每个加载轴及符号一支紫箭，固定方向绿色 T。
+  表格、图例／标题、真实箭头 hover 明示 Force／Displacement／Stress／Strain 及单位。
+  零、缺失、无效标量不再凭空画正向箭头；上传值与约束仍保留。
+- 第二类每个非零分量在相对两面各一支定长紫箭；铜样例从 24 支减至 8 支，九个非零
+  分量为 18 支。剪切方向错开在各自平行于面的线位，避开法向及另一剪切箭头。
+  仍使用 ij=方向 i／面法向 j，xy 与 yx 独立、不补缺失。默认全部，点击矩阵隔离，
+  再次点击恢复全部；选择前后位置保持。应变形状仅为明确假设下的自选归一化示意。
+- 单条张量记录去掉编号导航与重复状态；多条只保留一个 Load record 下拉框。
+  step 可选，按原值和原序展示（包括小数及完整整数），不是时间，也不按频率造动画。
+  标量 applied_load 继续按已加载 XYZ 方向映射，不能解释成时间序列。
+  图下折叠说明解释点／边／面／整体、四种量和重复箭头；界面保持英文。
+- **验证：121 项相关 Django 测试、131 项 Node 测试全部通过，0 失败／跳过。**
+  Django 覆盖 boundary browser/schema、detail metadata、upload compatibility、plots、CSV、
+  原有 pages 权限／详情等测试。真实 Chromium 覆盖五份跟踪样例、九分量、负法向与互异
+  xy/yx、step 7→3→123456789012345→缺失原序、多条件、混合局部、零值及空条件，
+  1280／1440／1920 桌面、矩阵联动、真实悬停及清除、旋转／复位、独立展开、无 JS
+  原生 details，并逐个核对原 JSON／导出完全一致。独立只读审查无阻断问题。
+- 新的持久浏览器回归是 `apps/pages/test_boundary_browser.py` 与
+  `tests/browser/boundary.cjs`；只有测试响应注入检查入口，生产代码没有测试全局。
+  `BC_BROWSER_REPORT_DIR` 可保存实际窗口截图。避免 captureBeyondViewport 对局部截图
+  临时改变布局造成假裁切；当前截图使用同桌面宽度的完整窗口。
+- 本机完整测试日志及截图在 `/tmp/boundary-final-qa-iv3LPA/`，不随 Git 同步。
+  五种最终截图另存 ignored 样例目录 `boundary_final_{point,edge,face,whole,tensor}_20261026.png`。
+  方案及执行记录在 `docs/superpowers/{specs,plans}/2026-10-26-boundary-viewer-delivery.md`。
+- 工作在 `.worktrees/boundary-final`／`finalize-boundary-viewer` 隔离完成。开发只用
+  `DEBUG=True` 与测试 SQLite，禁用 dotenv 读取，未接触生产库或原始样例值。
+  隔离目录曾缺本机已有 `.assistant-models`，复用本机模型后相关旧测试也已通过；
+  临时模型链接须在 `git add .` 前移除，模型不提交。PyCharm build 返回成功但提示
+  诊断能力有限，实际验收以 Django／Node／Chromium 结果为准。
+- 本次交付提交合入 main 并推送的结果见最终回复；**Git push 与 Render 部署是两件事**。
+  提交时尚未核实生产部署，不把本地验收写成线上验收。站点仍为
+  https://fair-materials-data-hub.onrender.com/ 。
+
+## 历史交接（以下状态已被上面的最终交付替代）
+
+### 上次交接：第二类整体 cube 张量画法讨论
 
 - 当前用户要求写交接后开新聊天。正在讨论详情页的 Mechanical Boundary Condition Cube，
   不涉及重做整个平台。用户认为整体应力图箭头拥挤、面板文字杂乱，先询问两类整体
