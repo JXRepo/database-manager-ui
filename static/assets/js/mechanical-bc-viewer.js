@@ -1033,7 +1033,7 @@ function createScene(container, hasWholeMarkers = false) {
   const root = new THREE.Group();
   root.userData.hasWholeConditions = hasWholeMarkers;
   root.add(wholeRoot);
-  const cameraDirection = new THREE.Vector3(1.45, -1.45, 1.15).normalize();
+  const cameraDirection = new THREE.Vector3(1.45, 1.45, 1.15).normalize();
   const ambient = new THREE.AmbientLight("#ffffff", 1.35);
   const keyLight = new THREE.DirectionalLight("#ffffff", 2.35);
   const fillLight = new THREE.DirectionalLight("#dbeafe", 0.95);

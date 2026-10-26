@@ -2,13 +2,24 @@
 status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-26
-code_base: main at application commit 7460fb1 (pushed; live static files and health verified)
-next_topic: Boundary viewer delivery complete; see current rules before further changes
+code_base: main; see git log for the latest default camera and coordinate guide adjustment
+next_topic: Boundary viewer complete; default XY opening now faces the viewer
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：默认 XYZ 坐标放大，XY 开口朝向观察者
+
+- 用户截图指出原先 XY 都朝右，要求默认开口朝外且小坐标稍大。
+  默认相机改到 +X／+Y／+Z 一侧，X 朝左下、Y 朝右下、Z 朝上；cube 与小坐标同步，
+  保持旋转时方向一致，Reset 恢复该视角。桌面坐标框由 104×86 放大到 124×102 CSS px。
+  坐标框靠右 6px、靠下 4px，给较窄桌面的局部箭头留出间距。
+- 只修改 `mechanical-bc-viewer.js` 默认相机方向与 `data_detail.html` 坐标尺寸。
+  12 项相关 Django 测试、16 项 Node 测试通过，零失败／跳过，含真实 Chromium 的
+  五种边界、多记录、旋转／Reset、1280／1440／1920 桌面与无 JavaScript 查看。
+  本机截图与日志在 `/tmp/boundary-axis-qa-cmf1vR/`；正式站发布状态以本轮回复为准。
 
 ### 2026-10-26：边界条件图最终交付
 

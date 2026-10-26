@@ -693,7 +693,9 @@ lengths are fixed; the matrix and arrow hover show two decimal places with
 half-up rounding, and value titles retain full precision. A fixed camera
 envelope keeps the cube centered and avoids zoom changes between components.
 The positive X/Y/Z orientation guide follows the camera projection during
-rotation and Reset.
+rotation and Reset. The default view faces the positive X/Y/Z corner, with X
+pointing down-left, Y down-right and Z upward; the guide is 124 × 102 CSS pixels
+on desktop. Reset restores this view for every boundary type.
 Zero values produce no arrows; missing and invalid components are identified
 without being replaced by zero or mirrored. Stress and strain units come from
 the uploaded units metadata; dimensionless strain `1` appears as `(-)`.
