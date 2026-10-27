@@ -33,6 +33,11 @@ next_topic: Whole cube scalar and tensor loads have distinct visual meanings
   `/tmp/cube-reading-qa/`。部署状态以本轮最终核验为准，不能仅用 push 判断。
   本次只改显示，现有记录无需重传。独立只读审查已通过，无 Critical／Important 问题；
   审查同时查看了实际截图，未扩大到移动端、真实物理重建或隐藏默认完整分量。
+- 应用提交 `07f444a` 已快进合入并推送 main。2026-10-27 11:41:31 UTC，线上
+  `mechanical-bc-viewer.js`、`mechanical-bc-tensor.js`、`mechanical-bc-tensor-panel.js`
+  的普通 URL 与独立 no-cache URL 均与本次文件逐字节一致，`/healthz/` HTTP 200。
+  证据为 `/tmp/cube-reading-qa/live-verification.json`；桌面交互验收在本地真实 Chromium
+  完成，未登录生产详情或操作生产数据。本段核验记录使用 `[skip render]` 文档提交。
 
 ### 最新调整：整体 cube 添加半透明高亮
 
