@@ -22,7 +22,9 @@ next_topic: Whole cube boundary regions have a translucent purple highlight
   覆盖五种边界、混合／空条件、1280／1440／1920 桌面、悬停、旋转／Reset、切换与导出。
   已查看整体力、整体应力及三种桌面宽度的混合场景截图；本次仅配色改动，复用现有测试。
 - 截图与日志在 `/tmp/boundary-cube-tint-qa-y3R2zN/`，不随 Git 同步。
-  Git 推送与线上脚本更新分开核验，发布状态以本轮最终回复为准。
+- 应用提交 `169cb12` 已推送。2026-10-27 09:13:04 UTC，线上 viewer 的普通 URL 和
+  独立 no-cache URL 均与本次文件逐字节一致，`/healthz/` 返回 HTTP 200，确认脚本已更新。
+  核验记录在上述目录的 `live-verification.json`；交互检查在本地完成，未修改生产数据。
 
 ### 最新调整：边和面每个方向一支箭头，共用中心起点
 
