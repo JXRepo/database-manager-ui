@@ -654,17 +654,20 @@ italic glyphs for these two symbols; field keys and plotted values are unchanged
 
 Mechanical boundary conditions show the quantity name and explicitly supplied
 unit in the table, whole cube captions and load-arrow hover. Force, displacement,
-stress and strain share direction arrows; the name and unit identify what the
-arrow represents. Missing units are labeled as not supplied.
+stress and strain retain distinct quantity labels. Scalar force/displacement uses
+slim purple axis arrows, while tensors use broad block arrows on opposing faces.
+Missing units are labeled as not supplied.
 The local legend uses `Local loads` and `Fixed constraint` without repeating
 quantity names, units or an `X/Y/Z directions` label.
 Whole cube
-stress and strain tensors use a compact panel below the cube with an always
+stress and strain tensors use a compact panel to the right of the cube with an always
 visible component matrix. Its row and column headings identify direction `i`
 and face normal `j`. The initial view shows all supplied nonzero numeric
 components in the current load entry. Selecting a value isolates that component;
 selecting it again returns to all components. Hover and keyboard focus link the
-value and arrows.
+value, arrows and corresponding faces. The matrix stays in place when a component
+is selected; status appears below it. Nonzero cells include a short action label,
+with matching colors in the diagram and pictorial legend.
 Load navigation preserves the selected component, even when a later entry omits
 it, and identifies missing or invalid values without drawing arrows. Selectors
 appear only for multiple conditions or load entries and retain their supplied
@@ -682,14 +685,21 @@ The direction schematic explicitly uses `ij` for direction `i` on faces normal
 to `j`, with outward arrows for positive normal values. It shows supplied
 components independently, including unequal `xy` and `yx`, and does not claim
 to reconstruct the actual tractions on the simulation boundary. Each nonzero
-component uses one larger purple arrow on each of its two opposite faces.
+component uses one broad straight arrow on each of its two opposite faces.
 The copper stress example has eight arrows; nine nonzero components have eighteen.
-The arrows occupy an outer layer that leaves room for local boundary markers;
-mixed views give shear components additional normal distance.
-Normal arrows point outward for tension and inward for compression; shear arrows
+Tensor-only scenes place arrow tails at the faces for tension and arrow tips at
+the faces for compression; mixed scenes use an outer layer to leave room for
+local markers and give shear components additional normal distance.
+Blue normal arrows point outward for tension (`Pull`), orange arrows point inward
+for compression (`Push`), and teal shear arrows
 run parallel to the corresponding faces in separate lanes, keeping both shear
 directions clear of the normal arrow. Their placement is stable when a component
-is selected. Arrow
+is selected. Strain uses `Extend` / `Shorten` and `Shear`, explicitly as direction
+guides rather than forces. These actions use the original sign even when a tiny
+value rounds to `0.00`. The legend combines shapes, words and colors; curved
+arrows are avoided because they commonly indicate
+[moments or rotation](https://engineeringstatics.org/moment-of-force.html).
+Arrow
 lengths are fixed; the matrix and arrow hover show two decimal places with
 half-up rounding, and value titles retain full precision. A fixed camera
 envelope keeps the cube centered and avoids zoom changes between components.
@@ -724,8 +734,9 @@ Scalar whole cube conditions use larger purple arrows and green T markers close
 to the corresponding axis faces, leaving room for local outward arrows.
 Each loaded direction and sign uses one large arrow;
 each fixed direction uses one enlarged T. Local load arrows stay red and local
-constraint markers stay blue; the `Whole cube` legend shows the purple arrow and
-green T. Each marker group is centered on the normal through its corresponding
+constraint markers stay blue; the scalar legend names the active quantity beside
+the purple arrow and identifies the green T as `Whole cube fixed`. Each marker
+group is centered on the normal through its corresponding
 face center. Mixed-view vertex labels move locally in screen space when they
 overlap these outer markers; the marker geometry stays centered. The shorter
 outer offsets and reduced view padding make the cube larger on initial display
@@ -739,8 +750,10 @@ directions. The side of each arrow group follows its load sign; fixed markers
 use the positive axis side. These positions illustrate the whole cube axis
 conditions; the uploaded XYZ data do not specify a loaded local face. Multiple scalar
 whole cube conditions have a selector and remain separate; their original values
-and all table rows are retained. A caption below the cube names the active scalar
-quantity and its unit, including for a single condition.
+and all table rows are retained. A caption above the cube names the active scalar
+quantity and its unit, including for a single condition. `XYZ loads · sign shows
+direction` distinguishes this representation from the tensor's opposing faces;
+a negative force or displacement is not labeled as compression.
 Whole cube conditions tint the existing cube surface translucent light purple,
 for both scalar force/displacement and stress/strain tensors. The tint identifies
 the whole affected region; its color does not encode magnitude or change with

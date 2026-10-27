@@ -243,4 +243,25 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /2\.00 MPa/);
     assert.equal(await ev('document.querySelector("[data-tensor-status]").checkVisibility()'), true);
   });
+
+  test('matrix actions explain normal signs and shear, then follow the selected record and quantity', async t => {
+    const ev = await page(t, [condition(), condition('strain', [
+      {magnitude: {xx: -0.0001, yy: 0.02, xy: -0.3, zz: 0}},
+    ])]);
+    const actions = () => ev('Array.from(document.querySelectorAll("[data-tensor-action]")).map(el => [el.closest("button").dataset.component, el.textContent])');
+    assert.deepEqual(await actions(), [['xx', 'Pull'], ['xy', 'Shear'], ['yx', 'Shear'], ['yy', 'Push']]);
+    assert.match(await ev('document.querySelector("[data-component=xx]").getAttribute("aria-label")'), /Pull.*tension/i);
+    assert.equal(await ev('document.querySelector("[data-component=yy]").dataset.effect'), 'inward');
+    await ev('document.querySelector("[data-component=xx]").click()');
+    assert.match(await ev('document.querySelector("[data-tensor-description]").textContent'), /Pull apart.*tension/i);
+    await ev('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
+    assert.deepEqual(await actions(), [['xx', 'Push']]);
+    assert.match(await ev('document.querySelector("[data-tensor-description]").textContent'), /Push together.*compression/i);
+    await ev('document.querySelector("[data-tensor-condition]").value="1";document.querySelector("[data-tensor-condition]").dispatchEvent(new Event("change"))');
+    assert.deepEqual(await actions(), [['xx', 'Shorten'], ['xy', 'Shear'], ['yy', 'Extend']]);
+    assert.equal(await ev('document.querySelector("[data-component=xx] strong").textContent'), '0.00');
+    assert.equal(await ev('document.querySelector("[data-component=xx]").title'), 'xx: -0.0001 -');
+    assert.doesNotMatch(await ev('document.querySelector("[data-tensor-matrix]").textContent'), /Pull|Push/);
+    assert.equal(await ev('JSON.stringify(supplied) === original'), true);
+  });
 });

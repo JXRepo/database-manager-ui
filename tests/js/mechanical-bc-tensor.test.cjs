@@ -17,6 +17,24 @@ test('normal stress arrows point outward for tension and inward for compression'
   assert.deepEqual(tensor.tensorArrows({xx: -100}).map(a => a.sign), [1, -1]);
 });
 
+test('component meaning distinguishes stress actions from strain guides and keeps tiny signs', () => {
+  const meaning = tensor.tensorComponentMeaning;
+  assert.deepEqual(meaning('xx', 15), {effect: 'outward', name: 'Tension', action: 'Pull', color: '#2563eb'});
+  assert.deepEqual(meaning('yy', -0.0001), {effect: 'inward', name: 'Compression', action: 'Push', color: '#c2410c'});
+  assert.equal(meaning('xx', 0.001, true).action, 'Extend');
+  assert.equal(meaning('zz', -2, true).action, 'Shorten');
+  assert.equal(meaning('zz', -2, true).name, 'Contraction');
+  for (const value of [-9, 3]) {
+    assert.equal(meaning('xy', value).effect, 'shear');
+    assert.equal(meaning('yx', value).action, 'Shear');
+    assert.equal(meaning('yx', value, true).name, 'Shear strain');
+  }
+  for (const value of [0, -0, undefined, null, true, '5', NaN, Infinity, {}]) {
+    assert.equal(meaning('xx', value), null);
+  }
+  assert.equal(meaning('unknown', 1), null);
+});
+
 test('shear components stay independent and use the declared direction/normal convention', () => {
   const arrows = tensor.tensorArrows({xy: 3, yx: -7});
   assert.equal(arrows.length, 4);

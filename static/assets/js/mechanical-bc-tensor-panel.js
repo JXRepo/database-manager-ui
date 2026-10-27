@@ -1,4 +1,4 @@
-import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows} from './mechanical-bc-tensor.js';
+import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows, tensorComponentMeaning} from './mechanical-bc-tensor.js';
 
 export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
@@ -21,8 +21,10 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       return `${isStrain ? 'Shear strain' : 'Shear'} · ${key[0].toUpperCase()} direction on ±${key[1].toUpperCase()} faces`;
     }
     let kind = 'Normal component';
-    if (isTensorNumber(value) && value !== 0) {
-      kind = value > 0 ? (isStrain ? 'Normal extension' : 'Normal tension') : 'Normal compression';
+    const meaning = tensorComponentMeaning(key, value, isStrain);
+    if (meaning) {
+      const action = isStrain ? meaning.action : value > 0 ? 'Pull apart' : 'Push together';
+      kind = `${action} (${meaning.name.toLowerCase()})`;
     }
     return `${kind} · ${key[0].toUpperCase()} direction on ±${key[1].toUpperCase()} faces`;
   }
@@ -62,11 +64,11 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     }
     panel.querySelector('[data-tensor-kind]').textContent = shape.checked
       ? 'Normalized small-strain illustration · all supplied components'
-      : (isStrain ? 'Strain direction guides · fixed arrow lengths' : 'Stress component directions · fixed arrow lengths');
+      : (isStrain ? 'Strain direction guides · fixed arrow lengths' : 'Stress on opposing faces · fixed arrow lengths');
     shape.title = preview.error;
     matrix.replaceChildren();
     cells = [];
-    for (const text of ['i / j', 'X', 'Y', 'Z']) {
+    for (const text of ['i / j', 'X face', 'Y face', 'Z face']) {
       const heading = document.createElement('span');
       heading.className = 'bc-tensor-axis';
       heading.textContent = text;
@@ -77,7 +79,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       if (key[1] === 'x') {
         const heading = document.createElement('span');
         heading.className = 'bc-tensor-axis';
-        heading.textContent = key[0].toUpperCase();
+        heading.textContent = `${key[0].toUpperCase()} direction`;
         heading.setAttribute('aria-hidden', 'true');
         matrix.appendChild(heading);
       }
@@ -96,8 +98,17 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       label.textContent = key;
       const number = document.createElement('strong');
       number.textContent = supplied ? formatTensorValue(value) : '—';
-      cell.setAttribute('aria-label', `${key}: ${supplied ? number.textContent : 'Not supplied'}${unit && supplied ? ` ${unit}` : ''}`);
       cell.append(label, number);
+      const meaning = tensorComponentMeaning(key, value, isStrain);
+      if (meaning) {
+        cell.dataset.effect = meaning.effect;
+        cell.style.setProperty('--bc-component-color', meaning.color);
+        const action = document.createElement('small');
+        action.dataset.tensorAction = '';
+        action.textContent = meaning.action;
+        cell.appendChild(action);
+      }
+      cell.setAttribute('aria-label', `${key}: ${supplied ? number.textContent : 'Not supplied'}${unit && supplied ? ` ${unit}` : ''}${meaning ? ` · ${meaning.action} (${meaning.name.toLowerCase()})` : ''}`);
       cell.addEventListener('click', () => {
         shape.checked = false;
         selected = selected === key ? '' : key;

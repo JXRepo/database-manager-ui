@@ -456,11 +456,24 @@ details[open] > .detail-group-summary {
       align-items: center;
       flex-wrap: wrap;
       gap: 6px;
-      margin: 10px 0 0;
+      margin: 0;
       font-size: 0.82rem;
       font-weight: 600;
       overflow-wrap: anywhere;
     }
+
+    .bc-diagram-caption {
+      display: grid;
+      gap: 3px;
+      margin: 0 0 10px;
+      font-size: 0.86rem;
+      color: #334155;
+      overflow-wrap: anywhere;
+    }
+
+    .bc-diagram-caption > span { color: #64748b; font-size: 0.78rem; }
+    .bc-tensor-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; width: 100%; font-size: 0.78rem; }
+    .bc-tensor-key { width: 48px; height: 24px; flex: 0 0 48px; }
 
     .bc-whole-select {
       max-width: 100%;
@@ -847,7 +860,7 @@ details[open] > .detail-group-summary {
       border-radius: 12px;
       background: #f8fafc;
       padding: 14px;
-      margin-top: 14px;
+      margin: 0 0 18px;
       min-width: 0;
     }
 
@@ -862,20 +875,22 @@ details[open] > .detail-group-summary {
     .bc-tensor-selects label[hidden], .bc-tensor-status[hidden] { display: none; }
     .bc-tensor-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
     .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
-    .bc-tensor-matrix { display: grid; grid-template-columns: 24px repeat(3, minmax(0, 1fr)); gap: 5px; margin-top: 8px; }
-    .bc-tensor-axis { display: flex; align-items: center; justify-content: center; color: #536176; font-size: 0.75rem; font-weight: 600; }
+    .bc-tensor-matrix { display: grid; grid-template-columns: 64px repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+    .bc-tensor-axis { display: flex; align-items: center; justify-content: center; color: #536176; font-size: 0.75rem; font-weight: 600; text-align: center; }
     .bc-tensor-cell {
-      display: flex; align-items: center; justify-content: space-between; gap: 6px;
-      min-width: 0; padding: 8px 6px; background: #fff; border: 1px solid #dbe4f0;
+      display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 6px;
+      min-width: 0; min-height: 58px; padding: 7px 9px; background: #fff; border: 1px solid #dbe4f0;
+      border-left: 3px solid var(--bc-component-color, #dbe4f0);
       border-radius: 6px; color: #334155;
     }
     .bc-tensor-cell span { font-size: 0.78rem; font-weight: 600; }
-    .bc-tensor-cell strong { font-size: 0.8rem; overflow-wrap: anywhere; min-width: 0; }
+    .bc-tensor-cell strong { font-size: 0.84rem; overflow-wrap: anywhere; min-width: 0; text-align: right; }
+    .bc-tensor-cell small { grid-column: 1 / -1; color: var(--bc-component-color); font-size: 0.72rem; text-align: left; font-weight: 600; }
     .bc-tensor-cell:disabled { color: #64748b; background: #f1f5f9; }
     .bc-tensor-cell:disabled strong { font-size: 0.7rem; font-weight: 400; }
-    .bc-tensor-cell[aria-pressed="true"], .bc-tensor-cell.is-hovered { outline: 2px solid #a21caf; outline-offset: -2px; background: #fdf4ff; }
+    .bc-tensor-cell[aria-pressed="true"], .bc-tensor-cell.is-hovered { outline: 2px solid var(--bc-component-color, #a21caf); outline-offset: -2px; background: #f1f5f9; }
     .bc-tensor-cell.is-filtered { opacity: 0.5; }
-    .bc-tensor-cell:focus-visible { outline: 3px solid #a21caf; outline-offset: 2px; }
+    .bc-tensor-cell:focus-visible { outline: 3px solid var(--bc-component-color, #a21caf); outline-offset: 2px; }
     .bc-tensor-caption, .bc-tensor-help { font-size: 0.77rem; color: #536176; margin-top: 8px; overflow-wrap: anywhere; }
     .bc-tensor-help p { margin: 6px 0; }
     .bc-tensor-status { font-size: 0.82rem; margin: 10px 0 6px; overflow-wrap: anywhere; }
@@ -1680,6 +1695,9 @@ details[open] > .detail-group-summary {
                   Fixed constraint
                 </span>
               </div>
+            </div>
+
+            <div class="bc-table-wrap">
               <section class="bc-tensor-panel" data-bc-tensor-panel hidden aria-label="Whole RVE loading">
                 <h6 data-tensor-heading>Whole cube</h6>
                 <div class="bc-tensor-caption" data-tensor-kind></div>
@@ -1688,9 +1706,9 @@ details[open] > .detail-group-summary {
                   <label>Load record<select class="form-select" data-tensor-load></select></label>
                 </div>
                 <div class="bc-tensor-description" data-tensor-description></div>
-                <div class="bc-tensor-status" data-tensor-status role="status"></div>
                 <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: rows are direction i; columns are face normal j"></div>
-                <div class="bc-tensor-caption">Rows: direction i · columns: face normal j. Select a value to isolate it; select it again to show all.<br>Values rounded to two decimals; hover for full precision.</div>
+                <div class="bc-tensor-status" data-tensor-status role="status"></div>
+                <div class="bc-tensor-caption">ij: direction i on faces normal to j. Select a value to isolate its arrows and faces; select again to show all.<br>Values rounded to two decimals; hover for full precision.</div>
                 <details class="bc-tensor-options" data-tensor-options>
                   <summary>Advanced display options</summary>
                   <div class="bc-tensor-caption" data-tensor-metadata></div>
@@ -1709,9 +1727,6 @@ details[open] > .detail-group-summary {
                   </div>
                 </details>
               </section>
-            </div>
-
-            <div class="bc-table-wrap">
               {% for group in mechanical_bc_groups %}
               <section class="bc-table-group" aria-labelledby="bc-group-{{ forloop.counter }}">
                 <h3 class="bc-group-label" id="bc-group-{{ forloop.counter }}">

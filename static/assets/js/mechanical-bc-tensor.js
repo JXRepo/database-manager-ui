@@ -5,6 +5,16 @@ export function isTensorNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+export function tensorComponentMeaning(component, value, isStrain = false) {
+  if (!TENSOR_COMPONENTS.includes(component) || !isTensorNumber(value) || value === 0) return null;
+  if (component[0] !== component[1]) {
+    return {effect: 'shear', name: isStrain ? 'Shear strain' : 'Shear', action: 'Shear', color: '#0f766e'};
+  }
+  return value > 0
+    ? {effect: 'outward', name: isStrain ? 'Extension' : 'Tension', action: isStrain ? 'Extend' : 'Pull', color: '#2563eb'}
+    : {effect: 'inward', name: isStrain ? 'Contraction' : 'Compression', action: isStrain ? 'Shorten' : 'Push', color: '#c2410c'};
+}
+
 function componentVisible(component, filter, selected) {
   const normal = component[0] === component[1];
   return (!selected || component === selected)

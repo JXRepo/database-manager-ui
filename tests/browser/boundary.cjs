@@ -125,6 +125,39 @@ async function main() {
   }
   const tensorCount = () => evaluate('__bcTest.state.tensorMeshes.length / 2');
   const visibleTooltip = `Array.from(document.querySelector('#mechanical-bc-cube').children).find(el=>el.style.pointerEvents==='none'&&el.style.opacity==='1')`;
+  async function checkTensorGeometry() {
+    const arrows = await evaluate(`(() => {
+      __bcTest.state.root.updateMatrixWorld(true);
+      const result = [];
+      for (let index = 0; index < __bcTest.state.tensorMeshes.length; index += 2) {
+        const shaft = __bcTest.state.tensorMeshes[index], head = __bcTest.state.tensorMeshes[index + 1];
+        const start = new __bcThree.Vector3(0, -shaft.geometry.parameters.height / 2, 0).applyMatrix4(shaft.matrixWorld);
+        const tip = new __bcThree.Vector3(0, head.geometry.parameters.height / 2, 0).applyMatrix4(head.matrixWorld);
+        result.push({component: shaft.userData.component, value: shaft.userData.value,
+          shaft: shaft.geometry.type, headSides: head.geometry.parameters.radialSegments,
+          color: shaft.material.color.getHexString(), start: start.toArray(), tip: tip.toArray()});
+      }
+      return result;
+    })()`);
+    for (const arrow of arrows) {
+      assert.equal(arrow.shaft, 'BoxGeometry', 'Tensor arrows need a broad block shaft distinct from scalar arrows');
+      assert.equal(arrow.headSides, 4);
+      const direction = 'xyz'.indexOf(arrow.component[0]);
+      const normal = 'xyz'.indexOf(arrow.component[1]);
+      const faceSign = Math.sign(arrow.start[normal]);
+      assert.ok((arrow.tip[direction] - arrow.start[direction]) * faceSign * Math.sign(arrow.value) > 0,
+        `${arrow.component}: arrow follows the supplied component sign on its opposing face`);
+      if (direction === normal) {
+        const nearest = Math.min(Math.abs(arrow.start[normal]), Math.abs(arrow.tip[normal]));
+        assert.ok(nearest >= 0.5 && nearest <= 0.58, 'Pull tails and push tips must meet the corresponding face');
+        assert.equal(arrow.color, arrow.value > 0 ? '2563eb' : 'c2410c');
+      } else {
+        assert.ok(Math.abs(arrow.start[normal] - arrow.tip[normal]) < 1e-8, 'Shear must stay parallel to the face');
+        assert.ok(Math.abs(arrow.start[normal]) >= 0.5 && Math.abs(arrow.start[normal]) <= 0.6);
+        assert.equal(arrow.color, '0f766e');
+      }
+    }
+  }
   async function checkLocalArrowOrigins(key) {
     const geometry = await evaluate(`(() => {
       const shafts = [], heads = [], markers = [];
@@ -161,20 +194,58 @@ async function main() {
   assert.equal(await evaluate('document.querySelector("[data-tensor-load]").closest("label").hidden'),true);
   assert.equal(await evaluate('document.querySelector("[data-tensor-status]").checkVisibility()'),false);
   assert.match(await evaluate('document.querySelector("[data-tensor-heading]").textContent'),/Stress \(MPa\)/);
+  await checkTensorGeometry();
+  for (const width of [1280, 1440, 1920]) {
+    await command('Emulation.setDeviceMetricsOverride', {width, height: 1080, deviceScaleFactor: 1, mobile: false});
+    await evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    assert.equal(await evaluate(`(() => {const cube=document.querySelector('.bc-cube-wrap').getBoundingClientRect();
+      const matrix=document.querySelector('[data-tensor-matrix]').getBoundingClientRect();
+      return matrix.left>cube.right && matrix.top<cube.bottom && matrix.right<=innerWidth;})()`), true,
+      `Tensor matrix must sit beside the cube at ${width}`);
+    await screenshot('tensor-'+width);
+  }
   await screenshot('tensor-final');
+  const matrixTop = await evaluate('document.querySelector("[data-tensor-matrix]").getBoundingClientRect().top');
   await evaluate('document.querySelector("[data-component=xy]").click()');
+  assert.equal(await evaluate('document.querySelector("[data-tensor-matrix]").getBoundingClientRect().top'), matrixTop,
+    'Selecting a component must not move the matrix buttons');
   assert.equal(await tensorCount(),2);
+  assert.equal(await evaluate('__bcTest.tensorGroup.children.filter(m=>m.userData.tensorFace&&m.material.opacity>0.1).length'),2);
+  await evaluate('document.activeElement.blur()');
+  assert.equal(await evaluate('__bcTest.tensorGroup.children.filter(m=>m.userData.tensorFace&&m.material.opacity>0.1).length'),2,
+    'Selected faces stay emphasized when focus moves away');
+  await screenshot('tensor-shear-selected');
   await evaluate('document.querySelector("[data-component=xy]").click();document.activeElement.blur()');
   assert.equal(await tensorCount(),8);
-  report.push('copper: 8 arrows, exact quantity, single record, matrix isolation/restoration');
+  await evaluate('document.querySelector("[data-component=xx]").click();document.activeElement.blur()');
+  assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /Pull apart \(tension\)/);
+  await screenshot('tensor-pull-selected');
+  const tensorHover = await evaluate(`(() => {
+    const mesh=__bcTest.state.tensorMeshes.find(m=>m.geometry.type==='ConeGeometry'&&m.position.x>0);
+    const p=mesh.getWorldPosition(new __bcThree.Vector3()).project(__bcTest.state.camera);
+    const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();
+    return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2};})()`);
+  await command('Input.dispatchMouseEvent', {type:'mouseMoved',...tensorHover});
+  assert.match(await evaluate(`${visibleTooltip}?.textContent||''`), /Stress component xx: 15\.00 MPa[\s\S]*Pull · Tension/);
+  assert.equal(await evaluate('document.querySelector("[data-component=xx]").classList.contains("is-hovered")'),true);
+  await command('Input.dispatchMouseEvent', {type:'mouseMoved',x:0,y:0});
+  assert.equal(await evaluate(`!!(${visibleTooltip})`),false);
+  assert.equal(await evaluate('document.querySelector("[data-component=xx]").classList.contains("is-hovered")'),false);
+  await evaluate('document.querySelector("[data-component=xx]").click();document.activeElement.blur()');
+  report.push('copper: 8 broad arrows at faces, pull meaning, real hover and persistent face selection; stable matrix to the right at 1280/1440/1920');
 
   await open('records');
   assert.equal(await tensorCount(),18);
+  await checkTensorGeometry();
   assert.equal(await evaluate(`(()=>{const groups={};for(const mesh of __bcTest.state.tensorMeshes){
     const face=mesh.userData.tooltip.split('\\n')[1].split(' face')[0];const key=face+mesh.userData.component;
     (groups[key]??={face,box:new __bcThree.Box3()}).box.expandByObject(mesh)}
     const boxes=Object.values(groups);return boxes.some((a,i)=>boxes.slice(i+1).some(b=>a.face===b.face&&a.box.intersectsBox(b.box)))})()`),false,
     'Normal and both shear arrows must not physically cross on one face');
+  await evaluate('document.querySelector("[data-component=xx]").click();document.activeElement.blur()');
+  assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /Push together \(compression\)/);
+  await screenshot('tensor-push-selected');
+  await evaluate('document.querySelector("[data-component=xx]").click();document.activeElement.blur()');
   await evaluate('document.querySelector("[data-component=yx]").click()');
   assert.equal(await tensorCount(),2);
   await evaluate('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
@@ -208,6 +279,8 @@ async function main() {
   }
   await open('whole');
   assert.match(await evaluate('document.querySelector(".bc-whole-heading").textContent'),/Force \(N\)/);
+  assert.match(await evaluate('document.querySelector("[data-bc-scalar-legend]").textContent'), /Force \(N\)/);
+  assert.match(await evaluate('document.querySelector(".bc-diagram-caption").textContent'), /sign shows direction/);
   const hover = await evaluate(`(()=>{const m=__bcTest.state.wholeMeshes.find(m=>m.geometry.type==='ConeGeometry');
     const p=m.getWorldPosition(new __bcThree.Vector3()).project(__bcTest.state.camera);
     const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2}})()`);
@@ -249,6 +322,7 @@ async function main() {
     await evaluate('document.querySelector("[data-component=xx]").click()');
     assert.equal(await tensorCount(),2);
     await evaluate('document.querySelector(".bc-whole-select").value="1";document.querySelector(".bc-whole-select").dispatchEvent(new Event("change"))');
+    assert.match(await evaluate('document.querySelector("[data-bc-scalar-legend]").textContent'), /Displacement \(mm\)/);
     assert.match(await evaluate('document.querySelector(".bc-whole-heading").textContent'),/Displacement \(mm\)/);
     assert.equal(await evaluate(`['.bc-panel','#mechanical-bc-cube','[data-tensor-matrix]'].every(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return r.left>=0&&r.right<=innerWidth})`),true,`Interaction clips the diagram at ${width}`);
     await screenshot('mixed-'+width);

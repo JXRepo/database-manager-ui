@@ -3,12 +3,36 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-27
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Whole cube boundary regions have a translucent purple highlight
+next_topic: Whole cube scalar and tensor loads have distinct visual meanings
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：区分两类整体条件，并直观表达拉、压、剪切
+
+- 用户要求认真改善读图，不仅换箭头外观；右下角 XYZ 不动。整体 force/displacement
+  保持细杆紫箭头，标题明示量名／单位，`XYZ loads · sign shows direction` 说明正负是
+  方向，不能据负号断言压缩。紫箭图例随条件切换量名，绿色 T 标为 Whole cube fixed。
+- 整体张量改为宽的直箭头：正法向蓝色 Pull／向外，负法向橙色 Push／向内，剪切
+  青绿色／沿面。纯张量场景中拉伸的箭尾靠面，压缩的箭尖靠面；混合场景保留局部标记
+  空间。曲箭常表示力矩／转动，故不用于剪切。小型图例同时用图形、动作和颜色说明。
+- 应变使用 Extend／Shorten／Shear，保留 direction guides 及自选小应变示意的限制。
+  两种视图共享 `tensorComponentMeaning`，按原始有限非零值判读；负小数即使显示 0.00
+  也仍为向内。零／缺失／无效无动作标签或箭头，xy/yx 不互补，完整数值与 JSON 不变。
+- 矩阵移至 cube 右侧、原表格上方；明确 X face／X direction 等标题，格内直接标
+  Pull／Push／Shear。选中值同时突出对应箭头与两面；焦点移开仍保留所选面的强调。
+  数值状态移至矩阵下方，点击不会把按钮向下推。默认全部、单击隔离、再点恢复。
+- 已通过 12 项相关 Django 测试与 133 项 Node 测试，零失败／跳过。真实 Chromium
+  检查宽箭头几何、靠面位置、拉压符号、剪切平行且分道、真实悬停、面和数字联动、
+  1280／1440／1920 右侧矩阵布局，以及既有点边面、多记录、混合、导出与无 JS 行为。
+  查看了正／负法向、剪切、九分量、整体力和桌面混合场景截图。
+- 工作区 `.worktrees/cube-reading`，方案见
+  `docs/superpowers/{specs,plans}/2026-10-27-whole-cube-reading.md`；本机证据在
+  `/tmp/cube-reading-qa/`。部署状态以本轮最终核验为准，不能仅用 push 判断。
+  本次只改显示，现有记录无需重传。独立只读审查已通过，无 Critical／Important 问题；
+  审查同时查看了实际截图，未扩大到移动端、真实物理重建或隐藏默认完整分量。
 
 ### 最新调整：整体 cube 添加半透明高亮
 

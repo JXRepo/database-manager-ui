@@ -128,6 +128,9 @@ Current priority:
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
 - Whole RVE tensor schematics use the explicitly labeled ij direction/face-normal convention, fixed-length component arrows, and linked numeric matrices; preserve distinct xy/yx values and never infer missing components in the direction view
 - Use one tensor arrow per supplied nonzero component on each opposing face, with separate shear lanes; scalar whole cube loads keep one arrow per loaded axis/sign and local point/edge/face marker geometry stays independent
+- Distinguish slim purple scalar XYZ arrows from broad straight tensor arrows; positive normal stress uses blue Pull/outward, negative normal stress orange Push/inward, and shear teal parallel-to-face arrows with pictorial keys and linked action labels
+- Strain uses Extend/Shorten/Shear direction guides; scalar load signs indicate direction only, never infer compression from a negative force/displacement; use original tensor signs even when displayed values round to zero
+- Keep the tensor matrix to the right of the cube on desktop, link hover/selection to its opposing faces, and keep matrix buttons in place when selection status appears; preserve the bottom-right XYZ orientation guide
 - Edge and face scalar loads use one arrow per supplied loaded direction/sign; all shafts share the exact edge midpoint or face center, with no center dot or other center marker
 - Whole cube boundary conditions use a translucent light purple cube surface to highlight the affected region for scalar and tensor loads; keep outlines, local markers and arrow hover visible, without encoding magnitude in the tint
 - Label boundary quantities with their supplied units in tables, captions and arrow hover; zero, missing and invalid scalar magnitudes produce no arrows, and repeated region arrows do not multiply the load
