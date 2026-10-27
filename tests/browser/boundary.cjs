@@ -125,6 +125,37 @@ async function main() {
   }
   const tensorCount = () => evaluate('__bcTest.state.tensorMeshes.length / 2');
   const visibleTooltip = `Array.from(document.querySelector('#mechanical-bc-cube').children).find(el=>el.style.pointerEvents==='none'&&el.style.opacity==='1')`;
+  async function checkLocalArrowOrigins(key) {
+    const geometry = await evaluate(`(() => {
+      const shafts = [], heads = [], markers = [];
+      __bcTest.state.root.updateMatrixWorld(true);
+      __bcTest.state.root.traverse(mesh => {
+        if (mesh.geometry?.type === 'SphereGeometry' || mesh.geometry?.type === 'OctahedronGeometry') {
+          markers.push(mesh.getWorldPosition(new __bcThree.Vector3()).toArray());
+        }
+        if (mesh.material?.color?.getHexString() !== 'dc2626') return;
+        if (mesh.geometry?.type === 'ConeGeometry') heads.push(mesh.userData.tooltip);
+        if (mesh.geometry?.type !== 'CylinderGeometry') return;
+        const halfHeight = mesh.geometry.parameters.height / 2;
+        const start = new __bcThree.Vector3(0, -halfHeight, 0).applyMatrix4(mesh.matrixWorld);
+        const end = new __bcThree.Vector3(0, halfHeight, 0).applyMatrix4(mesh.matrixWorld);
+        shafts.push({start: start.toArray(), direction: end.sub(start).normalize().toArray()});
+      });
+      return {shafts, heads, markers};
+    })()`);
+    const center = key === 'edge' ? [0, 0.5, -0.5] : [0, 0, 0.5];
+    const sign = key === 'edge' ? -1 : 1;
+    assert.equal(geometry.shafts.length, 3, `${key}: one shaft per loaded direction`);
+    assert.equal(geometry.heads.length, 3, `${key}: one head per loaded direction`);
+    const directions = geometry.shafts.map(shaft => {
+      assert.ok(shaft.start.every((value, axis) => Math.abs(value - center[axis]) < 1e-8),
+        `${key}: all arrow shafts must start at the region center; got ${shaft.start}`);
+      return shaft.direction.map(value => Math.abs(value) < 1e-8 ? 0 : Math.round(value));
+    });
+    assert.deepEqual(directions, [[sign, 0, 0], [0, sign, 0], [0, 0, sign]], `${key}: retain the supplied load signs`);
+    assert.equal(geometry.markers.some(point => point.every((value, axis) => Math.abs(value - center[axis]) < 1e-8)),
+      false, `${key}: do not draw a center marker`);
+  }
   await open('tensor');
   assert.equal(await tensorCount(),8,'Copper needs four independent components, two faces each');
   assert.equal(await evaluate('document.querySelector("[data-tensor-load]").closest("label").hidden'),true);
@@ -167,8 +198,11 @@ async function main() {
     if(key==='zero') assert.equal(counts.whole,0);
     if(key==='empty') assert.deepEqual(counts,{whole:0,local:0});
     if(key==='point') assert.equal(counts.local,1);
-    if(key==='edge'||key==='face') assert.equal(counts.local,9);
-    if(key==='mixed') assert.equal(counts.local,19);
+    if(key==='edge'||key==='face') {
+      assert.equal(counts.local,3);
+      await checkLocalArrowOrigins(key);
+    }
+    if(key==='mixed') assert.equal(counts.local,7);
     await screenshot(key+'-final');
     report.push(`${key}: local ${counts.local}, whole scalar ${counts.whole}`);
   }
@@ -196,6 +230,12 @@ async function main() {
   report.push('real pointer hover includes force and value; rotate and reset restore camera');
 
   for (const width of [1280,1440,1920]) {
+    for (const key of ['edge', 'face']) {
+      await open(key, width);
+      await checkLocalArrowOrigins(key);
+      assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'), false);
+      if (width !== 1440) await screenshot(key+'-'+width);
+    }
     await open('mixed',width);
     await evaluate('document.querySelectorAll(".bc-axis-list .bc-load-detail").forEach(el=>el.open=true)');
     assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,`Page overflows at ${width}`);

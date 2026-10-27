@@ -128,6 +128,7 @@ Current priority:
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
 - Whole RVE tensor schematics use the explicitly labeled ij direction/face-normal convention, fixed-length component arrows, and linked numeric matrices; preserve distinct xy/yx values and never infer missing components in the direction view
 - Use one tensor arrow per supplied nonzero component on each opposing face, with separate shear lanes; scalar whole cube loads keep one arrow per loaded axis/sign and local point/edge/face marker geometry stays independent
+- Edge and face scalar loads use one arrow per supplied loaded direction/sign; all shafts share the exact edge midpoint or face center, with no center dot or other center marker
 - Label boundary quantities with their supplied units in tables, captions and arrow hover; zero, missing and invalid scalar magnitudes produce no arrows, and repeated region arrows do not multiply the load
 - Strain shape illustration is opt-in, normalized, and explicitly assumes symmetric small strain with tensor shear; reject incomplete or conflicting reciprocal data for that preview, and never present it as a simulated shape or change stored/exported values
 - Tensor load navigation follows the supplied entry order and exact step values; do not invent intermediate steps, combine separate tensor conditions, or simulate time histories from frequency/duration metadata

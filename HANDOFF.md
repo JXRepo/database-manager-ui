@@ -3,12 +3,28 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-27
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Five boundary example identifiers renamed for reupload
+next_topic: Edge and face arrows share their region center
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：边和面每个方向一支箭头，共用中心起点
+
+- 用户明确要求边与面不再每个方向画三支箭头，所有箭杆分别从边中点或面中心出发，
+  不绘制中心点。`mechanical-bc-viewer.js` 已改为每个实际方向／符号一支箭头，移除
+  三位置复制、面内分散与沿边方向的额外位移；边／面箭杆起点不再留轴向间隙。
+- 边保留黄色整边高亮，面保留半透明填充。点、整体标量／张量与固定 T 标记保持，
+  零／缺失／无效载荷不画箭头，正负值继续分别显示。JSON 和所有导出内容未修改，
+  现有上传记录在网页更新后即可使用新画法，不需要重新上传。
+- 实际 Chromium 回归先确认旧版为 9 支而预期为 3 支，再验证新版边／面均为 3 支，
+  混合场景为 7 支局部箭头；直接测量三维箭杆起点、方向及无中心球／菱形标记。
+- 12 项相关 Django 测试、131 项 Node 测试全部通过，零失败／跳过；浏览器覆盖
+  1280／1440／1920 桌面、长内容、空条件、矩阵／记录切换、悬停、旋转／Reset、
+  无 JavaScript 表格和完整 JSON 导出。三种宽度的边／面截图均已查看。
+  日志与截图在 `/tmp/boundary-center-qa-YwQQFM/`，不随 Git 同步。
+- 应用提交及线上脚本核验以本轮最终回复为准，不能将 Git push 等同于部署完成。
 
 ### 最新调整：五份边界示例改用清晰 identifier
 

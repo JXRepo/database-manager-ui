@@ -717,9 +717,9 @@ Scalar point, edge and face force/displacement loads retain their axis display.
 Scalar zero, missing and invalid magnitudes produce no load arrows; the supplied
 constraint and value remain in the table. Mixed positive/negative scalar arrays
 show both supplied signs without inventing an animation.
-Edge and face groups share the same centered spacing between
-their three arrow origins in cube coordinates. Projected spacing changes with
-the viewing angle.
+Edge and face loads use one arrow per supplied direction and sign. All arrow
+shafts on an edge start at its midpoint; all arrow shafts on a face start at its
+center. These shared origins have no dot or other center marker.
 Scalar whole cube conditions use larger purple arrows and green T markers close
 to the corresponding axis faces, leaving room for local outward arrows.
 Each loaded direction and sign uses one large arrow;
@@ -744,12 +744,12 @@ quantity and its unit, including for a single condition.
 The cube has no scalar whole cube center dot or
 covering load surface, so local markers remain available for hover. Whole RVE
 stress and strain tensors retain their separate component and face convention.
-Edge loading uses a thick yellow edge and three arrows for each displayed
+Edge loading uses a thick yellow edge and one arrow for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load
 magnitude or its spatial distribution.
 Parallel and transverse edge arrows use the same shaft length, thickness and
-arrowhead size for the same load sign pattern. Parallel shafts extend back from
-their existing tips, keeping all three arrowheads clear of the endpoint spheres.
+arrowhead size for the same load sign pattern. Their shafts share the exact
+midpoint, with the parallel arrowhead clear of the endpoint spheres.
 Edges with a loaded or fixed direction use a yellow rod along the entire edge,
 drawn behind the arrows and constraint markers. Their matching
 default outline and halo segments are omitted to avoid overlapping pale-blue
@@ -765,11 +765,10 @@ remain perpendicular in the screen projection. An axis viewed directly along
 its length is foreshortened. Face constraint markers retain their
 existing style. The table and hover retain the complete X/Y/Z constraints.
 Face boundaries use a translucent fill without extra thick perimeter rods or a
-center dot. Each loaded direction and sign uses three arrows side by side in one
-row across the face. Normal arrow rows follow a face edge; tangential arrow rows
-run perpendicular to their load direction. Arrow spacing and size
-keep the two tangential directions separate when both are loaded. These positions
-illustrate a face condition, without defining point loads or a spatial distribution.
+center dot. Each loaded direction and sign uses one arrow starting at the face
+center, including both normal and tangential directions. The shared origin
+illustrates the face condition without changing it into a point load or defining
+a spatial distribution.
 Nonempty targets have separate tables in the order Points, Edges, Faces, then
 Whole cube, each with its group title above the table. Empty groups are omitted.
 Unspecified cube corners may appear as free Point rows; whole RVE tensor

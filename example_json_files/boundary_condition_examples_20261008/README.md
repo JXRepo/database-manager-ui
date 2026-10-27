@@ -173,8 +173,9 @@ swapped to match; all numerical samples, equivalent arrays and plastic strain
 were retained. That parallel-only edge identifier was `5bd9f42c`.
 
 The current trial retains the X load and adds independent Y and Z entries on
-the same edge, all at -172.8 N with step 1. Each direction has three schematic
-arrows; only the X arrows are parallel to the edge. The existing nominal X
-curves are retained and explicitly do not resolve the combined XYZ loads.
+the same edge, all at -172.8 N with step 1. Each direction now has one schematic
+arrow starting at the shared edge midpoint; only the X arrow is parallel to the
+edge. The existing nominal X curves are retained and explicitly do not resolve
+the combined XYZ loads.
 That revision used `22cdfdb0`, generated with the platform's MiMeDat template.
 The current identifier is listed above; older uploaded objects are retained.

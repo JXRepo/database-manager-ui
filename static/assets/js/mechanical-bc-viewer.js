@@ -17,7 +17,6 @@ const STATUS_COLORS = {
 };
 const WHOLE_COLOR = "#a21caf";
 const WHOLE_FIXED_COLOR = "#047857";
-const THREE_ARROW_OFFSETS = [-0.24, 0, 0.24];
 
 function readMechanicalBcItems() {
   const script = document.getElementById("mechanical-bc-data");
@@ -286,9 +285,9 @@ function fixedMarkerOutwardVector(point, direction) {
   return new THREE.Vector3(0, 0, point.z < 0 ? -1 : 1);
 }
 
-function createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale = 1, sizeScale = 1) {
+function createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, lengthScale = 1, sizeScale = 1, startGap = 0.075) {
   const direction = directionVector3d(axis.direction).multiplyScalar(sign).normalize();
-  const start = origin.clone().add(direction.clone().multiplyScalar(0.075 * sizeScale));
+  const start = origin.clone().addScaledVector(direction, startGap * sizeScale);
   const shaftEnd = origin.clone().add(direction.clone().multiplyScalar(0.29 * lengthScale * sizeScale));
   const tip = origin.clone().add(direction.clone().multiplyScalar(0.39 * lengthScale * sizeScale));
   const shaft = makeCylinderBetween(start, shaftEnd, 0.012 * sizeScale, materials.loaded);
@@ -299,7 +298,7 @@ function createArrow(origin, axis, sign, materials, group, tooltip, selectableMe
   return [shaft, head];
 }
 
-function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, sizeScale = 1, opposingSizeScale = sizeScale, edgeDirection = "") {
+function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, sizeScale = 1, opposingSizeScale = sizeScale, startGap = 0.075) {
   (item.axes || [])
     .filter(axis => axis.status === "loaded")
     .forEach(axis => {
@@ -307,14 +306,9 @@ function drawLoadedAxesAt(origins, item, materials, group, selectableMeshes, siz
       const signs = getLoadDirectionSigns(axis.magnitude);
       const arrowSize = signs.length > 1 ? opposingSizeScale : sizeScale;
       const arrowLength = signs.length > 1 ? 0.82 : 1;
-      const originOffset = axis.direction === edgeDirection
-        ? 0.39 * arrowLength * (arrowSize - Math.min(arrowSize, 0.35))
-        : 0;
       origins.forEach(origin => {
         signs.forEach(sign => {
-          // Extend parallel shafts back from their tips to keep the heads inside the edge.
-          const arrowOrigin = origin.clone().addScaledVector(directionVector3d(axis.direction), -sign * originOffset);
-          createArrow(arrowOrigin, axis, sign, materials, group, tooltip, selectableMeshes, arrowLength, arrowSize);
+          createArrow(origin, axis, sign, materials, group, tooltip, selectableMeshes, arrowLength, arrowSize, startGap);
         });
       });
     });
@@ -652,38 +646,15 @@ function drawEdgeCondition(item, materials, group, selectableMeshes) {
   const edge = hasConstraint
     ? makeCylinderBetween(points[0], points[1], 0.015, materials.edgeLineHighlight, 18)
     : new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), materials.cubeEdgeLine);
-  const edgeVector = points[1].clone().sub(points[0]).normalize();
   const center = averagePoints(points);
-  const markerOrigins = THREE_ARROW_OFFSETS
-    .map(offset => center.clone().addScaledVector(edgeVector, offset));
-  const edgeDirection = Object.keys(AXIS_DIRECTIONS).find(direction => Math.abs(edgeVector.dot(AXIS_DIRECTIONS[direction])) > 0.999);
 
   if (edge) {
     // Keep the thicker edge behind arrows and constraint markers
     edge.renderOrder = hasConstraint ? -1 : 4;
     addMesh(group, edge, tooltip, selectableMeshes);
   }
-  drawLoadedAxesAt(markerOrigins, item, materials, group, selectableMeshes, 0.65, 0.45, edgeDirection);
-  createClampMarker(markerOrigins[1], item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
-}
-
-function getFaceArrowOrigins(points, direction, offsets = [-0.42, -0.21, 0, 0.21, 0.42]) {
-  const center = averagePoints(points);
-  const firstTangent = points[1].clone().sub(points[0]);
-  const secondTangent = points[3].clone().sub(points[0]);
-  const normal = new THREE.Vector3().crossVectors(firstTangent, secondTangent).normalize();
-  const spread = new THREE.Vector3().crossVectors(normal, directionVector3d(direction));
-
-  if (spread.lengthSq() < 0.0001) {
-    spread.copy(firstTangent);
-    if (spread.lengthSq() < 0.0001) {
-      spread.copy(secondTangent);
-    }
-  }
-
-  spread.normalize();
-  return offsets
-    .map(offset => center.clone().addScaledVector(spread, offset));
+  drawLoadedAxesAt([center], item, materials, group, selectableMeshes, 0.65, 0.45, 0);
+  createClampMarker(center, item, materials, group, selectableMeshes, {sizeScale: 0.65, viewFacing: true});
 }
 
 function drawFaceCondition(item, materials, group, selectableMeshes) {
@@ -696,19 +667,7 @@ function drawFaceCondition(item, materials, group, selectableMeshes) {
   const tooltip = formatBoundaryConditionHover(item);
   const center = averagePoints(points);
   addMesh(group, createFaceMesh(points, materials.faceHighlight), tooltip, selectableMeshes);
-  (item.axes || []).filter(axis => axis.status === "loaded").forEach(axis => {
-    const origins = getFaceArrowOrigins(points, axis.direction, THREE_ARROW_OFFSETS);
-    const loadTooltip = formatAxisLoadHover(item, axis);
-    const signs = getLoadDirectionSigns(axis.magnitude);
-    const sizeScale = signs.length > 1 ? 0.45 : 0.5;
-    const lengthScale = signs.length > 1 ? 0.82 : 1;
-
-    origins.forEach(origin => {
-      signs.forEach(sign => {
-        createArrow(origin, axis, sign, materials, group, loadTooltip, selectableMeshes, lengthScale, sizeScale);
-      });
-    });
-  });
+  drawLoadedAxesAt([center], item, materials, group, selectableMeshes, 0.5, 0.45, 0);
   createClampMarker(center, item, materials, group, selectableMeshes);
 }
 
