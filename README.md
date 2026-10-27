@@ -741,8 +741,11 @@ conditions; the uploaded XYZ data do not specify a loaded local face. Multiple s
 whole cube conditions have a selector and remain separate; their original values
 and all table rows are retained. A caption below the cube names the active scalar
 quantity and its unit, including for a single condition.
-The cube has no scalar whole cube center dot or
-covering load surface, so local markers remain available for hover. Whole RVE
+Whole cube conditions tint the existing cube surface translucent light purple,
+for both scalar force/displacement and stress/strain tensors. The tint identifies
+the whole affected region; its color does not encode magnitude or change with
+component selection. Cube edges, arrows and mixed local markers remain visible.
+The tinted surface does not intercept marker hover or add a center dot. Whole RVE
 stress and strain tensors retain their separate component and face convention.
 Edge loading uses a thick yellow edge and one arrow for each displayed
 direction and sign. Their placement illustrates the loaded edge, not the load

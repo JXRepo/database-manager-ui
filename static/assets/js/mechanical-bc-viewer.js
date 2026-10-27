@@ -113,12 +113,12 @@ function formatAxisLoadHover(item, axis) {
     `${axis.direction}: ${axis.status}`, axis.load_summary || 'No load value supplied'].join('\n');
 }
 
-function createMaterials() {
+function createMaterials(hasWholeCondition = false) {
   return {
     cubeSurface: new THREE.MeshBasicMaterial({
-      color: "#e0f2fe",
+      color: hasWholeCondition ? "#c084fc" : "#e0f2fe",
       transparent: true,
-      opacity: 0.18,
+      opacity: hasWholeCondition ? 0.24 : 0.18,
       side: THREE.DoubleSide,
       depthWrite: false,
     }),
@@ -1124,7 +1124,8 @@ function renderMechanicalBcViewer() {
   const wholeItems = items.map((item, index) => ({item, index}))
     .filter(({item}) => item.target_type === "Whole cube" && !item.is_tensor_load && item.is_defined !== false);
   const state = createScene(container, wholeItems.length > 0);
-  const materials = createMaterials();
+  const hasWholeCondition = items.some(item => item.target_type === "Whole cube" && item.is_defined !== false);
+  const materials = createMaterials(hasWholeCondition);
   const selectableMeshes = [];
   const tooltip = createTooltip(container);
   const tensorItems = items.filter(item => item.is_tensor_load);

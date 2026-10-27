@@ -3,12 +3,26 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-27
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Edge and face arrows share their region center
+next_topic: Whole cube boundary regions have a translucent purple highlight
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：整体 cube 添加半透明高亮
+
+- 用户要求整体受力时也像点、边、面一样高亮作用范围。`mechanical-bc-viewer.js`
+  在存在已定义的 Whole cube 条件时，将原 cube 表面改为浅紫色 `#c084fc`、透明度 0.24；
+  整体 force/displacement 与 stress/strain 均适用。仅局部条件保留原来的浅蓝表面。
+- 复用既有表面，不添加覆盖网格或中心点，不拦截箭头 hover。颜色仅表示整体作用范围，
+  不编码载荷大小，切换矩阵分量或记录时保持；混合场景中的点、边和面标记仍可见。
+  JSON、载荷、箭头方向及数量、导出不变，现有记录无需重新上传。
+- 12 项相关 Django 测试及 16 项边界 Node 测试通过，零失败／跳过；真实 Chromium
+  覆盖五种边界、混合／空条件、1280／1440／1920 桌面、悬停、旋转／Reset、切换与导出。
+  已查看整体力、整体应力及三种桌面宽度的混合场景截图；本次仅配色改动，复用现有测试。
+- 截图与日志在 `/tmp/boundary-cube-tint-qa-y3R2zN/`，不随 Git 同步。
+  Git 推送与线上脚本更新分开核验，发布状态以本轮最终回复为准。
 
 ### 最新调整：边和面每个方向一支箭头，共用中心起点
 
