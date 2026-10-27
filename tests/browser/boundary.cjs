@@ -117,6 +117,7 @@ async function main() {
     const height = await evaluate('Math.ceil(document.querySelector(".bc-panel").getBoundingClientRect().height+200)');
     await command('Emulation.setDeviceMetricsOverride',{width:viewport.width,height,deviceScaleFactor:1,mobile:false});
     await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+    await waitFor(`document.getAnimations().every(animation=>animation.playState!=='running'||animation.effect.getComputedTiming().iterations===Infinity)`, 'Screenshot transitions did not settle');
     await evaluate(`document.querySelector('.bc-panel').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy({top:-100,behavior:'instant'})`);
     const result = await command('Page.captureScreenshot',{format:'png'});
     writeFileSync(join(process.env.BC_BROWSER_REPORT_DIR,name+'.png'),Buffer.from(result.data,'base64'));
@@ -203,6 +204,20 @@ async function main() {
       return matrix.left>cube.right && matrix.top<cube.bottom && matrix.right<=innerWidth;})()`), true,
       `Tensor matrix must sit beside the cube at ${width}`);
     await screenshot('tensor-'+width);
+    const matrixValues = await evaluate('Array.from(document.querySelectorAll("[data-component] strong")).map(value=>value.textContent)');
+    await evaluate('document.querySelector("[data-tensor-options]").open=true');
+    for (const [filter, components] of [['pull', ['xx', 'xx', 'yy', 'yy']], ['push', []], ['slide', ['xy', 'xy', 'yx', 'yx']]]) {
+      await evaluate(`document.querySelector('[data-tensor-filter=${filter}]').click();document.activeElement.blur()`);
+      assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.filter((mesh,index)=>index%2===0).map(mesh=>mesh.userData.component)'), components);
+      assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-component] strong")).map(value=>value.textContent)'), matrixValues);
+      assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /^Cube arrows:/);
+      assert.equal(await evaluate('document.querySelector("[data-tensor-filter-note]").checkVisibility()'), true);
+      assert.equal(await evaluate('document.querySelector("[data-tensor-note]").checkVisibility()'), false);
+      assert.doesNotMatch(await evaluate('document.querySelector("[data-tensor-options]").textContent'), /step:|Stress component schematic/);
+      assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);
+      if (width === 1280 || filter === 'slide') await screenshot('tensor-'+filter+'-'+width);
+    }
+    await evaluate('document.querySelector("[data-tensor-filter=all]").click();document.activeElement.blur();document.querySelector("[data-tensor-options]").open=false');
   }
   await screenshot('tensor-final');
   const matrixTop = await evaluate('document.querySelector("[data-tensor-matrix]").getBoundingClientRect().top');
@@ -232,11 +247,14 @@ async function main() {
   assert.equal(await evaluate(`!!(${visibleTooltip})`),false);
   assert.equal(await evaluate('document.querySelector("[data-component=xx]").classList.contains("is-hovered")'),false);
   await evaluate('document.querySelector("[data-component=xx]").click();document.activeElement.blur()');
-  report.push('copper: 8 broad arrows at faces, pull meaning, real hover and persistent face selection; stable matrix to the right at 1280/1440/1920');
+  report.push('copper: Pull/Push/Slide filter actual arrows while preserving the full matrix at 1280/1440/1920; no repeated step or stress paragraph; selection and hover stay linked');
 
   await open('records');
   assert.equal(await tensorCount(),18);
   await checkTensorGeometry();
+  await evaluate('document.querySelector("[data-tensor-filter=push]").click()');
+  assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.filter((mesh,index)=>index%2===0).map(mesh=>mesh.userData.component)'), ['xx', 'xx', 'zz', 'zz']);
+  await evaluate('document.querySelector("[data-tensor-filter=all]").click();document.activeElement.blur()');
   assert.equal(await evaluate(`(()=>{const groups={};for(const mesh of __bcTest.state.tensorMeshes){
     const face=mesh.userData.tooltip.split('\\n')[1].split(' face')[0];const key=face+mesh.userData.component;
     (groups[key]??={face,box:new __bcThree.Box3()}).box.expandByObject(mesh)}

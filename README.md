@@ -675,8 +675,17 @@ order and exact steps. Multiple records use one `Load record` selector; a single
 record has no navigation. The optional `step` is an unchanged record label,
 not a time scale, and is never generated from the array index. Scalar load entries
 may correspond to different X/Y/Z directions and are not treated as a timeline.
-Advanced options contain explicit views of all, normal or shear components,
-shape illustration and explanation. These controls select recorded entries
+Advanced options contain `Show all`, `Pull`, `Push` and `Slide` arrow filters,
+plus the optional strain shape illustration. Pull selects positive normal
+components, Push selects negative normal components and Slide selects nonzero
+shear components of either sign. Strain labels these actions `Extend`, `Shorten`
+and `Slide`. The shared predicate also dims matrix cells whose arrows are hidden;
+all values remain in place and clickable. `Cube arrows: …` describes the diagram,
+while `All supplied values` labels the complete matrix. Empty action filters draw
+no arrows and show a short status. The repeated stress explanation and metadata
+line (including `step`) are omitted from Advanced display options; the existing
+record selector and original load details are unchanged. Strain shape assumptions
+appear when its illustration is enabled. These controls select recorded entries
 without interpolating a loading history from frequency or duration.
 All supplied load details remain available in the
 table, including without JavaScript.
@@ -694,7 +703,7 @@ Blue normal arrows point outward for tension (`Pull`), orange arrows point inwar
 for compression (`Push`), and teal shear arrows
 run parallel to the corresponding faces in separate lanes, keeping both shear
 directions clear of the normal arrow. Their placement is stable when a component
-is selected. Strain uses `Extend` / `Shorten` and `Shear`, explicitly as direction
+is selected. Strain uses `Extend` / `Shorten` and `Slide`, explicitly as direction
 guides rather than forces. These actions use the original sign even when a tiny
 value rounds to `0.00`. The legend combines shapes, words and colors; curved
 arrows are avoided because they commonly indicate

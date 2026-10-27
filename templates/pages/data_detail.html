@@ -875,6 +875,7 @@ details[open] > .detail-group-summary {
     .bc-tensor-selects label[hidden], .bc-tensor-status[hidden] { display: none; }
     .bc-tensor-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
     .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
+    .bc-tensor-matrix-heading { font-size: 0.77rem; color: #536176; margin-top: 8px; }
     .bc-tensor-matrix { display: grid; grid-template-columns: 64px repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
     .bc-tensor-axis { display: flex; align-items: center; justify-content: center; color: #536176; font-size: 0.75rem; font-weight: 600; text-align: center; }
     .bc-tensor-cell {
@@ -1706,16 +1707,17 @@ details[open] > .detail-group-summary {
                   <label>Load record<select class="form-select" data-tensor-load></select></label>
                 </div>
                 <div class="bc-tensor-description" data-tensor-description></div>
+                <div class="bc-tensor-matrix-heading" data-tensor-matrix-heading>All supplied values <span data-tensor-filter-note hidden>· faded cells have no arrows in the cube</span></div>
                 <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: rows are direction i; columns are face normal j"></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
                 <div class="bc-tensor-caption">ij: direction i on faces normal to j. Select a value to isolate its arrows and faces; select again to show all.<br>Values rounded to two decimals; hover for full precision.</div>
                 <details class="bc-tensor-options" data-tensor-options>
                   <summary>Advanced display options</summary>
-                  <div class="bc-tensor-caption" data-tensor-metadata></div>
-                  <div class="bc-tensor-filters" role="group" aria-label="Components to show">
+                  <div class="bc-tensor-filters" role="group" aria-label="Cube arrows to show">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="true">Show all</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="normal" aria-pressed="false">Normal</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="shear" aria-pressed="false">Shear</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="pull" aria-pressed="false">Pull</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="push" aria-pressed="false">Push</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="slide" aria-pressed="false">Slide</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-clear>Clear selection</button>
                   </div>
                   <label class="bc-tensor-shape" data-tensor-shape-label hidden>

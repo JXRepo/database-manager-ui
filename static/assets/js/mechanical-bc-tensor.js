@@ -8,24 +8,25 @@ export function isTensorNumber(value) {
 export function tensorComponentMeaning(component, value, isStrain = false) {
   if (!TENSOR_COMPONENTS.includes(component) || !isTensorNumber(value) || value === 0) return null;
   if (component[0] !== component[1]) {
-    return {effect: 'shear', name: isStrain ? 'Shear strain' : 'Shear', action: 'Shear', color: '#0f766e'};
+    return {effect: 'shear', name: isStrain ? 'Shear strain' : 'Shear', action: 'Slide', color: '#0f766e'};
   }
   return value > 0
     ? {effect: 'outward', name: isStrain ? 'Extension' : 'Tension', action: isStrain ? 'Extend' : 'Pull', color: '#2563eb'}
     : {effect: 'inward', name: isStrain ? 'Contraction' : 'Compression', action: isStrain ? 'Shorten' : 'Push', color: '#c2410c'};
 }
 
-function componentVisible(component, filter, selected) {
-  const normal = component[0] === component[1];
-  return (!selected || component === selected)
-    && (filter === 'all' || (filter === 'normal' ? normal : !normal));
+export function tensorComponentVisible(component, value, filter = 'all', selected = '') {
+  if (!TENSOR_COMPONENTS.includes(component) || (selected && component !== selected)) return false;
+  if (filter === 'all') return true;
+  const effect = tensorComponentMeaning(component, value)?.effect;
+  return !!effect && effect === {pull: 'outward', push: 'inward', slide: 'shear'}[filter];
 }
 
 export function tensorArrows(magnitude, filter = 'all', selected = '') {
   const arrows = [];
   for (const component of TENSOR_COMPONENTS) {
     const value = magnitude?.[component];
-    if (!isTensorNumber(value) || value === 0 || !componentVisible(component, filter, selected)) continue;
+    if (!isTensorNumber(value) || value === 0 || !tensorComponentVisible(component, value, filter, selected)) continue;
     for (const faceSign of [-1, 1]) {
       arrows.push({component, value, direction: component[0], normal: component[1],
         faceSign, sign: Math.sign(value) * faceSign});
@@ -49,7 +50,8 @@ export function strainIllustration(magnitude, filter = 'all', selected = '') {
   const matrix = axes.map(first => axes.map(second => {
     const key = first + second;
     const reverse = second + first;
-    if (!componentVisible(key, filter, selected) && !componentVisible(reverse, filter, selected)) return 0;
+    if (!tensorComponentVisible(key, magnitude[key], filter, selected)
+      && !tensorComponentVisible(reverse, magnitude[reverse], filter, selected)) return 0;
     return magnitude[key] / peak;
   }));
   const rowSize = Math.max(...matrix.map(row => row.reduce((sum, value) => sum + Math.abs(value), 0)), 1);

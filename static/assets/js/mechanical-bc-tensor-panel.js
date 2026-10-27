@@ -1,4 +1,4 @@
-import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows, tensorComponentMeaning} from './mechanical-bc-tensor.js';
+import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows, tensorComponentMeaning, tensorComponentVisible} from './mechanical-bc-tensor.js';
 
 export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
@@ -18,7 +18,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
 
   function componentDescription(key, value, isStrain) {
     if (key[0] !== key[1]) {
-      return `${isStrain ? 'Shear strain' : 'Shear'} · ${key[0].toUpperCase()} direction on ±${key[1].toUpperCase()} faces`;
+      return `Slide (${isStrain ? 'shear strain' : 'shear'}) · ${key[0].toUpperCase()} direction on ±${key[1].toUpperCase()} faces`;
     }
     let kind = 'Normal component';
     const meaning = tensorComponentMeaning(key, value, isStrain);
@@ -42,15 +42,14 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     const loads = current.item.tensor_loads || [];
     const load = loads[loadIndex];
     const magnitude = load?.magnitude;
+    if (selected && isTensorNumber(magnitude?.[selected])
+      && !tensorComponentVisible(selected, magnitude[selected], filter)) filter = 'all';
     const isStrain = current.item.loading_type === 'strain';
     const rawUnit = units?.[isStrain ? 'Strain' : 'Stress'];
     const unit = isStrain && (rawUnit === 1 || (typeof rawUnit === 'string' && rawUnit.trim() === '1'))
       ? '-' : (typeof rawUnit === 'string' ? rawUnit.trim() : '');
     panel.querySelector('[data-tensor-heading]').textContent =
       `Whole cube · ${isStrain ? 'Strain' : 'Stress'}${unit ? ` (${unit})` : ' · unit not supplied'}`;
-    panel.querySelector('[data-tensor-metadata]').textContent = (load?.details || [])
-      .filter(detail => detail.key !== 'magnitude')
-      .map(detail => `${detail.key}: ${detail.display}`).join(' · ');
     loadSelect.value = String(loadIndex);
     shapeLabel.hidden = !isStrain;
     const preview = strainIllustration(magnitude, filter, selected);
@@ -91,7 +90,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       cell.dataset.component = key;
       cell.disabled = !isTensorNumber(value);
       cell.setAttribute('aria-pressed', String(selected === key));
-      cell.classList.toggle('is-filtered', filter !== 'all' && ((key[0] === key[1]) !== (filter === 'normal')));
+      cell.classList.toggle('is-filtered', !tensorComponentVisible(key, value, filter, selected));
       const rawValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
       cell.title = supplied ? `${key}: ${rawValue}${unit ? ` ${unit}` : ''}` : `${key}: not supplied`;
       const label = document.createElement('span');
@@ -112,7 +111,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       cell.addEventListener('click', () => {
         shape.checked = false;
         selected = selected === key ? '' : key;
-        if (!selected || (filter !== 'all' && ((key[0] === key[1]) !== (filter === 'normal')))) filter = 'all';
+        if (!selected || !tensorComponentVisible(key, value, filter)) filter = 'all';
         render();
         cells.find(button => button.dataset.component === key)?.focus({preventScroll: true});
       });
@@ -123,8 +122,12 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       matrix.appendChild(cell);
       cells.push(cell);
     }
-    filterButtons.forEach(button => button.setAttribute('aria-pressed', String(!selected && !shape.checked
-      && button.dataset.tensorFilter === filter)));
+    const actionLabels = {all: 'Show all', pull: isStrain ? 'Extend' : 'Pull', push: isStrain ? 'Shorten' : 'Push', slide: 'Slide'};
+    filterButtons.forEach(button => {
+      button.textContent = actionLabels[button.dataset.tensorFilter];
+      button.setAttribute('aria-pressed', String(!selected && !shape.checked && button.dataset.tensorFilter === filter));
+    });
+    panel.querySelector('[data-tensor-filter-note]').hidden = !selected && filter === 'all';
     const valid = TENSOR_COMPONENTS.filter(key => isTensorNumber(magnitude?.[key]));
     const invalid = TENSOR_COMPONENTS.filter(key => magnitude && Object.hasOwn(magnitude, key) && !isTensorNumber(magnitude[key]));
     let status = '';
@@ -140,16 +143,19 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       else status = `${selected}: ${formatTensorValue(value)}${unit ? ` ${unit}` : ''}${value === 0 ? ' · zero value, no arrows' : ''}`;
       statusElement.title = cells.find(cell => cell.dataset.component === selected).title;
     } else {
-      description.textContent = filter === 'all' ? 'All supplied components' : `${filter === 'normal' ? 'Normal' : 'Shear'} components`;
+      description.textContent = shape.checked ? 'Cube: Strain shape illustration'
+        : `Cube arrows: ${filter === 'all' ? 'All' : actionLabels[filter]}`;
       if (!valid.length) status = 'No numeric tensor components to visualize. See supplied load details in the table.';
       else if (!tensorArrows(magnitude, filter).length) status = 'No nonzero components in this view';
     }
     if (invalid.length) status += `${status ? ' · ' : ''}Invalid components omitted: ${invalid.join(', ')}`;
     statusElement.textContent = status;
     statusElement.hidden = !status;
-    panel.querySelector('[data-tensor-note]').textContent = shape.checked
+    const note = panel.querySelector('[data-tensor-note]');
+    note.textContent = shape.checked
       ? 'Normalized small-strain illustration, not a simulated shape. Assumes tensor shear and symmetry; all nine components must be supplied and reciprocal values must agree. Blue: original, purple: illustration.'
-      : `${isStrain ? 'Strain direction guides, not forces or a predicted shape.' : 'Stress component schematic, not reconstructed boundary tractions.'} ij means direction i on faces normal to j. Positive normal values point outward. Arrow lengths are fixed; use the values for magnitude. Missing components are not inferred.`;
+      : '';
+    note.parentElement.hidden = !shape.checked;
     panel.querySelector('[data-tensor-preview-note]').textContent = isStrain && preview.error ? preview.error : '';
     onHighlight('');
     onChange({item: current.item, itemIndex: current.index, load, filter, selected, unit,

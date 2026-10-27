@@ -978,7 +978,7 @@ function updateTensorLegend(legend, view) {
     item.innerHTML = `<svg class="bc-tensor-key" viewBox="0 0 48 24" aria-hidden="true">
       <rect x="20" y="7" width="8" height="10" fill="#e9d5ff" stroke="#94a3b8"/>
       <path d="${entry.path}" fill="${meaning.color}"/></svg>`;
-    const text = meaning.effect === 'shear' ? (isStrain ? 'Shear strain' : 'Slide (shear)')
+    const text = meaning.effect === 'shear' ? (isStrain ? 'Slide (shear strain)' : 'Slide (shear)')
       : `${meaning.action} (${meaning.name.toLowerCase()})`;
     item.appendChild(document.createTextNode(text));
     legend.appendChild(item);
@@ -1278,7 +1278,7 @@ function renderMechanicalBcViewer() {
       const isStrain = view.item.loading_type === 'strain';
       tensorTitle.textContent = `${isStrain ? 'Strain' : 'Stress'} tensor${view.unit ? ` (${view.unit})` : ' · unit not supplied'}`;
       tensorExplanation.textContent = view.shapeMatrix ? 'Normalized illustration · not a simulated shape'
-        : isStrain ? 'Opposing faces · strain direction guides' : 'Opposing faces · pull, push or shear';
+        : isStrain ? 'Opposing faces · strain direction guides' : 'Opposing faces · pull, push or slide';
       updateTensorLegend(tensorLegend, view);
       state.renderSceneOnce();
     }, highlight);

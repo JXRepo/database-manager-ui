@@ -26,7 +26,7 @@ test('component meaning distinguishes stress actions from strain guides and keep
   assert.equal(meaning('zz', -2, true).name, 'Contraction');
   for (const value of [-9, 3]) {
     assert.equal(meaning('xy', value).effect, 'shear');
-    assert.equal(meaning('yx', value).action, 'Shear');
+    assert.equal(meaning('yx', value).action, 'Slide');
     assert.equal(meaning('yx', value, true).name, 'Shear strain');
   }
   for (const value of [0, -0, undefined, null, true, '5', NaN, Infinity, {}]) {
@@ -54,10 +54,22 @@ test('zero, missing, invalid and unknown components never become directional arr
 test('filters and component selection do not alter the source tensor', () => {
   const magnitude = {xx: 2, xy: 3, yx: -5, yz: 0};
   const before = JSON.stringify(magnitude);
-  assert.deepEqual(tensor.tensorArrows(magnitude, 'normal').map(a => a.component), ['xx', 'xx']);
-  assert.deepEqual(tensor.tensorArrows(magnitude, 'shear', 'yx').map(a => a.component), ['yx', 'yx']);
-  assert.deepEqual(tensor.tensorArrows(magnitude, 'normal', 'xy'), []);
+  assert.deepEqual(tensor.tensorArrows(magnitude, 'pull').map(a => a.component), ['xx', 'xx']);
+  assert.deepEqual(tensor.tensorArrows(magnitude, 'slide', 'yx').map(a => a.component), ['yx', 'yx']);
+  assert.deepEqual(tensor.tensorArrows(magnitude, 'pull', 'xy'), []);
   assert.equal(JSON.stringify(magnitude), before);
+});
+
+test('action filters separate pulling, pushing and sliding using original finite values', () => {
+  const values = {xx: 15, yy: -5, zz: -0.0001, xy: 2, yx: -7, xz: 0, yz: null, zx: '3'};
+  const original = JSON.stringify(values);
+  const components = filter => tensor.tensorArrows(values, filter).map(arrow => arrow.component);
+  assert.deepEqual(components('pull'), ['xx', 'xx']);
+  assert.deepEqual(components('push'), ['yy', 'yy', 'zz', 'zz']);
+  assert.deepEqual(components('slide'), ['xy', 'xy', 'yx', 'yx']);
+  assert.deepEqual(components('unknown'), []);
+  assert.deepEqual(tensor.tensorArrows(values, 'pull', 'xy'), []);
+  assert.equal(JSON.stringify(values), original);
 });
 
 test('small-strain illustration preserves sign, uses explicit symmetry, and remains bounded', () => {

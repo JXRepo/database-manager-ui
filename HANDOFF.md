@@ -3,12 +3,37 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-27
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Whole cube scalar and tensor loads have distinct visual meanings
+next_topic: Pull/Push/Slide filters apply to cube arrows while the matrix stays complete
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：Pull／Push／Slide 筛选与完整矩阵明确分开
+
+- 用户指出 Normal 不够直观，并把 Shear components 标题理解为下方全部数值都属于
+  剪切。现改为 Show all／Pull／Push／Slide：分别显示全部、正法向、负法向和两种
+  符号的非零剪切箭头。应变保留科学含义，使用 Extend／Shorten／Slide。
+- 共享 `tensorComponentVisible` 同时筛选图形和标识淡化的矩阵格；完整 3×3 格仍在，
+  淡化的值也可点击单独查看。标题 `Cube arrows: …` 仅说明图形；矩阵另标
+  `All supplied values`，筛选或选择时说明淡化格在 cube 中没有箭头。动作标签统一为
+  Slide，详情仍保留 shear 的科学名称。原值、符号、单位及 JSON 导出均保持。
+- 用户样例 xx=15、yy=5 属于 Pull，xy=yx=2 属于 Slide；Push 没有箭头且提示无非零
+  分量，不能把这份记录称为只有剪切。负小数即使显示为 0.00 也照原负号进入 Push。
+- 去掉 Advanced display options 中重复的 Stress component 长说明及元数据行
+  （包括 step: 1）；本轮不设计新的 step 交互，既有记录顺序、选择器与 Load details
+  中的原始信息保留。小应变形状的必要假设只在启用该示意时显示。
+- 136 项 Node 测试、12 项相关 Django／真实 Chromium 测试通过，零失败／跳过。
+  新回归验证三种筛选实际改变箭头且不删矩阵值、未知筛选为空、微小负号、选择恢复、
+  应变用词及去掉的说明；浏览器覆盖 1280／1440／1920 并检查空的 Push 视图。
+  本机截图／日志位于 `/tmp/cube-filters-qa/`，已查看 Pull、Push、Slide 的实际截图。
+- 独立复核指出所选分量跨记录变号时可能被旧筛选挡住；已通过先失败后通过的回归确认，
+  有效所选分量与原筛选冲突时恢复 All，继续显示同一分量的新值与方向；缺失／无效
+  分量的选择保留规则不变。截图等待使用有界的动画状态轮询，避免 headless 中等待
+  transition.finished 卡住；不改变或强制结束生产页面动效。
+- 仅处理本轮明确提出的筛选和说明问题；上一轮提出的更圆润箭头／按需动画仍在讨论，
+  未擅自增加动画或改变 cube 几何。部署核验见后续记录，不能仅用 push 代替上线证明。
 
 ### 最新调整：区分两类整体条件，并直观表达拉、压、剪切
 
