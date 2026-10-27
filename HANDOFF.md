@@ -1,14 +1,27 @@
 ---
 status: boundary_viewer_delivered
 branch: main
-timestamp: 2026-10-26
+timestamp: 2026-10-27
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Boundary viewer complete; local legend simplified at user request
+next_topic: Five boundary example identifiers renamed for reupload
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：五份边界示例改用清晰 identifier
+
+- 用户要求把五份 JSON 的 identifier 改成易区分的名字，由用户重新上传。
+  文件仍在 `example_json_files/boundary_condition_examples_20261008/`，文件名不变。
+- 点、边、面、整体力、整体应力依次为 `01-Point-Force-Aluminium`、
+  `02-Edge-Force-Steel`、`03-Face-Force-Titanium`、`04-Whole-Cube-Force-Copper`、
+  `05-Whole-Cube-Stress-Copper`。文件与旧 identifier 的对照表在同目录 README。
+- 五份均通过实际必填／嵌套／条件规则、identifier 格式与组内唯一性、JSON 深度及
+  有限数值检查；与改名前 Git 内容逐字节比较，确认只有顶层 identifier 值变化。
+  本次未改应用代码或界面，未重新运行浏览器测试。
+- 重新上传会新增记录，旧的线上记录不会自动改名或删除；未操作生产数据。
+  截图里的 `a46fde6c` 是另外的原始参考文件，本次未改该文件。
 
 ### 最新调整：精简局部图例
 

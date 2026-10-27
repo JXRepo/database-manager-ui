@@ -4,16 +4,26 @@ Git tracks the JSON examples and this README. Local browser preview images remai
 ignored and are not required for upload.
 
 Upload the five JSON files in this folder together, or upload them individually.
-Each contains one public data object with a distinct identifier. The point,
-edge and face identifiers use the MiMeDat template; the two whole cube examples
-use explicit descriptive identifiers.
+Each contains one public data object with a distinct descriptive identifier.
+The identifiers name the boundary location, loading quantity and material so
+the five examples are easy to distinguish in search results and My Data.
 Select only the JSON files in the platform's upload picker. Public data is
 available to other signed-in platform users and appears in Live Data Objects.
-The point and edge files have new identifiers after separating their support
-conditions, so they can coexist with earlier mixed versions. The face and whole
-cube examples also have revised identifiers. Reuploading an existing identifier
+All five identifiers were renamed on 2026-10-27. Uploading these files creates
+new objects alongside earlier uploads. Reuploading the same new identifier
 uses the ordinary duplicate check.
 Existing uploaded objects are not changed by editing these local files.
+
+| File | Current identifier | Previous identifier |
+| --- | --- | --- |
+| 01_point_tension_aluminium.json | `01-Point-Force-Aluminium` | `d45afab2` |
+| 02_edge_compression_steel.json | `02-Edge-Force-Steel` | `22cdfdb0` |
+| 03_face_cyclic_shear_titanium.json | `03-Face-Force-Titanium` | `1f84367d` |
+| 04_whole_cube_force_displacement_copper.json | `04-Whole-Cube-Force-Copper` | `synthetic-whole-force-copper-20261011` |
+| 04_whole_cube_tensor_copper.json | `05-Whole-Cube-Stress-Copper` | `synthetic-whole-stress-copper-one-state-20261011` |
+
+Only the top-level `identifier` values changed in this rename. All other JSON
+content and the filenames remain unchanged.
 
 Each file now uses only one boundary target type, including fixed and free
 conditions: Point, Edge, Face, or Whole cube. The point file has one loaded point
@@ -121,14 +131,19 @@ Neither solver was used to produce these fixtures.
 
 ## Current file checks
 
-On 2026-10-13, all five current files passed the platform's required field profile,
+On 2026-10-27, all five renamed files passed the platform's required field profile,
 including nested and conditional requirements, identifier format, distinct
 identifiers across the set and JSON depth checks. All numeric values were finite,
-and validation left the original JSON bytes unchanged. The 20 existing required
-schema and boundary condition schema tests also passed against an isolated local
-SQLite test database. These checks do not establish a simulated physical response.
+and validation left the JSON bytes unchanged. A byte comparison with the previous
+committed files confirmed that only the five top-level identifier values changed.
+These checks do not establish a simulated physical response.
 
 ## Historical local verification
+
+On 2026-10-13, the five files with their previous identifiers passed the same
+required field, identifier and depth checks. The 20 existing required schema and
+boundary condition schema tests also passed against an isolated local SQLite
+test database on that date.
 
 The earlier four file set passed the platform's required field and conditional
 requirement profile before the later Face and whole cube display revisions.
@@ -161,6 +176,5 @@ The current trial retains the X load and adds independent Y and Z entries on
 the same edge, all at -172.8 N with step 1. Each direction has three schematic
 arrows; only the X arrows are parallel to the edge. The existing nominal X
 curves are retained and explicitly do not resolve the combined XYZ loads.
-The current identifier is `22cdfdb0`, generated with the platform's MiMeDat
-template. Upload this file again to view all three directions; older uploaded
-objects are retained.
+That revision used `22cdfdb0`, generated with the platform's MiMeDat template.
+The current identifier is listed above; older uploaded objects are retained.

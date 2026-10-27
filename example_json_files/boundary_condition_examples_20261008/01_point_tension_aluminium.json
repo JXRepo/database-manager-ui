@@ -1272,5 +1272,5 @@
     },
     "history_interpretation": "A constitutive load ramp sampled from zero to the prescribed endpoint; sample index is not physical time"
   },
-  "identifier": "d45afab2"
+  "identifier": "01-Point-Force-Aluminium"
 }
