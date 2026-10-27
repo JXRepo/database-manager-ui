@@ -24,7 +24,10 @@ next_topic: Edge and face arrows share their region center
   1280／1440／1920 桌面、长内容、空条件、矩阵／记录切换、悬停、旋转／Reset、
   无 JavaScript 表格和完整 JSON 导出。三种宽度的边／面截图均已查看。
   日志与截图在 `/tmp/boundary-center-qa-YwQQFM/`，不随 Git 同步。
-- 应用提交及线上脚本核验以本轮最终回复为准，不能将 Git push 等同于部署完成。
+- 应用提交 `96895f0` 已推送。2026-10-27 08:59:05 UTC 核对线上 viewer 的普通 URL
+  和独立 no-cache URL 均与本次文件逐字节一致，`/healthz/` 返回 HTTP 200，确认脚本已更新。
+  线上核验记录在上述目录的 `live-verification.json`；交互验收在本地 Chromium 完成，
+  未登录或修改生产数据。此后仅记录核验的文档提交使用 `[skip render]`。
 
 ### 最新调整：五份边界示例改用清晰 identifier
 
