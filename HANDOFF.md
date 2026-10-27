@@ -34,6 +34,10 @@ next_topic: Pull/Push/Slide filters apply to cube arrows while the matrix stays 
   transition.finished 卡住；不改变或强制结束生产页面动效。
 - 仅处理本轮明确提出的筛选和说明问题；上一轮提出的更圆润箭头／按需动画仍在讨论，
   未擅自增加动画或改变 cube 几何。部署核验见后续记录，不能仅用 push 代替上线证明。
+- 应用提交 `e669595` 已合入并推送 main。2026-10-27 14:32 UTC，线上 viewer、tensor、
+  tensor-panel 三个脚本在普通 URL 与独立 no-cache URL 均逐字节匹配，`/healthz/`
+  HTTP 200。证据在 `/tmp/cube-filters-qa/live-verification.json`；交互截图来自本地
+  Chromium，未操作生产数据。隔离工作区已清理，当前修改均在 main。
 
 ### 最新调整：区分两类整体条件，并直观表达拉、压、剪切
 
