@@ -270,6 +270,21 @@ async function main() {
   assert.equal(await evaluate('__bcTest.state.tensorMeshes.length'),6);
   assert.equal(await evaluate('__bcTest.state.tensorMeshes.every(mesh=>mesh.userData.entries.length===3)'),true,
     'One surface per face retains all three independent components without overlapping surfaces');
+  const sharedFaceHover = await evaluate(`(() => {
+    const mesh=__bcTest.state.tensorMeshes.find(m=>m.userData.normal==='x'&&m.userData.faceSign===1);
+    const p=mesh.position.clone().project(__bcTest.state.camera);
+    const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();
+    return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2};})()`);
+  await command('Input.dispatchMouseEvent', {type:'mouseMoved',...sharedFaceHover});
+  const sharedTooltip = await evaluate(`${visibleTooltip}?.textContent||''`);
+  assert.match(sharedTooltip, /xx: -15\.00 MPa · Push · -X direction/);
+  assert.match(sharedTooltip, /yx: -7\.00 MPa · Slide · -Y direction/);
+  assert.match(sharedTooltip, /zx: 6\.00 MPa · Slide · \+Z direction/);
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-component].is-hovered")).map(cell=>cell.dataset.component)'),
+    ['xx','yx','zx'], 'A shared face highlights every associated component without guessing one');
+  await command('Input.dispatchMouseEvent', {type:'mouseMoved',x:0,y:0});
+  assert.equal(await evaluate('document.querySelectorAll("[data-component].is-hovered").length'),0);
+  await checkTensorGeometry();
   await evaluate('document.querySelector("[data-component=xx]").click();document.activeElement.blur()');
   assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /Push together \(compression\)/);
   await screenshot('tensor-push-selected');

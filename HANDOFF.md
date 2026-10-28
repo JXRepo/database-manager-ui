@@ -31,7 +31,10 @@ next_topic: Arrow-free tensor face and conceptual action guide
   静态和动态 SVG、原形固定、主 cube／数值不动、手动减少动态效果重播、点边面／
   标量／混合／零值／无 JS／导出。截图、动画帧、测试日志在
   `/tmp/tensor-face-guide-qa/`。已查看 1280 静态及 1920 剪切、压缩和全分量截图。
-- 独立复核与上线验证待本轮完成后补充。
+- 独立只读复核未发现待修复问题；复核者另跑 21 项 tensor helper／Chromium panel
+  测试通过。另补共享面的真实鼠标回归，验证同一 +X 面完整显示 xx／yx／zx 三项
+  数值及符号方向、同时高亮三项并正确清除；12 项 Django／浏览器复跑通过。
+- 上线验证待推送后补充。
 
 ### 最新修复：减少动态效果不再禁用手动重播
 
