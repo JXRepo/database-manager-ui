@@ -655,7 +655,7 @@ italic glyphs for these two symbols; field keys and plotted values are unchanged
 Mechanical boundary conditions show the quantity name and explicitly supplied
 unit in the table, whole cube captions and load-arrow hover. Force, displacement,
 stress and strain retain distinct quantity labels. Scalar force/displacement uses
-slim purple axis arrows, while tensors use broad block arrows on opposing faces.
+slim purple axis arrows, while tensors use fuller, rounded arrows on opposing faces.
 Missing units are labeled as not supplied.
 The local legend uses `Local loads` and `Fixed constraint` without repeating
 quantity names, units or an `X/Y/Z directions` label.
@@ -695,6 +695,10 @@ to `j`, with outward arrows for positive normal values. It shows supplied
 components independently, including unequal `xy` and `yx`, and does not claim
 to reconstruct the actual tractions on the simulation boundary. Each nonzero
 component uses one broad straight arrow on each of its two opposite faces.
+Tensor arrows have a continuous rounded shaft and head with soft surface shading;
+the pictorial keys use matching colors and shading. The style is static, and its
+width does not encode magnitude. Shear lanes leave room for the complete rounded
+surface outside the cube and keep arrows on the same face separate.
 The copper stress example has eight arrows; nine nonzero components have eighteen.
 Tensor-only scenes place arrow tails at the faces for tension and arrow tips at
 the faces for compression; mixed scenes use an outer layer to leave room for

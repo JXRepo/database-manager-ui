@@ -124,25 +124,34 @@ async function main() {
     await command('Emulation.setDeviceMetricsOverride',{...viewport,deviceScaleFactor:1,mobile:false});
     await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
   }
-  const tensorCount = () => evaluate('__bcTest.state.tensorMeshes.length / 2');
+  const tensorComponents = () => evaluate('[...new Map(__bcTest.state.tensorMeshes.map(mesh=>[mesh.userData.tooltip,mesh.userData.component])).values()]');
+  const tensorCount = async () => (await tensorComponents()).length;
   const visibleTooltip = `Array.from(document.querySelector('#mechanical-bc-cube').children).find(el=>el.style.pointerEvents==='none'&&el.style.opacity==='1')`;
   async function checkTensorGeometry() {
     const arrows = await evaluate(`(() => {
       __bcTest.state.root.updateMatrixWorld(true);
-      const result = [];
-      for (let index = 0; index < __bcTest.state.tensorMeshes.length; index += 2) {
-        const shaft = __bcTest.state.tensorMeshes[index], head = __bcTest.state.tensorMeshes[index + 1];
-        const start = new __bcThree.Vector3(0, -shaft.geometry.parameters.height / 2, 0).applyMatrix4(shaft.matrixWorld);
-        const tip = new __bcThree.Vector3(0, head.geometry.parameters.height / 2, 0).applyMatrix4(head.matrixWorld);
-        result.push({component: shaft.userData.component, value: shaft.userData.value,
-          shaft: shaft.geometry.type, headSides: head.geometry.parameters.radialSegments,
-          color: shaft.material.color.getHexString(), start: start.toArray(), tip: tip.toArray()});
+      const groups = new Map();
+      for (const mesh of __bcTest.state.tensorMeshes) {
+        if (!groups.has(mesh.userData.tooltip)) groups.set(mesh.userData.tooltip, {
+          component: mesh.userData.component, value: mesh.userData.value,
+          color: mesh.material.color.getHexString(), box: new __bcThree.Box3(),
+          direction: new __bcThree.Vector3(0, 1, 0).transformDirection(mesh.matrixWorld),
+        });
+        groups.get(mesh.userData.tooltip).box.expandByObject(mesh);
       }
-      return result;
+      return [...groups.values()].map(arrow => {
+        const center = arrow.box.getCenter(new __bcThree.Vector3());
+        const size = arrow.box.getSize(new __bcThree.Vector3());
+        const halfLength = (Math.abs(arrow.direction.x)*size.x + Math.abs(arrow.direction.y)*size.y + Math.abs(arrow.direction.z)*size.z)/2;
+        return {component: arrow.component, value: arrow.value, color: arrow.color,
+          start: center.clone().addScaledVector(arrow.direction, -halfLength).toArray(),
+          tip: center.clone().addScaledVector(arrow.direction, halfLength).toArray(),
+          min: arrow.box.min.toArray(), max: arrow.box.max.toArray()};
+      });
     })()`);
     for (const arrow of arrows) {
-      assert.equal(arrow.shaft, 'BoxGeometry', 'Tensor arrows need a broad block shaft distinct from scalar arrows');
-      assert.equal(arrow.headSides, 4);
+      assert.ok(Math.abs(Math.hypot(...arrow.tip.map((value, axis)=>value-arrow.start[axis]))-0.44)<1e-6,
+        'Tensor arrows keep a fixed length independent of the component value');
       const direction = 'xyz'.indexOf(arrow.component[0]);
       const normal = 'xyz'.indexOf(arrow.component[1]);
       const faceSign = Math.sign(arrow.start[normal]);
@@ -154,7 +163,9 @@ async function main() {
         assert.equal(arrow.color, arrow.value > 0 ? '2563eb' : 'c2410c');
       } else {
         assert.ok(Math.abs(arrow.start[normal] - arrow.tip[normal]) < 1e-8, 'Shear must stay parallel to the face');
-        assert.ok(Math.abs(arrow.start[normal]) >= 0.5 && Math.abs(arrow.start[normal]) <= 0.6);
+        assert.ok(Math.abs(arrow.start[normal]) >= 0.5 && Math.abs(arrow.start[normal]) <= 0.61);
+        const nearestSurface = faceSign > 0 ? arrow.min[normal] : -arrow.max[normal];
+        assert.ok(nearestSurface >= 0.5 - 1e-8, 'The complete shear arrow must stay outside the cube face');
         assert.equal(arrow.color, '0f766e');
       }
     }
@@ -208,7 +219,7 @@ async function main() {
     await evaluate('document.querySelector("[data-tensor-options]").open=true');
     for (const [filter, components] of [['pull', ['xx', 'xx', 'yy', 'yy']], ['push', []], ['slide', ['xy', 'xy', 'yx', 'yx']]]) {
       await evaluate(`document.querySelector('[data-tensor-filter=${filter}]').click();document.activeElement.blur()`);
-      assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.filter((mesh,index)=>index%2===0).map(mesh=>mesh.userData.component)'), components);
+      assert.deepEqual(await tensorComponents(), components);
       assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-component] strong")).map(value=>value.textContent)'), matrixValues);
       assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /^Cube arrows:/);
       assert.equal(await evaluate('document.querySelector("[data-tensor-filter-note]").checkVisibility()'), true);
@@ -236,8 +247,8 @@ async function main() {
   assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /Pull apart \(tension\)/);
   await screenshot('tensor-pull-selected');
   const tensorHover = await evaluate(`(() => {
-    const mesh=__bcTest.state.tensorMeshes.find(m=>m.geometry.type==='ConeGeometry'&&m.position.x>0);
-    const p=mesh.getWorldPosition(new __bcThree.Vector3()).project(__bcTest.state.camera);
+    const mesh=__bcTest.state.tensorMeshes.find(m=>m.userData.component==='xx'&&m.position.x>0);
+    const p=new __bcThree.Box3().setFromObject(mesh).getCenter(new __bcThree.Vector3()).project(__bcTest.state.camera);
     const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();
     return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2};})()`);
   await command('Input.dispatchMouseEvent', {type:'mouseMoved',...tensorHover});
@@ -253,7 +264,7 @@ async function main() {
   assert.equal(await tensorCount(),18);
   await checkTensorGeometry();
   await evaluate('document.querySelector("[data-tensor-filter=push]").click()');
-  assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.filter((mesh,index)=>index%2===0).map(mesh=>mesh.userData.component)'), ['xx', 'xx', 'zz', 'zz']);
+  assert.deepEqual(await tensorComponents(), ['xx', 'xx', 'zz', 'zz']);
   await evaluate('document.querySelector("[data-tensor-filter=all]").click();document.activeElement.blur()');
   assert.equal(await evaluate(`(()=>{const groups={};for(const mesh of __bcTest.state.tensorMeshes){
     const face=mesh.userData.tooltip.split('\\n')[1].split(' face')[0];const key=face+mesh.userData.component;

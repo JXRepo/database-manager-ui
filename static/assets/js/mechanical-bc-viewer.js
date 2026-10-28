@@ -872,19 +872,23 @@ function disposeTensorGroup(group) {
 }
 
 function createTensorArrow(start, direction, material, group, tooltip, selectableMeshes) {
-  const headLength = 0.15;
-  const shaftLength = TENSOR_ARROW_LENGTH - headLength + 0.01;
-  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.065, shaftLength, 0.065), material);
-  shaft.position.copy(start).addScaledVector(direction, shaftLength / 2);
-  shaft.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
-  const headGeometry = new THREE.ConeGeometry(0.09, headLength, 4);
-  headGeometry.rotateY(Math.PI / 4);
-  const head = new THREE.Mesh(headGeometry, material);
-  head.position.copy(start).addScaledVector(direction, TENSOR_ARROW_LENGTH - headLength / 2);
-  head.quaternion.copy(shaft.quaternion);
-  addMesh(group, shaft, tooltip, selectableMeshes);
-  addMesh(group, head, tooltip, selectableMeshes);
-  return [shaft, head];
+  const shoulder = TENSOR_ARROW_LENGTH * 0.59;
+  const profile = new THREE.Path();
+  profile.moveTo(0, 0);
+  profile.quadraticCurveTo(0.048, 0, 0.048, 0.036);
+  profile.lineTo(0.048, shoulder - 0.012);
+  profile.quadraticCurveTo(0.048, shoulder, 0.06, shoulder);
+  profile.lineTo(0.082, shoulder);
+  profile.quadraticCurveTo(0.098, shoulder, 0.09, shoulder + 0.018);
+  profile.lineTo(0.012, TENSOR_ARROW_LENGTH - 0.012);
+  profile.quadraticCurveTo(0.006, TENSOR_ARROW_LENGTH, 0, TENSOR_ARROW_LENGTH);
+
+  const geometry = new THREE.LatheGeometry(profile.getPoints(8), 32);
+  const arrow = new THREE.Mesh(geometry, material);
+  arrow.position.copy(start);
+  arrow.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+  addMesh(group, arrow, tooltip, selectableMeshes);
+  return [arrow];
 }
 
 function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = false) {
@@ -905,12 +909,13 @@ function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = fals
   }
 
   const componentMaterials = new Map();
-  const shearLaneOffset = 0.30;
+  const shearLaneOffset = 0.32;
   for (const arrow of tensorArrows(view.load?.magnitude, view.filter, view.selected)) {
     const meaning = tensorComponentMeaning(arrow.component, arrow.value, isStrain);
     if (!componentMaterials.has(arrow.component)) {
       componentMaterials.set(arrow.component, new THREE.MeshStandardMaterial({
-        color: meaning.color, roughness: 0.65, metalness: 0,
+        color: meaning.color, roughness: 0.48, metalness: 0,
+        emissive: meaning.color, emissiveIntensity: 0.07,
         transparent: true, opacity: 1,
       }));
     }
@@ -918,7 +923,7 @@ function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = fals
     const normal = AXIS_DIRECTIONS[arrow.normal.toUpperCase()].clone().multiplyScalar(arrow.faceSign);
     const direction = directionVector3d(arrow.direction.toUpperCase()).multiplyScalar(arrow.sign);
     const shear = arrow.direction !== arrow.normal;
-    const normalDistance = hasLocalMarkers ? (shear ? 1.25 : 0.9) : (shear ? 0.56 : 0.54);
+    const normalDistance = hasLocalMarkers ? (shear ? 1.25 : 0.9) : (shear ? 0.60 : 0.54);
     const origin = normal.clone().multiplyScalar(normalDistance);
     const tooltip = `${isStrain ? 'Strain guide' : 'Stress component'} ${arrow.component}: ${formatTensorValue(arrow.value)}${view.unit ? ` ${view.unit}` : ''}\n${arrow.faceSign > 0 ? '+' : '-'}${arrow.normal.toUpperCase()} face · ${arrow.sign > 0 ? '+' : '-'}${arrow.direction.toUpperCase()} direction\n${meaning.action} · ${meaning.name}`;
     if (arrow.direction === arrow.normal && arrow.value < 0) {
@@ -973,11 +978,19 @@ function updateTensorLegend(legend, view) {
   ];
   for (const entry of entries) {
     const meaning = tensorComponentMeaning(entry.key, entry.value, isStrain);
+    const gradientId = `bc-tensor-key-${meaning.effect}`;
+    const highlight = new THREE.Color(meaning.color).lerp(new THREE.Color('#ffffff'), 0.18);
+    const shade = new THREE.Color(meaning.color).multiplyScalar(0.72);
     const item = document.createElement('span');
     item.className = 'bc-legend-item';
     item.innerHTML = `<svg class="bc-tensor-key" viewBox="0 0 48 24" aria-hidden="true">
-      <rect x="20" y="7" width="8" height="10" fill="#e9d5ff" stroke="#94a3b8"/>
-      <path d="${entry.path}" fill="${meaning.color}"/></svg>`;
+      <defs><linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#${highlight.getHexString()}"/>
+        <stop offset="0.6" stop-color="${meaning.color}"/>
+        <stop offset="1" stop-color="#${shade.getHexString()}"/>
+      </linearGradient></defs>
+      <rect x="20" y="7" width="8" height="10" rx="1.5" fill="#e9d5ff" stroke="#94a3b8"/>
+      <path d="${entry.path}" fill="url(#${gradientId})" stroke="${meaning.color}" stroke-width="0.7" stroke-linejoin="round"/></svg>`;
     const text = meaning.effect === 'shear' ? (isStrain ? 'Slide (shear strain)' : 'Slide (shear)')
       : `${meaning.action} (${meaning.name.toLowerCase()})`;
     item.appendChild(document.createTextNode(text));

@@ -1,14 +1,32 @@
 ---
 status: boundary_viewer_delivered
 branch: main
-timestamp: 2026-10-27
+timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Pull/Push/Slide filters apply to cube arrows while the matrix stays complete
+next_topic: Rounded static tensor arrows distinguish whole cube actions from scalar XYZ loads
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：第二类箭头采用圆润、饱满的科研示意造型
+
+- 用户明确要求实施此前讨论的活泼箭头风格。本轮将张量箭头的方杆和棱角尖头改为
+  连续的圆润箭杆、饱满箭头及柔和明暗；三个动作图例同步使用圆角和明暗。保持静态，
+  不添加受力动画、step 设计或 cube 变形。第一类细紫箭头、局部点边面和右下角 XYZ
+  均保持既有实现；全部原值、单位、选择和导出行为不变。
+- 方向仍是蓝色 Pull 向外、橙色 Push 向内、青绿色 Slide 沿面；应变使用原有
+  Extend／Shorten／Slide。箭头仍为固定长度，粗细不编码大小。稍增剪切箭头离面距离
+  和分道间距，确保加粗后的完整表面在 cube 外侧、同面箭头不相交。
+- 136 项 Node 测试及 12 项相关 Django／真实 Chromium 测试通过，零失败／跳过。
+  浏览器断言改为检查实际箭头边界、固定长度、方向、颜色和间隔，不再绑定旧的双网格
+  实现；新增完整剪切箭头不穿面的回归已先失败后通过。浏览器覆盖 1280／1440／1920，
+  既有筛选、选择、真实悬停、原始记录、点边面、混合、导出及无 JS 检查均通过。
+- 已查看实际 Pull、Push、Slide、全部 18 个箭头及混合场景截图；本机截图和日志在
+  `/tmp/rounded-tensor-qa/`。代码位于 `static/assets/js/mechanical-bc-viewer.js`，
+  浏览器回归位于 `tests/browser/boundary.cjs`。独立只读审查通过，无待修复问题；
+  复核包括单网格悬停／高亮／资源释放及实际截图。部署状态待本轮提交后核验。
 
 ### 最新调整：Pull／Push／Slide 筛选与完整矩阵明确分开
 
