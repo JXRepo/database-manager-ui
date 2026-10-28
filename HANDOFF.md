@@ -25,7 +25,12 @@ next_topic: Compact tensor controls and one categorized XYZ table
   三维模块无法初始化时仍能展开所有记录，未以删除重复表为由丢失查看入口。
 - 已通过普通／纯张量／混合／零值／空列表、独立 xy/yx、记录切换、暂停／重播／
   重置和无 JavaScript 检查。1280、1440、1920 桌面截图与测试日志位于
-  /tmp/boundary-panel-cleanup-qa/。发布状态待本轮提交后的独立验证。
+  /tmp/boundary-panel-cleanup-qa/。138 项 Node、12 项 Django／真实 Chromium 测试
+  全部通过，零跳过；独立只读复核无待修复问题。
+- 应用提交 d949e3a 已合入并推送 main。2026-10-28T20:14:30.028Z，线上六个相关
+  脚本的普通 URL 和独立 no-cache URL 均逐字节匹配，/healthz/ HTTP 200。
+  证据为 /tmp/boundary-panel-cleanup-qa/live-verification.json。刷新现有详情页即可，
+  无需重传 JSON；本轮工作树已清理，其他工作树保持原样。
 
 ### 最新修正：默认显示明显的抓取、拉扯和回弹动作
 
