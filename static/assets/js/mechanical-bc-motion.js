@@ -6,7 +6,7 @@ export function createTensorMotion(container, meshes, render) {
   container.parentElement.appendChild(button);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let visible = false;
-  let pending = false;
+  let pending = null;
   let playing = false;
   let frameId = null;
   let startedAt = null;
@@ -14,11 +14,11 @@ export function createTensorMotion(container, meshes, render) {
 
   function updateButton() {
     button.hidden = !meshes.length;
-    button.disabled = reducedMotion.matches;
+    button.disabled = !meshes.length;
     button.textContent = playing ? 'Stop motion' : 'Replay motion';
     button.setAttribute('aria-pressed', String(playing));
     button.title = reducedMotion.matches
-      ? 'Animation is off because your system prefers reduced motion.'
+      ? 'Automatic motion is off. Manual replay shows the direction cue, not a simulated response.'
       : 'A short direction cue, not a simulated response or loading history.';
   }
 
@@ -27,7 +27,7 @@ export function createTensorMotion(container, meshes, render) {
     frameId = null;
     startedAt = null;
     playing = false;
-    pending = false;
+    pending = null;
     for (const mesh of meshes) {
       mesh.position.copy(mesh.userData.motion.position);
     }
@@ -61,11 +61,11 @@ export function createTensorMotion(container, meshes, render) {
     frameId = requestAnimationFrame(tick);
   }
 
-  function play() {
+  function play(manual = false) {
     stop();
-    if (reducedMotion.matches || !meshes.length || document.hidden) return;
+    if ((reducedMotion.matches && !manual) || !meshes.length || document.hidden) return;
     if (!visible) {
-      pending = true;
+      pending = manual;
       return;
     }
     playing = true;
@@ -74,7 +74,7 @@ export function createTensorMotion(container, meshes, render) {
     frameId = requestAnimationFrame(tick);
   }
 
-  button.addEventListener('click', () => playing ? stop() : play());
+  button.addEventListener('click', () => playing ? stop() : play(true));
   reducedMotion.addEventListener('change', stop);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) stop();
@@ -83,7 +83,7 @@ export function createTensorMotion(container, meshes, render) {
   const observer = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting && entry.intersectionRatio >= 0.35;
     if (!visible && playing) stop();
-    else if (visible && pending) play();
+    else if (visible && pending !== null) play(pending);
   }, {threshold: [0, 0.35]});
   observer.observe(container);
   updateButton();

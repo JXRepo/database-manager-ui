@@ -205,8 +205,24 @@ async function main() {
   await open('tensor');
   assert.equal(await evaluate('!!document.querySelector("[data-bc-motion]")'),true,
     'Tensor diagrams provide a replay control for their short direction cue');
-  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),true,
-    'Reduced motion keeps the diagram static');
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),false,
+    'Reduced motion must allow an explicit manual replay');
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false',
+    'Reduced motion suppresses automatic playback');
+  const reducedRest = await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())');
+  const replayButton = await evaluate(`(() => {const r=document.querySelector('[data-bc-motion]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
+  await command('Input.dispatchMouseEvent', {type:'mousePressed',...replayButton,button:'left',clickCount:1});
+  await command('Input.dispatchMouseEvent', {type:'mouseReleased',...replayButton,button:'left',clickCount:1});
+  await waitFor('__bcTest.state.tensorMeshes.some(mesh=>mesh.position.distanceTo(mesh.userData.motion.position)>0.015)',
+    'A real click must animate one direction cue even with reduced motion');
+  await waitFor('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")==="false"',
+    'Manual replay under reduced motion must finish once');
+  assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())'),reducedRest);
+  assert.equal(await evaluate('matchMedia("(prefers-reduced-motion: reduce)").matches'),true);
+  await evaluate('document.querySelector("[data-component=xx]").click();new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false',
+    'A manual replay must not enable later automatic component animations');
+  await evaluate('document.querySelector("[data-component=xx]").click();document.activeElement.blur()');
   assert.equal(await tensorCount(),8,'Copper needs four independent components, two faces each');
   assert.equal(await evaluate('document.querySelector("[data-tensor-load]").closest("label").hidden'),true);
   assert.equal(await evaluate('document.querySelector("[data-tensor-status]").checkVisibility()'),false);
@@ -486,7 +502,9 @@ async function main() {
     'Returning to an already seen diagram must not start a distracting loop');
   await evaluate('document.querySelector("[data-bc-motion]").click()');
   await command('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
-  await waitFor('document.querySelector("[data-bc-motion]").disabled', 'Reduced motion preference did not apply');
+  await waitFor('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")==="false"', 'Reduced motion preference did not stop the active cue');
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),false,
+    'Changing the system preference must preserve manual replay');
   assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())'),rest);
   assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false');
   await evaluate('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"));document.querySelector("[data-component=xx]").click()');

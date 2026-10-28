@@ -704,8 +704,10 @@ along the face. They fade back to their exact resting positions after 1.2 second
 `Replay motion` and `Stop motion` control this illustration; their description
 clarifies that it is not a simulated response or loading history. Arrow sizes,
 cube geometry, camera, values, units and supplied steps remain unchanged.
-Motion respects the system's reduced-motion preference and stops for arrow
-inspection, camera interaction, Reset, a hidden tab or an offscreen diagram.
+Automatic motion respects the system's reduced-motion preference; an explicit
+`Replay motion` click still plays one cue without enabling later automatic cues
+or changing the system preference. Motion stops for arrow inspection, camera
+interaction, Reset, a hidden tab or an offscreen diagram.
 Zero, missing and invalid components and the strain shape illustration have no
 motion. Shear lanes leave room for the complete rounded surface outside the cube
 and keep arrows on the same face separate throughout the cue.

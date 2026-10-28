@@ -3,12 +3,25 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Short replayable direction cues for whole cube tensor arrows
+next_topic: Manual tensor replay remains available with reduced motion enabled
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新修复：减少动态效果不再禁用手动重播
+
+- 用户截图显示 Replay motion 变灰且点不动。原因是原实现将系统的减少动态效果
+  偏好同时用于禁用自动播放和手动按钮。现只禁止自动播放；显式点击可以播放一次，
+  不修改系统设置，也不为后续分量／筛选／记录变化开启自动动画。
+- `play(manual=false)` 区分自动和手动请求；尚未进入视野的待播放请求保留该意图。
+  切换减少动态效果设置仍会停止正在播放的动画，手动按钮继续可用。原有方向、
+  停止条件、精确复位及零／缺失分量行为保持不变，提示说明自动关闭、手动可用。
+- 真实 Chromium 回归先失败后通过，使用真实鼠标点击验证减少动态效果模式下的
+  实际运动、单次结束、精确复位、系统偏好未改变及后续切换不自动播放。
+  136 项 Node 和 12 项 Django／真实 Chromium 测试全部通过，零跳过。
+  日志／截图在 `/tmp/manual-tensor-replay-qa/`；线上状态待提交后核验。
 
 ### 最新调整：第二类箭头增加短暂、可重播的方向动画
 
