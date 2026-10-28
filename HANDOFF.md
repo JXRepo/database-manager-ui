@@ -27,7 +27,12 @@ next_topic: Tensor actions now appear directly on the left main cube
   139 项 Node 与 12 项 Django／真实 Chromium 测试全部通过，零跳过。已查看左图
   Pull、Push、Slide 在 1280／1440／1920 的截图；真实帧验证左图矩阵变化而原形、
   相机和数据不变，且右侧没有 SVG／canvas／示意图。证据在
-  `/tmp/tensor-main-cube-qa/`。独立复核与部署验证待收尾补充。
+  `/tmp/tensor-main-cube-qa/`。独立只读复核通过，无待修复问题；已补查混合场景
+  动画，12 项 Django／真实浏览器回归再次通过。
+- 应用提交 `594d78e` 已合入并推送 main。2026-10-28T02:47:08.390Z，线上五个相关
+  脚本在普通 URL 与独立 no-cache URL 均逐字节匹配，`/healthz/` HTTP 200。
+  证据在 `/tmp/tensor-main-cube-qa/live-verification.json`。刷新现有详情页即可，
+  无需重传 JSON；未修改生产数据。本轮独立 worktree 已清理。
 
 ### 最新调整：第二类改为面高亮与拉／压／剪切概念示意
 
