@@ -33,7 +33,11 @@ next_topic: Short replayable direction cues for whole cube tensor arrows
   样式在 `templates/pages/data_detail.html`，回归在 `tests/browser/boundary.cjs`。
 - 独立只读审查发现取消选择后清除焦点可能恢复旧的淡化透明度；已用真实 Chromium
   回归先失败后通过验证修复：任何实际高亮变化均先停止动画，再应用新高亮。
-  最终复核通过，无待修复问题。部署状态待提交后的线上核验。
+  最终复核通过，无待修复问题。
+- 应用提交 `feff2bb` 已合入并推送 main。2026-10-28 00:58 UTC，线上 motion、viewer、
+  tensor、tensor-panel 四个脚本在普通 URL 与独立 no-cache URL 均逐字节匹配，
+  `/healthz/` HTTP 200。证据在 `/tmp/tensor-motion-qa/live-verification.json`。
+  现有数据刷新即可，无需重新上传 JSON；未操作生产数据。
 
 ### 最新调整：第二类箭头采用圆润、饱满的科研示意造型
 
