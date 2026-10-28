@@ -34,7 +34,11 @@ next_topic: Arrow-free tensor face and conceptual action guide
 - 独立只读复核未发现待修复问题；复核者另跑 21 项 tensor helper／Chromium panel
   测试通过。另补共享面的真实鼠标回归，验证同一 +X 面完整显示 xx／yx／zx 三项
   数值及符号方向、同时高亮三项并正确清除；12 项 Django／浏览器复跑通过。
-- 上线验证待推送后补充。
+- 应用与回归提交 `d561079`、`86b5f58` 已合入并推送 main。2026-10-28 02:16:29 UTC，
+  线上 motion、viewer、tensor、tensor-panel、illustrations 五个脚本在普通 URL 与
+  独立 no-cache URL 均逐字节匹配，`/healthz/` HTTP 200。证据在
+  `/tmp/tensor-face-guide-qa/live-verification.json`。刷新详情页即可，无需重新上传
+  JSON；未操作生产数据。本轮独立 worktree 已清理，其他 worktree 保持原样。
 
 ### 最新修复：减少动态效果不再禁用手动重播
 
