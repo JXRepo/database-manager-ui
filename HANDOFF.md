@@ -27,7 +27,12 @@ next_topic: Expressive gripping and rebound on the original glass cube
 - 验证证据在 `/tmp/tensor-jelly-action-qa/`，包括 Pull／Push／Shear／组合截图和动作帧。
   142 项 Node 和 16 项 Django／真实 Chromium 测试通过，零跳过。独立复核无阻断
   问题；所指出的高亮边框同步问题已补失败回归并修复，边框所有边界采样点与弯曲
-  表面一致，完整回归再次通过。最终提交和线上验证状态将在发布后补充。
+  表面一致，完整回归再次通过。
+- 应用提交 `8724792`、`3dea461` 已合入并推送 main。2026-10-28T18:35:50.908Z，
+  线上七个相关脚本在普通 URL 和独立 no-cache URL 均逐字节匹配，`/healthz/` HTTP 200。
+  证据在 `/tmp/tensor-jelly-action-qa/live-verification.json`；动作预览为同目录
+  `pull-action.gif`。刷新详情页后默认 Action animation，点击 Play action 即可。
+  无需重传 JSON，未修改生产数据；本轮工作树已清理，其他工作树保持原样。
 
 
 ### 当前实现：保留原立方体，按数值播放任意分量组合
