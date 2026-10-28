@@ -3,12 +3,30 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Data-driven combined deformation on the original glass cube
+next_topic: Expressive gripping and rebound on the original glass cube
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新修正：默认显示明显的抓取、拉扯和回弹动作
+
+- 用户进一步澄清：需要果冻般被两侧揪住的动作感，而非按数值让整个方块变大。
+  因此停止只添加放大入口的方案。默认改为 Action animation，两侧小夹持片带动
+  原模型表面局部拉伸、挤压或错动，短暂停留、轻弹并准确回到原状；保留透明材质、
+  边线、白色角点和 XYZ，没有替换立方体，也不添加手或箭头。
+- 新增 `mechanical-bc-action.js` 的局部位移／回弹函数和 `mechanical-bc-action-view.js`
+  的原几何顶点更新、夹持片与资源释放。动作幅度在 ×1 时即明显，明确标为受力示意，
+  不将它说成材料真实变形或时间。任意组合与独立不对称分量仍可示意，不补缺失值。
+- 原数值计算保留在 Calculated strain，可显式切换；其材料参数、对称性检查、倍率
+  和真实应变显示仍然有效。切换模式先复原表面并取消旧帧，所有数值／记录／导出不变。
+- 动作播放约 2.4 秒，可暂停／继续／重播／重置；无自动播放，减少动态效果设置下仍
+  可手动播放。真实浏览器验证局部面心移动超过 15 CSS 像素、夹持片随动、模型矩阵
+  不缩放、原网格复用与准确回弹，并保留原数值预览与局部／标量箭头回归。
+- 验证证据在 `/tmp/tensor-jelly-action-qa/`，包括 Pull／Push／Shear／组合截图和动作帧。
+  最终提交和线上验证状态将在发布后补充。
+
 
 ### 当前实现：保留原立方体，按数值播放任意分量组合
 

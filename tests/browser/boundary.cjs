@@ -102,13 +102,14 @@ async function main() {
     }
     throw new Error(message);
   }
-  async function open(key, width = 1440) {
+  async function open(key, width = 1440, mode = 'calculated') {
     await command('Emulation.setDeviceMetricsOverride',{width,height:1080,deviceScaleFactor:1,mobile:false});
     await command('Page.navigate',{url:config.baseUrl+config.pages[key]});
     await waitFor(`location.href===${JSON.stringify(config.baseUrl+config.pages[key])} && !!window.__bcTest && !!document.querySelector('[data-bc-tensor-panel]') && document.readyState==='complete'`, 'Boundary page did not render');
     await evaluate(`Promise.all(document.getAnimations().filter(a=>a.effect.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})))`);
     await evaluate('document.fonts.ready');
     await evaluate(`document.querySelector('.bc-panel').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy({top:-100,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+    if(mode==='calculated') await evaluate('document.querySelector("[data-tensor-mode=calculated]")?.click()');
     assert.equal(await evaluate('__bcTest.state.renderer.getContext().isContextLost()'),false);
   }
   async function screenshot(name) {
@@ -224,6 +225,84 @@ async function main() {
         `Displayed component ${i},${j} must equal the calculated value at the selected amplification`);
     }
   }
+  async function actionAnimation(components, name) {
+    await evaluate(`document.querySelector('[data-tensor-clear]').click();${components.map(key=>`document.querySelector('[data-component=${key}]').click();`).join('')}document.activeElement.blur()`);
+    assert.match(await evaluate('document.querySelector("[data-bc-motion]").textContent'),/^Play action$/);
+    const capture = `(()=>{const {state,baseCube,tensorGroup}=__bcTest;state.root.updateMatrixWorld(true);
+      const mesh=baseCube.children[0], data=Array.from(mesh.geometry.attributes.position.array);
+      const grips=state.root.children.find(o=>o.userData.tensorActionGrips);
+      const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();
+      const world=new __bcThree.Vector3().fromBufferAttribute(mesh.geometry.attributes.position, window.actionVertex);
+      const p=mesh.localToWorld(world).project(state.camera);
+      return {matrix:baseCube.matrix.toArray(),data,grips:grips.children.map(g=>({position:g.position.toArray(),anchor:g.userData.anchor})),
+        point:[(p.x+1)*r.width/2,(1-p.y)*r.height/2],camera:state.camera.position.toArray(),
+        originals:baseCube.children.map(o=>o.uuid),values:document.querySelector('[data-tensor-matrix]').textContent,
+        source:JSON.stringify(__bcTest.items)}})()`;
+    const normal=components[0][1];
+    await evaluate(`window.actionVertex=(()=>{const p=__bcTest.baseCube.children[0].geometry.attributes.position;
+      for(let i=0;i<p.count;i++){const v=[p.getX(i),p.getY(i),p.getZ(i)];if(v['xyz'.indexOf('${normal}')]==.5&&v.filter((_,axis)=>axis!=='xyz'.indexOf('${normal}')).every(n=>n===0))return i;}throw Error('No face center')})()`);
+    const original=await evaluate(capture);
+    assert.ok(original.grips.length>=2);
+    const start=await evaluate(`(()=>{document.querySelector('[data-bc-motion]').click();return performance.now()})()`);
+    await waitFor(`performance.now()-${start}>500`,'Action did not reach its tug');
+    await evaluate('document.querySelector("[data-bc-motion]").click()');
+    const tug=await evaluate(capture);
+    assert.deepEqual(tug.matrix,identity,'Action animates vertices, without scaling the whole cube matrix');
+    assert.notDeepEqual(tug.data,original.data,'The original surface is locally deformed');
+    assert.ok(Math.hypot(tug.point[0]-original.point[0],tug.point[1]-original.point[1])>15,'The local gripping action is visibly large at ×1');
+    assert.deepEqual(tug.camera,original.camera);
+    assert.deepEqual(tug.originals,original.originals,'Reuse all original meshes and white corners');
+    assert.equal(tug.values,original.values);
+    assert.equal(tug.source,original.source);
+    assert.ok(tug.grips.some((g,i)=>g.position.some((v,j)=>Math.abs(v-original.grips[i].position[j])>.15)),'Opposing gripping pads actually move');
+    await screenshot(name+'-tug');
+    await evaluate('document.querySelector("[data-bc-motion]").click()');
+    await waitFor('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")==="false"','Action did not return');
+    const returned=await evaluate(capture);
+    assert.deepEqual(returned.data,original.data,'Tug and rebound return exactly to the original surface');
+    assert.deepEqual(returned.grips,original.grips);
+    assert.equal(await evaluate('document.querySelector("[data-tensor-scale]").value'),'1');
+    if(name==='pull'&&process.env.BC_BROWSER_REPORT_DIR){
+      const clip=await evaluate(`(()=>{const r=document.querySelector('.bc-cube-wrap').getBoundingClientRect();return{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`);
+      const frames=[];
+      await evaluate('document.querySelector("[data-bc-motion]").click()');
+      for(let i=0;i<24;i++){
+        frames.push({at:Date.now(),point:(await evaluate(capture)).point});
+        const image=await command('Page.captureScreenshot',{format:'png',clip});
+        writeFileSync(join(process.env.BC_BROWSER_REPORT_DIR,'pull-action-'+String(i).padStart(2,'0')+'.png'),Buffer.from(image.data,'base64'));
+        await new Promise(resolve=>setTimeout(resolve,100));
+      }
+      writeFileSync(join(process.env.BC_BROWSER_REPORT_DIR,'pull-action-frames.json'),JSON.stringify(frames));
+    }
+  }
+  await open('tensor',1440,'action');
+  assert.equal(await evaluate('document.querySelector("[data-tensor-calculated]").hidden'),true);
+  assert.match(await evaluate('document.querySelector("[data-tensor-action-note]").textContent'),/Illustrative motion/);
+  assert.equal(await evaluate('document.querySelector("[data-tensor-mode=action]").getAttribute("aria-pressed")'),'true');
+  await screenshot('action-original');
+  await actionAnimation(['xx'],'pull');
+  await actionAnimation(['xy'],'shear');
+  await actionAnimation(['xx','xy'],'pull-shear');
+  for(const width of [1280,1920]){
+    await open('tensor',width,'action');
+    await actionAnimation(['xx'],'pull-'+width);
+    assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);
+  }
+  await evaluate('document.querySelector("[data-bc-motion]").click()');
+  await waitFor('__bcTest.baseCube.children[0].geometry.boundingBox.max.x>.6','Action did not begin before switching mode');
+  await evaluate('document.querySelector("[data-tensor-mode=calculated]").click()');
+  assert.ok(Math.abs(await evaluate('__bcTest.baseCube.children[0].geometry.boundingBox.max.x')-.5)<1e-8,'Changing mode restores original vertex buffers');
+  assert.equal(await evaluate('__bcTest.state.root.children.find(o=>o.userData.tensorActionGrips).visible'),false);
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false');
+  await open('elastic',1440,'action');
+  await actionAnimation(['xx'],'push');
+  await actionAnimation(['xx','xy'],'push-shear');
+  await open('records',1440,'action');
+  await actionAnimation(['yx'],'independent-shear');
+  await open('mixed',1280,'action');
+  await actionAnimation(['xx'],'mixed-push');
+  report.push('Action animation: original glass surfaces tug locally at ×1 with moving opposing grip pads, then rebound exactly; Pull, Push, Shear, mixtures and independent asymmetric components; numeric matrix/data/camera unchanged');
+
   await open('tensor');
   assert.deepEqual(await cubeMatrix(),identity);
   assert.deepEqual(await evaluate('__bcTest.baseCube.children.map(o=>o.geometry.type)'),

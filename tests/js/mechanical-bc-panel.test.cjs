@@ -114,6 +114,21 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
+  test('action animation is the default while calculated strain remains a separate explicit view', async t => {
+    const ev = await page(t,[condition()]);
+    const selected=await ev('Array.from(view.selected)');
+    assert.equal(await ev('view.mode'),'action');
+    assert.equal(await ev('document.querySelector("[data-tensor-calculated]").hidden'),true);
+    await ev('document.querySelector("[data-tensor-mode=calculated]").click()');
+    assert.equal(await ev('view.mode'),'calculated');
+    assert.equal(await ev('document.querySelector("[data-tensor-calculated]").hidden'),false);
+    assert.equal(await ev('document.querySelector("[data-tensor-action-note]").hidden'),true);
+    assert.deepEqual(await ev('Array.from(view.selected)'),selected);
+    await ev('document.querySelector("[data-tensor-mode=action]").click()');
+    assert.equal(await ev('view.mode'),'action');
+    assert.equal(await ev('JSON.stringify(supplied) === original'),true);
+  });
+
   const complete = {xx: .02, yy: -.01, zz: 0, xy: .003, yx: .003, xz: 0, zx: 0, yz: 0, zy: 0};
 
   test('matrix cells independently combine normal strains and toggle reciprocal shear together', async t => {

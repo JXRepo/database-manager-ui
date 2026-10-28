@@ -3,6 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {tensorFaceLoads, formatTensorValue, tensorComponentMeaning} from './mechanical-bc-tensor.js';
 import {createTensorPanel} from './mechanical-bc-tensor-panel.js';
 import {createTensorMotion} from './mechanical-bc-motion.js';
+import {createTensorAction} from './mechanical-bc-action-view.js';
 
 const VERTICES = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
 const AXIS_DIRECTIONS = {
@@ -613,9 +614,10 @@ function drawGlassCubeEdges(group, materials, excludedEdges) {
   group.add(createCubeWireBox(1.006, materials.cubeEdgeLine, 3, excludedEdges));
 }
 
-function drawBaseCube(group, materials, items = []) {
-  const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), materials.cubeSurface);
-  const sheen = new THREE.Mesh(new THREE.BoxGeometry(1.018, 1.018, 1.018), materials.cubeSheen);
+function drawBaseCube(group, materials, items = [], deformable = false) {
+  const segments = deformable ? 20 : 1;
+  const cube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1, segments, segments, segments), materials.cubeSurface);
+  const sheen = new THREE.Mesh(new THREE.BoxGeometry(1.018, 1.018, 1.018, segments, segments, segments), materials.cubeSheen);
 
   group.add(cube);
   group.add(sheen);
@@ -881,7 +883,7 @@ function drawTensorLoading(view, group, selectableMeshes) {
   for (const load of tensorFaceLoads(view.load?.magnitude, view.filter, view.selected)) {
     const normal = AXIS_DIRECTIONS[load.normal.toUpperCase()].clone().multiplyScalar(load.faceSign);
     const color = tensorFaceColor(load.components);
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96), new THREE.MeshBasicMaterial({
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96, view.mode === 'action' ? 16 : 1, view.mode === 'action' ? 16 : 1), new THREE.MeshBasicMaterial({
       color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false,
     }));
     face.position.copy(normal).multiplyScalar(0.506);
@@ -919,7 +921,7 @@ function highlightTensor(group, components) {
 }
 
 function updateTensorLegend(legend, view, hasOtherLoads) {
-  legend.textContent = view.deformation.matrix
+  legend.textContent = view.mode === 'action' ? 'Gripping motion · illustrative action, not physical deformation or time.' : view.deformation.matrix
     ? 'Unit cube · display ×' + view.scale + ' · movement shows the selected homogeneous strain.'
     : 'Highlighted faces show the selected components; deformation is unavailable.';
   if (hasOtherLoads) legend.textContent += ' Local and scalar markers stay on the gray original outline; their effects are excluded.';
@@ -1146,7 +1148,7 @@ function renderMechanicalBcViewer() {
   let tensorMotion = null;
   let highlighted = '';
 
-  drawBaseCube(baseCube, materials, scalarItems);
+  drawBaseCube(baseCube, materials, scalarItems, tensorItems.length > 0);
   if (!tensorItems.length && !wholeItems.length) {
     addVertexLabels(state.root);
   } else if (scalarItems.length) {
@@ -1213,12 +1215,27 @@ function renderMechanicalBcViewer() {
     const context = contextElement ? JSON.parse(contextElement.textContent) : {};
     let deformation = null;
     let displayScale = 1;
+    let previewMode = 'action';
+    const tensorAction = createTensorAction(baseCube, tensorGroup, state.root);
     baseCube.matrixAutoUpdate = false;
     tensorGroup.matrixAutoUpdate = false;
     const reference = scalarItems.length
       ? createCubeWireBox(1, new THREE.LineBasicMaterial({color: '#94a3b8', transparent: true, opacity: 0.6}), 1) : null;
     if (reference) { reference.visible = false; state.root.add(reference); }
-    tensorMotion = createTensorMotion(container, progress => {
+    tensorMotion = createTensorMotion(container, (progress, time) => {
+      if (previewMode === 'action') {
+        baseCube.matrix.identity();
+        tensorGroup.matrix.identity();
+        baseCube.matrixWorldNeedsUpdate = tensorGroup.matrixWorldNeedsUpdate = true;
+        const amount = tensorAction.update(time);
+        if (reference) reference.visible = amount > 0;
+        faceLabels.forEach(label => {
+          label.position.fromArray(tensorAction.map(label.userData.referencePosition.toArray(), amount));
+          label.userData.faceNormal.copy(label.userData.referenceNormal);
+        });
+        state.renderSceneOnce();
+        return;
+      }
       const e = deformation;
       const factor = progress * displayScale;
       baseCube.matrix.set(
@@ -1236,15 +1253,18 @@ function renderMechanicalBcViewer() {
         label.userData.faceNormal.copy(label.userData.referenceNormal).applyNormalMatrix(normalMatrix);
       });
       state.renderSceneOnce();
-    }, () => !!deformation);
+    }, () => previewMode === 'action' ? state.tensorMeshes.length > 0 : !!deformation, () => previewMode);
     tensorPanel = createTensorPanel(document.querySelector('[data-bc-tensor-panel]'), items, units, view => {
       tensorMotion.pause();
       highlighted = '';
+      tensorAction.reset();
       disposeTensorGroup(tensorGroup);
       selectableMeshes.splice(staticMeshCount);
       state.tensorMeshes.length = 0;
       tooltip.style.opacity = '0';
       drawTensorLoading(view, tensorGroup, state.tensorMeshes);
+      previewMode = view.mode;
+      tensorAction.setView(view);
       deformation = view.deformation.matrix;
       displayScale = view.scale;
       selectableMeshes.push(...state.tensorMeshes);
@@ -1253,7 +1273,7 @@ function renderMechanicalBcViewer() {
       });
       const isStrain = view.item.loading_type === 'strain';
       tensorTitle.textContent = (isStrain ? 'Strain' : 'Stress') + ' tensor' + (view.unit ? ' (' + view.unit + ')' : ' · unit not supplied');
-      tensorExplanation.textContent = deformation ? 'Original shape → selected deformation · display ×' + view.scale
+      tensorExplanation.textContent = view.mode === 'action' ? (view.actionLabel || 'Select components') + ' · grip and rebound' : deformation ? 'Original shape → selected deformation · display ×' + view.scale
         : 'Original shape · see the deformation requirements beside the cube';
       updateTensorLegend(tensorLegend, view, scalarItems.length > 0);
       tensorMotion.reset();

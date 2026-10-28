@@ -880,6 +880,7 @@ details[open] > .detail-group-summary {
     .bc-tensor-filters button.is-partial { border-style: dashed; }
     .bc-deformation-scale { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; font-size: .78rem; }
     .bc-deformation-scale input { width: 85px; }
+    [data-tensor-calculated][hidden], [data-tensor-action-note][hidden] { display: none; }
     .bc-deformation-values { display: flex; flex-direction: column; gap: 3px; font-size: .75rem; color: #475569; margin-top: 8px; }
     .bc-tensor-filter-count { opacity: 0.7; margin-left: 4px; }
     .bc-tensor-matrix-heading { font-size: 0.77rem; color: #536176; margin-top: 8px; }
@@ -1721,9 +1722,16 @@ details[open] > .detail-group-summary {
                 <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: rows are direction i; columns are face normal j"></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
                 <div class="bc-tensor-caption">ij: direction i on faces normal to j. Toggle any components to combine them. Matching reciprocal shear entries are selected together.<br>Values rounded to two decimals; hover for full precision.</div>
-                <label class="bc-deformation-scale">Display amplification ×<input type="number" class="form-control form-control-sm" min="1" step="any" value="1" data-tensor-scale></label>
-                <div class="bc-tensor-caption" data-tensor-preview-note role="status"></div>
-                <div class="bc-deformation-values" data-tensor-deformation-values aria-label="Unamplified normal strain and axial changes"></div>
+                <div class="bc-tensor-filters" role="group" aria-label="Cube preview">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-mode="action" aria-pressed="true">Action animation</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-mode="calculated" aria-pressed="false">Calculated strain</button>
+                </div>
+                <div class="bc-tensor-caption" data-tensor-action-note>Grip pads show pulling, squeezing and sliding. Illustrative motion; magnitude and time are not to scale.</div>
+                <div data-tensor-calculated hidden>
+                  <label class="bc-deformation-scale">Display amplification ×<input type="number" class="form-control form-control-sm" min="1" step="any" value="1" data-tensor-scale></label>
+                  <div class="bc-tensor-caption" data-tensor-preview-note role="status"></div>
+                  <div class="bc-deformation-values" data-tensor-deformation-values aria-label="Unamplified normal strain and axial changes"></div>
+                </div>
               </section>
               {% for group in mechanical_bc_groups %}
               <section class="bc-table-group" aria-labelledby="bc-group-{{ forloop.counter }}">

@@ -665,20 +665,39 @@ cube, glass edges and eight white corner spheres. The matrix stays to its right,
 with rows for direction `i` and columns for face normal `j`; the bottom-right XYZ
 guide keeps its existing orientation. No replacement cube or right-side examples
 are drawn. On opening a condition, all supplied nonzero components are selected
-and the cube remains undeformed until `Play deformation` is clicked.
+and the cube remains undeformed until `Play action` is clicked.
 
 Pull, Push and Shear are independent group toggles, with selected/available counts,
 `Select all` and `Clear`. Users can combine any action groups or matrix components.
 Positive normal stress is Pull, negative normal stress is Push; strain uses Extend
 and Shorten. Matching reciprocal shear entries toggle together for symmetric
 strain. Distinct `xy` and `yx` values remain visible and independently selectable;
-they prevent deformation instead of being averaged. The complete matrix is always
+they remain independent in the action view and prevent a numerical deformation
+estimate instead of being averaged. The complete matrix is always
 visible, including faded unselected cells. Missing, invalid and zero components do
 not produce highlighted faces. Hover and focus link each matrix value to its
 opposing faces; shared faces retain every component and use purple for mixed actions.
 
-Deformation uses numerical values, without peak normalization or fixed action
-amplitudes. Supplied strain requires all nine finite entries, equal reciprocal
+The default `Action animation` view shows small gripping pads on affected opposing
+faces. They tug the original surface locally, squeeze inward or slide tangentially,
+with a short hold, soft rebound and exact return to the original shape. The original
+mesh vertices, glass edges and white corner positions move together; the whole cube
+is not uniformly scaled. No hands, arrows or replacement model are introduced.
+The finite 2.4-second cue is clearly illustrative: selected component directions
+and signs determine the action, while visual amplitude and playback time are not
+physical quantities. Incomplete or asymmetric data can still show each explicitly
+supplied selected nonzero component without inventing or averaging other entries.
+Multiple selected actions are combined in the same left cube. Numerical eligibility
+does not disable this illustrative cue.
+
+The separate `Calculated strain` option preserves the numerical preview described
+below. Its amplification and actual strain values appear only in that view; changing
+views restores the original geometry and cancels old frames. The matrix and selection
+are preserved. Both modes offer explicit Play/Pause/Resume/Replay and Reset, without
+automatic animation.
+
+Calculated deformation uses numerical values, without peak normalization or fixed
+action amplitudes. Supplied strain requires all nine finite entries, equal reciprocal
 values and explicit dimensionless (`1`, `-`, `dimensionless`) or percent (`%`,
 `percent`) units. It represents homogeneous symmetric small strain with tensor
 shear and no rigid rotation. Stress can be converted only for an explicitly named
@@ -707,7 +726,7 @@ unit. The drawing is a unit cube strain view, not the RVE's dimensional aspect r
 or a spatial simulation. Both original surfaces, edges, white corners and tensor
 face highlights use `I + progress * amplification * epsilon`.
 
-Playback is explicit, finite (about 1.2 seconds), and independent of physical time
+Numerical playback is explicit, finite (about 1.2 seconds), and independent of physical time
 or loading histories. `Pause deformation` freezes the current shape; Resume
 continues, Replay restarts, and `Reset` restores the original shape
 and camera. Changing a selection, record or amplification resets the shape without

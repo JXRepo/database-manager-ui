@@ -14,6 +14,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
   let selected = null;
   let scale = 1;
   let preview = null;
+  let mode = 'action';
   let cells = [];
 
   function highlight(components) {
@@ -39,7 +40,9 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
     const rawUnit = units?.[isStrain ? 'Strain' : 'Stress'];
     const unit = isStrain && (rawUnit === 1 || rawUnit === '1') ? '-' : typeof rawUnit === 'string' ? rawUnit.trim() : '';
     panel.querySelector('[data-tensor-heading]').textContent = `Whole cube · ${isStrain ? 'Strain' : 'Stress'}${unit ? ` (${unit})` : ' · unit not supplied'}`;
-    panel.querySelector('[data-tensor-kind]').textContent = 'Combine actions or toggle components, then play the deformation.';
+    panel.querySelector('[data-tensor-kind]').textContent = mode === 'action'
+      ? 'Combine actions or toggle components, then play the gripping motion.'
+      : 'Numerical strain preview from the selected components.';
     loadSelect.value = String(loadIndex);
     matrix.replaceChildren();
     cells = [];
@@ -148,9 +151,14 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
       }
     }
     panel.querySelector('[data-tensor-preview-note]').textContent = preview.error || `${preview.source}. Display ×${scale}.${scaleNote}`;
+    panel.querySelectorAll('[data-tensor-mode]').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.tensorMode === mode));
+    });
+    panel.querySelector('[data-tensor-calculated]').hidden = mode !== 'calculated';
+    panel.querySelector('[data-tensor-action-note]').hidden = mode !== 'action';
     onHighlight('');
     onChange({item: current.item, itemIndex: current.index, load, filter: 'all', selected: new Set(selected), unit,
-      deformation: preview, scale});
+      deformation: preview, scale, mode, actionLabel: actions.join(' + ')});
   }
   function selectCondition(index, record = 0) {
     const next = conditions.find(entry => entry.index === Number(index)) || conditions[0];
@@ -182,6 +190,10 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
       const remove = keys.every(key => selected.has(key));
       keys.forEach(key => remove ? selected.delete(key) : selected.add(key));
     }
+    render();
+  }));
+  panel.querySelectorAll('[data-tensor-mode]').forEach(button => button.addEventListener('click', () => {
+    mode = button.dataset.tensorMode;
     render();
   }));
   panel.querySelector('[data-tensor-clear]').addEventListener('click', () => { selected.clear(); render(); });
