@@ -29,7 +29,12 @@ next_topic: Data-driven combined deformation on the original glass cube
   Chromium 已通过，零跳过，覆盖真实几何、数值倍增、混合选择、播放暂停重置、
   无 JS、导出和三个桌面宽度。独立复核指出自由材料参数别名冲突可能被择一读取；
   已补 E、ν、Stiffness 一致／冲突回归，先失败后通过，并在真实浏览器确认冲突提示
-  与播放禁用。最终 138／16 项回归通过；无其余待修复问题。线上验证将在发布后补充。
+  与播放禁用。最终 138／16 项回归通过；无其余待修复问题。
+- 应用提交 `9e965fa`、`b2426ca` 已合入并推送 main。2026-10-28T03:47:18.624Z，
+  线上 motion、viewer、tensor、tensor-panel、deformation 五个脚本在普通 URL 和独立
+  no-cache URL 均逐字节匹配，`/healthz/` HTTP 200。证据在
+  `/tmp/tensor-data-motion-qa/live-verification.json`。刷新原详情页即可，无需重传 JSON。
+  未修改生产数据；本轮 worktree 已完成清理，其他工作树保持原样。
 
 
 ### 最新修正：把动作直接画在左侧主 cube 上
