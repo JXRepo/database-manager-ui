@@ -78,6 +78,7 @@ async function main() {
   const {sessionId} = await send('Target.attachToTarget', {targetId,flatten:true});
   const command = (method, params = {}) => send(method,params,sessionId);
   await command('Runtime.enable');
+  await command('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
   await command('Network.enable');
   await command('Network.setCookie', {name:config.cookieName,value:config.session,url:config.baseUrl});
   await command('Fetch.enable', {patterns:[
@@ -202,6 +203,10 @@ async function main() {
       false, `${key}: do not draw a center marker`);
   }
   await open('tensor');
+  assert.equal(await evaluate('!!document.querySelector("[data-bc-motion]")'),true,
+    'Tensor diagrams provide a replay control for their short direction cue');
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),true,
+    'Reduced motion keeps the diagram static');
   assert.equal(await tensorCount(),8,'Copper needs four independent components, two faces each');
   assert.equal(await evaluate('document.querySelector("[data-tensor-load]").closest("label").hidden'),true);
   assert.equal(await evaluate('document.querySelector("[data-tensor-status]").checkVisibility()'),false);
@@ -357,6 +362,141 @@ async function main() {
     await screenshot('mixed-'+width);
     report.push(`${width}px: long metadata, independent panels, stress/strain and force/displacement selection`);
   }
+  await command('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+  await open('tensor');
+  async function checkMotion(trigger) {
+    const motion = await evaluate(`new Promise((resolve, reject) => {
+      ${trigger};
+      const button = document.querySelector('[data-bc-motion]');
+      const snapshot = () => {
+        __bcTest.state.root.updateMatrixWorld(true);
+        return __bcTest.state.tensorMeshes.map(mesh => {
+          const box = new __bcThree.Box3().setFromObject(mesh);
+          return {component: mesh.userData.component, value: mesh.userData.value,
+            position: mesh.position.toArray(), scale: mesh.scale.toArray(),
+            min: box.min.toArray(), max: box.max.toArray(), opacity: mesh.material.opacity};
+        });
+      };
+      const before = snapshot(), frames = [], start = performance.now();
+      const values = document.querySelector('[data-tensor-matrix]').textContent;
+      const data = JSON.stringify(__bcTest.items);
+      const camera = __bcTest.state.camera.position.toArray();
+      function sample() {
+        frames.push(snapshot());
+        if (button.getAttribute('aria-pressed') === 'false') {
+          resolve({before, frames, after: snapshot(), camera,
+            finalCamera: __bcTest.state.camera.position.toArray(),
+            unchanged: data === JSON.stringify(__bcTest.items)
+              && values === document.querySelector('[data-tensor-matrix]').textContent});
+        } else if (performance.now() - start > 3000) reject(new Error('Motion did not finish'));
+        else requestAnimationFrame(sample);
+      }
+      requestAnimationFrame(sample);
+    })`);
+    assert.ok(motion.frames.length > 3, 'The cue must animate over real rendered frames');
+    assert.deepEqual(motion.after, motion.before, 'A completed cue restores the exact static diagram');
+    assert.deepEqual(motion.finalCamera, motion.camera, 'Motion must not zoom or rotate the camera');
+    assert.equal(motion.unchanged, true, 'Motion must preserve supplied records and all matrix values');
+    for (let index = 0; index < motion.before.length; index++) {
+      const before = motion.before[index];
+      const axis = 'xyz'.indexOf(before.component[0]);
+      const normal = 'xyz'.indexOf(before.component[1]);
+      const faceSign = Math.sign(before.position[normal]);
+      const sign = Math.sign(before.value) * faceSign;
+      const travel = [];
+      for (const frame of motion.frames) {
+        const arrow = frame[index];
+        travel.push((arrow.position[axis] - before.position[axis]) * sign);
+        assert.deepEqual(arrow.scale, before.scale, 'Animation cannot encode magnitude by changing arrow size');
+        assert.ok((faceSign > 0 ? arrow.min[normal] : -arrow.max[normal]) >= 0.5 - 1e-8,
+          'No animated arrow may pass through the cube');
+        for (let other = 0; other < 3; other++) {
+          if (other !== axis) assert.equal(arrow.position[other], before.position[other],
+            'Motion follows only the supplied direction, including shear parallel to its face');
+        }
+      }
+      if (axis === normal && before.value < 0) {
+        assert.ok(Math.min(...travel) < -0.02 && Math.max(...travel) <= 1e-8,
+          'Push approaches the face from outside and stops at its resting tip');
+      } else {
+        assert.ok(Math.max(...travel) > 0.02 && Math.min(...travel) >= -1e-8,
+          'Pull and Slide move visibly along the arrow direction');
+      }
+    }
+    for (const frame of motion.frames) {
+      for (let index = 0; index < frame.length; index++) {
+        const first = frame[index], normal = 'xyz'.indexOf(first.component[1]);
+        for (const second of frame.slice(index + 1)) {
+          if (second.component[1] !== first.component[1]
+            || Math.sign(second.position[normal]) !== Math.sign(first.position[normal])) continue;
+          assert.equal(first.min.every((value, axis) => value < second.max[axis] - 1e-8
+            && second.min[axis] < first.max[axis] - 1e-8), false,
+          'Arrows sharing a face must remain separate throughout the cue');
+        }
+      }
+    }
+  }
+  await checkMotion('document.querySelector("[data-component=xx]").click()');
+  if (process.env.BC_BROWSER_REPORT_DIR) {
+    const clip = await evaluate(`(() => {const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()`);
+    const timings = [];
+    await evaluate('document.querySelector("[data-bc-motion]").click()');
+    for (let frame = 0; frame < 12; frame++) {
+      timings.push(Date.now());
+      const result = await command('Page.captureScreenshot', {format:'png',clip});
+      writeFileSync(join(process.env.BC_BROWSER_REPORT_DIR,`pull-motion-${String(frame).padStart(2,'0')}.png`),Buffer.from(result.data,'base64'));
+      await new Promise(resolve => setTimeout(resolve,80));
+    }
+    writeFileSync(join(process.env.BC_BROWSER_REPORT_DIR,'pull-motion-timings.json'),JSON.stringify(timings));
+  }
+  await checkMotion('document.querySelector("[data-component=xy]").click()');
+  await open('records');
+  await checkMotion('document.querySelector("[data-component=xx]").click()');
+  await checkMotion('document.querySelector("[data-component=xx]").click()');
+  await evaluate('document.querySelector("[data-bc-motion]").click()');
+  await waitFor('__bcTest.state.tensorMeshes.some(mesh=>mesh.position.distanceTo(mesh.userData.motion.position)>0.02)', 'Highlight check requires moving arrows');
+  await evaluate('document.activeElement.blur();new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+  assert.equal(await evaluate('__bcTest.state.tensorMeshes.every(mesh=>mesh.material.opacity===1)'),true,
+    'Clearing matrix focus during motion must restore every arrow in Show all without reviving stale dimming');
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false');
+  const rest = await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())');
+  await evaluate('document.querySelector("[data-bc-motion]").click()');
+  await waitFor('__bcTest.state.tensorMeshes.some(mesh=>mesh.position.distanceTo(mesh.userData.motion.position)>0.01)', 'Replay did not move arrows');
+  await evaluate('document.querySelector("[data-bc-motion]").click()');
+  assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())'),rest,
+    'Stop must restore all resting positions immediately');
+  await evaluate('document.querySelector("[data-bc-motion]").click()');
+  await waitFor('__bcTest.state.tensorMeshes.some(mesh=>mesh.position.distanceTo(mesh.userData.motion.position)>0.03)', 'Hover check requires moving arrows');
+  const movingArrow = await evaluate(`(() => {
+    const mesh=__bcTest.state.tensorMeshes.find(m=>m.userData.component==='xx'&&m.position.x>0);
+    const p=new __bcThree.Box3().setFromObject(mesh).getCenter(new __bcThree.Vector3()).project(__bcTest.state.camera);
+    const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();
+    return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2};})()`);
+  await command('Input.dispatchMouseEvent', {type:'mouseMoved',...movingArrow});
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false',
+    'Inspecting an animated arrow stops the cue for a stable tooltip');
+  assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())'),rest);
+  assert.match(await evaluate(`${visibleTooltip}?.textContent||''`),/Stress component xx/);
+  await command('Input.dispatchMouseEvent', {type:'mouseMoved',x:0,y:0});
+  await evaluate('document.querySelector("[data-bc-motion]").click();window.scrollTo({top:0,behavior:"instant"})');
+  await waitFor('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")==="false"', 'Offscreen motion did not stop');
+  assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())'),rest);
+  await evaluate(`document.querySelector('.bc-panel').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy({top:-100,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false',
+    'Returning to an already seen diagram must not start a distracting loop');
+  await evaluate('document.querySelector("[data-bc-motion]").click()');
+  await command('Emulation.setEmulatedMedia', {features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+  await waitFor('document.querySelector("[data-bc-motion]").disabled', 'Reduced motion preference did not apply');
+  assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())'),rest);
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false');
+  await evaluate('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"));document.querySelector("[data-component=xx]").click()');
+  assert.equal(await tensorCount(),0);
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").hidden'),true,
+    'Zero and missing components provide no motion');
+  await open('whole');
+  assert.equal(await evaluate('!!document.querySelector("[data-bc-motion]")'),false,
+    'Ordinary scalar XYZ arrows have no tensor motion control');
+  report.push('motion: real frames show Pull out, Push in and Slide along the face; arrows stay separate and outside the cube, then return exactly; replay/stop and reduced motion work without changing values or camera');
   await command('Emulation.setScriptExecutionDisabled',{value:true});
   await command('Page.navigate',{url:config.baseUrl+config.pages.tensor});
   await waitFor(`location.href===${JSON.stringify(config.baseUrl+config.pages.tensor)}&&document.readyState==='complete'`, 'No-JavaScript page did not load');

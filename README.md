@@ -696,9 +696,19 @@ components independently, including unequal `xy` and `yx`, and does not claim
 to reconstruct the actual tractions on the simulation boundary. Each nonzero
 component uses one broad straight arrow on each of its two opposite faces.
 Tensor arrows have a continuous rounded shaft and head with soft surface shading;
-the pictorial keys use matching colors and shading. The style is static, and its
-width does not encode magnitude. Shear lanes leave room for the complete rounded
-surface outside the cube and keep arrows on the same face separate.
+the pictorial keys use matching colors and shading. Width does not encode
+magnitude. A short direction cue plays once when the diagram first becomes
+visible or its component, filter or record changes. Pull arrows move outward,
+Push arrows approach their resting tips from outside, and Slide arrows move
+along the face. They fade back to their exact resting positions after 1.2 seconds.
+`Replay motion` and `Stop motion` control this illustration; their description
+clarifies that it is not a simulated response or loading history. Arrow sizes,
+cube geometry, camera, values, units and supplied steps remain unchanged.
+Motion respects the system's reduced-motion preference and stops for arrow
+inspection, camera interaction, Reset, a hidden tab or an offscreen diagram.
+Zero, missing and invalid components and the strain shape illustration have no
+motion. Shear lanes leave room for the complete rounded surface outside the cube
+and keep arrows on the same face separate throughout the cue.
 The copper stress example has eight arrows; nine nonzero components have eighteen.
 Tensor-only scenes place arrow tails at the faces for tension and arrow tips at
 the faces for compression; mixed scenes use an outer layer to leave room for

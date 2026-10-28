@@ -3,12 +3,37 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Rounded static tensor arrows distinguish whole cube actions from scalar XYZ loads
+next_topic: Short replayable direction cues for whole cube tensor arrows
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：第二类箭头增加短暂、可重播的方向动画
+
+- 用户要求 Pull 像向外轻拽的小动画。现为张量箭头增加一次约 1.2 秒的方向示意：
+  Pull 向外、Push 从外侧靠近原始箭尖位置、Slide 沿面滑动；淡出后回到原位并淡入，
+  不用可见的反向回摆表示卸载。首次进入视野和切换分量／筛选／记录时各播放一次，
+  左上角提供 Replay motion／Stop motion。保留固定箭头大小，不缩放 cube 或改变数值、
+  相机、单位及 step；控件说明明确不是模拟响应或加载历程。
+- 动画使用现有绘制器，仅播放期间请求帧；离开视野、隐藏标签页、旋转、Reset、
+  查看箭头或改变减少动态效果偏好时停止并准确复位。遵循 prefers-reduced-motion，
+  零／缺失／无效分量及小应变形状示意不播放。第一类及局部点边面没有此动画控件。
+- 为完整的 18 箭头动画加宽剪切分道，逐帧检查完整箭头不穿 cube、同面箭头不相交，
+  Pull／Push／Slide 的运动保持原始分量方向。新增 `mechanical-bc-motion.js` 管理
+  动画，viewer 负责接入，模板仅添加紧凑控件样式。矩阵恢复焦点后才开始播放，
+  防止点击数值时正常的焦点恢复立即取消动画。
+- 136 项 Node 及 12 项 Django／真实 Chromium 测试通过，零失败／跳过。浏览器仍
+  覆盖 1280／1440／1920；新增真实帧、准确复位、相机／数值不变、重播／停止、
+  真实指针悬停、离开视野、动态减少动画偏好和零值检查。已查看静态布局与实际
+  Pull 运动帧；`/tmp/tensor-motion-qa/pull-motion.gif` 由浏览器截图及采集间隔生成，
+  循环仅为预览文件，页面本身每次只播放一次。日志与截图在同一目录。
+- 代码在 `static/assets/js/mechanical-bc-motion.js` 和 `mechanical-bc-viewer.js`，
+  样式在 `templates/pages/data_detail.html`，回归在 `tests/browser/boundary.cjs`。
+- 独立只读审查发现取消选择后清除焦点可能恢复旧的淡化透明度；已用真实 Chromium
+  回归先失败后通过验证修复：任何实际高亮变化均先停止动画，再应用新高亮。
+  最终复核通过，无待修复问题。部署状态待提交后的线上核验。
 
 ### 最新调整：第二类箭头采用圆润、饱满的科研示意造型
 

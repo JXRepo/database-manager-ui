@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import {tensorArrows, formatTensorValue, tensorComponentMeaning} from './mechanical-bc-tensor.js';
 import {createTensorPanel} from './mechanical-bc-tensor-panel.js';
+import {createTensorMotion} from './mechanical-bc-motion.js';
 
 const VERTICES = ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"];
 const TENSOR_ARROW_LENGTH = 0.44;
@@ -519,7 +520,7 @@ function avoidWholeCubeLabelOverlap(root, meshes, camera, viewport, container) {
     return bounds;
   });
   const containerRect = container.getBoundingClientRect();
-  container.parentElement.querySelectorAll(".bc-axis-overlay, [data-bc-reset], .bc-whole-heading")
+  container.parentElement.querySelectorAll(".bc-axis-overlay, [data-bc-reset], [data-bc-motion], .bc-whole-heading")
     .forEach(element => {
       const bounds = element.getBoundingClientRect();
       obstacles.push({left: bounds.left - containerRect.left - 3, right: bounds.right - containerRect.left + 3,
@@ -909,7 +910,7 @@ function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = fals
   }
 
   const componentMaterials = new Map();
-  const shearLaneOffset = 0.32;
+  const shearLaneOffset = 0.40;
   for (const arrow of tensorArrows(view.load?.magnitude, view.filter, view.selected)) {
     const meaning = tensorComponentMeaning(arrow.component, arrow.value, isStrain);
     if (!componentMaterials.has(arrow.component)) {
@@ -938,6 +939,7 @@ function drawTensorLoading(view, group, selectableMeshes, hasLocalMarkers = fals
     for (const mesh of meshes) {
       mesh.userData.component = arrow.component;
       mesh.userData.value = arrow.value;
+      mesh.userData.motion = {position: mesh.position.clone(), direction, effect: meaning.effect};
     }
     const faceMaterial = new THREE.MeshBasicMaterial({
       color: meaning.color, transparent: true, opacity: view.selected ? 0.16 : 0,
@@ -1216,6 +1218,7 @@ function renderMechanicalBcViewer() {
     && (item.axes || []).some(axis => axis.status === "loaded" || axis.status === "fixed"));
   const tensorGroup = new THREE.Group();
   let tensorPanel = null;
+  let tensorMotion = null;
   let highlighted = '';
 
   drawBaseCube(state.root, materials, scalarItems);
@@ -1233,12 +1236,15 @@ function renderMechanicalBcViewer() {
   const staticMeshCount = selectableMeshes.length;
   function highlight(component) {
     if (highlighted === component) return;
+    tensorMotion?.stop();
     highlighted = component;
     highlightTensor(tensorGroup, component);
     tensorPanel?.highlight(component);
     state.renderSceneOnce();
   }
   if (tensorItems.length) {
+    tensorMotion = createTensorMotion(container, state.tensorMeshes, state.renderSceneOnce);
+    state.controls.addEventListener('start', tensorMotion.stop);
     state.root.userData.tensorView = true;
     // A fixed envelope keeps the camera stable while components and loads change.
     state.root.userData.tensorRadius = scalarItems.length ? 1.7 : 1.18;
@@ -1277,6 +1283,7 @@ function renderMechanicalBcViewer() {
     const unitsElement = document.getElementById('plot-units-data');
     const units = unitsElement ? JSON.parse(unitsElement.textContent) : {};
     tensorPanel = createTensorPanel(document.querySelector('[data-bc-tensor-panel]'), items, units, view => {
+      tensorMotion.stop();
       highlighted = '';
       disposeTensorGroup(tensorGroup);
       selectableMeshes.splice(staticMeshCount);
@@ -1294,9 +1301,14 @@ function renderMechanicalBcViewer() {
         : isStrain ? 'Opposing faces · strain direction guides' : 'Opposing faces · pull, push or slide';
       updateTensorLegend(tensorLegend, view);
       state.renderSceneOnce();
+      // Start after the matrix restores keyboard focus to its selected value.
+      queueMicrotask(() => tensorMotion.play());
     }, highlight);
   }
-  setupTooltip(container, state.camera, selectableMeshes, tooltip, highlight,
+  setupTooltip(container, state.camera, selectableMeshes, tooltip, component => {
+    if (component) tensorMotion?.stop();
+    highlight(component);
+  },
     y => state.getHoverView(y, selectableMeshes));
   state.resetCameraView();
 
@@ -1305,7 +1317,10 @@ function renderMechanicalBcViewer() {
     : null;
 
   if (resetButton) {
-    resetButton.addEventListener("click", state.resetCameraView);
+    resetButton.addEventListener("click", () => {
+      tensorMotion?.stop();
+      state.resetCameraView();
+    });
   }
   state.renderSceneOnce();
 }
