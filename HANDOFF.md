@@ -3,12 +3,31 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Arrow-free tensor face and conceptual action guide
+next_topic: Tensor actions now appear directly on the left main cube
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新修正：把动作直接画在左侧主 cube 上
+
+- 用户明确指出拉／压／剪切应反映在左侧大图，不能放在右侧小图。现移除右侧三个
+  小立方体，右侧只留紧凑动作按钮、分量计数与完整矩阵；左侧同一个 Three.js cube
+  显示蓝色拉长、橙色压短和青绿色剪切错开，固定虚线原形与彩色浅网格作对照。
+- 默认选中矩阵顺序中首个实际非零分量，并在左图标题标出；动作按钮选择该动作的
+  首个实际分量，用户可以直接点其他矩阵值。一次仅示意一个分量，不把独立应力
+  分量合成假变形；Show all 保留完整作用面概览。概念幅度不使用数值大小，保留
+  原始方向／符号、独立 xy/yx 与缺失值；左图说明明确不是模拟结果。
+- 重播／停止移到左图内，初始形状静态可读；后续选择可演示一次。相机、虚线原形、
+  局部点边面与标量箭头保持原始坐标；混合图说明局部标记属于虚线参考体。减少
+  动态效果下仍可手动重播。独立小应变预览、完整数值／单位／step／导出保留。
+- 核心改动在 `mechanical-bc-illustrations.js`（现为 Three.js 主图几何）、viewer、
+  tensor-panel、motion 及 `templates/pages/data_detail.html`。选择回归先失败后通过；
+  139 项 Node 与 12 项 Django／真实 Chromium 测试全部通过，零跳过。已查看左图
+  Pull、Push、Slide 在 1280／1440／1920 的截图；真实帧验证左图矩阵变化而原形、
+  相机和数据不变，且右侧没有 SVG／canvas／示意图。证据在
+  `/tmp/tensor-main-cube-qa/`。独立复核与部署验证待收尾补充。
 
 ### 最新调整：第二类改为面高亮与拉／压／剪切概念示意
 

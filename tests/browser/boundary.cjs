@@ -127,6 +127,24 @@ async function main() {
   }
   const tensorComponents = () => evaluate('__bcTest.state.tensorMeshes.flatMap(mesh=>mesh.userData.entries.map(entry=>entry.component)).sort()');
   const tensorCount = async () => (await tensorComponents()).length;
+  const concept = '__bcTest.tensorGroup.children.find(object=>object.userData.tensorConcept)';
+  const reference = '__bcTest.tensorGroup.children.find(object=>object.userData.tensorReference)';
+  async function checkConcept(component, signedValue) {
+    const data = await evaluate(`({component:(${concept})?.userData.tensorConcept.component,
+      matrix:(${concept})?.matrix.toArray(), reference:(${reference})?.matrix.toArray(),
+      referenceMaterial:(${reference})?.material.type})`);
+    assert.equal(data.component,component);
+    const identity=[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1];
+    const expected=[...identity];
+    const direction='xyz'.indexOf(component[0]),normal='xyz'.indexOf(component[1]);
+    expected[normal*4+direction]=direction===normal?(signedValue>0?1.55:0.58):Math.sign(signedValue)*0.7;
+    data.matrix.forEach((value,index)=>assert.ok(Math.abs(value-expected[index])<1e-8));
+    assert.deepEqual(data.reference,identity,'The dashed original cube stays fixed');
+    assert.equal(data.referenceMaterial,'LineDashedMaterial');
+    assert.equal(await evaluate('document.querySelector(".bc-cube-wrap").contains(document.querySelector("[data-bc-motion]"))'),true);
+    assert.equal(await evaluate('document.querySelector("[data-bc-tensor-panel]").querySelectorAll("svg, canvas, [data-tensor-example-host]").length'),0,
+      'The action is drawn on the left main cube, with no right-side example graphics');
+  }
   const visibleTooltip = `Array.from(document.querySelector('#mechanical-bc-cube').children).find(el=>el.style.pointerEvents==='none'&&el.style.opacity==='1')`;
   async function checkTensorGeometry() {
     const faces = await evaluate(`__bcTest.state.tensorMeshes.map(mesh=>({
@@ -180,23 +198,21 @@ async function main() {
       false, `${key}: do not draw a center marker`);
   }
   await open('tensor');
-  assert.equal(await evaluate('document.querySelectorAll("[data-tensor-example]").length'),3);
-  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").hidden'),true,
-    'The all-components overview has static, readable action examples');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-tensor-action-count]")).map(node=>node.textContent)'),['2 components','No components','2 components']);
-  await evaluate('document.querySelector("[data-component=xx]").click()');
+  await checkConcept('xx',15);
+  await screenshot('tensor-main-initial');
+  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-tensor-action-count]")).map(node=>node.textContent)'),['(2)','(0)','(2)']);
   assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),false,
     'Reduced motion must allow an explicit manual replay');
   assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")'),'false');
   const reducedRest = await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())');
-  const finalExample = await evaluate('document.querySelector("[data-tensor-filter=pull] [data-example-shape]").innerHTML');
+  const finalExample = await evaluate(`(${concept}).matrix.toArray()`);
   const replayButton = await evaluate(`(() => {const r=document.querySelector('[data-bc-motion]').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);
   await command('Input.dispatchMouseEvent', {type:'mousePressed',...replayButton,button:'left',clickCount:1});
   await command('Input.dispatchMouseEvent', {type:'mouseReleased',...replayButton,button:'left',clickCount:1});
-  await waitFor(`document.querySelector('[data-tensor-filter=pull] [data-example-shape]').innerHTML!==${JSON.stringify(finalExample)}`,
+  await waitFor(`JSON.stringify((${concept}).matrix.toArray())!==${JSON.stringify(JSON.stringify(finalExample))}`,
     'A real click must animate the conceptual example with reduced motion enabled');
   await waitFor('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")==="false"','Manual replay must finish once');
-  assert.equal(await evaluate('document.querySelector("[data-tensor-filter=pull] [data-example-shape]").innerHTML'),finalExample,
+  assert.deepEqual(await evaluate(`(${concept}).matrix.toArray()`),finalExample,
     'The conceptual changed shape remains visible at rest');
   assert.deepEqual(await evaluate('__bcTest.state.tensorMeshes.map(mesh=>mesh.position.toArray())'),reducedRest);
   assert.equal(await evaluate('matchMedia("(prefers-reduced-motion: reduce)").matches'),true);
@@ -218,11 +234,12 @@ async function main() {
     await screenshot('tensor-'+width);
     const matrixValues = await evaluate('Array.from(document.querySelectorAll("[data-component] strong")).map(value=>value.textContent)');
     await evaluate('document.querySelector("[data-tensor-options]").open=true');
-    for (const [filter, components] of [['pull', ['xx', 'xx', 'yy', 'yy']], ['push', []], ['slide', ['xy', 'xy', 'yx', 'yx']]]) {
+    for (const [filter, components] of [['pull', ['xx', 'xx']], ['push', []], ['slide', ['xy', 'xy']]]) {
       await evaluate(`document.querySelector('[data-tensor-filter=${filter}]').click();document.activeElement.blur()`);
       assert.deepEqual(await tensorComponents(), components);
       assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-component] strong")).map(value=>value.textContent)'), matrixValues);
-      assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /^Cube faces:/);
+      if (components.length) await checkConcept(components[0],1);
+      else assert.match(await evaluate('document.querySelector("[data-tensor-description]").textContent'), /^Cube faces:/);
       assert.equal(await evaluate('document.querySelector("[data-tensor-filter-note]").checkVisibility()'), true);
       assert.equal(await evaluate('document.querySelector("[data-tensor-note]").checkVisibility()'), false);
       assert.doesNotMatch(await evaluate('document.querySelector("[data-tensor-options]").textContent'), /step:|Stress component schematic/);
@@ -262,10 +279,12 @@ async function main() {
   report.push('copper: Pull/Push/Slide filter highlighted faces and examples while preserving the full matrix at 1280/1440/1920; no repeated step or stress paragraph; selection and hover stay linked');
 
   await open('records');
+  await checkConcept('xx',-15);
+  await evaluate('document.querySelector("[data-tensor-filter=all]").click()');
   assert.equal(await tensorCount(),18);
   await checkTensorGeometry();
   await evaluate('document.querySelector("[data-tensor-filter=push]").click()');
-  assert.deepEqual(await tensorComponents(), ['xx', 'xx', 'zz', 'zz']);
+  assert.deepEqual(await tensorComponents(), ['xx', 'xx']);
   await evaluate('document.querySelector("[data-tensor-filter=all]").click();document.activeElement.blur()');
   assert.equal(await evaluate('__bcTest.state.tensorMeshes.length'),6);
   assert.equal(await evaluate('__bcTest.state.tensorMeshes.every(mesh=>mesh.userData.entries.length===3)'),true,
@@ -376,20 +395,20 @@ async function main() {
   async function checkMotion(trigger) {
     const motion = await evaluate(`new Promise((resolve,reject)=>{
       ${trigger};
-      const drawing=()=>Array.from(document.querySelectorAll('[data-example-shape]')).map(node=>node.innerHTML);
-      const original=()=>Array.from(document.querySelectorAll('[data-example-original]')).map(node=>node.getAttribute('d'));
+      const drawing=()=>(${concept}).matrix.toArray();
+      const original=()=>({matrix:(${reference}).matrix.toArray(),points:Array.from((${reference}).geometry.attributes.position.array)});
       const scene=()=>JSON.stringify({camera:__bcTest.state.camera.position.toArray(),
-        objects:__bcTest.state.root.children.map(object=>({position:object.position.toArray(),scale:object.scale.toArray()})),
-        faces:__bcTest.state.tensorMeshes.map(mesh=>({position:mesh.position.toArray(),points:Array.from(mesh.geometry.attributes.position.array)}))});
+        objects:__bcTest.state.root.children.filter(object=>object!==__bcTest.tensorGroup&&!object.userData.tensorFaceAxis)
+          .map(object=>({position:object.position.toArray(),scale:object.scale.toArray()}))});
       const before=drawing(), base=scene(), outlines=original(), frames=[];
       const data=JSON.stringify(__bcTest.items), values=document.querySelector('[data-tensor-matrix]').textContent;
       const started=performance.now();
       function sample(){
         frames.push(drawing());
-        if(scene()!==base||JSON.stringify(original())!==JSON.stringify(outlines)) return reject(new Error('Animation changed the data cube or original reference outline'));
+        if(scene()!==base||JSON.stringify(original())!==JSON.stringify(outlines)) return reject(new Error('Animation changed the camera, local markers or dashed reference'));
         if(document.querySelector('[data-bc-motion]').getAttribute('aria-pressed')==='false') return resolve({before,frames,after:drawing(),
           unchanged:data===JSON.stringify(__bcTest.items)&&values===document.querySelector('[data-tensor-matrix]').textContent});
-        if(performance.now()-started>3000) return reject(new Error('Conceptual cue did not finish'));
+        if(performance.now()-started>3000) return reject(new Error('Main cube cue did not finish'));
         requestAnimationFrame(sample);
       }
       requestAnimationFrame(sample);
@@ -399,9 +418,9 @@ async function main() {
     assert.deepEqual(motion.after,motion.before,'Motion ends at the same readable changed-shape illustration');
     assert.equal(motion.unchanged,true,'Examples must not change supplied values or records');
   }
-  await checkMotion('document.querySelector("[data-component=xx]").click()');
+  await checkMotion('document.querySelector("[data-tensor-filter=pull]").click()');
   if(process.env.BC_BROWSER_REPORT_DIR){
-    const clip=await evaluate(`(()=>{const r=document.querySelector('[data-tensor-illustrations]').getBoundingClientRect();return{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`);
+    const clip=await evaluate(`(()=>{const r=document.querySelector('.bc-cube-wrap').getBoundingClientRect();return{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1}})()`);
     const timings=[];
     await evaluate('document.querySelector("[data-bc-motion]").click()');
     for(let frame=0;frame<12;frame++){
@@ -413,18 +432,17 @@ async function main() {
     writeFileSync(join(process.env.BC_BROWSER_REPORT_DIR,'pull-motion-timings.json'),JSON.stringify(timings));
   }
   await checkMotion('document.querySelector("[data-component=xy]").click()');
-  assert.equal(await evaluate('document.querySelector("[data-tensor-filter=slide] [data-tensor-example]").dataset.exampleComponent'),'xy');
+  await checkConcept('xy',2);
   await open('records');
-  await checkMotion('document.querySelector("[data-component=xx]").click()');
-  assert.equal(await evaluate('document.querySelector("[data-tensor-filter=push] [data-tensor-example]").dataset.exampleSign'),'-1');
+  await checkMotion('document.querySelector("[data-tensor-filter=push]").click()');
+  await checkConcept('xx',-15);
   await checkMotion('document.querySelector("[data-component=yx]").click()');
-  assert.equal(await evaluate('document.querySelector("[data-tensor-filter=slide] [data-tensor-example]").dataset.exampleComponent'),'yx');
-  assert.equal(await evaluate('document.querySelector("[data-tensor-filter=slide] [data-tensor-example]").dataset.exampleSign'),'-1');
-  const rest=await evaluate('Array.from(document.querySelectorAll("[data-example-shape]")).map(node=>node.innerHTML)');
+  await checkConcept('yx',-7);
+  const rest=await evaluate(`(${concept}).matrix.toArray()`);
   await evaluate('document.querySelector("[data-bc-motion]").click()');
-  await waitFor(`JSON.stringify(Array.from(document.querySelectorAll('[data-example-shape]')).map(node=>node.innerHTML))!==${JSON.stringify(JSON.stringify(rest))}`,'Replay did not animate the example');
+  await waitFor(`JSON.stringify((${concept}).matrix.toArray())!==${JSON.stringify(JSON.stringify(rest))}`,'Replay did not animate the example');
   await evaluate('document.querySelector("[data-bc-motion]").click()');
-  assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-example-shape]")).map(node=>node.innerHTML)'),rest);
+  assert.deepEqual(await evaluate(`(${concept}).matrix.toArray()`),rest);
   await evaluate('document.querySelector("[data-bc-motion]").click();window.scrollTo({top:0,behavior:"instant"})');
   await waitFor('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")==="false"','Offscreen illustration did not stop');
   await evaluate(`document.querySelector('.bc-panel').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy({top:-100,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
@@ -436,9 +454,13 @@ async function main() {
   await evaluate('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
   assert.equal(await tensorCount(),0);
   assert.equal(await evaluate('document.querySelector("[data-bc-motion]").hidden'),true);
+  await command('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
+  await open('mixed');
+  await checkMotion('document.querySelector("[data-tensor-filter=push]").click()');
+  assert.match(await evaluate('document.querySelector("[data-tensor-legend]").textContent'), /Local markers stay on the dashed reference/);
   await open('whole');
   assert.equal(await evaluate('!!document.querySelector("[data-bc-motion]")'),false);
-  report.push('conceptual SVG examples retain original outlines and final changed shapes; signed selection, manual reduced-motion replay, stop and offscreen behavior work without moving the reference cube or changing values');
+  report.push('main 3D cube shows signed Pull/Push/Slide with a fixed dashed reference; right panel has no graphics; finite motion and manual reduced-motion replay preserve data, local markers and camera');
   await command('Emulation.setScriptExecutionDisabled',{value:true});
   await command('Page.navigate',{url:config.baseUrl+config.pages.tensor});
   await waitFor(`location.href===${JSON.stringify(config.baseUrl+config.pages.tensor)}&&document.readyState==='complete'`, 'No-JavaScript page did not load');

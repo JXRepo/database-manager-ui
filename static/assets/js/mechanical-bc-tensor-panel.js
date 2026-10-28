@@ -1,5 +1,4 @@
 import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows, tensorComponentMeaning, tensorComponentVisible} from './mechanical-bc-tensor.js';
-import {createTensorIllustrations} from './mechanical-bc-illustrations.js';
 
 export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
@@ -11,7 +10,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const shape = panel.querySelector('[data-tensor-shape]');
   const shapeLabel = panel.querySelector('[data-tensor-shape-label]');
   const filterButtons = Array.from(panel.querySelectorAll('[data-tensor-filter]'));
-  const illustrations = createTensorIllustrations(panel.querySelector('[data-tensor-illustrations]'));
   let current = conditions[0];
   let loadIndex = 0;
   let filter = 'all';
@@ -34,7 +32,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   function highlight(component) {
     const keys = Array.isArray(component) ? component : [component];
     cells.forEach(cell => cell.classList.toggle('is-hovered', keys.includes(cell.dataset.component)));
-    illustrations?.highlight(keys);
   }
 
   function hover(component) {
@@ -67,7 +64,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     }
     panel.querySelector('[data-tensor-kind]').textContent = shape.checked
       ? 'Normalized small-strain illustration · all supplied components'
-      : 'Highlighted faces locate the selected components';
+      : 'Select a value to show its action on the cube';
     shape.title = preview.error;
     matrix.replaceChildren();
     cells = [];
@@ -129,7 +126,17 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     const actionLabels = {all: 'Show all', pull: isStrain ? 'Extend' : 'Pull', push: isStrain ? 'Shorten' : 'Push', slide: 'Slide'};
     filterButtons.forEach(button => {
       (button.querySelector('[data-tensor-filter-label]') || button).textContent = actionLabels[button.dataset.tensorFilter];
-      button.setAttribute('aria-pressed', String(!selected && !shape.checked && button.dataset.tensorFilter === filter));
+      const mode = button.dataset.tensorFilter;
+      const count = button.querySelector('[data-tensor-action-count]');
+      if (count) {
+        const total = TENSOR_COMPONENTS.filter(key => tensorComponentVisible(key, magnitude?.[key], mode)).length;
+        count.textContent = `(${total})`;
+        button.title = total ? `${total} component${total === 1 ? '' : 's'}; select a value for its action`
+          : 'No nonzero components';
+      }
+      const active = selected ? mode !== 'all' && tensorComponentVisible(selected, magnitude?.[selected], mode)
+        : mode === filter;
+      button.setAttribute('aria-pressed', String(!shape.checked && active));
     });
     panel.querySelector('[data-tensor-filter-note]').hidden = !selected && filter === 'all';
     const valid = TENSOR_COMPONENTS.filter(key => isTensorNumber(magnitude?.[key]));
@@ -164,7 +171,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     onHighlight('');
     const view = {item: current.item, itemIndex: current.index, load, filter, selected, unit,
       shapeMatrix: shape.checked ? preview.matrix : null};
-    illustrations?.update(view);
     onChange(view);
   }
 
@@ -176,8 +182,8 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     const loads = current.item.tensor_loads || [];
     loadIndex = Math.max(0, Math.min(step, loads.length - 1));
     if (fresh) {
-      selected = '';
       filter = 'all';
+      selected = TENSOR_COMPONENTS.find(key => tensorComponentMeaning(key, loads[loadIndex]?.magnitude?.[key])) || '';
       shape.checked = false;
     }
     loadSelect.replaceChildren();
@@ -208,7 +214,8 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   filterButtons.forEach(button => button.addEventListener('click', () => {
     shape.checked = false;
     filter = button.dataset.tensorFilter;
-    selected = '';
+    const magnitude = current.item.tensor_loads?.[loadIndex]?.magnitude;
+    selected = filter === 'all' ? '' : TENSOR_COMPONENTS.find(key => tensorComponentVisible(key, magnitude?.[key], filter)) || '';
     render();
   }));
   shape.addEventListener('change', () => {
@@ -230,5 +237,5 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   });
   panel.hidden = false;
   selectCondition(current.index);
-  return {highlight, stopMotion: () => illustrations?.stop()};
+  return {highlight};
 }

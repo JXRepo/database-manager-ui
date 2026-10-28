@@ -1,9 +1,9 @@
 export function createTensorMotion(container, render, available) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'btn btn-sm btn-outline-secondary bc-motion-btn';
+  button.className = 'bc-reset-btn bc-motion-btn';
   button.dataset.bcMotion = '';
-  container.querySelector('[data-tensor-motion-controls]').appendChild(button);
+  container.parentElement.appendChild(button);
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let visible = false;
   let pending = null;

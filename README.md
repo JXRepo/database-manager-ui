@@ -655,66 +655,66 @@ italic glyphs for these two symbols; field keys and plotted values are unchanged
 Mechanical boundary conditions show the quantity name and explicitly supplied
 unit in the table, whole cube captions and load hover. Force, displacement,
 stress and strain retain distinct quantity labels. Scalar force/displacement uses
-slim purple axis arrows; tensor loads use highlighted opposing faces and a compact
-action guide beside the cube. Missing units are labeled as not supplied.
+slim purple axis arrows; tensor actions appear directly on the large left cube,
+with compact controls and a numeric matrix on the right. Missing units are labeled as not supplied.
 The local legend uses `Local loads` and `Fixed constraint` without repeating
 quantity names, units or an `X/Y/Z directions` label.
 
 Whole cube stress and strain tensors retain an always visible numeric matrix to
 the right of the cube. Its rows identify direction `i`, and columns identify
-face normal `j`. Initially, the cube highlights the faces of all supplied nonzero
-numeric components in the current load entry. Selecting a value isolates that
-component; selecting it again returns to all components. Hover and keyboard focus
-link the value, its opposing faces and its action example. The matrix stays in
-place when selected status appears below it. Nonzero cells include action labels
-and matching colors. Values remain complete and clickable when a filter is active.
+face normal `j`. On opening a condition, the first supplied nonzero component
+in matrix order is selected and named above the left cube. Selecting another
+value changes the action on that same cube; selecting it again or `Show all`
+returns to the complete face overview. Missing and zero values are never chosen
+as an initial action. The right panel contains no example cubes or other diagrams.
 
-The action guide contains three small gridded SVG examples: blue `Pull` lengthens,
-orange `Push` shortens and teal `Slide` offsets opposing faces. Strain uses
-`Extend`, `Shorten` and `Slide`. A dashed original cube remains behind each
-colored changed shape, so the distinction remains visible without animation.
-Each card is also a filter and shows how many supplied nonzero components match;
-empty modes say `No components`. `Show all` restores all components. Generic
-illustrations say `Example`; a single hovered or selected component updates the
-relevant illustration to its actual direction, face normal and sign. The shared
-caption explicitly labels these as conceptual changes, not simulation output.
-Their fixed example amplitude is independent of the uploaded magnitude. They do
-not infer material properties, lateral contraction or a stress-derived deformation.
+The left cube itself is a gridded conceptual illustration: blue `Pull` lengthens,
+orange `Push` shortens and teal `Slide` offsets opposite faces. Strain uses
+`Extend`, `Shorten` and `Slide`. A dashed original cube at the same center stays
+fixed, providing a clear comparison with the colored changed shape at rest or
+while moving. Both rotate in the existing Three.js view; the bottom-right XYZ
+guide retains its camera orientation. The caption explicitly labels the action
+as conceptual, not simulation output. Its fixed illustrative amplitude uses the
+selected component direction and original sign, independent of magnitude. No
+material response, lateral contraction or stress-derived deformation is computed.
+Only one component is illustrated at a time; separate components are not combined
+into a purported deformation. Independent `xy` and `yx` remain separate choices.
 
-Positive normal stress maps to Pull, negative normal stress to Push, and nonzero
-shear of either sign maps to Slide. Independent components, including unequal
-`xy` and `yx`, are preserved rather than mirrored or averaged. The main reference
-cube retains its geometry. Each affected opposite face is drawn once, grouping
-its supplied components; mixed-action faces use neutral purple until a component
-is inspected. Face hover lists every associated component, value, unit and signed
-direction. The highlighted surfaces locate components, without claiming to
-reconstruct actual simulation boundary tractions. Zero, missing and invalid
-components produce no face highlights and are never replaced by inferred values.
-Action labels use the original signs even when tiny values round to `0.00`.
+Compact Pull / Push / Slide buttons show matching component counts and select
+the first supplied nonzero component for that action. The full matrix remains
+visible and clickable so other components can be inspected directly. Empty actions
+show a zero count and a clear status, without inventing a shape. Positive normal
+stress means Pull, negative normal stress means Push, and shear of either sign
+means Slide. Tiny values retain their original sign even if rounded to `0.00`.
+Selected status appears below the matrix without shifting its buttons. Hover and
+keyboard focus link matrix values to the affected opposing faces. The overview
+groups all components of a shared face into one surface; mixed actions use neutral
+purple. Hover lists each component, unit, value and signed direction. Missing,
+invalid or zero selected values draw no action or highlighted faces.
 
-The initial all-components view is static. Selecting a component or nonempty
-action filter plays one short conceptual cue in its matching SVG card; changing
-records can replay that active cue. The dashed outline stays fixed and the final
-changed shape stays visible after the cue ends. `Replay motion` and `Stop motion`
-control the approximately 1.2-second illustration. No main cube geometry, camera,
-values, units or steps move with it. Automatic motion respects reduced motion;
-an explicit Replay click still plays once without enabling later automatic cues
-or changing system preferences. Motion stops on face/matrix inspection, camera
-interaction, Reset, a hidden tab or an offscreen guide. Zero, missing or invalid
-selected components, empty filters and the separate strain shape preview have
-no motion. The initial view does not arbitrarily choose one component to animate.
+The initial selected shape is static. Selecting a component or nonempty action
+plays one short cue on the large left cube; changing records can replay the active
+component. `Replay motion` and `Stop motion` sit inside that left view. The cue
+lasts about 1.2 seconds and ends at the readable changed shape. The dashed reference,
+camera, values, units and exact steps stay fixed. Scalar and local markers also
+stay on their original reference coordinates; mixed-view captions explain this.
+Automatic motion respects reduced motion; explicit Replay still plays once
+without enabling later automatic cues or changing system preferences. Inspection,
+camera interaction, Reset, hidden tabs and leaving the view stop the cue. Missing,
+zero or invalid selected components and the separate strain shape preview have
+no motion. Local loads and scalar XYZ arrows retain their ordinary geometry.
 
-`Cube faces: …` describes the current selection; `All supplied values` labels
-the complete matrix, with faded cells explicitly identified as outside the current
-selection. Advanced options retain Clear selection and the optional strain shape
-illustration. Load navigation preserves a selected component even if a later
-entry omits it, explaining missing or invalid values. Selectors appear only for
-multiple conditions or load entries, preserving supplied order and exact steps.
-Multiple records use one `Load record` selector; a single record has none. The
-optional `step` is an unchanged record label, not time or an array index. Scalar
-X/Y/Z entries are not a timeline. No steps or loading history are inferred from
-frequency or duration. Full load details remain in the table, including without
-JavaScript; the repeated stress paragraph and step line stay omitted from Advanced.
+`All supplied values` labels the complete matrix, with faded cells explicitly
+identified as outside the current selection. Advanced options retain Clear
+selection and the optional strain shape illustration. Load navigation preserves
+a selected component even if a later entry omits it, explaining missing or invalid
+values. Selectors appear only for multiple conditions or entries, preserving order
+and exact steps. Multiple entries use one `Load record` selector; a single entry
+has none. The optional `step` remains a supplied label, not time or an array
+index. Scalar X/Y/Z entries are not a timeline. No steps or loading history are
+inferred from frequency or duration. Full details remain in the table, including
+without JavaScript; the repeated stress paragraph and step line stay omitted
+from Advanced display options.
 
 Matrix values and face hover use two decimal places with half-up rounding; value
 titles retain full precision. Stress and strain units come from uploaded metadata;
@@ -727,9 +727,9 @@ Strain directions are labeled as guides, not forces. An optional shape
 illustration assumes symmetric small strain with tensor shear and no rigid
 rotation. It requires all nine numeric components and equal reciprocal values;
 missing or conflicting reciprocal entries disable the shape preview without
-affecting their independent face display. Enabling the illustration hides the
-conceptual action cards and uses all supplied components; selecting a component
-returns to the face and action guide.
+affecting their independent component display. Enabling the illustration replaces
+the single conceptual action with all supplied strain components; selecting a
+component returns to its conceptual action on the main cube.
 Deformation is normalized for readability, not a calculated or to-scale
 simulation result; stored values and exports are unchanged. These distinctions
 follow the difference between

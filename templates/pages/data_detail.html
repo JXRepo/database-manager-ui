@@ -875,22 +875,8 @@ details[open] > .detail-group-summary {
     .bc-tensor-selects label[hidden], .bc-tensor-status[hidden] { display: none; }
     .bc-tensor-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
     .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
-    .bc-action-guide { margin-top: 10px; }
-    .bc-action-guide[hidden] { display: none; }
-    .bc-action-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; margin-bottom: 7px; }
-    .bc-action-heading > span { font-size: 0.8rem; font-weight: 600; color: #475569; }
-    .bc-action-controls { display: flex; align-items: center; gap: 6px; }
-    .bc-action-controls button { font-size: 0.72rem; padding: 4px 7px; white-space: nowrap; }
-    .bc-action-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .bc-action-card { min-width: 0; padding: 8px 6px 6px; border: 1px solid #dbe4f0; border-radius: 8px; background: #fff; color: var(--bc-action-color); text-align: center; }
-    .bc-action-card strong { display: block; font-size: 0.8rem; }
-    .bc-action-card small { display: block; color: #64748b; font-size: 0.68rem; line-height: 1.3; }
-    .bc-action-card svg { display: block; width: 100%; max-width: 160px; height: 94px; margin: 0 auto; }
-    .bc-action-card [data-tensor-example-component] { min-height: 16px; color: var(--bc-action-color); }
-    .bc-action-card.is-empty { color: #94a3b8; background: #f8fafc; }
-    .bc-action-card.is-current, .bc-action-card.is-hovered { border-color: var(--bc-action-color); box-shadow: inset 0 0 0 1px var(--bc-action-color); }
-    .bc-action-card:focus-visible { outline: 3px solid var(--bc-action-color); outline-offset: 2px; }
-    .bc-action-key { font-size: 0.71rem; line-height: 1.45; color: #64748b; margin-top: 6px; }
+    .bc-reset-btn.bc-motion-btn { left: 12px; right: auto; }
+    .bc-tensor-filter-count { opacity: 0.7; margin-left: 4px; }
     .bc-tensor-matrix-heading { font-size: 0.77rem; color: #536176; margin-top: 8px; }
     .bc-tensor-matrix { display: grid; grid-template-columns: 64px repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
     .bc-tensor-axis { display: flex; align-items: center; justify-content: center; color: #536176; font-size: 0.75rem; font-weight: 600; text-align: center; }
@@ -1722,29 +1708,11 @@ details[open] > .detail-group-summary {
                   <label>Boundary condition<select class="form-select" data-tensor-condition></select></label>
                   <label>Load record<select class="form-select" data-tensor-load></select></label>
                 </div>
-                <div class="bc-action-guide" data-tensor-illustrations>
-                  <div class="bc-action-heading">
-                    <span>Action examples</span>
-                    <div class="bc-action-controls"><span data-tensor-motion-controls></span><button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="true">Show all</button></div>
-                  </div>
-                  <div class="bc-action-cards" role="group" aria-label="Components to highlight">
-                    <button type="button" class="bc-action-card" data-tensor-action-card data-tensor-filter="pull" aria-pressed="false">
-                      <strong data-tensor-filter-label>Pull</strong><small data-tensor-action-count></small>
-                      <span data-tensor-example-host></span><small data-tensor-example-component>Example</small>
-                      <small>Longer</small>
-                    </button>
-                    <button type="button" class="bc-action-card" data-tensor-action-card data-tensor-filter="push" aria-pressed="false">
-                      <strong data-tensor-filter-label>Push</strong><small data-tensor-action-count></small>
-                      <span data-tensor-example-host></span><small data-tensor-example-component>Example</small>
-                      <small>Shorter</small>
-                    </button>
-                    <button type="button" class="bc-action-card" data-tensor-action-card data-tensor-filter="slide" aria-pressed="false">
-                      <strong data-tensor-filter-label>Slide</strong><small data-tensor-action-count></small>
-                      <span data-tensor-example-host></span><small data-tensor-example-component>Example</small>
-                      <small>Opposite faces shift</small>
-                    </button>
-                  </div>
-                  <div class="bc-action-key">Dashed: original · Color: conceptual change<br>Action examples, not simulation output.</div>
+                <div class="bc-tensor-filters" role="group" aria-label="Action to show on the cube">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="false">Show all</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="pull" aria-pressed="false"><span data-tensor-filter-label>Pull</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="push" aria-pressed="false"><span data-tensor-filter-label>Push</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="slide" aria-pressed="false"><span data-tensor-filter-label>Slide</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
                 </div>
                 <div class="bc-tensor-description" data-tensor-description></div>
                 <div class="bc-tensor-matrix-heading" data-tensor-matrix-heading>All supplied values <span data-tensor-filter-note hidden>· faded cells are outside the current selection</span></div>
