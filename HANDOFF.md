@@ -26,7 +26,11 @@ next_topic: Rounded static tensor arrows distinguish whole cube actions from sca
 - 已查看实际 Pull、Push、Slide、全部 18 个箭头及混合场景截图；本机截图和日志在
   `/tmp/rounded-tensor-qa/`。代码位于 `static/assets/js/mechanical-bc-viewer.js`，
   浏览器回归位于 `tests/browser/boundary.cjs`。独立只读审查通过，无待修复问题；
-  复核包括单网格悬停／高亮／资源释放及实际截图。部署状态待本轮提交后核验。
+  复核包括单网格悬停／高亮／资源释放及实际截图。
+- 应用提交 `ef73626` 已合入并推送 main。2026-10-28 00:09:04 UTC，线上 viewer、
+  tensor、tensor-panel 三个脚本在普通 URL 与独立 no-cache URL 均逐字节匹配，
+  `/healthz/` HTTP 200。证据在 `/tmp/rounded-tensor-qa/live-verification.json`；
+  交互截图来自本地 Chromium，未操作生产数据。现有记录刷新即可，无需重新上传。
 
 ### 最新调整：Pull／Push／Slide 筛选与完整矩阵明确分开
 
