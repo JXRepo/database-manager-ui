@@ -660,81 +660,78 @@ with compact controls and a numeric matrix on the right. Missing units are label
 The local legend uses `Local loads` and `Fixed constraint` without repeating
 quantity names, units or an `X/Y/Z directions` label.
 
-Whole cube stress and strain tensors retain an always visible numeric matrix to
-the right of the cube. Its rows identify direction `i`, and columns identify
-face normal `j`. On opening a condition, the first supplied nonzero component
-in matrix order is selected and named above the left cube. Selecting another
-value changes the action on that same cube; selecting it again or `Show all`
-returns to the complete face overview. Missing and zero values are never chosen
-as an initial action. The right panel contains no example cubes or other diagrams.
+Whole cube stress and strain tensors retain the original translucent purple 3D
+cube, glass edges and eight white corner spheres. The matrix stays to its right,
+with rows for direction `i` and columns for face normal `j`; the bottom-right XYZ
+guide keeps its existing orientation. No replacement cube or right-side examples
+are drawn. On opening a condition, all supplied nonzero components are selected
+and the cube remains undeformed until `Play deformation` is clicked.
 
-The left cube itself is a gridded conceptual illustration: blue `Pull` lengthens,
-orange `Push` shortens and teal `Slide` offsets opposite faces. Strain uses
-`Extend`, `Shorten` and `Slide`. A dashed original cube at the same center stays
-fixed, providing a clear comparison with the colored changed shape at rest or
-while moving. Both rotate in the existing Three.js view; the bottom-right XYZ
-guide retains its camera orientation. The caption explicitly labels the action
-as conceptual, not simulation output. Its fixed illustrative amplitude uses the
-selected component direction and original sign, independent of magnitude. No
-material response, lateral contraction or stress-derived deformation is computed.
-Only one component is illustrated at a time; separate components are not combined
-into a purported deformation. Independent `xy` and `yx` remain separate choices.
+Pull, Push and Shear are independent group toggles, with selected/available counts,
+`Select all` and `Clear`. Users can combine any action groups or matrix components.
+Positive normal stress is Pull, negative normal stress is Push; strain uses Extend
+and Shorten. Matching reciprocal shear entries toggle together for symmetric
+strain. Distinct `xy` and `yx` values remain visible and independently selectable;
+they prevent deformation instead of being averaged. The complete matrix is always
+visible, including faded unselected cells. Missing, invalid and zero components do
+not produce highlighted faces. Hover and focus link each matrix value to its
+opposing faces; shared faces retain every component and use purple for mixed actions.
 
-Compact Pull / Push / Slide buttons show matching component counts and select
-the first supplied nonzero component for that action. The full matrix remains
-visible and clickable so other components can be inspected directly. Empty actions
-show a zero count and a clear status, without inventing a shape. Positive normal
-stress means Pull, negative normal stress means Push, and shear of either sign
-means Slide. Tiny values retain their original sign even if rounded to `0.00`.
-Selected status appears below the matrix without shifting its buttons. Hover and
-keyboard focus link matrix values to the affected opposing faces. The overview
-groups all components of a shared face into one surface; mixed actions use neutral
-purple. Hover lists each component, unit, value and signed direction. Missing,
-invalid or zero selected values draw no action or highlighted faces.
+Deformation uses numerical values, without peak normalization or fixed action
+amplitudes. Supplied strain requires all nine finite entries, equal reciprocal
+values and explicit dimensionless (`1`, `-`, `dimensionless`) or percent (`%`,
+`percent`) units. It represents homogeneous symmetric small strain with tensor
+shear and no rigid rotation. Stress can be converted only for an explicitly named
+isotropic linear elastic model in one fully dense phase of volume fraction 1,
+with valid `youngs_modulus`, `poisson_ratio` and explicit compatible Stress and
+Stiffness units (Pa/kPa/MPa/GPa). The estimate uses
+`epsilon_ii = (sigma_ii - nu * (sigma_jj + sigma_kk)) / E` and
+`epsilon_ij = (1 + nu) * sigma_ij / E`. Selection applies to stress before this
+conversion, so lateral Poisson contraction/expansion is included. Other material
+models, missing properties or incomplete/asymmetric tensors retain the original
+cube with an explanation. No effective multiphase properties or nonlinear,
+plastic, thermal or local boundary response is inferred. Supplied output histories
+are not decomposed into hypothetical responses to different component selections.
+The UI explicitly identifies the linear elastic estimate and these assumptions.
 
-The initial selected shape is static. Selecting a component or nonempty action
-plays one short cue on the large left cube; changing records can replay the active
-component. `Replay motion` and `Stop motion` sit inside that left view. The cue
-lasts about 1.2 seconds and ends at the readable changed shape. The dashed reference,
-camera, values, units and exact steps stay fixed. Scalar and local markers also
-stay on their original reference coordinates; mixed-view captions explain this.
-Automatic motion respects reduced motion; explicit Replay still plays once
-without enabling later automatic cues or changing system preferences. Inspection,
-camera interaction, Reset, hidden tabs and leaving the view stop the cue. Missing,
-zero or invalid selected components and the separate strain shape preview have
-no motion. Local loads and scalar XYZ arrows retain their ordinary geometry.
+`Display amplification` starts at ×1 and multiplies the actual strain by the
+chosen factor, consistently across combinations and records. Clear retains that
+factor; a new valid selection resets it to ×1 with a notice only if its safe
+upper bound is exceeded. The real maximum absolute strain row sum must be at most
+5%; amplified strain is capped at a 45% row sum to keep the display invertible.
+Unamplified normal and tensor shear strains are shown separately. When RVE lengths
+and a length unit are supplied, axial changes `L_i * epsilon_ii` are shown in that
+unit. The drawing is a unit cube strain view, not the RVE's dimensional aspect ratio
+or a spatial simulation. Both original surfaces, edges, white corners and tensor
+face highlights use `I + progress * amplification * epsilon`.
 
-`All supplied values` labels the complete matrix, with faded cells explicitly
-identified as outside the current selection. Advanced options retain Clear
-selection and the optional strain shape illustration. Load navigation preserves
-a selected component even if a later entry omits it, explaining missing or invalid
-values. Selectors appear only for multiple conditions or entries, preserving order
-and exact steps. Multiple entries use one `Load record` selector; a single entry
-has none. The optional `step` remains a supplied label, not time or an array
-index. Scalar X/Y/Z entries are not a timeline. No steps or loading history are
-inferred from frequency or duration. Full details remain in the table, including
-without JavaScript; the repeated stress paragraph and step line stay omitted
-from Advanced display options.
+Playback is explicit, finite (about 1.2 seconds), and independent of physical time
+or loading histories. `Pause deformation` freezes the current shape; Resume
+continues, Replay restarts, and `Reset` restores the original shape
+and camera. Changing a selection, record or amplification resets the shape without
+automatic playback. Inspection, camera interaction, hidden tabs, offscreen views
+and changes to reduced-motion preferences pause playback. Reduced-motion settings
+never disable explicit manual playback. Scalar and local markers remain at their
+reference coordinates; mixed views display a gray original outline and explain
+that those loads are not part of the homogeneous deformation estimate. The camera,
+record labels, original values, stored JSON and exports remain unchanged.
 
-Matrix values and face hover use two decimal places with half-up rounding; value
-titles retain full precision. Stress and strain units come from uploaded metadata;
-dimensionless strain `1` appears as `(-)`. A fixed camera envelope keeps the cube
-centered between selections. The positive X/Y/Z orientation guide follows camera
-rotation and Reset. The default view faces the positive corner, with X down-left,
-Y down-right and Z upward; the guide remains 124 × 102 CSS pixels on desktop.
+Record navigation preserves selected component keys, even if later records omit
+or invalidate them, with a visible explanation. Selectors appear only for multiple
+conditions or records, preserving supplied order and exact optional `step` labels.
+Steps are labels, not time; scalar X/Y/Z entries are not a timeline. No loading
+history is inferred from frequency or duration. Full load details remain available
+in the table, including without JavaScript.
 
-Strain directions are labeled as guides, not forces. An optional shape
-illustration assumes symmetric small strain with tensor shear and no rigid
-rotation. It requires all nine numeric components and equal reciprocal values;
-missing or conflicting reciprocal entries disable the shape preview without
-affecting their independent component display. Enabling the illustration replaces
-the single conceptual action with all supplied strain components; selecting a
-component returns to its conceptual action on the main cube.
-Deformation is normalized for readability, not a calculated or to-scale
-simulation result; stored values and exports are unchanged. These distinctions
-follow the difference between
-[stress components](https://www.comsol.com/multiphysics/stress-and-equations-of-motion)
-and [deformation measures](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.009.html).
+Matrix values and face hover use two decimal places with half-up rounding; titles
+retain full precision. Stress and strain units come from uploaded metadata;
+dimensionless strain `1` appears as `(-)`. Actual strain and axial changes use
+seven significant digits so small deformations do not round to zero. A fixed camera
+envelope keeps the cube centered between selections. The positive X/Y/Z orientation
+guide follows camera rotation and Reset. The default view faces the positive
+corner, with X down-left, Y down-right and Z upward; the guide remains 124 × 102
+CSS pixels on desktop. The stress/strain conversion follows
+[linear elasticity](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.026.html).
 
 Scalar point, edge and face force/displacement loads retain their axis display.
 Scalar zero, missing and invalid magnitudes produce no load arrows; the supplied

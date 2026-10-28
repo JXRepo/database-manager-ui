@@ -36,6 +36,7 @@ from .my_data_filters import filter_my_data_objects
 from .assistant import help_reply, read_context, sign_context
 from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
 from .mechanical_csv import write_mechanical_csv
+from .boundary_deformation import deformation_context
 from .advanced_search import (
     DATA_FIELD_CHOICES,
     DATA_FIELD_TYPES,
@@ -4407,6 +4408,7 @@ def json_data_detail_view(request, pk):
         "detail_rows": display_rows,
         "plot_variables": plot_variables,
         "mechanical_bc_items": mechanical_bc_items,
+        "boundary_deformation": deformation_context(metadata),
         "mechanical_bc_groups": _group_mechanical_bc_items(mechanical_bc_items),
         "shared_users": obj.shared_users.order_by("username"),
         "detail_back_url_name": detail_back_url_name,

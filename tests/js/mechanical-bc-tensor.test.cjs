@@ -23,20 +23,7 @@ test('face loads retain independent components on both opposing faces', () => {
   assert.equal(JSON.stringify(values), original);
 });
 
-test('conceptual shapes show the supplied direction and sign without encoding magnitude', () => {
-  assert.equal(typeof tensor.tensorConceptPoint, 'function');
-  const point = [0.5, 0.5, 0.5];
-  assert.deepEqual(tensor.tensorConceptPoint(point, 'xx', 15), [0.775, 0.5, 0.5]);
-  assert.deepEqual(tensor.tensorConceptPoint(point, 'xx', -15), [0.29000000000000004, 0.5, 0.5]);
-  assert.deepEqual(tensor.tensorConceptPoint(point, 'xy', 2), [0.85, 0.5, 0.5]);
-  assert.ok(Math.abs(tensor.tensorConceptPoint(point, 'xy', -2)[0] - 0.15) < 1e-12);
-  assert.deepEqual(tensor.tensorConceptPoint(point, 'yx', 2), [0.5, 0.85, 0.5]);
-  assert.deepEqual(tensor.tensorConceptPoint([-0.5, -0.5, 0], 'xy', 2), [-0.85, -0.5, 0]);
-  assert.deepEqual(tensor.tensorConceptPoint(point, 'xy', 2), tensor.tensorConceptPoint(point, 'xy', 20000));
-  assert.deepEqual(tensor.tensorConceptPoint(point, 'xx', 2, 0), point);
-  assert.deepEqual(tensor.tensorConceptPoint(point, 'xy', 0), point);
-  assert.deepEqual(point, [0.5, 0.5, 0.5]);
-});
+
 
 test('normal stress arrows point outward for tension and inward for compression', () => {
   const positive = tensor.tensorArrows({xx: 100});
@@ -101,31 +88,21 @@ test('action filters separate pulling, pushing and sliding using original finite
   assert.equal(JSON.stringify(values), original);
 });
 
-test('small-strain illustration preserves sign, uses explicit symmetry, and remains bounded', () => {
-  const values = {xx: 1e200, yy: -1e200, zz: 0, xy: 1e200, yx: 1e200, xz: 0, zx: 0, yz: 0, zy: 0};
-  const original = JSON.stringify(values);
-  const result = tensor.strainIllustration(values);
-  assert.equal(result.error, '');
-  assert.ok(result.matrix[0][0] > 0 && result.matrix[1][1] < 0);
-  assert.equal(result.matrix[0][1], result.matrix[1][0]);
-  assert.ok(result.matrix.every(row => row.reduce((sum, n) => sum + Math.abs(n), 0) <= 0.24));
-  assert.equal(JSON.stringify(values), original);
-});
 
-test('shape preview refuses incomplete or non-symmetric strain without averaging it', () => {
-  assert.ok(tensor.strainIllustration({xx: 1}).error);
-  assert.match(tensor.strainIllustration({xx: 1, yy: 0, zz: 0, xy: 2, xz: 0, zx: 0, yz: 0, zy: 0}).error,
-    /all nine numeric strain components; missing components are not inferred/);
-  assert.ok(tensor.strainIllustration({xx: 1, yy: 0, zz: 0, xy: 2, yx: 3, xz: 0, zx: 0, yz: 0, zy: 0}).error);
-});
 
-test('an explicitly zero tensor has a zero shape change', () => {
-  assert.deepEqual(tensor.strainIllustration({xx: 0, yy: 0, zz: 0, xy: 0, yx: 0, xz: 0, zx: 0, yz: 0, zy: 0}).matrix,
-    [[0, 0, 0], [0, 0, 0], [0, 0, 0]]);
-});
+
+
+
 
 test('display rounding is half-up while original component values are retained', () => {
   assert.equal(tensor.formatTensorValue(1.005), '1.01');
   assert.equal(tensor.formatTensorValue(-1.005), '-1.01');
   assert.equal(tensor.formatTensorValue(-0.004), '0.00');
+});
+
+test('multi-selection keeps only the selected supplied components on their own faces', () => {
+  const values = {xx: 15, yy: -5, xy: 2, yx: 2};
+  assert.deepEqual(tensor.tensorArrows(values, 'all', new Set(['xx','xy','yx'])).map(a => a.component),
+    ['xx','xx','xy','xy','yx','yx']);
+  assert.deepEqual(tensor.tensorArrows(values, 'all', new Set()), []);
 });

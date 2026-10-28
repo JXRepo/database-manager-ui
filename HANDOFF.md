@@ -3,12 +3,32 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Tensor actions now appear directly on the left main cube
+next_topic: Data-driven combined deformation on the original glass cube
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 当前实现：保留原立方体，按数值播放任意分量组合
+
+- 用户最新要求覆盖下面旧记录的概念示意方案：保留原透明紫色表面、边框、白色
+  顶点，直接变形同一组几何。Pull / Push / Shear 可任意叠加，也可切换分量；
+  相同倒易剪切值成对选择，不同 xy/yx 保留原值并明确阻止不成立的变形。
+- 默认全选非零分量但保持原状，手动 Play 才播放；Pause 保持当前帧，Resume 继续，
+  Replay 重播，Reset 恢复形状与视角。改变组合／记录／倍率恢复原状，不自动播放。
+- 应变按所选数值计算；应力仅在明确单相、全致密、各向同性线弹性模型及 E/ν／单位
+  齐全时换算。包括泊松效应，明确为均匀线弹性估计，排除塑性、热及局部边界效应。
+  不使用应力值捏造固定幅度，也不从输出曲线倒推任意分量组合。
+- 单位立方体视图默认 ×1，可明确设置放大倍率；跨组合保留倍率，并单独列真实应变、
+  张量剪切和有尺寸时的轴向长度变化。拒绝不完整／不对称张量及超出小应变范围的输入。
+- 新模块：`apps/pages/boundary_deformation.py`、`mechanical-bc-deformation.js`。
+  原 illustrations 模块已移除；viewer 变换原 baseCube 与高亮面，独立局部／标量标记
+  保持参考坐标，混合视图显示灰色原形。数值、step、权限和 JSON 导出保持不变。
+- 本轮验证证据在 `/tmp/tensor-data-motion-qa/`；137 项 Node、14 项 Django／真实
+  Chromium 已通过，零跳过，覆盖真实几何、数值倍增、混合选择、播放暂停重置、
+  无 JS、导出和三个桌面宽度。最终复核、提交与线上验证状态将在发布后补充。
+
 
 ### 最新修正：把动作直接画在左侧主 cube 上
 

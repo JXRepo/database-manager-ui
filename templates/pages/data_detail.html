@@ -7,6 +7,7 @@
 {{ plot_variables|json_script:"plot-variables-data" }}
 {{ metadata.units|json_script:"plot-units-data" }}
 {{ mechanical_bc_items|json_script:"mechanical-bc-data" }}
+{{ boundary_deformation|json_script:"bc-deformation-data" }}
 <style>
 
 
@@ -865,7 +866,7 @@ details[open] > .detail-group-summary {
     }
 
     .bc-tensor-panel h6 { margin: 0 0 4px; font-weight: 700; overflow-wrap: anywhere; }
-    .bc-tensor-panel[hidden], .bc-tensor-shape[hidden] { display: none; }
+    .bc-tensor-panel[hidden] { display: none; }
     [data-bc-show-tensor][hidden] { display: none; }
     .bc-layout:has(.bc-tensor-panel:not([hidden])) .bc-cube-wrap { width: 100%; }
     .bc-tensor-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -876,6 +877,10 @@ details[open] > .detail-group-summary {
     .bc-tensor-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
     .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
     .bc-reset-btn.bc-motion-btn { left: 12px; right: auto; }
+    .bc-tensor-filters button.is-partial { border-style: dashed; }
+    .bc-deformation-scale { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; font-size: .78rem; }
+    .bc-deformation-scale input { width: 85px; }
+    .bc-deformation-values { display: flex; flex-direction: column; gap: 3px; font-size: .75rem; color: #475569; margin-top: 8px; }
     .bc-tensor-filter-count { opacity: 0.7; margin-left: 4px; }
     .bc-tensor-matrix-heading { font-size: 0.77rem; color: #536176; margin-top: 8px; }
     .bc-tensor-matrix { display: grid; grid-template-columns: 64px repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
@@ -898,10 +903,6 @@ details[open] > .detail-group-summary {
     .bc-tensor-help p { margin: 6px 0; }
     .bc-tensor-status { font-size: 0.82rem; margin: 10px 0 6px; overflow-wrap: anywhere; }
     .bc-tensor-description { font-size: 0.82rem; font-weight: 600; color: #334155; margin-top: 12px; overflow-wrap: anywhere; }
-    .bc-tensor-options { margin-top: 10px; }
-    .bc-tensor-options > summary { font-size: 0.82rem; font-weight: 600; color: #334155; }
-    .bc-tensor-shape { display: block; margin-top: 10px; }
-    .bc-tensor-shape input { margin-right: 5px; }
     .bc-tensor-badge { position: absolute; top: 14px; left: 14px; z-index: 2; color: #5b21b6; font-size: 0.78rem; font-weight: 700; pointer-events: none; }
     .bc-quantity { font-weight: 600; overflow-wrap: anywhere; }
 
@@ -1708,30 +1709,21 @@ details[open] > .detail-group-summary {
                   <label>Boundary condition<select class="form-select" data-tensor-condition></select></label>
                   <label>Load record<select class="form-select" data-tensor-load></select></label>
                 </div>
-                <div class="bc-tensor-filters" role="group" aria-label="Action to show on the cube">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="false">Show all</button>
+                <div class="bc-tensor-filters" role="group" aria-label="Actions to combine on the cube">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="false">Select all</button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="pull" aria-pressed="false"><span data-tensor-filter-label>Pull</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="push" aria-pressed="false"><span data-tensor-filter-label>Push</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="slide" aria-pressed="false"><span data-tensor-filter-label>Slide</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="slide" aria-pressed="false"><span data-tensor-filter-label>Shear</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-clear>Clear</button>
                 </div>
                 <div class="bc-tensor-description" data-tensor-description></div>
                 <div class="bc-tensor-matrix-heading" data-tensor-matrix-heading>All supplied values <span data-tensor-filter-note hidden>· faded cells are outside the current selection</span></div>
                 <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: rows are direction i; columns are face normal j"></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
-                <div class="bc-tensor-caption">ij: direction i on faces normal to j. Select a value to see its faces and action; select again to show all.<br>Values rounded to two decimals; hover for full precision.</div>
-                <details class="bc-tensor-options" data-tensor-options>
-                  <summary>Advanced display options</summary>
-                  <div class="bc-tensor-filters">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-clear>Clear selection</button>
-                  </div>
-                  <label class="bc-tensor-shape" data-tensor-shape-label hidden>
-                    <input type="checkbox" data-tensor-shape>Small-strain shape illustration (assumes symmetry)
-                  </label>
-                  <div class="bc-tensor-caption" data-tensor-preview-note></div>
-                  <div class="bc-tensor-help">
-                    <p data-tensor-note></p>
-                  </div>
-                </details>
+                <div class="bc-tensor-caption">ij: direction i on faces normal to j. Toggle any components to combine them. Matching reciprocal shear entries are selected together.<br>Values rounded to two decimals; hover for full precision.</div>
+                <label class="bc-deformation-scale">Display amplification ×<input type="number" class="form-control form-control-sm" min="1" step="any" value="1" data-tensor-scale></label>
+                <div class="bc-tensor-caption" data-tensor-preview-note role="status"></div>
+                <div class="bc-deformation-values" data-tensor-deformation-values aria-label="Unamplified normal strain and axial changes"></div>
               </section>
               {% for group in mechanical_bc_groups %}
               <section class="bc-table-group" aria-labelledby="bc-group-{{ forloop.counter }}">
