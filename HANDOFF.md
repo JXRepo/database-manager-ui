@@ -25,7 +25,9 @@ next_topic: Expressive gripping and rebound on the original glass cube
   可手动播放。真实浏览器验证局部面心移动超过 15 CSS 像素、夹持片随动、模型矩阵
   不缩放、原网格复用与准确回弹，并保留原数值预览与局部／标量箭头回归。
 - 验证证据在 `/tmp/tensor-jelly-action-qa/`，包括 Pull／Push／Shear／组合截图和动作帧。
-  最终提交和线上验证状态将在发布后补充。
+  142 项 Node 和 16 项 Django／真实 Chromium 测试通过，零跳过。独立复核无阻断
+  问题；所指出的高亮边框同步问题已补失败回归并修复，边框所有边界采样点与弯曲
+  表面一致，完整回归再次通过。最终提交和线上验证状态将在发布后补充。
 
 
 ### 当前实现：保留原立方体，按数值播放任意分量组合

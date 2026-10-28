@@ -255,6 +255,17 @@ async function main() {
     assert.equal(tug.values,original.values);
     assert.equal(tug.source,original.source);
     assert.ok(tug.grips.some((g,i)=>g.position.some((v,j)=>Math.abs(v-original.grips[i].position[j])>.15)),'Opposing gripping pads actually move');
+    assert.equal(await evaluate(`__bcTest.state.tensorMeshes.every(face=>{
+      const border=__bcTest.tensorGroup.children.find(o=>o.userData.tensorOutline&&o.userData.normal===face.userData.normal&&o.userData.faceSign===face.userData.faceSign);
+      const points=border.geometry.attributes.position, surface=face.geometry.attributes.position, uv=face.geometry.attributes.uv;
+      for(let i=0;i<surface.count;i++){
+        if(Math.min(uv.getX(i),uv.getY(i),1-uv.getX(i),1-uv.getY(i))!==0)continue;
+        let attached=false;
+        for(let j=0;j<points.count;j++)if(Math.hypot(surface.getX(i)-points.getX(j),surface.getY(i)-points.getY(j),surface.getZ(i)-points.getZ(j))<1e-5)attached=true;
+        if(!attached)return false;
+      }
+      return true;
+    })`),true,'Every curved highlight boundary point must remain attached to its outline');
     await screenshot(name+'-tug');
     await evaluate('document.querySelector("[data-bc-motion]").click()');
     await waitFor('document.querySelector("[data-bc-motion]").getAttribute("aria-pressed")==="false"','Action did not return');

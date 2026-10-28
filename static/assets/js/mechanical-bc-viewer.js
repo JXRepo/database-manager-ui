@@ -879,11 +879,12 @@ function tensorFaceColor(entries) {
 }
 
 function drawTensorLoading(view, group, selectableMeshes) {
+  const segments = view.mode === 'action' ? 16 : 1;
   const isStrain = view.item.loading_type === 'strain';
   for (const load of tensorFaceLoads(view.load?.magnitude, view.filter, view.selected)) {
     const normal = AXIS_DIRECTIONS[load.normal.toUpperCase()].clone().multiplyScalar(load.faceSign);
     const color = tensorFaceColor(load.components);
-    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96, view.mode === 'action' ? 16 : 1, view.mode === 'action' ? 16 : 1), new THREE.MeshBasicMaterial({
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(0.96, 0.96, segments, segments), new THREE.MeshBasicMaterial({
       color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false,
     }));
     face.position.copy(normal).multiplyScalar(0.506);
@@ -897,10 +898,14 @@ function drawTensorLoading(view, group, selectableMeshes) {
         + ' · ' + meaning.action + ' · ' + (entry.sign > 0 ? '+' : '-') + entry.direction.toUpperCase() + ' direction';
     });
     addMesh(group, face, (isStrain ? 'Strain on ' : 'Stress on ') + name + '\n' + values.join('\n'), selectableMeshes);
-    const border = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([
+    const corners = [
       new THREE.Vector3(-0.48, -0.48, 0), new THREE.Vector3(0.48, -0.48, 0),
       new THREE.Vector3(0.48, 0.48, 0), new THREE.Vector3(-0.48, 0.48, 0),
-    ]), new THREE.LineBasicMaterial({color, transparent: true, opacity: 0.8}));
+    ];
+    const outline = corners.flatMap((corner, side) => Array.from({length: segments}, (_, part) =>
+      corner.clone().lerp(corners[(side + 1) % 4], part / segments)));
+    const border = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(outline),
+      new THREE.LineBasicMaterial({color, transparent: true, opacity: 0.8}));
     border.position.copy(face.position);
     border.quaternion.copy(face.quaternion);
     border.userData = {...face.userData, tensorOutline: true};
