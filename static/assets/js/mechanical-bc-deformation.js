@@ -22,6 +22,7 @@ export function tensorDeformation(magnitude, selected, type, units = {}, context
     matrix = values.map(row => row.map(value => value * factor));
     source = 'Supplied tensor strain · homogeneous small strain, no rigid rotation';
   } else if (type === 'stress') {
+    if (context.error) return invalid(context.error);
     const model = context.model;
     if (context.phaseCount !== 1 || context.phaseFraction !== 1 || context.solidFraction !== 1) {
       return invalid('Stress deformation needs one fully dense phase with volume fraction 1; effective properties are not inferred.');

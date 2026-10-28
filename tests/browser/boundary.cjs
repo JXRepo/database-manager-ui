@@ -293,6 +293,13 @@ async function main() {
   assertStrainMatrix(await playDeformation(),pushShear.map(row=>row.map(n=>2*n)),1000);
   report.push('Push plus Shear combines physically; doubled supplied stress doubles deformation at the same display factor');
 
+  await open('conflict');
+  assert.deepEqual(await cubeMatrix(),identity);
+  assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),true);
+  assert.match(await evaluate('document.querySelector("[data-tensor-preview-note]").textContent'),/Conflicting.*youngs_modulus/);
+  assert.equal(await tensorCount(),8);
+  report.push('conflicting material aliases disable estimation with a specific explanation while preserving load values');
+
   await open('records');
   assert.equal(await tensorCount(),18);
   assert.deepEqual(await cubeMatrix(),identity);

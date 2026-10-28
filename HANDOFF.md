@@ -25,9 +25,11 @@ next_topic: Data-driven combined deformation on the original glass cube
 - 新模块：`apps/pages/boundary_deformation.py`、`mechanical-bc-deformation.js`。
   原 illustrations 模块已移除；viewer 变换原 baseCube 与高亮面，独立局部／标量标记
   保持参考坐标，混合视图显示灰色原形。数值、step、权限和 JSON 导出保持不变。
-- 本轮验证证据在 `/tmp/tensor-data-motion-qa/`；137 项 Node、14 项 Django／真实
+- 本轮验证证据在 `/tmp/tensor-data-motion-qa/`；138 项 Node、16 项 Django／真实
   Chromium 已通过，零跳过，覆盖真实几何、数值倍增、混合选择、播放暂停重置、
-  无 JS、导出和三个桌面宽度。最终复核、提交与线上验证状态将在发布后补充。
+  无 JS、导出和三个桌面宽度。独立复核指出自由材料参数别名冲突可能被择一读取；
+  已补 E、ν、Stiffness 一致／冲突回归，先失败后通过，并在真实浏览器确认冲突提示
+  与播放禁用。最终 138／16 项回归通过；无其余待修复问题。线上验证将在发布后补充。
 
 
 ### 最新修正：把动作直接画在左侧主 cube 上

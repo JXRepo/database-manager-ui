@@ -684,7 +684,9 @@ values and explicit dimensionless (`1`, `-`, `dimensionless`) or percent (`%`,
 shear and no rigid rotation. Stress can be converted only for an explicitly named
 isotropic linear elastic model in one fully dense phase of volume fraction 1,
 with valid `youngs_modulus`, `poisson_ratio` and explicit compatible Stress and
-Stiffness units (Pa/kPa/MPa/GPa). The estimate uses
+Stiffness units (Pa/kPa/MPa/GPa). Equivalent duplicate parameter spellings are
+accepted; conflicting E, nu or stiffness entries disable estimation with a field
+explanation instead of silently choosing a value. The estimate uses
 `epsilon_ii = (sigma_ii - nu * (sigma_jj + sigma_kk)) / E` and
 `epsilon_ij = (1 + nu) * sigma_ij / E`. Selection applies to stress before this
 conversion, so lateral Poisson contraction/expansion is included. Other material

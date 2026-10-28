@@ -132,6 +132,7 @@ Current priority:
 - Initially select all supplied nonzero components while keeping the original shape; Pull, Push and Shear are independent multiselect groups, with Select all, Clear and component toggles
 - Matching reciprocal shear entries toggle together; distinct xy/yx remain independent and prevent deformation instead of being averaged or inferred
 - Use supplied strain directly with explicit dimensionless or percent units; stress requires explicit single-phase fully dense isotropic linear elasticity, valid E/nu and compatible Stress/Stiffness units, with clearly stated homogeneous elastic assumptions
+- Reject conflicting freeform E/nu/Stiffness spellings before estimating deformation; accept consistent numeric/text duplicates and preserve uploaded keys and values
 - Apply selected stress before elastic conversion, including Poisson effects; never infer effective properties, plastic/thermal/local-boundary responses or counterfactual responses from output histories
 - Show a unit cube strain view with actual numerical strain, explicit display amplification starting at ×1 and separate unamplified strain/axial changes; never normalize amplitudes by their maximum or imply a spatial solver or dimensional RVE shape
 - Require complete symmetric finite tensors and at most 5% actual strain row sum; cap amplified row sum at 45%, retain amplification across Clear, and reset it with a notice only when a new valid selection exceeds the safe bound

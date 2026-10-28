@@ -61,3 +61,11 @@ test('unsupported or conflicting data never produces a guessed deformation', () 
   assert.equal(empty.matrix,null);
   assert.match(empty.error,/Select/);
 });
+test('reported material alias conflicts disable stress estimation but not supplied strain', () => {
+  const metadata = {...context,error:'Conflicting material values for youngs_modulus.'};
+  const result = calculate(complete,Object.keys(complete),'stress',{Stress:'MPa'},metadata);
+  assert.equal(result.matrix,null);
+  assert.match(result.error,/Conflicting.*youngs_modulus/);
+  const strain = Object.fromEntries(Object.entries(complete).map(([key,value])=>[key,value/1000]));
+  assert.equal(calculate(strain,Object.keys(strain),'strain',{Strain:1},metadata).error,'');
+});
