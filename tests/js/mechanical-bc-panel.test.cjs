@@ -68,6 +68,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
   async function page(t, items, units = {Stress: 'MPa', Strain: 1}) {
     const {targetId} = await send('Target.createTarget', {url: 'about:blank'});
     const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
+    await send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]}, sessionId);
     t.after(() => send('Target.closeTarget', {targetId}));
     const evaluate = async expression => {
       const result = await send('Runtime.evaluate', {expression, returnByValue: true, awaitPromise: true}, sessionId);
@@ -78,8 +79,11 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     const panelHTML = template.match(/<section class="bc-tensor-panel"[\s\S]*?<\/section>/)[0];
     const pure = readFileSync(join(root, 'static/assets/js/mechanical-bc-tensor.js'), 'utf8').replaceAll('export ', '');
     const panel = readFileSync(join(root, 'static/assets/js/mechanical-bc-tensor-panel.js'), 'utf8')
-      .replace(/^import .*;\n/, '').replaceAll('export ', '');
-    await evaluate(`document.body.innerHTML = ${JSON.stringify(panelHTML)}; ${pure}\n${panel}
+      .replace(/^import .*;\n/gm, '').replaceAll('export ', '');
+    const illustration = readFileSync(join(root, 'static/assets/js/mechanical-bc-illustrations.js'), 'utf8')
+      .replace(/^import .*;\n/gm, '').replaceAll('export ', '');
+    const motion = readFileSync(join(root, 'static/assets/js/mechanical-bc-motion.js'), 'utf8').replaceAll('export ', '');
+    await evaluate(`document.body.innerHTML = ${JSON.stringify(panelHTML)}; ${pure}\n${motion}\n${illustration}\n${panel}
       window.supplied = ${JSON.stringify(items)};
       window.original = JSON.stringify(supplied);
       createTensorPanel(document.querySelector('[data-bc-tensor-panel]'), supplied, ${JSON.stringify(units)},
@@ -107,7 +111,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('document.querySelector("[data-tensor-filter=all]").getAttribute("aria-pressed")'), 'true');
     assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter, view.selected).map(a => a.component)'),
       ['xx', 'xx', 'xy', 'xy', 'yx', 'yx', 'yy', 'yy']);
-    assert.equal(await ev('document.querySelector("[data-tensor-description]").textContent'), 'Cube arrows: All');
+    assert.equal(await ev('document.querySelector("[data-tensor-description]").textContent'), 'Cube faces: All supplied nonzero components');
     assert.equal(await ev('document.querySelector("[data-tensor-load]").closest("details")'), null);
     assert.equal(await ev('document.querySelector("[data-component=xy] strong").textContent'), '1.01');
     assert.equal(await ev('document.querySelector("[data-component=xy]").title'), 'xy: 1.005 MPa');
@@ -161,7 +165,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('view.selected'), 'yy');
     assert.equal(await ev('view.shapeMatrix'), null);
     assert.equal(await ev('document.querySelector("[data-tensor-shape]").checked'), false);
-    assert.match(await ev('document.querySelector("[data-tensor-kind]").textContent'), /^Strain direction guides/);
+    assert.equal(await ev('document.querySelector("[data-tensor-kind]").textContent'), 'Highlighted faces locate the selected components');
     await ev('document.querySelector("[data-tensor-options] > summary").click();document.querySelector("[data-tensor-shape]").click();document.querySelector("[data-tensor-shape]").click()');
     assert.equal(await ev('view.selected'), '');
     assert.equal(await ev('view.filter'), 'all');
@@ -265,9 +269,9 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
-  test('action filters describe cube arrows while the full matrix keeps every supplied value', async t => {
+  test('action filters describe cube faces while the full matrix keeps every supplied value', async t => {
     const ev = await page(t, [condition(), condition('strain')]);
-    const labels = () => ev('Array.from(document.querySelectorAll("[data-tensor-filter]")).map(button => button.textContent)');
+    const labels = () => ev('Array.from(document.querySelectorAll("[data-tensor-filter]")).map(button => (button.querySelector("[data-tensor-filter-label]")||button).textContent)');
     assert.deepEqual(await labels(), ['Show all', 'Pull', 'Push', 'Slide']);
     await ev('document.querySelector("[data-tensor-options]").open = true');
     assert.doesNotMatch(await ev('document.querySelector("[data-tensor-options]").textContent'), /step:|Stress component schematic/);
@@ -275,7 +279,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     for (const [filter, components] of [['pull', ['xx', 'xx']], ['push', ['yy', 'yy']], ['slide', ['xy', 'xy', 'yx', 'yx']]]) {
       await ev(`document.querySelector('[data-tensor-filter=${filter}]').click()`);
       assert.deepEqual(await ev('tensorArrows(view.load.magnitude, view.filter).map(arrow => arrow.component)'), components);
-      assert.match(await ev('document.querySelector("[data-tensor-description]").textContent'), /^Cube arrows:/);
+      assert.match(await ev('document.querySelector("[data-tensor-description]").textContent'), /^Cube faces:/);
       assert.match(await ev('document.querySelector("[data-tensor-matrix-heading]").textContent'), /All supplied values/);
       assert.equal(await ev('document.querySelector("[data-tensor-filter-note]").hidden'), false);
       assert.equal(await ev('document.querySelectorAll("[data-component]").length'), 9);

@@ -3,12 +3,35 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Manual tensor replay remains available with reduced motion enabled
+next_topic: Arrow-free tensor face and conceptual action guide
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新调整：第二类改为面高亮与拉／压／剪切概念示意
+
+- 用户要求忘掉箭头重新考虑表达，随后明确“做”。现移除第二类张量箭头，主 cube
+  用对应的正反两面高亮定位分量；同面的多个分量合并为一个面，混合动作使用紫色，
+  悬停逐项列出原始分量、数值、单位与符号方向，不合并 xy/yx 或推断缺失值。
+- 右侧完整矩阵上方增加三个带浅网格的小示意：Pull 拉长、Push 压短、Slide 错开。
+  虚线原形与彩色变化轮廓静止时仍可对照；选中／单独悬停的分量使用其方向与符号，
+  通用图标明确标为 Example。公共说明标注为概念示意而非模拟输出，幅度不使用
+  应力大小，也不推断材料变形或横向收缩。应变用 Extend／Shorten／Slide。
+- 三张卡片同时作为筛选，显示实际非零分量数或 No components；Show all 恢复全部。
+  点击矩阵联动实际作用面和示意。默认全部视图静止，非空筛选／分量选择时只演示
+  对应卡片一次，结束／停止保留变化后的轮廓。减少动态效果下仍可显式手动重播。
+  主 cube、相机、第一类箭头、局部点边面、XYZ、所有值／单位／step／导出保持不变。
+  原有数据派生的小应变预览仍单独显式启用，启用后隐藏概念卡片。
+- 新增 `static/assets/js/mechanical-bc-illustrations.js`；配套改动在 tensor、motion、
+  tensor-panel、viewer 模块与 `templates/pages/data_detail.html`。
+- 138 项 Node 和 12 项 Django／真实 Chromium 测试通过，零跳过。覆盖
+  1280／1440／1920 排版、分量／记录／筛选、真实面悬停、独立分量、正负符号、
+  静态和动态 SVG、原形固定、主 cube／数值不动、手动减少动态效果重播、点边面／
+  标量／混合／零值／无 JS／导出。截图、动画帧、测试日志在
+  `/tmp/tensor-face-guide-qa/`。已查看 1280 静态及 1920 剪切、压缩和全分量截图。
+- 独立复核与上线验证待本轮完成后补充。
 
 ### 最新修复：减少动态效果不再禁用手动重播
 

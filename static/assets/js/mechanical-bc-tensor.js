@@ -35,6 +35,31 @@ export function tensorArrows(magnitude, filter = 'all', selected = '') {
   return arrows;
 }
 
+export function tensorFaceLoads(magnitude, filter = 'all', selected = '') {
+  const faces = new Map();
+  for (const entry of tensorArrows(magnitude, filter, selected)) {
+    const key = entry.normal + entry.faceSign;
+    if (!faces.has(key)) faces.set(key, {normal: entry.normal, faceSign: entry.faceSign, components: []});
+    faces.get(key).components.push(entry);
+  }
+  return [...faces.values()];
+}
+
+export function tensorConceptPoint(point, component, value, progress = 1) {
+  const result = [...point];
+  const meaning = tensorComponentMeaning(component, value);
+  if (!meaning) return result;
+  const direction = 'xyz'.indexOf(component[0]);
+  const normal = 'xyz'.indexOf(component[1]);
+  const amount = Math.min(Math.max(progress, 0), 1);
+  if (direction === normal) {
+    result[direction] *= 1 + (value > 0 ? 0.55 : -0.42) * amount;
+  } else {
+    result[direction] += Math.sign(value) * 0.7 * point[normal] * amount;
+  }
+  return result;
+}
+
 export function strainIllustration(magnitude, filter = 'all', selected = '') {
   if (!magnitude || !TENSOR_COMPONENTS.every(key => Object.hasOwn(magnitude, key) && isTensorNumber(magnitude[key]))) {
     return {matrix: null, error: 'Shape preview needs all nine numeric strain components; missing components are not inferred.'};

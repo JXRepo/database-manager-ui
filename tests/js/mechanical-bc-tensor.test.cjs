@@ -9,6 +9,35 @@ before(async () => {
   tensor = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 });
 
+test('face loads retain independent components on both opposing faces', () => {
+  assert.equal(typeof tensor.tensorFaceLoads, 'function');
+  const values = {xx: 15, xy: 2, yx: -7, zz: 0, yz: null};
+  const original = JSON.stringify(values);
+  assert.deepEqual(tensor.tensorFaceLoads(values).map(face => [face.normal, face.faceSign,
+    face.components.map(entry => [entry.component, entry.value])]), [
+    ['x', -1, [['xx', 15], ['yx', -7]]], ['x', 1, [['xx', 15], ['yx', -7]]],
+    ['y', -1, [['xy', 2]]], ['y', 1, [['xy', 2]]],
+  ]);
+  assert.deepEqual(tensor.tensorFaceLoads(values, 'push'), []);
+  assert.deepEqual(tensor.tensorFaceLoads(values, 'slide', 'xy').map(face => face.normal), ['y', 'y']);
+  assert.equal(JSON.stringify(values), original);
+});
+
+test('conceptual shapes show the supplied direction and sign without encoding magnitude', () => {
+  assert.equal(typeof tensor.tensorConceptPoint, 'function');
+  const point = [0.5, 0.5, 0.5];
+  assert.deepEqual(tensor.tensorConceptPoint(point, 'xx', 15), [0.775, 0.5, 0.5]);
+  assert.deepEqual(tensor.tensorConceptPoint(point, 'xx', -15), [0.29000000000000004, 0.5, 0.5]);
+  assert.deepEqual(tensor.tensorConceptPoint(point, 'xy', 2), [0.85, 0.5, 0.5]);
+  assert.ok(Math.abs(tensor.tensorConceptPoint(point, 'xy', -2)[0] - 0.15) < 1e-12);
+  assert.deepEqual(tensor.tensorConceptPoint(point, 'yx', 2), [0.5, 0.85, 0.5]);
+  assert.deepEqual(tensor.tensorConceptPoint([-0.5, -0.5, 0], 'xy', 2), [-0.85, -0.5, 0]);
+  assert.deepEqual(tensor.tensorConceptPoint(point, 'xy', 2), tensor.tensorConceptPoint(point, 'xy', 20000));
+  assert.deepEqual(tensor.tensorConceptPoint(point, 'xx', 2, 0), point);
+  assert.deepEqual(tensor.tensorConceptPoint(point, 'xy', 0), point);
+  assert.deepEqual(point, [0.5, 0.5, 0.5]);
+});
+
 test('normal stress arrows point outward for tension and inward for compression', () => {
   const positive = tensor.tensorArrows({xx: 100});
   assert.equal(positive.length, 2);

@@ -1,4 +1,5 @@
 import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, strainIllustration, tensorArrows, tensorComponentMeaning, tensorComponentVisible} from './mechanical-bc-tensor.js';
+import {createTensorIllustrations} from './mechanical-bc-illustrations.js';
 
 export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
@@ -10,6 +11,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const shape = panel.querySelector('[data-tensor-shape]');
   const shapeLabel = panel.querySelector('[data-tensor-shape-label]');
   const filterButtons = Array.from(panel.querySelectorAll('[data-tensor-filter]'));
+  const illustrations = createTensorIllustrations(panel.querySelector('[data-tensor-illustrations]'));
   let current = conditions[0];
   let loadIndex = 0;
   let filter = 'all';
@@ -30,7 +32,9 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   }
 
   function highlight(component) {
-    cells.forEach(cell => cell.classList.toggle('is-hovered', cell.dataset.component === component));
+    const keys = Array.isArray(component) ? component : [component];
+    cells.forEach(cell => cell.classList.toggle('is-hovered', keys.includes(cell.dataset.component)));
+    illustrations?.highlight(keys);
   }
 
   function hover(component) {
@@ -63,7 +67,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     }
     panel.querySelector('[data-tensor-kind]').textContent = shape.checked
       ? 'Normalized small-strain illustration · all supplied components'
-      : (isStrain ? 'Strain direction guides · fixed arrow lengths' : 'Stress on opposing faces · fixed arrow lengths');
+      : 'Highlighted faces locate the selected components';
     shape.title = preview.error;
     matrix.replaceChildren();
     cells = [];
@@ -124,7 +128,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     }
     const actionLabels = {all: 'Show all', pull: isStrain ? 'Extend' : 'Pull', push: isStrain ? 'Shorten' : 'Push', slide: 'Slide'};
     filterButtons.forEach(button => {
-      button.textContent = actionLabels[button.dataset.tensorFilter];
+      (button.querySelector('[data-tensor-filter-label]') || button).textContent = actionLabels[button.dataset.tensorFilter];
       button.setAttribute('aria-pressed', String(!selected && !shape.checked && button.dataset.tensorFilter === filter));
     });
     panel.querySelector('[data-tensor-filter-note]').hidden = !selected && filter === 'all';
@@ -138,13 +142,13 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       const value = magnitude?.[selected];
       description.textContent = `${selected} · ${componentDescription(selected, value, isStrain)}`;
       const supplied = magnitude && Object.hasOwn(magnitude, selected);
-      if (!supplied) status = `${selected}: Not supplied in this load entry · no arrows`;
-      else if (!isTensorNumber(value)) status = `${selected}: Invalid value · no arrows`;
-      else status = `${selected}: ${formatTensorValue(value)}${unit ? ` ${unit}` : ''}${value === 0 ? ' · zero value, no arrows' : ''}`;
+      if (!supplied) status = `${selected}: Not supplied in this load entry · no highlighted faces`;
+      else if (!isTensorNumber(value)) status = `${selected}: Invalid value · no highlighted faces`;
+      else status = `${selected}: ${formatTensorValue(value)}${unit ? ` ${unit}` : ''}${value === 0 ? ' · zero value, no highlighted faces' : ''}`;
       statusElement.title = cells.find(cell => cell.dataset.component === selected).title;
     } else {
       description.textContent = shape.checked ? 'Cube: Strain shape illustration'
-        : `Cube arrows: ${filter === 'all' ? 'All' : actionLabels[filter]}`;
+        : `Cube faces: ${filter === 'all' ? 'All supplied nonzero components' : actionLabels[filter]}`;
       if (!valid.length) status = 'No numeric tensor components to visualize. See supplied load details in the table.';
       else if (!tensorArrows(magnitude, filter).length) status = 'No nonzero components in this view';
     }
@@ -158,8 +162,10 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     note.parentElement.hidden = !shape.checked;
     panel.querySelector('[data-tensor-preview-note]').textContent = isStrain && preview.error ? preview.error : '';
     onHighlight('');
-    onChange({item: current.item, itemIndex: current.index, load, filter, selected, unit,
-      shapeMatrix: shape.checked ? preview.matrix : null});
+    const view = {item: current.item, itemIndex: current.index, load, filter, selected, unit,
+      shapeMatrix: shape.checked ? preview.matrix : null};
+    illustrations?.update(view);
+    onChange(view);
   }
 
   function selectCondition(index, step = 0) {
@@ -224,5 +230,5 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   });
   panel.hidden = false;
   selectCondition(current.index);
-  return {highlight};
+  return {highlight, stopMotion: () => illustrations?.stop()};
 }
