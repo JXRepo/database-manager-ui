@@ -66,6 +66,7 @@ export function createTensorAction(baseCube, tensorGroup, root) {
   }
   function update(progress) {
     const amount = tensorTug(progress);
+    grips.visible = amount > 0 && grips.children.length > 0;
     [...originalSurfaces, ...faceSurfaces].forEach(entry => warp(entry, amount));
     corners.forEach(entry => entry.object.position.fromArray(map(entry.position.toArray(), amount)));
     grips.children.forEach(grip => grip.position.fromArray(map(grip.userData.anchor, amount)));
@@ -77,8 +78,7 @@ export function createTensorAction(baseCube, tensorGroup, root) {
     grips.clear();
     view = next;
     faceSurfaces = tensorGroup.children.filter(object => object.geometry).map(capture);
-    grips.visible = view.mode === 'action';
-    if (!grips.visible) return;
+    grips.visible = false;
     for (const face of tensorFaceLoads(view.load?.magnitude, 'all', view.selected)) {
       const normal = new THREE.Vector3();
       normal[face.normal] = face.faceSign;

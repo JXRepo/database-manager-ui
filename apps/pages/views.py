@@ -36,7 +36,6 @@ from .my_data_filters import filter_my_data_objects
 from .assistant import help_reply, read_context, sign_context
 from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
 from .mechanical_csv import write_mechanical_csv
-from .boundary_deformation import deformation_context
 from .advanced_search import (
     DATA_FIELD_CHOICES,
     DATA_FIELD_TYPES,
@@ -4230,10 +4229,10 @@ def _get_mechanical_target_layout(item):
 
 def _group_mechanical_bc_items(items):
     """
-    Group table rows by target type while retaining cube viewer indexes
+    Group ordinary XYZ conditions by target without duplicating tensor records
 
-    Only the table changes its display order. Each row keeps its original item
-    and index so tensor buttons still select the correct condition.
+    Tensor records use their own panel. Each ordinary row keeps its original
+    item and source index without changing the cube viewer data.
 
     Parameters
     ----------
@@ -4254,7 +4253,7 @@ def _group_mechanical_bc_items(items):
     ):
         rows = []
         for source_index, item in enumerate(items):
-            if item["target_type"] == target_type:
+            if item["target_type"] == target_type and not item.get("is_tensor_load"):
                 rows.append({
                     "item": item,
                     "source_index": source_index,
@@ -4408,7 +4407,7 @@ def json_data_detail_view(request, pk):
         "detail_rows": display_rows,
         "plot_variables": plot_variables,
         "mechanical_bc_items": mechanical_bc_items,
-        "boundary_deformation": deformation_context(metadata),
+        "mechanical_bc_tensors": [item for item in mechanical_bc_items if item.get("is_tensor_load")],
         "mechanical_bc_groups": _group_mechanical_bc_items(mechanical_bc_items),
         "shared_users": obj.shared_users.order_by("username"),
         "detail_back_url_name": detail_back_url_name,

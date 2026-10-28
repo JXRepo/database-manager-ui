@@ -3,12 +3,29 @@ status: boundary_viewer_delivered
 branch: main
 timestamp: 2026-10-28
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Expressive gripping and rebound on the original glass cube
+next_topic: Compact tensor controls and one categorized XYZ table
 ---
 
 # Project handoff
 
 ## 当前状态
+
+### 最新整理：精简受力面板，去掉重复表格和数值计算模式
+
+- 第二类张量只显示在上方一个紧凑面板；下面的普通 XYZ 表排除所有张量记录，
+  点、边、面、whole cube 共用一个表头和外框，在表内分类。纯张量数据不显示下表。
+- 删去重复标题、组合描述、常驻长解释和按钮计数；保留完整矩阵、单位、加载模式、
+  组合按钮和一行 not-to-scale 提示。精确值、选中状态及方向说明可悬停查看，
+  step 等附加字段归入 Load details。不能由九格矩阵表达的 magnitude 仍可展开。
+- 用户明确认为 Calculated strain 无用，因此移除入口、倍率、数值估算接线及专用
+  helper；当前仅保留原果冻动作，固定示意幅度，不按数值计算材料真实形变量。
+- 小夹片只是动作道具：静止时隐藏，拉／压／剪切动画及中途暂停时出现，回弹结束、
+  Reset 和切换选择后隐藏。原玻璃 cube、白色角点、XYZ、数据及导出保持不变。
+- 原生张量详情位于上方面板位置，在交互初始化成功后隐藏；没有 JavaScript 或
+  三维模块无法初始化时仍能展开所有记录，未以删除重复表为由丢失查看入口。
+- 已通过普通／纯张量／混合／零值／空列表、独立 xy/yx、记录切换、暂停／重播／
+  重置和无 JavaScript 检查。1280、1440、1920 桌面截图与测试日志位于
+  /tmp/boundary-panel-cleanup-qa/。发布状态待本轮提交后的独立验证。
 
 ### 最新修正：默认显示明显的抓取、拉扯和回弹动作
 

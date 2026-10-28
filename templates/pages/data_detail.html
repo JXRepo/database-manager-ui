@@ -7,7 +7,6 @@
 {{ plot_variables|json_script:"plot-variables-data" }}
 {{ metadata.units|json_script:"plot-units-data" }}
 {{ mechanical_bc_items|json_script:"mechanical-bc-data" }}
-{{ boundary_deformation|json_script:"bc-deformation-data" }}
 <style>
 
 
@@ -698,8 +697,10 @@ details[open] > .detail-group-summary {
       min-width: 0;
     }
 
-    .bc-table-group + .bc-table-group {
-      margin-top: 20px;
+    .bc-table .bc-group-heading th {
+      padding: 8px 12px;
+      background: #f8fafc;
+      text-align: left;
     }
 
     .bc-table-frame {
@@ -780,7 +781,7 @@ details[open] > .detail-group-summary {
       display: flex;
       align-items: center;
       gap: 8px;
-      margin: 0 0 10px;
+      margin: 0;
       color: #314b63;
       font-size: 0.875rem;
       font-weight: 600;
@@ -867,7 +868,6 @@ details[open] > .detail-group-summary {
 
     .bc-tensor-panel h6 { margin: 0 0 4px; font-weight: 700; overflow-wrap: anywhere; }
     .bc-tensor-panel[hidden] { display: none; }
-    [data-bc-show-tensor][hidden] { display: none; }
     .bc-layout:has(.bc-tensor-panel:not([hidden])) .bc-cube-wrap { width: 100%; }
     .bc-tensor-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .bc-tensor-selects:has(label[hidden]) { grid-template-columns: 1fr; }
@@ -878,12 +878,12 @@ details[open] > .detail-group-summary {
     .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
     .bc-reset-btn.bc-motion-btn { left: 12px; right: auto; }
     .bc-tensor-filters button.is-partial { border-style: dashed; }
-    .bc-deformation-scale { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; font-size: .78rem; }
-    .bc-deformation-scale input { width: 85px; }
-    [data-tensor-calculated][hidden], [data-tensor-action-note][hidden] { display: none; }
-    .bc-deformation-values { display: flex; flex-direction: column; gap: 3px; font-size: .75rem; color: #475569; margin-top: 8px; }
-    .bc-tensor-filter-count { opacity: 0.7; margin-left: 4px; }
-    .bc-tensor-matrix-heading { font-size: 0.77rem; color: #536176; margin-top: 8px; }
+    .bc-tensor-details { margin-top: 8px; font-size: .77rem; color: #536176; }
+    .bc-tensor-details[hidden] { display: none; }
+    .bc-tensor-details summary { cursor: pointer; width: fit-content; }
+    .bc-tensor-details dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; }
+    .bc-tensor-details dt, .bc-tensor-details dd { margin: 0; overflow-wrap: anywhere; }
+    .bc-tensor-filters [data-tensor-filter="all"] { margin-left: auto; }
     .bc-tensor-matrix { display: grid; grid-template-columns: 64px repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
     .bc-tensor-axis { display: flex; align-items: center; justify-content: center; color: #536176; font-size: 0.75rem; font-weight: 600; text-align: center; }
     .bc-tensor-cell {
@@ -903,7 +903,6 @@ details[open] > .detail-group-summary {
     .bc-tensor-caption, .bc-tensor-help { font-size: 0.77rem; color: #536176; margin-top: 8px; overflow-wrap: anywhere; }
     .bc-tensor-help p { margin: 6px 0; }
     .bc-tensor-status { font-size: 0.82rem; margin: 10px 0 6px; overflow-wrap: anywhere; }
-    .bc-tensor-description { font-size: 0.82rem; font-weight: 600; color: #334155; margin-top: 12px; overflow-wrap: anywhere; }
     .bc-tensor-badge { position: absolute; top: 14px; left: 14px; z-index: 2; color: #5b21b6; font-size: 0.78rem; font-weight: 700; pointer-events: none; }
     .bc-quantity { font-weight: 600; overflow-wrap: anywhere; }
 
@@ -1705,64 +1704,78 @@ details[open] > .detail-group-summary {
             <div class="bc-table-wrap">
               <section class="bc-tensor-panel" data-bc-tensor-panel hidden aria-label="Whole RVE loading">
                 <h6 data-tensor-heading>Whole cube</h6>
-                <div class="bc-tensor-caption" data-tensor-kind></div>
                 <div class="bc-tensor-selects">
                   <label>Boundary condition<select class="form-select" data-tensor-condition></select></label>
                   <label>Load record<select class="form-select" data-tensor-load></select></label>
                 </div>
                 <div class="bc-tensor-filters" role="group" aria-label="Actions to combine on the cube">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="pull" aria-pressed="false"><span data-tensor-filter-label>Pull</span></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="push" aria-pressed="false"><span data-tensor-filter-label>Push</span></button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="slide" aria-pressed="false"><span data-tensor-filter-label>Shear</span></button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="false">Select all</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="pull" aria-pressed="false"><span data-tensor-filter-label>Pull</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="push" aria-pressed="false"><span data-tensor-filter-label>Push</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="slide" aria-pressed="false"><span data-tensor-filter-label>Shear</span><span class="bc-tensor-filter-count" data-tensor-action-count></span></button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-clear>Clear</button>
                 </div>
-                <div class="bc-tensor-description" data-tensor-description></div>
-                <div class="bc-tensor-matrix-heading" data-tensor-matrix-heading>All supplied values <span data-tensor-filter-note hidden>· faded cells are outside the current selection</span></div>
-                <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: rows are direction i; columns are face normal j"></div>
+                <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: i is direction, j is face normal. Faded cells are unselected." title="Toggle components to combine actions. Matching reciprocal shear entries toggle together. Values use two decimals; hover a value for full precision."></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
-                <div class="bc-tensor-caption">ij: direction i on faces normal to j. Toggle any components to combine them. Matching reciprocal shear entries are selected together.<br>Values rounded to two decimals; hover for full precision.</div>
-                <div class="bc-tensor-filters" role="group" aria-label="Cube preview">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-mode="action" aria-pressed="true">Action animation</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-mode="calculated" aria-pressed="false">Calculated strain</button>
-                </div>
-                <div class="bc-tensor-caption" data-tensor-action-note>Grip pads show pulling, squeezing and sliding. Illustrative motion; magnitude and time are not to scale.</div>
-                <div data-tensor-calculated hidden>
-                  <label class="bc-deformation-scale">Display amplification ×<input type="number" class="form-control form-control-sm" min="1" step="any" value="1" data-tensor-scale></label>
-                  <div class="bc-tensor-caption" data-tensor-preview-note role="status"></div>
-                  <div class="bc-deformation-values" data-tensor-deformation-values aria-label="Unamplified normal strain and axial changes"></div>
-                </div>
+                <div class="bc-tensor-caption" data-tensor-action-note title="Motion shows the selected directions and signs. Its amplitude and playback duration are illustrative, not calculated material deformation or physical time.">Illustrative motion · not to scale</div>
+                <details class="bc-tensor-details" data-tensor-details hidden>
+                  <summary>Load details</summary>
+                  <dl data-tensor-details-list></dl>
+                </details>
               </section>
-              {% for group in mechanical_bc_groups %}
-              <section class="bc-table-group" aria-labelledby="bc-group-{{ forloop.counter }}">
-                <h3 class="bc-group-label" id="bc-group-{{ forloop.counter }}">
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                    {% if group.target_type == "Point" %}
-                      <circle cx="8" cy="8" r="2.5" fill="currentColor" stroke="none" />
-                    {% elif group.target_type == "Edge" %}
-                      <path d="M3 8h10" />
-                      <circle cx="3" cy="8" r="1.5" fill="currentColor" stroke="none" />
-                      <circle cx="13" cy="8" r="1.5" fill="currentColor" stroke="none" />
-                    {% elif group.target_type == "Face" %}
-                      <rect x="3" y="3" width="10" height="10" rx="1" />
-                    {% else %}
-                      <path d="M8 2 13 5v6l-5 3-5-3V5Zm-5 3 5 3 5-3M8 8v6" />
-                    {% endif %}
-                  </svg>
-                  {{ group.label }}
-                </h3>
-                <div class="bc-table-frame">
-                  <table class="bc-table">
-                    <thead>
-                      <tr>
-                        <th>Boundary Location</th>
-                        <th>Constraints</th>
-                        <th>Loading Type / Mode</th>
-                      </tr>
-                    </thead>
-                    <tbody data-bc-target-type="{{ group.target_type }}">
-                      {% for row in group.rows %}
-                      {% with item=row.item %}
+              {% if mechanical_bc_tensors %}
+              <section class="bc-tensor-panel" data-bc-tensor-fallback aria-label="Whole cube tensor loads">
+                {% for item in mechanical_bc_tensors %}
+                  <h6>Whole cube · {{ item.quantity_label }}{% if item.loading_mode %} / {{ item.loading_mode }}{% endif %}</h6>
+                  <div class="bc-tensor-loads">
+                    {% for load in item.tensor_loads %}
+                      <details class="bc-load-detail">
+                        <summary>{% if item.tensor_loads|length > 1 %}Load record {{ forloop.counter }}{% else %}Load details{% endif %}</summary>
+                        <ul class="bc-load-list">
+                          {% for detail in load.details %}
+                            <li><span class="bc-load-key">{{ detail.key }}</span>: {{ detail.display }}</li>
+                          {% endfor %}
+                        </ul>
+                      </details>
+                    {% endfor %}
+                  </div>
+                {% endfor %}
+              </section>
+              {% endif %}
+              {% if mechanical_bc_groups %}
+              <div class="bc-table-frame">
+                <table class="bc-table" aria-label="XYZ boundary conditions">
+                  <thead>
+                    <tr>
+                      <th>Boundary Location</th>
+                      <th>Constraints</th>
+                      <th>Loading Type / Mode</th>
+                    </tr>
+                  </thead>
+                  {% for group in mechanical_bc_groups %}
+                  <tbody data-bc-target-type="{{ group.target_type }}">
+                    <tr class="bc-group-heading">
+                      <th colspan="3" scope="rowgroup">
+                        <span class="bc-group-label">
+                          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                            {% if group.target_type == "Point" %}
+                              <circle cx="8" cy="8" r="2.5" fill="currentColor" stroke="none" />
+                            {% elif group.target_type == "Edge" %}
+                              <path d="M3 8h10" />
+                              <circle cx="3" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                              <circle cx="13" cy="8" r="1.5" fill="currentColor" stroke="none" />
+                            {% elif group.target_type == "Face" %}
+                              <rect x="3" y="3" width="10" height="10" rx="1" />
+                            {% else %}
+                              <path d="M8 2 13 5v6l-5 3-5-3V5Zm-5 3 5 3 5-3M8 8v6" />
+                            {% endif %}
+                          </svg>
+                          {{ group.label }}
+                        </span>
+                      </th>
+                    </tr>
+                    {% for row in group.rows %}
+                    {% with item=row.item %}
                         <tr>
                           <td>
                             {% if item.target_type == "Whole cube" %}
@@ -1792,27 +1805,6 @@ details[open] > .detail-group-summary {
                             {% endif %}
                           </td>
                           <td>
-                            {% if item.is_tensor_load %}
-                              <span class="bc-status bc-status-loaded">{{ item.loading_type|capfirst }}: loaded</span>
-                              <div class="bc-tensor-loads">
-                              {% for load in item.tensor_loads %}
-                                <details class="bc-load-detail">
-                                  <summary>
-                                    <span class="bc-status bc-status-loaded">{% if item.tensor_loads|length > 1 %}Load record {{ forloop.counter }}{% else %}Load details{% endif %}</span>
-                                  </summary>
-                                  <button type="button" class="btn btn-sm btn-outline-primary mt-2" data-bc-show-tensor="{{ row.source_index }}" data-bc-load-index="{{ forloop.counter0 }}" hidden>View in cube</button>
-                                  <ul class="bc-load-list">
-                                    {% for detail in load.details %}
-                                      <li>
-                                        <span class="bc-load-key">{{ detail.key }}</span>:
-                                        {{ detail.display }}
-                                      </li>
-                                    {% endfor %}
-                                  </ul>
-                                </details>
-                              {% endfor %}
-                              </div>
-                            {% else %}
                             <div class="bc-axis-list">
                             {% for axis in item.axes %}
                               {% if axis.status == "loaded" and axis.load_details %}
@@ -1838,7 +1830,6 @@ details[open] > .detail-group-summary {
                               {% endif %}
                             {% endfor %}
                             </div>
-                            {% endif %}
                           </td>
                           <td>
                             <span class="bc-quantity">{{ item.quantity_label|default:item.loading_type|default:"-" }}</span>
@@ -1847,11 +1838,11 @@ details[open] > .detail-group-summary {
                         </tr>
                       {% endwith %}
                       {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              {% endfor %}
+                  </tbody>
+                  {% endfor %}
+                </table>
+              </div>
+              {% endif %}
             </div>
           </div>
         </div>

@@ -667,92 +667,54 @@ guide keeps its existing orientation. No replacement cube or right-side examples
 are drawn. On opening a condition, all supplied nonzero components are selected
 and the cube remains undeformed until `Play action` is clicked.
 
-Pull, Push and Shear are independent group toggles, with selected/available counts,
-`Select all` and `Clear`. Users can combine any action groups or matrix components.
-Positive normal stress is Pull, negative normal stress is Push; strain uses Extend
-and Shorten. Matching reciprocal shear entries toggle together for symmetric
-strain. Distinct `xy` and `yx` values remain visible and independently selectable;
-they remain independent in the action view and prevent a numerical deformation
-estimate instead of being averaged. The complete matrix is always
-visible, including faded unselected cells. Missing, invalid and zero components do
-not produce highlighted faces. Hover and focus link each matrix value to its
-opposing faces; shared faces retain every component and use purple for mixed actions.
+Pull, Push and Shear are independent group toggles, with Select all and Clear.
+Users can combine any groups or individual matrix components. Selected/available
+counts are in button titles and accessible labels instead of adding visible text.
+Positive normal stress is Pull, negative is Push; strain uses Extend and Shorten.
+Matching reciprocal shear entries toggle together. Distinct xy/yx values remain
+visible and independently selectable, without averaging or inventing entries.
+The complete matrix remains visible; faded cells are unselected. Its row/column
+labels identify direction i and face normal j. Hover/focus link values to opposing
+faces; shared faces retain all components and use purple for mixed actions.
+Zero, missing and invalid components produce no highlighted faces.
 
-The default `Action animation` view shows small gripping pads on affected opposing
-faces. They tug the original surface locally, squeeze inward or slide tangentially,
-with a short hold, soft rebound and exact return to the original shape. The original
-mesh vertices, glass edges and white corner positions move together; the whole cube
-is not uniformly scaled. No hands, arrows or replacement model are introduced.
-The finite 2.4-second cue is clearly illustrative: selected component directions
-and signs determine the action, while visual amplitude and playback time are not
-physical quantities. Incomplete or asymmetric data can still show each explicitly
-supplied selected nonzero component without inventing or averaging other entries.
-Multiple selected actions are combined in the same left cube. Numerical eligibility
-does not disable this illustrative cue.
+The original cube locally tugs, squeezes or slides, holds briefly, rebounds and
+returns exactly to its rest shape. Small gripping pads appear only while it is
+displaced, including when paused; initial display, return and Reset hide them.
+Original surface vertices, glass edges and white corner positions move together;
+the cube is not uniformly scaled or replaced. No hands or tensor arrows are added.
+The finite 2.4-second animation is illustrative: component signs and directions
+determine the action, while its fixed amplitude and playback duration do not
+represent numerical magnitude, material deformation or physical time. The panel
+keeps one short "Illustrative motion · not to scale" note with further context in
+its title. The former Calculated strain option, amplification controls and material
+estimation pipeline have been removed at the user's request.
 
-The separate `Calculated strain` option preserves the numerical preview described
-below. Its amplification and actual strain values appear only in that view; changing
-views restores the original geometry and cancels old frames. The matrix and selection
-are preserved. Both modes offer explicit Play/Pause/Resume/Replay and Reset, without
-automatic animation.
+Play/Pause/Resume/Replay and Reset remain explicit, with no automatic playback.
+Selections and records restore the original shape and cancel previous frames.
+Inspection, camera interaction, hidden tabs, offscreen views and reduced-motion
+preference changes pause the current action; manual playback remains available.
+Scalar/local markers retain their reference coordinates, with a gray original
+outline and a short reference legend in mixed views. The camera, bottom-right XYZ,
+original values, stored JSON and exports remain unchanged.
 
-Calculated deformation uses numerical values, without peak normalization or fixed
-action amplitudes. Supplied strain requires all nine finite entries, equal reciprocal
-values and explicit dimensionless (`1`, `-`, `dimensionless`) or percent (`%`,
-`percent`) units. It represents homogeneous symmetric small strain with tensor
-shear and no rigid rotation. Stress can be converted only for an explicitly named
-isotropic linear elastic model in one fully dense phase of volume fraction 1,
-with valid `youngs_modulus`, `poisson_ratio` and explicit compatible Stress and
-Stiffness units (Pa/kPa/MPa/GPa). Equivalent duplicate parameter spellings are
-accepted; conflicting E, nu or stiffness entries disable estimation with a field
-explanation instead of silently choosing a value. The estimate uses
-`epsilon_ii = (sigma_ii - nu * (sigma_jj + sigma_kk)) / E` and
-`epsilon_ij = (1 + nu) * sigma_ij / E`. Selection applies to stress before this
-conversion, so lateral Poisson contraction/expansion is included. Other material
-models, missing properties or incomplete/asymmetric tensors retain the original
-cube with an explanation. No effective multiphase properties or nonlinear,
-plastic, thermal or local boundary response is inferred. Supplied output histories
-are not decomposed into hypothetical responses to different component selections.
-The UI explicitly identifies the linear elastic estimate and these assumptions.
+Each whole-cube tensor appears only in the upper tensor panel, never again in the
+ordinary XYZ table. The heading retains its quantity, supplied unit and loading
+mode. Condition/record selectors appear only when multiple entries exist, retain
+supplied order and exact optional step labels, and preserve selected keys across
+records. Missing selected components produce a short status message. Steps are
+labels rather than physical time; frequency/duration never create a load history.
+Supplementary fields are behind Load details in the same panel. Ordinary magnitude
+values already shown in the matrix are omitted from that disclosure; unknown keys
+or non-matrix magnitude containers remain available there. Until initialization
+succeeds, a native expandable fallback in the upper area retains all supplied load
+details, including without JavaScript or when the viewer cannot initialize.
 
-`Display amplification` starts at ×1 and multiplies the actual strain by the
-chosen factor, consistently across combinations and records. Clear retains that
-factor; a new valid selection resets it to ×1 with a notice only if its safe
-upper bound is exceeded. The real maximum absolute strain row sum must be at most
-5%; amplified strain is capped at a 45% row sum to keep the display invertible.
-Unamplified normal and tensor shear strains are shown separately. When RVE lengths
-and a length unit are supplied, axial changes `L_i * epsilon_ii` are shown in that
-unit. The drawing is a unit cube strain view, not the RVE's dimensional aspect ratio
-or a spatial simulation. Both original surfaces, edges, white corners and tensor
-face highlights use `I + progress * amplification * epsilon`.
-
-Numerical playback is explicit, finite (about 1.2 seconds), and independent of physical time
-or loading histories. `Pause deformation` freezes the current shape; Resume
-continues, Replay restarts, and `Reset` restores the original shape
-and camera. Changing a selection, record or amplification resets the shape without
-automatic playback. Inspection, camera interaction, hidden tabs, offscreen views
-and changes to reduced-motion preferences pause playback. Reduced-motion settings
-never disable explicit manual playback. Scalar and local markers remain at their
-reference coordinates; mixed views display a gray original outline and explain
-that those loads are not part of the homogeneous deformation estimate. The camera,
-record labels, original values, stored JSON and exports remain unchanged.
-
-Record navigation preserves selected component keys, even if later records omit
-or invalidate them, with a visible explanation. Selectors appear only for multiple
-conditions or records, preserving supplied order and exact optional `step` labels.
-Steps are labels, not time; scalar X/Y/Z entries are not a timeline. No loading
-history is inferred from frequency or duration. Full load details remain available
-in the table, including without JavaScript.
-
-Matrix values and face hover use two decimal places with half-up rounding; titles
-retain full precision. Stress and strain units come from uploaded metadata;
-dimensionless strain `1` appears as `(-)`. Actual strain and axial changes use
-seven significant digits so small deformations do not round to zero. A fixed camera
-envelope keeps the cube centered between selections. The positive X/Y/Z orientation
-guide follows camera rotation and Reset. The default view faces the positive
-corner, with X down-left, Y down-right and Z upward; the guide remains 124 × 102
-CSS pixels on desktop. The stress/strain conversion follows
-[linear elasticity](https://doc.comsol.com/6.3/doc/com.comsol.help.sme/sme_ug_theory.06.026.html).
+Values and face hover use two decimals with half-up rounding; cell titles retain
+full precision and selection state. Units are supplied metadata; strain 1 displays
+as (-). A fixed envelope keeps the cube centered between selections. The positive
+XYZ guide follows camera rotation and Reset, with X down-left, Y down-right and Z
+upward in the initial positive-corner view; it stays 124 × 102 CSS pixels on desktop.
 
 Scalar point, edge and face force/displacement loads retain their axis display.
 Scalar zero, missing and invalid magnitudes produce no load arrows; the supplied
@@ -816,8 +778,10 @@ center dot. Each loaded direction and sign uses one arrow starting at the face
 center, including both normal and tangential directions. The shared origin
 illustrates the face condition without changing it into a point load or defining
 a spatial distribution.
-Nonempty targets have separate tables in the order Points, Edges, Faces, then
-Whole cube, each with its group title above the table. Empty groups are omitted.
+Ordinary XYZ targets share one table, one header and one outer frame, with category
+rows in the order Points, Edges, Faces, then Whole cube. Empty categories are omitted;
+pure tensor data has no ordinary table. Tensor records are excluded without
+changing the viewer data or source indexes.
 Unspecified cube corners may appear as free Point rows; whole RVE tensor
 conditions do not add these rows.
 The Boundary Location column connects the two endpoint names of a cube edge
@@ -831,16 +795,15 @@ Scalar load values appear below their field names. Conditions
 within each group retain their supplied order; grouping does not change the
 cube's condition indexes,
 tensor load entries, stored JSON, or exports.
-Tensor load labels use two columns; a single label or the last unpaired label
-spans both columns and stays centered beneath the tensor status. Each load's
-details expand beneath its own label.
+The native tensor fallback keeps each supplied record expandable in the upper
+area; it is hidden when the interactive tensor panel initializes successfully.
 The table labels the combined column `Loading Type / Mode`. X/Y/Z labels stay on
 one line in evenly spaced columns. Load details expand independently below their
 own labels, so multiple panels can stay open together. The row grows to fit the
 panels without moving sibling labels or covering other rows; click a label again
 to close its panel. Headings, vertex names, axis badges, load details and loading
-labels are centered within their columns. Vertical separators run continuously
-from the header to the bottom of each table; group titles sit outside its border.
+labels are centered within their columns. Vertical separators align across all data rows; category headings span the table
+inside the common border.
 The table uses a pale blue header, fine continuous column separators and compact
 group titles with point, edge, face or cube symbols. Axis states use equally
 sized, softly colored badges; hover and keyboard focus highlight the active row.

@@ -69,9 +69,6 @@ class BoundaryBrowserTests(StaticLiveServerTestCase):
             {"magnitude": {key: value * 2 for key, value in symmetric.items()}, "step": 2},
         ]
         data["elastic"] = elastic
-        conflict = deepcopy(data["tensor"])
-        conflict["phase"][0]["constitutive_model"]["elastic_parameters"]["Youngs Modulus"] = 1
-        data["conflict"] = conflict
 
         mixed = deepcopy(full)
         mixed["title"] = "Long boundary metadata " * 20

@@ -129,17 +129,16 @@ Current priority:
 - Whole RVE tensor schematics use the explicitly labeled ij direction/face-normal convention, highlighted opposing faces and linked numeric matrices; preserve distinct xy/yx values and never infer missing components
 - Replace tensor arrows with one highlighted surface per affected opposite face, grouping all supplied nonzero components on that face; use neutral purple for mixed actions and show every associated component, unit and signed direction on face hover
 - Preserve the original translucent purple cube, glass edges and white corner spheres; animate their own vertices and positions, never replace the model with a separate example
-- Default to Action animation: small opposing gripping pads locally tug, squeeze or slide the original surface, hold briefly and rebound exactly to its rest shape; avoid uniform whole-cube scaling, hands and arrows
-- Action animation is explicitly illustrative and follows only supplied selected nonzero component signs/directions, with visible amplitude at ×1; preserve independent asymmetric components and never imply physical magnitude, material response or time
-- Keep Calculated strain as a separate explicit numerical view with its original checks, amplification and actual quantities; switching modes restores geometry and cancels old frames without changing selections or data
-- Initially select all supplied nonzero components while keeping the original shape; Pull, Push and Shear are independent multiselect groups, with Select all, Clear and component toggles
-- Matching reciprocal shear entries toggle together; distinct xy/yx remain independent and prevent calculated strain instead of being averaged or inferred
-- Use supplied strain directly with explicit dimensionless or percent units; stress requires explicit single-phase fully dense isotropic linear elasticity, valid E/nu and compatible Stress/Stiffness units, with clearly stated homogeneous elastic assumptions
-- Reject conflicting freeform E/nu/Stiffness spellings before estimating deformation; accept consistent numeric/text duplicates and preserve uploaded keys and values
-- Apply selected stress before elastic conversion, including Poisson effects; never infer effective properties, plastic/thermal/local-boundary responses or counterfactual responses from output histories
-- Show a unit cube strain view with actual numerical strain, explicit display amplification starting at ×1 and separate unamplified strain/axial changes; never normalize amplitudes by their maximum or imply a spatial solver or dimensional RVE shape
-- Require complete symmetric finite tensors and at most 5% actual strain row sum; cap amplified row sum at 45%, retain amplification across Clear, and reset it with a notice only when a new valid selection exceeds the safe bound
-- Play/Pause/Resume/Replay are explicit and finite (2.4 seconds for actions, 1.2 seconds for numerical deformation); initial load and selection/record/scale changes retain or restore the original shape without autoplay, and Reset restores shape and camera
+- Use one compact tensor panel above one ordinary XYZ table; never repeat tensor records in the ordinary table, and omit that table for pure tensor data
+- Ordinary XYZ point/edge/face/whole-cube rows share one header and frame, with category headings inside it and empty categories omitted
+- Keep tensor quantity/unit/mode, optional condition/record selectors, action toggles and the complete matrix; move counts, precision and selection guidance to titles and supplementary fields to Load details
+- Native tensor details remain in the upper area until the interactive panel initializes, including without JavaScript; retain magnitude content that the nine matrix cells cannot represent
+- Animate small opposing gripping pads that locally tug, squeeze or slide the original surface, hold briefly and rebound exactly; hide pads at rest, on return and on Reset, and avoid uniform scaling, hands or tensor arrows
+- Action motion is illustrative and follows only supplied selected nonzero signs/directions with fixed visible amplitude; keep one short not-to-scale note and never imply physical magnitude, material response or time
+- Do not expose Calculated strain, display amplification or material estimation in this section; these were removed at the user's request
+- Initially select all supplied nonzero components while retaining the original shape; Pull, Push and Shear are independent multiselect groups, with Select all, Clear and component toggles
+- Matching reciprocal shear entries toggle together; distinct xy/yx remain independent without averaging or inference
+- Play/Pause/Resume/Replay are explicit and finite (2.4 seconds); initial load and selection/record changes retain or restore the original shape without autoplay, and Reset restores shape and camera
 - Keep playback separate from physical time and supplied steps; inspection, camera interaction, hidden tabs, offscreen views and reduced-motion changes pause at the current shape, while manual replay remains available
 - Scalar/local markers remain on reference coordinates with an original gray outline and explanation in mixed views; preserve bottom-right XYZ, camera, units, data and exports
 - Keep the complete matrix on the right, label faded cells as unselected, link hover/focus to faces, preserve missing selections across records and omit highlights for zero/missing/invalid components

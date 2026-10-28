@@ -65,7 +65,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     if (profile) rmSync(profile, {recursive: true, force: true});
   });
 
-  async function page(t, items, units = {Stress: 'MPa', Strain: 1}, context = {}) {
+  async function page(t, items, units = {Stress: 'MPa', Strain: 1}) {
     const {targetId} = await send('Target.createTarget', {url: 'about:blank'});
     const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
     await send('Emulation.setEmulatedMedia', {features: [{name: 'prefers-reduced-motion', value: 'reduce'}]}, sessionId);
@@ -78,15 +78,13 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     const template = readFileSync(join(root, 'templates/pages/data_detail.html'), 'utf8');
     const panelHTML = template.match(/<section class="bc-tensor-panel"[\s\S]*?<\/section>/)[0];
     const pure = readFileSync(join(root, 'static/assets/js/mechanical-bc-tensor.js'), 'utf8').replaceAll('export ', '');
-    const math = readFileSync(join(root, 'static/assets/js/mechanical-bc-deformation.js'), 'utf8')
-      .replace(/^import .*;\n/gm, '').replaceAll('export ', '');
     const panel = readFileSync(join(root, 'static/assets/js/mechanical-bc-tensor-panel.js'), 'utf8')
       .replace(/^import .*;\n/gm, '').replaceAll('export ', '');
-    await evaluate(`document.body.innerHTML = ${JSON.stringify(panelHTML)}; ${pure}\n${math}\n${panel}
+    await evaluate(`document.body.innerHTML = ${JSON.stringify(panelHTML)}; ${pure}\n${panel}
       window.supplied = ${JSON.stringify(items)};
       window.original = JSON.stringify(supplied);
       createTensorPanel(document.querySelector('[data-bc-tensor-panel]'), supplied, ${JSON.stringify(units)},
-        view => { window.view = view; }, () => {}, ${JSON.stringify(context)});`);
+        view => { window.view = view; }, () => {});`);
     return evaluate;
   }
 
@@ -114,19 +112,12 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
-  test('action animation is the default while calculated strain remains a separate explicit view', async t => {
-    const ev = await page(t,[condition()]);
-    const selected=await ev('Array.from(view.selected)');
-    assert.equal(await ev('view.mode'),'action');
-    assert.equal(await ev('document.querySelector("[data-tensor-calculated]").hidden'),true);
-    await ev('document.querySelector("[data-tensor-mode=calculated]").click()');
-    assert.equal(await ev('view.mode'),'calculated');
-    assert.equal(await ev('document.querySelector("[data-tensor-calculated]").hidden'),false);
-    assert.equal(await ev('document.querySelector("[data-tensor-action-note]").hidden'),true);
-    assert.deepEqual(await ev('Array.from(view.selected)'),selected);
-    await ev('document.querySelector("[data-tensor-mode=action]").click()');
-    assert.equal(await ev('view.mode'),'action');
-    assert.equal(await ev('JSON.stringify(supplied) === original'),true);
+  test('compact controls omit the numerical preview and keep the complete matrix', async t => {
+    const ev = await page(t, [condition()]);
+    assert.equal(await ev('document.querySelectorAll("[data-tensor-mode],[data-tensor-calculated],[data-tensor-scale]").length'), 0);
+    assert.equal(await ev('document.querySelectorAll("[data-component]").length'), 9);
+    assert.equal(await ev('document.querySelector("[data-tensor-description]")'), null);
+    assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
   const complete = {xx: .02, yy: -.01, zz: 0, xy: .003, yx: .003, xz: 0, zx: 0, yz: 0, zy: 0};
@@ -134,34 +125,39 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
   test('matrix cells independently combine normal strains and toggle reciprocal shear together', async t => {
     const ev = await page(t, [condition('strain', [{magnitude: complete}])]);
     assert.equal(await ev('document.querySelectorAll("svg,canvas,[data-tensor-example-host]").length'), 0);
-    assert.deepEqual(await ev('view.deformation.matrix'), [[.02,.003,0],[.003,-.01,0],[0,0,0]]);
     await ev('document.querySelector("[data-component=xy]").click()');
     assert.deepEqual(await ev('Array.from(view.selected)'), ['xx','yy']);
     assert.equal(await ev('document.activeElement.dataset.component'), 'xy');
     await ev('document.querySelector("[data-component=xx]").click();document.querySelector("[data-component=yx]").click()');
     assert.deepEqual(await ev('Array.from(view.selected).sort()'), ['xy','yx','yy']);
     assert.equal(await ev('document.querySelector("[data-component=xx] strong").textContent'), '0.02');
-    assert.equal(await ev('document.querySelector("[data-component=yx]").title'), 'yx: 0.003 -');
+    assert.equal(await ev('document.querySelector("[data-component=yx]").title'), 'yx: 0.003 - · Selected');
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
-  test('amplification changes only display scale and resets if a later selection needs a smaller bound', async t => {
-    const ev = await page(t, [condition('strain', [{magnitude: complete}])], {Strain: '%'}, {size: [2,3,4],lengthUnit: 'mm'});
-    const actual = await ev('view.deformation.matrix');
-    await ev('document.querySelector("[data-tensor-scale]").value="100";document.querySelector("[data-tensor-scale]").dispatchEvent(new Event("change"))');
-    assert.equal(await ev('view.scale'),100);
-    assert.deepEqual(await ev('view.deformation.matrix'),actual);
-    assert.match(await ev('document.querySelector("[data-tensor-deformation-values]").textContent'), /X: 0.02% · axial change 0.0004 mm/);
-    assert.match(await ev('document.querySelector("[data-tensor-deformation-values]").textContent'), /XY: 0.003% \(tensor shear\)/);
-    assert.match(await ev('document.querySelector("[data-tensor-preview-note]").textContent'), /Display ×100/);
-    for (const value of ['0','-2','99999999','']) {
-      await ev(`document.querySelector('[data-tensor-scale]').value=${JSON.stringify(value)};document.querySelector('[data-tensor-scale]').dispatchEvent(new Event('change'))`);
-      assert.equal(await ev('view.scale'),100);
-      assert.equal(await ev('document.querySelector("[data-tensor-scale]").validity.valid'),false);
-    }
-    await ev('document.querySelector("[data-tensor-clear]").click()');
-    assert.equal(await ev('view.scale'),100);
-    assert.equal(await ev('document.querySelector("[data-tensor-scale]").disabled'),true);
+  test('only supplementary fields appear in collapsed load details and uploaded text stays escaped', async t => {
+    const ev = await page(t, [condition('stress', [{magnitude: {xx: 15}, details: [
+      {key: 'magnitude', display: '{xx: 15.00}'},
+      {key: 'step', display: '0.0123456789'},
+      {key: 'frequency', display: '2.00'},
+      {key: '<img src=x>', display: '<b>raw text</b>'},
+    ]}])]);
+    assert.equal(await ev('document.querySelector("[data-tensor-details]").open'), false);
+    assert.equal(await ev('document.querySelector("[data-tensor-details]").hidden'), false);
+    assert.deepEqual(await ev('Array.from(document.querySelectorAll("[data-tensor-details-list] dt")).map(n=>n.textContent)'), ['step','frequency','<img src=x>']);
+    assert.equal(await ev('document.querySelector("[data-tensor-details-list] dd").textContent'), '0.0123456789');
+    assert.equal(await ev('document.querySelectorAll("[data-tensor-details-list] img,[data-tensor-details-list] b").length'), 0);
+    assert.equal(await ev('JSON.stringify(supplied) === original'), true);
+  });
+
+  test('load details retain magnitude content that the nine matrix cells cannot represent', async t => {
+    const ev = await page(t, [condition('stress', [
+      {magnitude: {xx: 15, extra: 9}, details: [{key: 'magnitude', display: '{xx: 15.00, extra: 9.00}'}]},
+      {magnitude: [1, 2], details: [{key: 'magnitude', display: '[1.00, 2.00]'}]},
+    ])]);
+    assert.match(await ev('document.querySelector("[data-tensor-details-list]").textContent'), /extra: 9.00/);
+    await ev('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
+    assert.equal(await ev('document.querySelector("[data-tensor-details-list] dd").textContent'), '[1.00, 2.00]');
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
@@ -180,22 +176,19 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.deepEqual(await ev('Array.from(view.selected)'),['xx','yx']);
     assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'),/missing or invalid.*yx/);
     assert.deepEqual(await ev('tensorArrows(view.load.magnitude,view.filter,view.selected).map(a=>[a.component,a.value])'),[['xx',-10],['xx',-10]]);
-    assert.match(await ev('document.querySelector("[data-tensor-description]").textContent'),/Push/);
+    assert.equal(await ev('view.actionLabel'), 'Push');
     assert.equal(await ev('document.querySelector("[data-component=yx]").disabled'),true);
     await ev('document.querySelector("[data-tensor-load]").value="2";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
-    assert.equal(await ev('view.deformation.matrix'),null);
-    assert.match(await ev('view.deformation.error'),/nine numeric/);
     assert.equal(await ev('JSON.stringify(supplied) === original'),true);
   });
 
-  test('different reciprocal values remain independent and cannot produce a numerical preview', async t => {
+  test('different reciprocal values remain independently selectable', async t => {
     const ev = await page(t,[condition('strain',[{magnitude:{...complete, yx:-.001}}])]);
     await ev('document.querySelector("[data-tensor-clear]").click();document.querySelector("[data-component=xy]").click()');
     assert.deepEqual(await ev('Array.from(view.selected)'),['xy']);
     assert.equal(await ev('document.querySelector("[data-component=yx] strong").textContent'),'0.00');
-    assert.equal(await ev('document.querySelector("[data-component=yx]").title'),'yx: -0.001 -');
-    assert.equal(await ev('view.deformation.matrix'),null);
-    assert.match(await ev('view.deformation.error'),/xy and yx differ/);
+    assert.equal(await ev('document.querySelector("[data-component=yx]").title'),'yx: -0.001 - · Not selected');
+    assert.equal(await ev('view.actionLabel'), 'Shear');
   });
 
   test('multiple conditions reset selection and use their own units; one record has no navigation', async t => {
@@ -203,20 +196,20 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     await ev('document.querySelector("[data-tensor-clear]").click();document.querySelector("[data-tensor-condition]").value="2";document.querySelector("[data-tensor-condition]").dispatchEvent(new Event("change"))');
     assert.equal(await ev('view.itemIndex'),2);
     assert.deepEqual(await ev('Array.from(view.selected)'),['xx','xy','yx','yy']);
-    assert.equal(await ev('document.querySelector("[data-tensor-heading]").textContent'),'Whole cube · Strain (-)');
+    assert.equal(await ev('document.querySelector("[data-tensor-heading]").textContent'),'Whole cube · Strain (-) / cyclic');
     assert.equal(await ev('document.querySelector("[data-tensor-load]").closest("label").hidden'),true);
-    assert.deepEqual(await ev('Array.from(document.querySelectorAll("[data-tensor-filter]")).map(b=>(b.querySelector("[data-tensor-filter-label]")||b).textContent)'),['Select all','Extend','Shorten','Shear']);
+    assert.deepEqual(await ev('Array.from(document.querySelectorAll("[data-tensor-filter]")).map(b=>(b.querySelector("[data-tensor-filter-label]")||b).textContent)'),['Extend','Shorten','Shear','Select all']);
     assert.equal(await ev('document.querySelector("[data-tensor-status]").hidden'),true);
     assert.equal(await ev('document.querySelectorAll("[data-tensor-slider]").length'),0);
   });
 
-  test('invalid uploaded containers and markup remain harmless and disable deformation', async t => {
+  test('invalid uploaded containers and markup remain harmless and unselected', async t => {
     const bad = {toString:{nested:true}};
     const ev = await page(t,[condition('strain',[{magnitude:{xx:bad,xy:'<img src=x onerror=alert(1)>',yy:true,zz:null}}])],{Strain:bad});
     assert.equal(await ev('document.querySelector("[data-tensor-matrix] img")'),null);
     assert.equal(await ev('document.querySelectorAll("[data-tensor-matrix] button:disabled").length'),9);
     assert.match(await ev('document.querySelector("[data-tensor-heading]").textContent'),/unit not supplied/);
-    assert.equal(await ev('view.deformation.matrix'),null);
+    assert.deepEqual(await ev('Array.from(view.selected)'), []);
     assert.equal(await ev('JSON.stringify(supplied) === original'),true);
   });
 });

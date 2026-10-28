@@ -879,7 +879,7 @@ function tensorFaceColor(entries) {
 }
 
 function drawTensorLoading(view, group, selectableMeshes) {
-  const segments = view.mode === 'action' ? 16 : 1;
+  const segments = 16;
   const isStrain = view.item.loading_type === 'strain';
   for (const load of tensorFaceLoads(view.load?.magnitude, view.filter, view.selected)) {
     const normal = AXIS_DIRECTIONS[load.normal.toUpperCase()].clone().multiplyScalar(load.faceSign);
@@ -923,13 +923,6 @@ function highlightTensor(group, components) {
     mesh.material.opacity = mesh.userData.tensorOutline
       ? (matching.length ? 0.8 : 0.06) : (matching.length ? 0.25 : 0.025);
   });
-}
-
-function updateTensorLegend(legend, view, hasOtherLoads) {
-  legend.textContent = view.mode === 'action' ? 'Gripping motion · illustrative action, not physical deformation or time.' : view.deformation.matrix
-    ? 'Unit cube · display ×' + view.scale + ' · movement shows the selected homogeneous strain.'
-    : 'Highlighted faces show the selected components; deformation is unavailable.';
-  if (hasOtherLoads) legend.textContent += ' Local and scalar markers stay on the gray original outline; their effects are excluded.';
 }
 
 function frameScene(camera, controls, root, container, cameraDirection) {
@@ -1202,63 +1195,30 @@ function renderMechanicalBcViewer() {
     const legend = container.closest('.bc-layout').querySelector('.bc-legend');
     const loadLegend = legend.firstElementChild;
     loadLegend.querySelectorAll('line').forEach(line => line.setAttribute('stroke', STATUS_COLORS.loaded));
-    const tensorLegend = document.createElement('div');
-    tensorLegend.className = 'bc-tensor-legend';
-    tensorLegend.dataset.tensorLegend = '';
-    if (scalarItems.length) legend.appendChild(tensorLegend);
-    else legend.replaceChildren(tensorLegend);
-    const tensorCaption = document.createElement('div');
-    tensorCaption.className = 'bc-diagram-caption';
-    tensorCaption.dataset.bcTensorCaption = '';
-    const tensorTitle = document.createElement('strong');
-    const tensorExplanation = document.createElement('span');
-    tensorCaption.append(tensorTitle, tensorExplanation);
-    container.parentElement.insertAdjacentElement('beforebegin', tensorCaption);
+    if (scalarItems.length) {
+      const referenceNote = document.createElement('span');
+      referenceNote.className = 'bc-legend-item';
+      referenceNote.textContent = 'Gray outline: XYZ reference';
+      referenceNote.title = 'XYZ markers stay at their original positions while the tensor action is illustrated.';
+      legend.appendChild(referenceNote);
+    } else legend.hidden = true;
     const unitsElement = document.getElementById('plot-units-data');
     const units = unitsElement ? JSON.parse(unitsElement.textContent) : {};
-    const contextElement = document.getElementById('bc-deformation-data');
-    const context = contextElement ? JSON.parse(contextElement.textContent) : {};
-    let deformation = null;
-    let displayScale = 1;
-    let previewMode = 'action';
     const tensorAction = createTensorAction(baseCube, tensorGroup, state.root);
     baseCube.matrixAutoUpdate = false;
     tensorGroup.matrixAutoUpdate = false;
     const reference = scalarItems.length
       ? createCubeWireBox(1, new THREE.LineBasicMaterial({color: '#94a3b8', transparent: true, opacity: 0.6}), 1) : null;
     if (reference) { reference.visible = false; state.root.add(reference); }
-    tensorMotion = createTensorMotion(container, (progress, time) => {
-      if (previewMode === 'action') {
-        baseCube.matrix.identity();
-        tensorGroup.matrix.identity();
-        baseCube.matrixWorldNeedsUpdate = tensorGroup.matrixWorldNeedsUpdate = true;
-        const amount = tensorAction.update(time);
-        if (reference) reference.visible = amount > 0;
-        faceLabels.forEach(label => {
-          label.position.fromArray(tensorAction.map(label.userData.referencePosition.toArray(), amount));
-          label.userData.faceNormal.copy(label.userData.referenceNormal);
-        });
-        state.renderSceneOnce();
-        return;
-      }
-      const e = deformation;
-      const factor = progress * displayScale;
-      baseCube.matrix.set(
-        1 + factor * (e?.[0][0] || 0), factor * (e?.[0][1] || 0), factor * (e?.[0][2] || 0), 0,
-        factor * (e?.[1][0] || 0), 1 + factor * (e?.[1][1] || 0), factor * (e?.[1][2] || 0), 0,
-        factor * (e?.[2][0] || 0), factor * (e?.[2][1] || 0), 1 + factor * (e?.[2][2] || 0), 0,
-        0, 0, 0, 1);
-      baseCube.matrixWorldNeedsUpdate = true;
-      tensorGroup.matrix.copy(baseCube.matrix);
-      tensorGroup.matrixWorldNeedsUpdate = true;
-      if (reference) reference.visible = progress > 0 && !!deformation;
-      const normalMatrix = new THREE.Matrix3().getNormalMatrix(baseCube.matrix);
+    tensorMotion = createTensorMotion(container, progress => {
+      const amount = tensorAction.update(progress);
+      if (reference) reference.visible = amount > 0;
       faceLabels.forEach(label => {
-        label.position.copy(label.userData.referencePosition).applyMatrix4(baseCube.matrix);
-        label.userData.faceNormal.copy(label.userData.referenceNormal).applyNormalMatrix(normalMatrix);
+        label.position.fromArray(tensorAction.map(label.userData.referencePosition.toArray(), amount));
+        label.userData.faceNormal.copy(label.userData.referenceNormal);
       });
       state.renderSceneOnce();
-    }, () => previewMode === 'action' ? state.tensorMeshes.length > 0 : !!deformation, () => previewMode);
+    }, () => state.tensorMeshes.length > 0);
     tensorPanel = createTensorPanel(document.querySelector('[data-bc-tensor-panel]'), items, units, view => {
       tensorMotion.pause();
       highlighted = '';
@@ -1268,21 +1228,13 @@ function renderMechanicalBcViewer() {
       state.tensorMeshes.length = 0;
       tooltip.style.opacity = '0';
       drawTensorLoading(view, tensorGroup, state.tensorMeshes);
-      previewMode = view.mode;
       tensorAction.setView(view);
-      deformation = view.deformation.matrix;
-      displayScale = view.scale;
       selectableMeshes.push(...state.tensorMeshes);
       faceLabels.forEach(label => {
         label.userData.tensorFaceSelected = state.tensorMeshes.some(mesh => mesh.userData.normal === label.userData.tensorFaceAxis);
       });
-      const isStrain = view.item.loading_type === 'strain';
-      tensorTitle.textContent = (isStrain ? 'Strain' : 'Stress') + ' tensor' + (view.unit ? ' (' + view.unit + ')' : ' · unit not supplied');
-      tensorExplanation.textContent = view.mode === 'action' ? (view.actionLabel || 'Select components') + ' · grip and rebound' : deformation ? 'Original shape → selected deformation · display ×' + view.scale
-        : 'Original shape · see the deformation requirements beside the cube';
-      updateTensorLegend(tensorLegend, view, scalarItems.length > 0);
       tensorMotion.reset();
-    }, highlight, context);
+    }, highlight);
   }
   setupTooltip(container, state.camera, selectableMeshes, tooltip, component => {
     if (component && (!Array.isArray(component) || component.length)) tensorMotion?.pause();

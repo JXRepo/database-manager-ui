@@ -1,20 +1,15 @@
 import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, tensorComponentMeaning, tensorComponentVisible} from './mechanical-bc-tensor.js';
-import {tensorDeformation} from './mechanical-bc-deformation.js';
 
-export function createTensorPanel(panel, items, units, onChange, onHighlight, context = {}) {
+export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
   if (!panel || !conditions.length) return null;
   const conditionSelect = panel.querySelector('[data-tensor-condition]');
   const loadSelect = panel.querySelector('[data-tensor-load]');
   const matrix = panel.querySelector('[data-tensor-matrix]');
-  const scaleInput = panel.querySelector('[data-tensor-scale]');
   const buttons = Array.from(panel.querySelectorAll('[data-tensor-filter]'));
   let current = conditions[0];
   let loadIndex = 0;
   let selected = null;
-  let scale = 1;
-  let preview = null;
-  let mode = 'action';
   let cells = [];
 
   function highlight(components) {
@@ -30,19 +25,13 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
     return TENSOR_COMPONENTS.filter(key => tensorComponentMeaning(key, magnitude?.[key])
       && tensorComponentVisible(key, magnitude[key], mode));
   }
-  function precise(value) {
-    return Number(value.toPrecision(7)).toString();
-  }
   function render() {
     const load = current.item.tensor_loads?.[loadIndex];
     const magnitude = load?.magnitude;
     const isStrain = current.item.loading_type === 'strain';
     const rawUnit = units?.[isStrain ? 'Strain' : 'Stress'];
     const unit = isStrain && (rawUnit === 1 || rawUnit === '1') ? '-' : typeof rawUnit === 'string' ? rawUnit.trim() : '';
-    panel.querySelector('[data-tensor-heading]').textContent = `Whole cube · ${isStrain ? 'Strain' : 'Stress'}${unit ? ` (${unit})` : ' · unit not supplied'}`;
-    panel.querySelector('[data-tensor-kind]').textContent = mode === 'action'
-      ? 'Combine actions or toggle components, then play the gripping motion.'
-      : 'Numerical strain preview from the selected components.';
+    panel.querySelector('[data-tensor-heading]').textContent = `Whole cube · ${isStrain ? 'Strain' : 'Stress'}${unit ? ` (${unit})` : ' · unit not supplied'}${current.item.loading_mode ? ` / ${current.item.loading_mode}` : ''}`;
     loadSelect.value = String(loadIndex);
     matrix.replaceChildren();
     cells = [];
@@ -50,6 +39,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
       const heading = document.createElement('span');
       heading.className = 'bc-tensor-axis';
       heading.textContent = text;
+      if (text === 'i / j') heading.title = 'i = direction; j = face normal';
       heading.setAttribute('aria-hidden', 'true');
       matrix.appendChild(heading);
     }
@@ -70,7 +60,8 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
       cell.setAttribute('aria-pressed', String(selected.has(key)));
       cell.classList.toggle('is-filtered', !selected.has(key));
       const raw = typeof value === 'object' ? JSON.stringify(value) : String(value);
-      cell.title = supplied ? `${key}: ${raw}${unit ? ` ${unit}` : ''}` : `${key}: not supplied`;
+      cell.title = (supplied ? `${key}: ${raw}${unit ? ` ${unit}` : ''}` : `${key}: not supplied`)
+        + (selected.has(key) ? ' · Selected' : ' · Not selected');
       const label = document.createElement('span');
       label.textContent = key;
       const number = document.createElement('strong');
@@ -111,54 +102,32 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
       button.classList.toggle('is-partial', included > 0 && included < available.length);
       if (mode !== 'all') {
         button.disabled = !available.length;
-        button.querySelector('[data-tensor-action-count]').textContent = `(${included}/${available.length})`;
-        button.title = available.length ? 'Toggle this group without changing the other selected actions' : 'No nonzero components';
+        button.title = available.length ? `${included} of ${available.length} components selected. Toggle this group independently.` : 'No nonzero components';
+        button.setAttribute('aria-label', `${labels[mode]}: ${included} of ${available.length} components selected`);
       }
     });
     const active = TENSOR_COMPONENTS.filter(key => selected.has(key));
     const actions = ['pull','push','slide'].filter(mode => members(mode).some(key => selected.has(key))).map(mode => labels[mode]);
-    panel.querySelector('[data-tensor-description]').textContent = actions.length ? `Combination: ${actions.join(' + ')}` : 'No nonzero components selected';
-    panel.querySelector('[data-tensor-filter-note]').hidden = members().every(key => selected.has(key));
     const unavailable = active.filter(key => !isTensorNumber(magnitude?.[key]));
     const status = panel.querySelector('[data-tensor-status]');
-    status.textContent = unavailable.length ? `Selected but missing or invalid in this record: ${unavailable.join(', ')}` : '';
+    status.textContent = unavailable.length ? `Selected but missing or invalid in this record: ${unavailable.join(', ')}`
+      : actions.length ? '' : 'Select a nonzero component to animate.';
     status.hidden = !status.textContent;
-    preview = tensorDeformation(magnitude, selected, current.item.loading_type, units, context);
-    let scaleNote = '';
-    if (preview.matrix && scale > preview.maxScale) {
-      scale = 1;
-      scaleNote = ' Display amplification reset to ×1 for this selection.';
-    }
-    scaleInput.value = String(scale);
-    scaleInput.max = String(preview.maxScale);
-    scaleInput.disabled = !preview.matrix;
-    scaleInput.setCustomValidity('');
-    const details = panel.querySelector('[data-tensor-deformation-values]');
+    const details = panel.querySelector('[data-tensor-details-list]');
     details.replaceChildren();
-    if (preview.matrix) {
-      for (let i = 0; i < 3; i++) {
-        const row = document.createElement('span');
-        const axis = 'XYZ'[i];
-        row.textContent = `${axis}: ${precise(preview.matrix[i][i] * 100)}%`;
-        if (preview.extensions) row.textContent += ` · axial change ${precise(preview.extensions[i])} ${context.lengthUnit}`;
-        details.appendChild(row);
-      }
-      for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) {
-        if (!preview.matrix[i][j]) continue;
-        const row = document.createElement('span');
-        row.textContent = `${'XYZ'[i]}${'XYZ'[j]}: ${precise(preview.matrix[i][j] * 100)}% (tensor shear)`;
-        details.appendChild(row);
-      }
+    for (const detail of load?.details || []) {
+      if (detail.key === 'magnitude' && magnitude && typeof magnitude === 'object'
+          && !Array.isArray(magnitude) && Object.keys(magnitude).every(key => TENSOR_COMPONENTS.includes(key))) continue;
+      const key = document.createElement('dt');
+      const value = document.createElement('dd');
+      key.textContent = detail.key;
+      value.textContent = detail.display;
+      details.append(key, value);
     }
-    panel.querySelector('[data-tensor-preview-note]').textContent = preview.error || `${preview.source}. Display ×${scale}.${scaleNote}`;
-    panel.querySelectorAll('[data-tensor-mode]').forEach(button => {
-      button.setAttribute('aria-pressed', String(button.dataset.tensorMode === mode));
-    });
-    panel.querySelector('[data-tensor-calculated]').hidden = mode !== 'calculated';
-    panel.querySelector('[data-tensor-action-note]').hidden = mode !== 'action';
+    panel.querySelector('[data-tensor-details]').hidden = !details.children.length;
     onHighlight('');
     onChange({item: current.item, itemIndex: current.index, load, filter: 'all', selected: new Set(selected), unit,
-      deformation: preview, scale, mode, actionLabel: actions.join(' + ')});
+      actionLabel: actions.join(' + ')});
   }
   function selectCondition(index, record = 0) {
     const next = conditions.find(entry => entry.index === Number(index)) || conditions[0];
@@ -167,7 +136,8 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
     conditionSelect.value = String(current.index);
     const loads = current.item.tensor_loads || [];
     loadIndex = Math.max(0, Math.min(record, loads.length - 1));
-    if (fresh) { selected = new Set(members()); scale = 1; }
+    if (fresh) selected = new Set(members());
+    panel.querySelector('[data-tensor-details]').open = false;
     loadSelect.replaceChildren();
     loads.forEach((load, index) => {
       const step = load.details?.find(detail => detail.key === 'step');
@@ -182,7 +152,11 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
   conditionSelect.disabled = conditions.length === 1;
   conditionSelect.closest('label').hidden = conditions.length === 1;
   conditionSelect.addEventListener('change', () => selectCondition(conditionSelect.value));
-  loadSelect.addEventListener('change', () => { loadIndex = Number(loadSelect.value); render(); });
+  loadSelect.addEventListener('change', () => {
+    loadIndex = Number(loadSelect.value);
+    panel.querySelector('[data-tensor-details]').open = false;
+    render();
+  });
   buttons.forEach(button => button.addEventListener('click', () => {
     const keys = members(button.dataset.tensorFilter);
     if (button.dataset.tensorFilter === 'all') selected = new Set(keys);
@@ -192,29 +166,10 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight, co
     }
     render();
   }));
-  panel.querySelectorAll('[data-tensor-mode]').forEach(button => button.addEventListener('click', () => {
-    mode = button.dataset.tensorMode;
-    render();
-  }));
   panel.querySelector('[data-tensor-clear]').addEventListener('click', () => { selected.clear(); render(); });
-  scaleInput.addEventListener('change', () => {
-    const next = Number(scaleInput.value);
-    if (!Number.isFinite(next) || next < 1 || next > preview.maxScale) {
-      scaleInput.setCustomValidity(`Choose a display amplification from 1 to ${preview.maxScale}.`);
-      scaleInput.reportValidity();
-      return;
-    }
-    scale = next;
-    render();
-  });
-  document.querySelectorAll('[data-bc-show-tensor]').forEach(button => {
-    button.hidden = false;
-    button.addEventListener('click', () => {
-      selectCondition(button.dataset.bcShowTensor, Number(button.dataset.bcLoadIndex));
-      panel.scrollIntoView({block:'nearest',behavior:'instant'});
-    });
-  });
-  panel.hidden = false;
   selectCondition(current.index);
+  panel.hidden = false;
+  const fallback = document.querySelector('[data-bc-tensor-fallback]');
+  if (fallback) fallback.hidden = true;
   return {highlight};
 }

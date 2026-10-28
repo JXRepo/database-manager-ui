@@ -203,13 +203,14 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertTrue("Load record 1" in response.content.decode(), "Missing tensor load display")
         self.assertContains(response, "Load record 2")
         self.assertContains(response, 'class="bc-load-key">step</span>:', count=2)
-        self.assertContains(response, "<th>Loading Type / Mode</th>", html=True)
+        self.assertNotContains(response, 'class="bc-table-frame"')
+        self.assertContains(response, "data-bc-tensor-fallback", count=1)
         self.assertContains(response, "&quot;xx&quot;: -1.23,")
         self.assertContains(response, "-1.23456789")
         self.assertNotContains(response, "X: loaded")
         self.assertNotContains(response, "Y: free")
         self.assertNotContains(response, "Z: free")
-        self.assertContains(response, "Entire cube", count=1)
+        self.assertNotContains(response, "Entire cube")
         exported = self.client.get(reverse("json_data_export", args=[obj.pk]))
         self.assertEqual(exported.json(), data)
         obj.refresh_from_db()
@@ -217,7 +218,7 @@ class MechanicalBCSchemaTests(TestCase):
 
     def test_detail_groups_targets_without_changing_tensor_selection_or_data(self):
         """
-        Group mixed targets while keeping tensor buttons linked to their source
+        Keep ordinary targets in one table and tensors in their own panel
 
         The table may reorder target categories, but cube selection and exports
         must retain the original conditions and load entries.
@@ -245,10 +246,10 @@ class MechanicalBCSchemaTests(TestCase):
         html = response.content.decode()
         groups = re.findall(r'<tbody data-bc-target-type="([^"]+)">(.*?)</tbody>', html, re.S)
 
-        self.assertEqual([kind for kind, _ in groups], ["Point", "Edge", "Face", "Whole cube"])
-        self.assertContains(response, 'class="bc-table-group"', count=4)
-        self.assertContains(response, 'class="bc-table-frame"', count=4)
-        self.assertNotContains(response, 'class="bc-group-heading"')
+        self.assertEqual([kind for kind, _ in groups], ["Point", "Edge", "Face"])
+        self.assertContains(response, 'class="bc-table-frame"', count=1)
+        self.assertContains(response, "<th>Loading Type / Mode</th>", count=1, html=True)
+        self.assertContains(response, 'class="bc-group-heading"', count=3)
         self.assertEqual(
             re.findall(r'<span class="bc-target-vertex">([^<]+)</span>', groups[0][1]),
             ["V111", "V100"],
@@ -257,10 +258,7 @@ class MechanicalBCSchemaTests(TestCase):
             re.findall(r'<span class="bc-target-vertex"[^>]*>([^<]+)</span>', groups[2][1]),
             ["V000", "V010", "V001", "V011", "V001", "V101", "V011", "V111"],
         )
-        self.assertEqual(
-            re.findall(r'data-bc-show-tensor="(\d+)".*?data-bc-load-index="(\d+)"', groups[3][1]),
-            [("0", "0"), ("0", "1"), ("5", "0"), ("5", "1")],
-        )
+        self.assertNotContains(response, "data-bc-show-tensor")
         script = re.search(r'<script id="mechanical-bc-data"[^>]*>(.*?)</script>', html, re.S)
         items = json.loads(script.group(1))
         self.assertEqual([item["target_type"] for item in items],
