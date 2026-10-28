@@ -21,7 +21,11 @@ next_topic: Manual tensor replay remains available with reduced motion enabled
 - 真实 Chromium 回归先失败后通过，使用真实鼠标点击验证减少动态效果模式下的
   实际运动、单次结束、精确复位、系统偏好未改变及后续切换不自动播放。
   136 项 Node 和 12 项 Django／真实 Chromium 测试全部通过，零跳过。
-  日志／截图在 `/tmp/manual-tensor-replay-qa/`；线上状态待提交后核验。
+  独立只读复核通过，无待修复问题；日志／截图在 `/tmp/manual-tensor-replay-qa/`。
+- 应用提交 `2b2343a` 已合入并推送 main。2026-10-28 01:29 UTC，线上 motion、viewer、
+  tensor、tensor-panel 四个脚本在普通 URL 与独立 no-cache URL 均逐字节匹配，
+  `/healthz/` HTTP 200。证据在 `/tmp/manual-tensor-replay-qa/live-verification.json`。
+  刷新现有页面即可使用手动重播，无需修改系统设置或重新上传数据。
 
 ### 最新调整：第二类箭头增加短暂、可重播的方向动画
 
