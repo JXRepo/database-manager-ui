@@ -1,12 +1,66 @@
 ---
 status: boundary_viewer_delivered
 branch: main
-timestamp: 2026-10-28
+timestamp: 2026-10-29
 code_base: main; see git log for the latest boundary viewer changes
-next_topic: Compact tensor controls and one categorized XYZ table
+next_topic: Resume the compact boundary viewer on the laptop; await further visual feedback
 ---
 
 # Project handoff
+
+## 笔记本接续入口（2026-10-29）
+
+- 当前分支为 `main`。最新应用改动是 `d949e3a`，部署验证记录是 `5a40b11`；
+  本次只补充交接文档，没有新的应用代码改动。下方“当前状态”为最终实现，
+  “历史记录”中的旧界面、旧模块和数值计算方案不能当作当前功能。
+- 最新用户要求已完成：第二类张量仅在上方独立面板显示；普通 XYZ 的点、边、面、
+  whole cube 共用下方一个分类表；去掉重复信息、长说明及 `Calculated strain`；
+  原 3D cube、右下角 XYZ 和果冻动作保留。小夹片是动画道具，只在形变动作中显示。
+- **明确限制：果冻动作幅度仍固定，只跟随所选分量的方向和正负；15 和 150 的单个
+  分量会有相同的动作幅度。它不是材料实际变形计算。** 用户之前问过数值联动，
+  已如实解释尚未实现；后续若继续讨论，需要以这一事实为起点，不要声称已经实现，
+  也不要自行恢复已移除的 `Calculated strain`。step 的进一步交互设计仍留待后续。
+- 当前没有已知未修复的阻断问题或进行中的代码任务。下一轮先查看精简后的现有
+  效果，再按用户的新反馈继续；不要重做模型、把动作移到右边或重新增加重复表格。
+
+### 换电脑后先做
+
+1. 在笔记本仓库执行 `git status --short`，先确认是否有该电脑尚未提交的工作。
+   工作区干净时执行 `git switch main`、`git pull --ff-only`，再看 `git log -5 --oneline`。
+   如有本地修改或分叉，先保留并检查，不用 reset、强推或覆盖来解决。
+2. 阅读 `AGENTS.md`、本交接顶部，以及 README 的边界条件说明和 Local Setup。
+   用笔记本自己的项目解释器；有 PyCharm 环境工具时先解析解释器，不能照抄这台
+   Linux 电脑的绝对路径。开发和测试使用 `DEBUG=True`、本地 SQLite。
+3. 在线站点为 https://fair-materials-data-hub.onrender.com 。已有数据刷新详情页即可，
+   不需要重新上传 JSON。最近一次实际部署核验是 `2026-10-28T20:14:30.028Z`，
+   六个相关脚本逐字节匹配，健康检查 HTTP 200；这是前次核验时间，不是每次推送
+   自动完成部署的保证。
+
+### 继续修改时定位这些文件
+
+| 文件 | 当前职责 |
+| --- | --- |
+| `templates/pages/data_detail.html` | 精简张量面板、普通 XYZ 统一分类表、原生详情回退 |
+| `apps/pages/views.py` | `_group_mechanical_bc_items` 排除张量表格行；详情上下文保留完整绘图数据 |
+| `static/assets/js/mechanical-bc-tensor-panel.js` | 组合选择、完整矩阵、单位、记录和附加详情 |
+| `static/assets/js/mechanical-bc-viewer.js` | 原 3D cube、面高亮、标量／局部标记及视图联动 |
+| `static/assets/js/mechanical-bc-action.js` | 固定示意幅度的局部拉／压／剪切与回弹曲线 |
+| `static/assets/js/mechanical-bc-action-view.js` | 更新原模型顶点、边框、角点及夹片显隐 |
+| `static/assets/js/mechanical-bc-motion.js` | 手动播放、暂停、继续、重播和重置 |
+| `tests/browser/boundary.cjs`、`apps/pages/test_boundary_browser.py` | 真实 Chromium 桌面布局、动作与数据保持回归 |
+
+- 最新应用回归结果为 138 项 Node、12 项 Django／真实 Chromium 通过，零跳过。
+  对应命令是 `node --test tests/js/*.test.cjs`；Django 检查设置 `DEBUG=True` 后，
+  用当前电脑已配置的解释器运行
+  `manage.py test apps.pages.test_bc_schema apps.pages.test_boundary_browser`。
+  浏览器检查需要 Chromium（必要时设置 `CHROMIUM_BIN`）和带全局 WebSocket 的 Node。
+  本次文档交接不把历史测试说成重新运行；仅检查文档差异和 Git 同步。
+- 五份边界样例随仓库位于 `example_json_files/boundary_condition_examples_20261008/`。
+  `/tmp/boundary-panel-cleanup-qa/` 中的截图、动画帧和日志只在这台电脑，不随 Git
+  同步，也不应假定笔记本上存在；可运行上述浏览器测试，并设置
+  `BC_BROWSER_REPORT_DIR` 为笔记本的本地目录重新生成证据。
+- 本轮功能工作树已清理。其余已有的 `boundary-final`、`public-pilot`、`publish`
+  工作树未改动，它们不是此次接续的工作分支。
 
 ## 当前状态
 
@@ -32,7 +86,9 @@ next_topic: Compact tensor controls and one categorized XYZ table
   证据为 /tmp/boundary-panel-cleanup-qa/live-verification.json。刷新现有详情页即可，
   无需重传 JSON；本轮工作树已清理，其他工作树保持原样。
 
-### 最新修正：默认显示明显的抓取、拉扯和回弹动作
+## 历史记录（以下旧方案不代表当前版本）
+
+### 历史修正：默认显示明显的抓取、拉扯和回弹动作
 
 - 用户进一步澄清：需要果冻般被两侧揪住的动作感，而非按数值让整个方块变大。
   因此停止只添加放大入口的方案。默认改为 Action animation，两侧小夹持片带动
@@ -57,7 +113,7 @@ next_topic: Compact tensor controls and one categorized XYZ table
   无需重传 JSON，未修改生产数据；本轮工作树已清理，其他工作树保持原样。
 
 
-### 当前实现：保留原立方体，按数值播放任意分量组合
+### 历史实现：保留原立方体，按数值播放任意分量组合（已移除数值模式）
 
 - 用户最新要求覆盖下面旧记录的概念示意方案：保留原透明紫色表面、边框、白色
   顶点，直接变形同一组几何。Pull / Push / Shear 可任意叠加，也可切换分量；
