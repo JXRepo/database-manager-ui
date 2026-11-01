@@ -699,10 +699,10 @@ Original surface vertices, glass edges and white corner positions move together;
 the cube is not uniformly scaled or replaced. No hands or tensor arrows are added.
 The finite 2.4-second animation is illustrative: component signs and directions
 determine the action, while its fixed amplitude and playback duration do not
-represent numerical magnitude, material deformation or physical time. The panel
-keeps one short "Illustrative motion · not to scale" note with further context in
-its title. The former Calculated strain option, amplification controls and material
-estimation pipeline have been removed at the user's request.
+represent numerical magnitude, material deformation or physical time. The
+playback button's tooltip explains this behavior. The visible motion caption,
+Calculated strain option, amplification controls and material estimation pipeline
+have been removed at the user's request.
 
 Play/Pause/Resume/Replay and Reset remain explicit, with no automatic playback.
 Selections and records restore the original shape and cancel previous frames.
@@ -718,11 +718,11 @@ mode. Condition/record selectors appear only when multiple entries exist, retain
 supplied order and exact optional step labels, and preserve selected keys across
 records. Missing selected components produce a short status message. Steps are
 labels rather than physical time; frequency/duration never create a load history.
-Supplementary fields are behind Load details in the same panel. Ordinary magnitude
-values already shown in the matrix are omitted from that disclosure; unknown keys
-or non-matrix magnitude containers remain available there. Until initialization
-succeeds, a native expandable fallback in the upper area retains all supplied load
-details, including without JavaScript or when the viewer cannot initialize.
+The interactive tensor panel omits the supplementary Load details disclosure.
+All supplied metadata remains in JSON downloads. Until initialization succeeds,
+a native expandable fallback in the upper area retains all supplied load details,
+including magnitude content outside the nine matrix cells, without JavaScript
+or when the viewer cannot initialize.
 
 Values and face hover use two decimals with half-up rounding; cell titles retain
 full precision and selection state. Units are supplied metadata; strain 1 displays

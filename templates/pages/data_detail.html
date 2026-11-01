@@ -878,11 +878,6 @@ details[open] > .detail-group-summary {
     .bc-tensor-filters button[aria-pressed="true"] { background: #e0ecff; color: #1e40af; border-color: #93b5ec; }
     .bc-reset-btn.bc-motion-btn { left: 12px; right: auto; }
     .bc-tensor-filters button.is-partial { border-style: dashed; }
-    .bc-tensor-details { margin-top: 8px; font-size: .77rem; color: #536176; }
-    .bc-tensor-details[hidden] { display: none; }
-    .bc-tensor-details summary { cursor: pointer; width: fit-content; }
-    .bc-tensor-details dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 8px 0 0; }
-    .bc-tensor-details dt, .bc-tensor-details dd { margin: 0; overflow-wrap: anywhere; }
     .bc-tensor-filters [data-tensor-filter="all"] { margin-left: auto; }
     .bc-tensor-matrix { display: grid; grid-template-columns: 64px repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
     .bc-tensor-axis { display: flex; align-items: center; justify-content: center; color: #536176; font-size: 0.75rem; font-weight: 600; text-align: center; }
@@ -900,7 +895,7 @@ details[open] > .detail-group-summary {
     .bc-tensor-cell[aria-pressed="true"], .bc-tensor-cell.is-hovered { outline: 2px solid var(--bc-component-color, #a21caf); outline-offset: -2px; background: #f1f5f9; }
     .bc-tensor-cell.is-filtered { opacity: 0.5; }
     .bc-tensor-cell:focus-visible { outline: 3px solid var(--bc-component-color, #a21caf); outline-offset: 2px; }
-    .bc-tensor-caption, .bc-tensor-help { font-size: 0.77rem; color: #536176; margin-top: 8px; overflow-wrap: anywhere; }
+    .bc-tensor-help { font-size: 0.77rem; color: #536176; margin-top: 8px; overflow-wrap: anywhere; }
     .bc-tensor-help p { margin: 6px 0; }
     .bc-tensor-status { font-size: 0.82rem; margin: 10px 0 6px; overflow-wrap: anywhere; }
     .bc-tensor-badge { position: absolute; top: 14px; left: 14px; z-index: 2; color: #5b21b6; font-size: 0.78rem; font-weight: 700; pointer-events: none; }
@@ -1717,11 +1712,6 @@ details[open] > .detail-group-summary {
                 </div>
                 <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: i is direction, j is face normal. Faded cells are unselected." title="Toggle components to combine actions. Matching reciprocal shear entries toggle together. Values use two decimals; hover a value for full precision."></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
-                <div class="bc-tensor-caption" data-tensor-action-note title="Motion shows the selected directions and signs. Its amplitude and playback duration are illustrative, not calculated material deformation or physical time.">Illustrative motion · not to scale</div>
-                <details class="bc-tensor-details" data-tensor-details hidden>
-                  <summary>Load details</summary>
-                  <dl data-tensor-details-list></dl>
-                </details>
               </section>
               {% if mechanical_bc_tensors %}
               <section class="bc-tensor-panel" data-bc-tensor-fallback aria-label="Whole cube tensor loads">

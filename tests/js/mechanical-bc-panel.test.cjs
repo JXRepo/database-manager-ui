@@ -115,6 +115,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
   test('compact controls omit the numerical preview and keep the complete matrix', async t => {
     const ev = await page(t, [condition()]);
     assert.equal(await ev('document.querySelectorAll("[data-tensor-mode],[data-tensor-calculated],[data-tensor-scale]").length'), 0);
+    assert.equal(await ev('document.querySelectorAll("[data-tensor-action-note],[data-tensor-details]").length'), 0);
     assert.equal(await ev('document.querySelectorAll("[data-component]").length'), 9);
     assert.equal(await ev('document.querySelector("[data-tensor-description]")'), null);
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
@@ -135,29 +136,16 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
-  test('only supplementary fields appear in collapsed load details and uploaded text stays escaped', async t => {
-    const ev = await page(t, [condition('stress', [{magnitude: {xx: 15}, details: [
-      {key: 'magnitude', display: '{xx: 15.00}'},
-      {key: 'step', display: '0.0123456789'},
-      {key: 'frequency', display: '2.00'},
-      {key: '<img src=x>', display: '<b>raw text</b>'},
-    ]}])]);
-    assert.equal(await ev('document.querySelector("[data-tensor-details]").open'), false);
-    assert.equal(await ev('document.querySelector("[data-tensor-details]").hidden'), false);
-    assert.deepEqual(await ev('Array.from(document.querySelectorAll("[data-tensor-details-list] dt")).map(n=>n.textContent)'), ['step','frequency','<img src=x>']);
-    assert.equal(await ev('document.querySelector("[data-tensor-details-list] dd").textContent'), '0.0123456789');
-    assert.equal(await ev('document.querySelectorAll("[data-tensor-details-list] img,[data-tensor-details-list] b").length'), 0);
-    assert.equal(await ev('JSON.stringify(supplied) === original'), true);
-  });
-
-  test('load details retain magnitude content that the nine matrix cells cannot represent', async t => {
+  test('unsupported magnitude content stays intact without inventing tensor components', async t => {
     const ev = await page(t, [condition('stress', [
       {magnitude: {xx: 15, extra: 9}, details: [{key: 'magnitude', display: '{xx: 15.00, extra: 9.00}'}]},
       {magnitude: [1, 2], details: [{key: 'magnitude', display: '[1.00, 2.00]'}]},
     ])]);
-    assert.match(await ev('document.querySelector("[data-tensor-details-list]").textContent'), /extra: 9.00/);
+    assert.equal(await ev('document.querySelector("[data-component=xx] strong").textContent'), '15.00');
+    assert.deepEqual(await ev('Array.from(view.selected)'), ['xx']);
     await ev('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
-    assert.equal(await ev('document.querySelector("[data-tensor-details-list] dd").textContent'), '[1.00, 2.00]');
+    assert.equal(await ev('document.querySelectorAll("[data-component]:disabled").length'), 9);
+    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /missing or invalid.*xx/);
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 

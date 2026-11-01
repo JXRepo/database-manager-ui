@@ -113,18 +113,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     status.textContent = unavailable.length ? `Selected but missing or invalid in this record: ${unavailable.join(', ')}`
       : actions.length ? '' : 'Select a nonzero component to animate.';
     status.hidden = !status.textContent;
-    const details = panel.querySelector('[data-tensor-details-list]');
-    details.replaceChildren();
-    for (const detail of load?.details || []) {
-      if (detail.key === 'magnitude' && magnitude && typeof magnitude === 'object'
-          && !Array.isArray(magnitude) && Object.keys(magnitude).every(key => TENSOR_COMPONENTS.includes(key))) continue;
-      const key = document.createElement('dt');
-      const value = document.createElement('dd');
-      key.textContent = detail.key;
-      value.textContent = detail.display;
-      details.append(key, value);
-    }
-    panel.querySelector('[data-tensor-details]').hidden = !details.children.length;
     onHighlight('');
     onChange({item: current.item, itemIndex: current.index, load, filter: 'all', selected: new Set(selected), unit,
       actionLabel: actions.join(' + ')});
@@ -137,7 +125,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     const loads = current.item.tensor_loads || [];
     loadIndex = Math.max(0, Math.min(record, loads.length - 1));
     if (fresh) selected = new Set(members());
-    panel.querySelector('[data-tensor-details]').open = false;
     loadSelect.replaceChildren();
     loads.forEach((load, index) => {
       const step = load.details?.find(detail => detail.key === 'step');
@@ -154,7 +141,6 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   conditionSelect.addEventListener('change', () => selectCondition(conditionSelect.value));
   loadSelect.addEventListener('change', () => {
     loadIndex = Number(loadSelect.value);
-    panel.querySelector('[data-tensor-details]').open = false;
     render();
   });
   buttons.forEach(button => button.addEventListener('click', () => {

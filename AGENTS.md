@@ -131,10 +131,10 @@ Current priority:
 - Preserve the original translucent purple cube, glass edges and white corner spheres; animate their own vertices and positions, never replace the model with a separate example
 - Use one compact tensor panel above one ordinary XYZ table; never repeat tensor records in the ordinary table, and omit that table for pure tensor data
 - Ordinary XYZ point/edge/face/whole-cube rows share one header and frame, with category headings inside it and empty categories omitted
-- Keep tensor quantity/unit/mode, optional condition/record selectors, action toggles and the complete matrix; move counts, precision and selection guidance to titles and supplementary fields to Load details
+- Keep tensor quantity/unit/mode, optional condition/record selectors, action toggles and the complete matrix; move counts, precision and selection guidance to titles, and omit the supplementary Load details disclosure from the interactive tensor panel
 - Native tensor details remain in the upper area until the interactive panel initializes, including without JavaScript; retain magnitude content that the nine matrix cells cannot represent
 - Animate small opposing gripping pads that locally tug, squeeze or slide the original surface, hold briefly and rebound exactly; hide pads at rest, on return and on Reset, and avoid uniform scaling, hands or tensor arrows
-- Action motion is illustrative and follows only supplied selected nonzero signs/directions with fixed visible amplitude; keep one short not-to-scale note and never imply physical magnitude, material response or time
+- Action motion is illustrative and follows only supplied selected nonzero signs/directions with fixed visible amplitude; omit the visible motion caption and never imply physical magnitude, material response or time
 - Do not expose Calculated strain, display amplification or material estimation in this section; these were removed at the user's request
 - Initially select all supplied nonzero components while retaining the original shape; Pull, Push and Shear are independent multiselect groups, with Select all, Clear and component toggles
 - Matching reciprocal shear entries toggle together; distinct xy/yx remain independent without averaging or inference

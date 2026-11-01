@@ -250,10 +250,9 @@ async function main() {
   }
   await open('tensor',1440);
   assert.equal(await evaluate('document.querySelectorAll("[data-tensor-mode],[data-tensor-calculated],[data-tensor-scale]").length'),0);
-  assert.match(await evaluate('document.querySelector("[data-tensor-action-note]").textContent'),/Illustrative motion/);
+  assert.equal(await evaluate('document.querySelectorAll("[data-tensor-action-note],[data-tensor-details]").length'),0);
   assert.equal(await evaluate('document.querySelectorAll(".bc-table-frame").length'),0,'Pure tensors have no duplicate XYZ table');
   assert.equal(await evaluate('document.querySelector("[data-bc-tensor-fallback]").checkVisibility()'),false);
-  assert.equal(await evaluate('document.querySelector("[data-tensor-details]").open'),false);
   await screenshot('action-original');
   await actionAnimation(['xx'],'pull');
   await actionAnimation(['xy'],'shear');
