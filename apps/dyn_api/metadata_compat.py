@@ -384,6 +384,8 @@ def _recognized(value, shape, path, conflicts):
             result[name] = _descriptive_values(values, shape["properties"][name]["single_value"])
         return result
     if isinstance(value, list) and shape["items"]:
+        if shape["items"]["numeric"] and all(type(child) in (int, float) for child in value):
+            return value
         result = [_recognized(child, shape["items"], path + (index,), conflicts)
                   for index, child in enumerate(value)]
         return value if all(first is second for first, second in zip(value, result)) else result

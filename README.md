@@ -375,8 +375,13 @@ page is visible. Individual feed rows omit the repeated Public badge.
 It is not filtered by the search form. Longer feeds
 scroll within the panel rather than stretching each card.
 Search scans stored JSON one record at a time and retains display summaries for
-matches rather than every original payload. It still reads the accessible data
-in the application; this is not an indexed search designed for large datasets.
+matches rather than every original payload. Sharing flags are fetched with the
+records, and an access filter restricts the database query before JSON is read.
+Keyword matching and result summaries reuse the same recognized metadata;
+plain numeric curves avoid unnecessary per-sample normalization. Search still
+reads the accessible JSON in the application; this is not an indexed search
+designed for large datasets. See the [search performance verification](docs/qa/2026-11-01-search-performance.md)
+for local measurements and remaining limits.
 
 ## Charts
 

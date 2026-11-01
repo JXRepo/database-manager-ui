@@ -349,7 +349,7 @@ class ExamplePresetSearchTests(TestCase):
         for path in sorted(example_dir.glob("*.json")):
             cls.examples[path.name] = json.loads(path.read_text(encoding="utf-8"))
 
-    def test_every_offered_preset_matches_the_repository_examples(self):
+    def test_every_offered_preset_matches_the_tracked_example(self):
         """
         Verify every offered preset against the complete tracked schema example
         """
@@ -360,11 +360,6 @@ class ExamplePresetSearchTests(TestCase):
                 rows, conditions, errors = parse_conditions(condition_query(rows_by_field[field]))
                 self.assertEqual(errors, [])
                 self.assertTrue(matches_conditions(self.example, conditions))
-                if field == "lattice_structure":
-                    continue
-                for name, data in self.examples.items():
-                    with self.subTest(example=name):
-                        self.assertTrue(matches_conditions(data, conditions))
 
     def test_presets_find_fields_beneath_a_moved_simulation_object(self):
         """
@@ -376,9 +371,9 @@ class ExamplePresetSearchTests(TestCase):
                 self.assertEqual(errors, [])
                 self.assertTrue(matches_conditions({"simulation": [self.example]}, conditions))
 
-    def test_default_comparisons_match_every_preset_in_fixtures_and_local_examples(self):
+    def test_default_comparisons_match_every_preset_in_the_tracked_example(self):
         """
-        Exercise the current form defaults with synthetic and locally available data
+        Exercise the current form defaults against the complete synthetic fixture
         """
         for field, operation, value in self.example_rows:
             operation = get_field_option(field)["default_operator"]
@@ -386,9 +381,49 @@ class ExamplePresetSearchTests(TestCase):
                 rows, conditions, errors = parse_conditions(condition_query((field, operation, value)))
                 self.assertEqual(errors, [])
                 self.assertTrue(matches_conditions({"simulation": [self.example]}, conditions))
-                for name, data in self.examples.items():
-                    with self.subTest(example=name):
-                        self.assertEqual(matches_conditions(data, conditions), field != "lattice_structure")
+
+    def test_local_examples_use_their_own_preset_values(self):
+        """
+        Check local records without assuming identical textures or loading modes
+        """
+        for name, payload in self.examples.items():
+            if isinstance(payload, list):
+                records = payload
+            else:
+                records = [payload] if "identifier" in payload else payload.values()
+            for index, data in enumerate(records):
+                phases = data.get("phase", data.get("Material", []))
+                if isinstance(phases, dict):
+                    phases = [phases]
+                orientation = [phase.get("orientation", {}) for phase in phases]
+                models = [phase.get("constitutive_model", phase.get("constituitve_model", {}))
+                          for phase in phases]
+                sources = {
+                    "texture_type": orientation,
+                    "grain_count": orientation + phases,
+                    "lattice_structure": phases + orientation + models,
+                    "orientation_identifier": orientation,
+                    "elastic_model_name": models,
+                    "plastic_model_name": models,
+                    "loading_type": data.get("mechanical_BC", []),
+                    "loading_mode": data.get("mechanical_BC", []),
+                }
+                for field, saved_operator, fallback in self.example_rows:
+                    value = next((source[field] for source in sources.get(field, [data])
+                                  if field in source), None)
+                    expected = value is not None
+                    if field == "RVE_continuity":
+                        expected = isinstance(value, bool)
+                        value = str(value).lower() if expected else fallback
+                    elif field == "global_temperature":
+                        unit = data.get("units", {}).get("Temperature")
+                        expected = value is not None and unit in ("Kelvin", "K")
+                    value = str(value) if expected else fallback
+                    for operator in {saved_operator, get_field_option(field)["default_operator"]}:
+                        with self.subTest(example=name, record=index, field=field, operator=operator):
+                            rows, conditions, errors = parse_conditions(condition_query((field, operator, value)))
+                            self.assertEqual(errors, [])
+                            self.assertEqual(matches_conditions(data, conditions), expected)
 
     def test_grain_count_searches_both_orientation_and_phase_counts(self):
         """

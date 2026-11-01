@@ -1,16 +1,47 @@
+import cProfile
 from copy import deepcopy
 
 from django.test import SimpleTestCase
 
 from apps.pages.upload_test_data import valid_upload_object, variant_field_names
 from .helpers import validate_json
-from .metadata_compat import field_value, metadata_view
+from .metadata_compat import _recognized, field_value, metadata_view
 
 
 class MetadataCompatibilityTests(SimpleTestCase):
     """
     Accept equivalent metadata spellings while retaining actual requirements
     """
+
+    def test_plain_numeric_curves_do_not_recurse_per_sample(self):
+        """
+        Preserve numeric arrays without interpreting each unchanged sample recursively
+        """
+        samples = [index / 100 for index in range(4096)]
+        data = {"Stress": {"Stress 11": samples}, "total_strain": {"strain_11": [0, 1, -2]}}
+        with cProfile.Profile() as profile:
+            view = metadata_view(data)
+        self.assertEqual(view["stress"]["stress_11"], samples)
+        self.assertEqual(view["total_strain"]["strain_11"], [0, 1, -2])
+        calls = sum(entry.callcount for entry in profile.getstats() if entry.code == _recognized.__code__)
+        self.assertLess(calls, 50)
+        self.assertEqual(data, {"Stress": {"Stress 11": samples}, "total_strain": {"strain_11": [0, 1, -2]}})
+
+    def test_mixed_curve_samples_keep_normalization_and_conflict_checks(self):
+        """
+        Keep wrapped and textual samples on the normal compatibility path
+        """
+        values = [0, 1.25, ["2.5"], [[-3]], True, None, "NaN", "1e999"]
+        data = {"stress": {"stress_11": values, "Stress 11": [0, 1.25, 2.5, -3, True, None, "NaN", "1e999"]}}
+        before = deepcopy(data)
+        conflicts = []
+        view = metadata_view(data, conflicts)
+        self.assertEqual(view["stress"]["stress_11"], [0, 1.25, 2.5, -3, True, None, "NaN", "1e999"])
+        self.assertEqual(conflicts, [])
+        self.assertEqual(data, before)
+        data["stress"]["Stress 11"][0] = 10
+        metadata_view(data, conflicts)
+        self.assertTrue(conflicts)
 
     def test_cpu_specifications_is_an_explicit_processor_alias(self):
         """

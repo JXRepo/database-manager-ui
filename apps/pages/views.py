@@ -17,7 +17,7 @@ from apps.pages.models import Product
 from django.core import serializers
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.urls import reverse
 from django.utils import timezone
@@ -1643,6 +1643,18 @@ def _is_identifier_search_key(key):
 def _collect_basic_search_values(value, key=""):
     """
     Collect meaningful text values from JSON while skipping numeric-only data
+
+    Parameters
+    ----------
+    value : object
+        JSON value or container to inspect.
+    key : str, optional
+        Parent field name used to identify technical fields and identifiers.
+
+    Returns
+    -------
+    list
+        Meaningful values included in the basic keyword search.
     """
     if _is_technical_search_key(key):
         return []
@@ -1663,7 +1675,7 @@ def _collect_basic_search_values(value, key=""):
         return []
 
     if isinstance(value, list):
-        if value and all(_is_number_value(item) for item in value):
+        if value and all(type(item) in (int, float) or _is_number_value(item) for item in value):
             return []
 
         values = []
@@ -2009,11 +2021,27 @@ def fair_assistant_ask_view(request):
     return JsonResponse(reply)
 
 
-def _build_basic_search_text(obj, access_text):
+def _build_basic_search_text(obj, access_text, data=None):
     """
     Build basic-search text from meaningful JSON values and ownership metadata
+
+    Parameters
+    ----------
+    obj : JSONData
+        Accessible data object with its owner available.
+    access_text : str
+        Access description for the current viewer.
+    data : dict or None, optional
+        Already recognized metadata, reused when supplied.
+
+    Returns
+    -------
+    str
+        Combined text for the whole word matcher.
     """
-    values = _collect_basic_search_values(metadata_view(obj.data))
+    if data is None:
+        data = metadata_view(obj.data)
+    values = _collect_basic_search_values(data)
     values.extend([obj.owner.username, access_text])
     return " ".join(str(value) for value in values if str(value).strip()).casefold()
 
@@ -2047,7 +2075,7 @@ def _build_search_text(obj, field):
     return _normalize_search_value(field_map.get(field, ""))
 
 
-def _prepare_list_object(obj):
+def _prepare_list_object(obj, data=None):
     """
     Attach summary fields to one data object
 
@@ -2055,13 +2083,16 @@ def _prepare_list_object(obj):
     ----------
     obj : JSONData
         Stored object to prepare for a result list.
+    data : dict or None, optional
+        Already recognized metadata, reused when supplied.
 
     Returns
     -------
     JSONData
         Object with readable titles, metadata summaries and access badges.
     """
-    data = metadata_view(obj.data)
+    if data is None:
+        data = metadata_view(obj.data)
     summary_fields = _build_summary_fields(data)
     title = _assistant_text(data.get("title"))
     obj.list_display_name = data.get("identifier") or title or "Object"
@@ -2103,9 +2134,29 @@ def _build_data_object_filename(obj):
     return f"{safe_name}.json"
 
 
+def _object_has_shares(obj):
+    """
+    Reuse the query's sharing flag when rendering search summaries
+
+    Parameters
+    ----------
+    obj : JSONData
+        Object with an optional has_shared_users query annotation.
+
+    Returns
+    -------
+    bool
+        Whether any user is explicitly listed as a recipient.
+    """
+    has_shares = getattr(obj, "has_shared_users", None)
+    if has_shares is not None:
+        return has_shares
+    return obj.shared_users.exists()
+
+
 def _get_access_display(obj):
     """
-    Return the access label shown in object summaries.
+    Return the access label shown in object summaries
 
     Parameters
     ----------
@@ -2120,7 +2171,7 @@ def _get_access_display(obj):
     if obj.access_type == "all":
         return "Public"
 
-    if obj.shared_users.exists():
+    if _object_has_shares(obj):
         return "Shared"
 
     return "Private"
@@ -2145,7 +2196,7 @@ def _get_access_badges(obj):
 
     badges = ["Private"]
 
-    if obj.shared_users.exists():
+    if _object_has_shares(obj):
         badges.append("Shared")
 
     return badges
@@ -2528,14 +2579,25 @@ def search_view(request):
     }
 
     filtered_objects = []
+    shares = JSONData.shared_users.through.objects.filter(jsondata_id=OuterRef("pk"))
     data_objects = (
         JSONData.objects
-        .filter(Q(owner=request.user) | Q(access_type="all") | Q(shared_users=request.user))
-        .distinct()
+        .annotate(
+            has_shared_users=Exists(shares),
+            shared_with_viewer=Exists(shares.filter(user_id=request.user.pk)),
+        )
+        .filter(Q(owner=request.user) | Q(access_type="all") | Q(shared_with_viewer=True))
         .select_related("owner")
-        .prefetch_related("shared_users")
         .order_by("-uploaded_at", "-pk")
     )
+    if access == "public":
+        data_objects = data_objects.filter(access_type="all")
+    elif access == "my_data":
+        data_objects = data_objects.filter(owner=request.user)
+    elif access == "my_private":
+        data_objects = data_objects.filter(owner=request.user, access_type="c")
+    elif access == "shared_with_me":
+        data_objects = data_objects.filter(shared_with_viewer=True).exclude(owner=request.user).exclude(access_type="all")
     if not search_performed or search_errors:
         data_objects = data_objects.none()
 
@@ -2545,17 +2607,8 @@ def search_view(request):
             specifically_shared = (
                 obj.owner_id != request.user.id
                 and obj.access_type != "all"
-                and any(user.pk == request.user.pk for user in obj.shared_users.all())
+                and obj.shared_with_viewer
             )
-            if access == "public" and obj.access_type != "all":
-                continue
-            if access == "my_data" and obj.owner_id != request.user.id:
-                continue
-            if access == "my_private":
-                if not (obj.owner_id == request.user.id and obj.access_type == "c"):
-                    continue
-            if access == "shared_with_me" and not specifically_shared:
-                continue
 
             if keyword_terms:
                 if specifically_shared:
@@ -2566,7 +2619,7 @@ def search_view(request):
                     access_text = "public"
                 else:
                     access_text = "shared"
-                full_text = _build_basic_search_text(obj, access_text)
+                full_text = _build_basic_search_text(obj, access_text, data=data)
                 if not matches_whole_words((full_text,), keyword_terms):
                     continue
 
@@ -2587,9 +2640,9 @@ def search_view(request):
             if not common_match or not matches_conditions(obj.data, conditions):
                 continue
 
-            filtered_objects.append(_prepare_list_object(obj))
+            filtered_objects.append(_prepare_list_object(obj, data=data))
         finally:
-            # prefetch caches can retain skipped objects until garbage collection
+            # keep only the identifier after building or skipping this result
             obj.data = {"identifier": data.get("identifier")}
 
     filtered_objects.sort(key=lambda obj: obj.access_type != "all")
