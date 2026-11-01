@@ -51,9 +51,9 @@ apps/pages/assistant_knowledge.py, related assistant fixtures and browser checks
 - [x] Update setup instructions and the assistant's outdated recovery answer.
 - [x] Verify the full flow, errors and disabled JavaScript in desktop Chromium.
 - [x] Run relevant Django tests and node --test tests/js/*.test.cjs.
-- [ ] Review the final diff, resolve material findings, then git add ., commit
+- [x] Review the final diff, resolve material findings, then git add ., commit
   and push as requested by project instructions.
-- [ ] Verify deployed pages separately from push. Report sender configuration
+- [x] Verify deployed pages separately from push. Report sender configuration
   and actual delivery as pending until independently verified.
 
 ## Verification record
@@ -86,3 +86,14 @@ apps/pages/assistant_knowledge.py, related assistant fixtures and browser checks
 - Ruling: actual inbox delivery and Render rollout cannot be established by code
   review. Verify rollout separately and retain the explicit sender/test-inbox
   dependency. Local screenshots were independently inspected after browser tests.
+
+## Published state
+
+- Feature commit `ceb307a` was pushed to `origin/main`.
+- Read-only checks on the public Render site confirmed the new recovery form
+  returns 200, login links to it, malformed reset links show the intended error
+  page, and `/healthz/` returns 200. These checks followed the actual rollout;
+  the first checks still saw the previous version's 404.
+- The live form explicitly reports unavailable recovery email. A verified sender
+  and provider credentials are still required, followed by a real inbox test.
+  No production mail was sent and no production account was changed.
