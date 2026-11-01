@@ -1680,7 +1680,8 @@ class JSONDataSharingTests(TestCase):
         self.assertContains(response, f'method="post" action="{reverse("home_logout")}"', count=2)
         self.assertContains(response, f'name="next" value="{home}"', count=2)
 
-        self.assertEqual(client.get(reverse("home_logout")).status_code, 405)
+        self.assertEqual(client.get(reverse("home_logout")).status_code, 200)
+        self.assertEqual(client.session["_auth_user_id"], str(self.owner.pk))
         rejected = client.post(reverse("home_logout"), {"next": home})
         self.assertEqual(rejected.status_code, 403)
         self.assertEqual(client.session["_auth_user_id"], str(self.owner.pk))
@@ -1695,6 +1696,41 @@ class JSONDataSharingTests(TestCase):
         self.assertContains(response, ">Register</a>", count=2)
         self.assertContains(response, ">Login</a>", count=2)
         self.assertEqual(client.get(reverse("json_data_list")).status_code, 302)
+
+    def test_direct_home_logout_visit_can_complete_logout(self):
+        """
+        Recover a direct logout visit without ending the session on GET
+
+        The rendered form supplies CSRF protection and returns the user home
+        after the explicit submission.
+        """
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(self.owner)
+
+        response = client.get(reverse("home_logout"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(client.session["_auth_user_id"], str(self.owner.pk))
+        self.assertContains(response, f'method="post" action="{reverse("home_logout")}"')
+        self.assertContains(response, 'name="csrfmiddlewaretoken"')
+
+        response = client.post(reverse("home_logout"), {
+            "csrfmiddlewaretoken": client.cookies["csrftoken"].value,
+        }, follow=True)
+
+        self.assertRedirects(response, reverse("index"))
+        self.assertNotIn("_auth_user_id", client.session)
+        self.assertContains(response, ">Login</a>", count=2)
+
+    def test_home_logout_visit_after_signing_out_returns_home(self):
+        """
+        Return signed out visitors home when they reopen the logout address
+        """
+        response = self.client.get(reverse("home_logout"), follow=True)
+
+        self.assertRedirects(response, reverse("index"))
+        self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertContains(response, ">Login</a>", count=2)
 
     def test_workspace_has_home_navigation(self):
         """

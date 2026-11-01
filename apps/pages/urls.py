@@ -2,7 +2,7 @@ from django.urls import path
 from django.urls import reverse_lazy
 from django.contrib.auth import views as auth_views
 from . import views
-from .auth_views import RateLimitedLoginView
+from .auth_views import HomeLogoutView, RateLimitedLoginView
 from .credential_validation import validate_account_credentials
 from .getting_started import getting_started_view
 from .views import account_settings_view, register_view
@@ -48,7 +48,7 @@ urlpatterns = [
     path("login/orcid/", views.orcid_login_view, name="orcid_login"),
     path(
         "logout/",
-        auth_views.LogoutView.as_view(next_page=reverse_lazy("index")),
+        HomeLogoutView.as_view(next_page=reverse_lazy("index")),
         name="home_logout",
     ),
     path("register/", register_view, name="register"),

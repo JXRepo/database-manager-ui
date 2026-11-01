@@ -1,0 +1,32 @@
+{% extends "layouts/base-auth.html" %}
+{% load static %}
+
+{% block title %}Log out{% endblock title %}
+
+{% block loader %}{% endblock loader %}
+
+{% block content %}
+<main class="auth-main">
+  <div class="auth-wrapper v1">
+    <div class="auth-form">
+      <div class="card mb-0">
+        <div class="card-body text-center">
+          <a href="{% url 'index' %}" class="d-inline-flex align-items-center justify-content-center gap-2 text-dark">
+            <span class="flex-shrink-0">
+              <img src="{% static 'assets/images/logo-icon.svg' %}" alt="" width="35" height="35">
+            </span>
+            <span class="f-w-600">Materials Simulation Data Platform</span>
+          </a>
+          <h1 class="h4 f-w-500 mt-4 mb-3">Log out?</h1>
+          <p class="text-muted">Log out of your account and return to the home page.</p>
+          <form method="post" action="{% url 'home_logout' %}" class="d-flex justify-content-center gap-2 mt-4">
+            {% csrf_token %}
+            <a href="{% url 'index' %}" class="btn btn-outline-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Log out</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock content %}

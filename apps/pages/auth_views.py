@@ -1,7 +1,8 @@
 from django.contrib import admin
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView, LogoutView
 from django.db import DatabaseError
 from django.http import Http404, HttpResponse
+from django.shortcuts import redirect
 
 from .forms import SignInForm
 from .rate_limits import consume_rate_limit, get_client_identifier
@@ -86,6 +87,40 @@ def pilot_disabled_auth_view(request, *args, **kwargs):
         Always raised so the disabled route is not exposed.
     """
     raise Http404
+
+
+class HomeLogoutView(LogoutView):
+    """
+    Offer a logout form on direct visits while keeping logout protected by POST
+    """
+
+    http_method_names = ["get", "head", "post", "options"]
+    template_name = "accounts/logout.html"
+
+    def get(self, request, *args, **kwargs):
+        """
+        Show the logout form or return an already signed out visitor home
+
+        Opening or refreshing the logout address must not end a login session.
+        The inherited POST handler keeps Django's CSRF and redirect checks.
+
+        Parameters
+        ----------
+        request : HttpRequest
+            Request for the logout page.
+        *args : tuple
+            Positional arguments supplied by Django.
+        **kwargs : dict
+            Keyword arguments supplied by Django.
+
+        Returns
+        -------
+        HttpResponse
+            Logout form or redirect to the home page.
+        """
+        if not request.user.is_authenticated:
+            return redirect("index")
+        return super().get(request, *args, **kwargs)
 
 
 class RateLimitedLoginView(LoginView):
