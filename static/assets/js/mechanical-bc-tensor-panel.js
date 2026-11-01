@@ -1,4 +1,4 @@
-import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, tensorComponentMeaning, tensorComponentVisible} from './mechanical-bc-tensor.js';
+import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, tensorComponentLabel, tensorComponentMeaning, tensorComponentVisible} from './mechanical-bc-tensor.js';
 
 export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
@@ -35,11 +35,11 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     loadSelect.value = String(loadIndex);
     matrix.replaceChildren();
     cells = [];
-    for (const text of ['i / j', 'X face', 'Y face', 'Z face']) {
+    for (const text of ['Direction / Face', 'X face', 'Y face', 'Z face']) {
       const heading = document.createElement('span');
       heading.className = 'bc-tensor-axis';
       heading.textContent = text;
-      if (text === 'i / j') heading.title = 'i = direction; j = face normal';
+      if (text === 'Direction / Face') heading.title = 'Lowercase x/y/z indicates direction; uppercase X/Y/Z identifies opposite face pairs.';
       heading.setAttribute('aria-hidden', 'true');
       matrix.appendChild(heading);
     }
@@ -47,11 +47,12 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       if (key[1] === 'x') {
         const heading = document.createElement('span');
         heading.className = 'bc-tensor-axis';
-        heading.textContent = `${key[0].toUpperCase()} direction`;
+        heading.textContent = `${key[0]} direction`;
         matrix.appendChild(heading);
       }
       const value = magnitude?.[key];
       const supplied = magnitude && Object.hasOwn(magnitude, key);
+      const componentLabel = tensorComponentLabel(key);
       const cell = document.createElement('button');
       cell.type = 'button';
       cell.className = 'bc-tensor-cell';
@@ -60,10 +61,10 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       cell.setAttribute('aria-pressed', String(selected.has(key)));
       cell.classList.toggle('is-filtered', !selected.has(key));
       const raw = typeof value === 'object' ? JSON.stringify(value) : String(value);
-      cell.title = (supplied ? `${key}: ${raw}${unit ? ` ${unit}` : ''}` : `${key}: not supplied`)
+      cell.title = (supplied ? `${componentLabel}: ${raw}${unit ? ` ${unit}` : ''}` : `${componentLabel}: not supplied`)
         + (selected.has(key) ? ' · Selected' : ' · Not selected');
       const label = document.createElement('span');
-      label.textContent = key;
+      label.textContent = componentLabel;
       const number = document.createElement('strong');
       number.textContent = supplied ? formatTensorValue(value) : '—';
       cell.append(label, number);
@@ -76,7 +77,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
         action.textContent = meaning.effect === 'shear' ? 'Shear' : meaning.action;
         cell.appendChild(action);
       }
-      cell.setAttribute('aria-label', `${key}: ${supplied ? number.textContent : 'Not supplied'}${unit && supplied ? ` ${unit}` : ''}${meaning ? ` · ${meaning.action}` : ''}`);
+      cell.setAttribute('aria-label', `${componentLabel}, ${key[0]} direction on ${key[1].toUpperCase()} faces: ${supplied ? number.textContent : 'Not supplied'}${unit && supplied ? ` ${unit}` : ''}${meaning ? ` · ${meaning.action}` : ''}`);
       cell.addEventListener('click', () => {
         const reverse = key[1] + key[0];
         const keys = reverse !== key && isTensorNumber(magnitude?.[reverse]) && magnitude[reverse] === value ? [key, reverse] : [key];
@@ -110,7 +111,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     const actions = ['pull','push','slide'].filter(mode => members(mode).some(key => selected.has(key))).map(mode => labels[mode]);
     const unavailable = active.filter(key => !isTensorNumber(magnitude?.[key]));
     const status = panel.querySelector('[data-tensor-status]');
-    status.textContent = unavailable.length ? `Selected but missing or invalid in this record: ${unavailable.join(', ')}`
+    status.textContent = unavailable.length ? `Selected but missing or invalid in this record: ${unavailable.map(tensorComponentLabel).join(', ')}`
       : actions.length ? '' : 'Select a nonzero component to animate.';
     status.hidden = !status.textContent;
     onHighlight('');

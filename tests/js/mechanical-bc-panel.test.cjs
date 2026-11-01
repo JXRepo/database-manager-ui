@@ -117,6 +117,10 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('document.querySelectorAll("[data-tensor-mode],[data-tensor-calculated],[data-tensor-scale]").length'), 0);
     assert.equal(await ev('document.querySelectorAll("[data-tensor-action-note],[data-tensor-details]").length'), 0);
     assert.equal(await ev('document.querySelectorAll("[data-component]").length'), 9);
+    assert.deepEqual(await ev('Array.from(document.querySelectorAll("[data-component] > span")).map(label => label.textContent)'),
+      ['xX','xY','xZ','yX','yY','yZ','zX','zY','zZ']);
+    assert.deepEqual(await ev('Array.from(document.querySelectorAll(".bc-tensor-axis")).map(label => label.textContent)'),
+      ['Direction / Face','X face','Y face','Z face','x direction','y direction','z direction']);
     assert.equal(await ev('document.querySelector("[data-tensor-description]")'), null);
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
@@ -132,7 +136,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     await ev('document.querySelector("[data-component=xx]").click();document.querySelector("[data-component=yx]").click()');
     assert.deepEqual(await ev('Array.from(view.selected).sort()'), ['xy','yx','yy']);
     assert.equal(await ev('document.querySelector("[data-component=xx] strong").textContent'), '0.02');
-    assert.equal(await ev('document.querySelector("[data-component=yx]").title'), 'yx: 0.003 - · Selected');
+    assert.equal(await ev('document.querySelector("[data-component=yx]").title'), 'yX: 0.003 - · Selected');
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
@@ -145,7 +149,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.deepEqual(await ev('Array.from(view.selected)'), ['xx']);
     await ev('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
     assert.equal(await ev('document.querySelectorAll("[data-component]:disabled").length'), 9);
-    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /missing or invalid.*xx/);
+    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'), /missing or invalid.*xX/);
     assert.equal(await ev('JSON.stringify(supplied) === original'), true);
   });
 
@@ -162,7 +166,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     assert.equal(await ev('document.querySelector("[data-component=yx] strong").textContent'),'-2.35');
     await ev('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
     assert.deepEqual(await ev('Array.from(view.selected)'),['xx','yx']);
-    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'),/missing or invalid.*yx/);
+    assert.match(await ev('document.querySelector("[data-tensor-status]").textContent'),/missing or invalid.*yX/);
     assert.deepEqual(await ev('tensorArrows(view.load.magnitude,view.filter,view.selected).map(a=>[a.component,a.value])'),[['xx',-10],['xx',-10]]);
     assert.equal(await ev('view.actionLabel'), 'Push');
     assert.equal(await ev('document.querySelector("[data-component=yx]").disabled'),true);
@@ -175,7 +179,7 @@ describe('whole RVE tensor panel in Chromium', {timeout: 30000}, () => {
     await ev('document.querySelector("[data-tensor-clear]").click();document.querySelector("[data-component=xy]").click()');
     assert.deepEqual(await ev('Array.from(view.selected)'),['xy']);
     assert.equal(await ev('document.querySelector("[data-component=yx] strong").textContent'),'0.00');
-    assert.equal(await ev('document.querySelector("[data-component=yx]").title'),'yx: -0.001 - · Not selected');
+    assert.equal(await ev('document.querySelector("[data-component=yx]").title'),'yX: -0.001 - · Not selected');
     assert.equal(await ev('view.actionLabel'), 'Shear');
   });
 

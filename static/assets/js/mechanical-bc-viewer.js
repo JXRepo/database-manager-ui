@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import {tensorFaceLoads, formatTensorValue, tensorComponentMeaning} from './mechanical-bc-tensor.js';
+import {tensorFaceLoads, formatTensorValue, tensorComponentLabel, tensorComponentMeaning} from './mechanical-bc-tensor.js';
 import {createTensorPanel} from './mechanical-bc-tensor-panel.js';
 import {createTensorMotion} from './mechanical-bc-motion.js';
 import {createTensorAction} from './mechanical-bc-action-view.js';
@@ -99,7 +99,7 @@ function formatBoundaryConditionHover(item) {
 
   const axes = (item.axes || []).map(axis => {
     const status = String(axis.status || "empty").toLowerCase();
-    return `${axis.direction}: ${status}`;
+    return `${axis.direction.toLowerCase()}: ${status}`;
   });
 
   return [item.vertex || item.target_type || "Boundary condition", item.quantity_label || '']
@@ -112,7 +112,7 @@ function formatAxisLoadHover(item, axis) {
   const location = item.target_type === 'Whole cube' ? 'Whole cube'
     : `${item.target_type || 'Boundary'} · ${item.vertex || ''}`;
   return [location, item.quantity_label || item.loading_type || 'Load',
-    `${axis.direction}: ${axis.status}`, axis.load_summary || 'No load value supplied'].join('\n');
+    `${axis.direction.toLowerCase()}: ${axis.status}`, axis.load_summary || 'No load value supplied'].join('\n');
 }
 
 function createMaterials(hasWholeCondition = false) {
@@ -719,7 +719,7 @@ function createWholeCubeControls(container, items, state, materials, tooltip) {
     heading.textContent = `Whole cube · ${items[0].item.quantity_label || 'Constraints'}`;
   }
   const explanation = document.createElement('span');
-  explanation.textContent = 'XYZ loads · sign shows direction';
+  explanation.textContent = 'xyz loads · sign shows direction';
   caption.append(heading, explanation);
   container.parentElement.insertAdjacentElement('beforebegin', caption);
   const legend = container.closest('.bc-layout').querySelector('.bc-legend');
@@ -894,8 +894,8 @@ function drawTensorLoading(view, group, selectableMeshes) {
     const name = (load.faceSign > 0 ? '+' : '-') + load.normal.toUpperCase() + ' face';
     const values = load.components.map(entry => {
       const meaning = tensorComponentMeaning(entry.component, entry.value, isStrain);
-      return entry.component + ': ' + formatTensorValue(entry.value) + (view.unit ? ' ' + view.unit : '')
-        + ' · ' + meaning.action + ' · ' + (entry.sign > 0 ? '+' : '-') + entry.direction.toUpperCase() + ' direction';
+      return tensorComponentLabel(entry.component) + ': ' + formatTensorValue(entry.value) + (view.unit ? ' ' + view.unit : '')
+        + ' · ' + meaning.action + ' · ' + (entry.sign > 0 ? '+' : '-') + entry.direction + ' direction';
     });
     addMesh(group, face, (isStrain ? 'Strain on ' : 'Stress on ') + name + '\n' + values.join('\n'), selectableMeshes);
     const corners = [
@@ -1198,8 +1198,8 @@ function renderMechanicalBcViewer() {
     if (scalarItems.length) {
       const referenceNote = document.createElement('span');
       referenceNote.className = 'bc-legend-item';
-      referenceNote.textContent = 'Gray outline: XYZ reference';
-      referenceNote.title = 'XYZ markers stay at their original positions while the tensor action is illustrated.';
+      referenceNote.textContent = 'Gray outline: xyz reference';
+      referenceNote.title = 'x/y/z markers stay at their original positions while the tensor action is illustrated.';
       legend.appendChild(referenceNote);
     } else legend.hidden = true;
     const unitsElement = document.getElementById('plot-units-data');

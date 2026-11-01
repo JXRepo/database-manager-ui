@@ -672,23 +672,29 @@ stress and strain retain distinct quantity labels. Scalar force/displacement use
 slim purple axis arrows; tensor actions appear directly on the large left cube,
 with compact controls and a numeric matrix on the right. Missing units are labeled as not supplied.
 The local legend uses `Local loads` and `Fixed constraint` without repeating
-quantity names, units or an `X/Y/Z directions` label.
+quantity names, units or an `x/y/z directions` label.
 
 Whole cube stress and strain tensors retain the original translucent purple 3D
 cube, glass edges and eight white corner spheres. The matrix stays to its right,
-with rows for direction `i` and columns for face normal `j`; the bottom-right XYZ
-guide keeps its existing orientation. No replacement cube or right-side examples
-are drawn. On opening a condition, all supplied nonzero components are selected
-and the cube remains undeformed until `Play action` is clicked.
+with lowercase `x/y/z` direction rows and uppercase `X/Y/Z` face columns.
+Component labels use `xX`, `xY`, and so on: the first letter is the direction,
+and the second identifies the opposing face pair. This is a display convention;
+original JSON keys such as `xx` and `xy` remain unchanged in storage and exports.
+Face labels retain signs (`+X` and `-X`); direction signs use lowercase (`+x`
+and `-x`). The bottom-right `x/y/z` guide keeps its existing orientation.
+The scalar boundary table and hover labels also use lowercase directions.
+No replacement cube or right-side examples are drawn. On opening a condition,
+all supplied nonzero components are selected and the cube remains undeformed
+until `Play action` is clicked.
 
 Pull, Push and Shear are independent group toggles, with Select all and Clear.
 Users can combine any groups or individual matrix components. Selected/available
 counts are in button titles and accessible labels instead of adding visible text.
 Positive normal stress is Pull, negative is Push; strain uses Extend and Shorten.
-Matching reciprocal shear entries toggle together. Distinct xy/yx values remain
+Matching reciprocal shear entries toggle together. Distinct xY/yX values remain
 visible and independently selectable, without averaging or inventing entries.
 The complete matrix remains visible; faded cells are unselected. Its row/column
-labels identify direction i and face normal j. Hover/focus link values to opposing
+labels distinguish directions from face pairs. Hover/focus link values to opposing
 faces; shared faces retain all components and use purple for mixed actions.
 Zero, missing and invalid components produce no highlighted faces.
 
@@ -709,11 +715,11 @@ Selections and records restore the original shape and cancel previous frames.
 Inspection, camera interaction, hidden tabs, offscreen views and reduced-motion
 preference changes pause the current action; manual playback remains available.
 Scalar/local markers retain their reference coordinates, with a gray original
-outline and a short reference legend in mixed views. The camera, bottom-right XYZ,
+outline and a short reference legend in mixed views. The camera, bottom-right xyz,
 original values, stored JSON and exports remain unchanged.
 
 Each whole-cube tensor appears only in the upper tensor panel, never again in the
-ordinary XYZ table. The heading retains its quantity, supplied unit and loading
+ordinary xyz table. The heading retains its quantity, supplied unit and loading
 mode. Condition/record selectors appear only when multiple entries exist, retain
 supplied order and exact optional step labels, and preserve selected keys across
 records. Missing selected components produce a short status message. Steps are
@@ -727,7 +733,7 @@ or when the viewer cannot initialize.
 Values and face hover use two decimals with half-up rounding; cell titles retain
 full precision and selection state. Units are supplied metadata; strain 1 displays
 as (-). A fixed envelope keeps the cube centered between selections. The positive
-XYZ guide follows camera rotation and Reset, with X down-left, Y down-right and Z
+xyz guide follows camera rotation and Reset, with x down-left, y down-right and z
 upward in the initial positive-corner view; it stays 124 × 102 CSS pixels on desktop.
 
 Scalar point, edge and face force/displacement loads retain their axis display.
@@ -752,13 +758,13 @@ Whole cube conditions
 do not add eight corner labels; mixed views retain the labels needed by local point,
 edge and face targets.
 The outer markers rotate with the cube in the same perspective view, with no heading
-or X/Y/Z text beside them. The table, hover and orientation guide retain the
+or x/y/z text beside them. The table, hover and orientation guide retain the
 directions. The side of each arrow group follows its load sign; fixed markers
 use the positive axis side. These positions illustrate the whole cube axis
 conditions; the uploaded XYZ data do not specify a loaded local face. Multiple scalar
 whole cube conditions have a selector and remain separate; their original values
 and all table rows are retained. A caption above the cube names the active scalar
-quantity and its unit, including for a single condition. `XYZ loads · sign shows
+quantity and its unit, including for a single condition. `xyz loads · sign shows
 direction` distinguishes this representation from the tensor's opposing faces;
 a negative force or displacement is not labeled as compression.
 Whole cube conditions tint the existing cube surface translucent light purple,
@@ -786,13 +792,13 @@ use one stem and one crossbar per blue T marker. The stem
 retains its X, Y or Z direction while the crossbar turns with the camera to
 remain perpendicular in the screen projection. An axis viewed directly along
 its length is foreshortened. Face constraint markers retain their
-existing style. The table and hover retain the complete X/Y/Z constraints.
+existing style. The table and hover retain the complete x/y/z constraints.
 Face boundaries use a translucent fill without extra thick perimeter rods or a
 center dot. Each loaded direction and sign uses one arrow starting at the face
 center, including both normal and tangential directions. The shared origin
 illustrates the face condition without changing it into a point load or defining
 a spatial distribution.
-Ordinary XYZ targets share one table, one header and one outer frame, with category
+Ordinary xyz targets share one table, one header and one outer frame, with category
 rows in the order Points, Edges, Faces, then Whole cube. Empty categories are omitted;
 pure tensor data has no ordinary table. Tensor records are excluded without
 changing the viewer data or source indexes.
@@ -811,7 +817,7 @@ cube's condition indexes,
 tensor load entries, stored JSON, or exports.
 The native tensor fallback keeps each supplied record expandable in the upper
 area; it is hidden when the interactive tensor panel initializes successfully.
-The table labels the combined column `Loading Type / Mode`. X/Y/Z labels stay on
+The table labels the combined column `Loading Type / Mode`. x/y/z labels stay on
 one line in evenly spaced columns. Load details expand independently below their
 own labels, so multiple panels can stay open together. The row grows to fit the
 panels without moving sibling labels or covering other rows; click a label again

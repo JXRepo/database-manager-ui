@@ -30,7 +30,7 @@ test('scalar arrow hover identifies its quantity, axis, value and supplied step'
   assert.match(result, /Point/);
   assert.match(result, /V111/);
   assert.match(result, /Force \(N\)/);
-  assert.match(result, /X/);
+  assert.match(result, /x: loaded/);
   assert.match(result, /12\.50/);
   assert.match(result, /step: 10001/);
   assert.doesNotMatch(tooltip({...item, quantity_label:'Displacement · unit not supplied'},

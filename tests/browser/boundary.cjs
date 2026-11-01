@@ -110,6 +110,8 @@ async function main() {
     await evaluate('document.fonts.ready');
     await evaluate(`document.querySelector('.bc-panel').scrollIntoView({block:'start',behavior:'instant'});window.scrollBy({top:-100,behavior:'instant'});new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
     assert.equal(await evaluate('__bcTest.state.renderer.getContext().isContextLost()'),false);
+    assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".bc-axis-overlay text")).map(label => label.textContent)'), ['x','y','z']);
+    assert.equal(await evaluate('Array.from(document.querySelectorAll(".bc-axis-list .bc-status")).every(label => /^[xyz]:/.test(label.textContent.trim()))'),true);
   }
   async function screenshot(name) {
     if (!process.env.BC_BROWSER_REPORT_DIR) return;
@@ -312,7 +314,7 @@ async function main() {
   await selectOnly('[data-component=xx]');
   const tensorHover=await evaluate(`(()=>{const mesh=__bcTest.state.tensorMeshes.find(m=>m.userData.components.includes('xx')&&m.position.x>0);const p=new __bcThree.Box3().setFromObject(mesh).getCenter(new __bcThree.Vector3()).project(__bcTest.state.camera);const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2}})()`);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',...tensorHover});
-  assert.match(await evaluate(`${visibleTooltip}?.textContent||''`),/Stress on \+X face[\s\S]*xx: 15\.00 MPa[\s\S]*Pull/);
+  assert.match(await evaluate(`${visibleTooltip}?.textContent||''`),/Stress on \+X face[\s\S]*xX: 15\.00 MPa[\s\S]*Pull/);
   assert.equal(await evaluate('document.querySelector("[data-component=xx]").classList.contains("is-hovered")'),true);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:0,y:0});
   assert.equal(await evaluate(`!!(${visibleTooltip})`),false);
@@ -326,16 +328,16 @@ async function main() {
   const sharedFaceHover=await evaluate(`(()=>{const mesh=__bcTest.state.tensorMeshes.find(m=>m.userData.normal==='x'&&m.userData.faceSign===1);const p=mesh.position.clone().project(__bcTest.state.camera);const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();return{x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2}})()`);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',...sharedFaceHover});
   const sharedTooltip=await evaluate(`${visibleTooltip}?.textContent||''`);
-  assert.match(sharedTooltip,/xx: -15\.00 MPa · Push · -X direction/);
-  assert.match(sharedTooltip,/yx: -7\.00 MPa · Slide · -Y direction/);
-  assert.match(sharedTooltip,/zx: 6\.00 MPa · Slide · \+Z direction/);
+  assert.match(sharedTooltip,/xX: -15\.00 MPa · Push · -x direction/);
+  assert.match(sharedTooltip,/yX: -7\.00 MPa · Slide · -y direction/);
+  assert.match(sharedTooltip,/zX: 6\.00 MPa · Slide · \+z direction/);
   assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-component].is-hovered")).map(c=>c.dataset.component)'),['xx','yx','zx']);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:0,y:0});
   await selectOnly('[data-component=yx]');
   assert.equal(await tensorCount(),2);
   await evaluate('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
   assert.equal(await tensorCount(),0);
-  assert.match(await evaluate('document.querySelector("[data-tensor-status]").textContent'),/missing or invalid.*yx/);
+  assert.match(await evaluate('document.querySelector("[data-tensor-status]").textContent'),/missing or invalid.*yX/);
   assert.match(await evaluate('document.querySelector("[data-tensor-load]").selectedOptions[0].textContent'),/step 3$/);
   assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),true);
   await evaluate('document.querySelector("[data-tensor-load]").value="2";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
@@ -407,7 +409,7 @@ async function main() {
     assert.equal(await evaluate('document.querySelectorAll(".bc-table thead").length'),1);
     assert.deepEqual(await evaluate('Array.from(document.querySelectorAll(".bc-table tbody")).map(n=>n.dataset.bcTargetType)'), ['Point','Edge','Face','Whole cube']);
     assert.equal(await evaluate('document.querySelectorAll(".bc-table .bc-tensor-loads").length'),0);
-    assert.match(await evaluate('document.querySelector(".bc-legend").textContent'),/Gray outline: XYZ reference/);
+    assert.match(await evaluate('document.querySelector(".bc-legend").textContent'),/Gray outline: xyz reference/);
     await evaluate('document.querySelector(".bc-whole-select").value="1";document.querySelector(".bc-whole-select").dispatchEvent(new Event("change"))');
     assert.match(await evaluate('document.querySelector("[data-bc-scalar-legend]").textContent'), /Displacement \(mm\)/);
     assert.match(await evaluate('document.querySelector(".bc-whole-heading").textContent'),/Displacement \(mm\)/);

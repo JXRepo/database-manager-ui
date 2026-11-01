@@ -126,7 +126,8 @@ Current priority:
 - Detail curve hover detects proximity to the full plotted segments, highlights a real recorded sample with a larger dot, shows its zero-based index and precise X/Y values with units, and clears away from the curve or canvas; never invent interpolated sample values or sort cyclic curves for hit testing
 - Detail curve canvases are centered at 720 × 480 CSS pixels on desktop; cap their width at the available panel space, keep status text outside the canvas parent, and let Chart.js resize to the displayed dimensions
 - Display whole cube stress or strain tensor loads with all their steps and components; never interpret a tensor as an X, Y, or Z scalar load or guess a directional arrow
-- Whole RVE tensor schematics use the explicitly labeled ij direction/face-normal convention, highlighted opposing faces and linked numeric matrices; preserve distinct xy/yx values and never infer missing components
+- Whole RVE tensor schematics retain direction/face-normal semantics, highlighted opposing faces and linked numeric matrices; preserve distinct xy/yx values and never infer missing components
+- Display boundary directions as lowercase x/y/z and faces as uppercase X/Y/Z, with tensor labels xX/xY/etc.; apply this convention to matrix rows, columns, tooltips, scalar boundary labels and the coordinate guide, retain signed face labels such as +X/-X, and preserve original JSON keys and internal component names
 - Replace tensor arrows with one highlighted surface per affected opposite face, grouping all supplied nonzero components on that face; use neutral purple for mixed actions and show every associated component, unit and signed direction on face hover
 - Preserve the original translucent purple cube, glass edges and white corner spheres; animate their own vertices and positions, never replace the model with a separate example
 - Use one compact tensor panel above one ordinary XYZ table; never repeat tensor records in the ordinary table, and omit that table for pure tensor data
@@ -140,7 +141,7 @@ Current priority:
 - Matching reciprocal shear entries toggle together; distinct xy/yx remain independent without averaging or inference
 - Play/Pause/Resume/Replay are explicit and finite (2.4 seconds); initial load and selection/record changes retain or restore the original shape without autoplay, and Reset restores shape and camera
 - Keep playback separate from physical time and supplied steps; inspection, camera interaction, hidden tabs, offscreen views and reduced-motion changes pause at the current shape, while manual replay remains available
-- Scalar/local markers remain on reference coordinates with an original gray outline and explanation in mixed views; preserve bottom-right XYZ, camera, units, data and exports
+- Scalar/local markers remain on reference coordinates with an original gray outline and explanation in mixed views; preserve bottom-right xyz, camera, units, data and exports
 - Keep the complete matrix on the right, label faded cells as unselected, link hover/focus to faces, preserve missing selections across records and omit highlights for zero/missing/invalid components
 - Edge and face scalar loads use one arrow per supplied loaded direction/sign, sharing the exact edge midpoint or face center without a center marker
 - Scalar load signs indicate direction only, never compression from a negative force/displacement; retain original tensor signs even when rounded to zero
@@ -148,7 +149,7 @@ Current priority:
 - Tensor load navigation follows the supplied entry order and exact step values; do not invent intermediate steps, combine separate tensor conditions, or simulate time histories from frequency/duration metadata
 - Show one Load record selector only for multiple tensor records; preserve optional fractional or integer step labels without treating them as time, and never treat separate scalar X/Y/Z entries as a timeline
 - Show boundary load numbers with two decimal places and half-up rounding, retaining full integer step values and original stored/exported numbers; label the combined column Loading Type / Mode
-- Keep X/Y/Z boundary labels on one line in evenly spaced columns; allow independent load panels to stay open together below their own labels, growing the row without shifting sibling labels or overlapping other rows
+- Keep x/y/z boundary labels on one line in evenly spaced columns; allow independent load panels to stay open together below their own labels, growing the row without shifting sibling labels or overlapping other rows
 - Search result pages should not include delete actions unless explicitly requested
 - Preserve the existing visual style unless a change is requested
 - Avoid large redesigns unless explicitly requested

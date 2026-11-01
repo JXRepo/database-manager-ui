@@ -26,6 +26,23 @@ JavaScript. README and AGENTS guidance now reflect the requested removal.
   entries, including subtests. No new failures appeared compared with the prior
   search verification. All browser cases passed in this run.
 
+## Direction and face notation
+
+Boundary labels now use lowercase `x/y/z` for directions and uppercase `X/Y/Z`
+for face pairs. Matrix components display `xX`, `xY`, and so on; matrix headings,
+face hover, scalar labels and the coordinate guide follow the same convention.
+Signed face labels such as `+X` and `-X` still distinguish opposite faces.
+Original component keys, values, selection behavior and JSON exports are unchanged.
+
+- Existing panel and hover checks failed with the old notation before the change.
+- All 137 JavaScript tests and all 12 focused Django/boundary browser tests passed.
+  Browser coverage includes signed directions, opposite faces, selections, raw
+  exports, no-JavaScript fallback and desktop widths of 1280, 1440 and 1920 pixels.
+- Tensor and point-boundary screenshots were visually inspected: mixed-case
+  components, row headings and lowercase coordinate labels remain readable.
+- The full Django suite ran 903 tests in 152.870 seconds, with no skips and the
+  same 15 existing failure entries listed below. All browser cases passed.
+
 ## Existing failures
 
 The following methods still assert obsolete upload wording or a previous cube

@@ -1,6 +1,10 @@
 export const TENSOR_COMPONENTS = ['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'];
 export const TENSOR_COLORS = {x: '#b45309', y: '#0f766e', z: '#7c3aed'};
 
+export function tensorComponentLabel(component) {
+  return component[0] + component[1].toUpperCase();
+}
+
 export function isTensorNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
