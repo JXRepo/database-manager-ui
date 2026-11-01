@@ -55,7 +55,59 @@ def axis_scale(values, counts=False):
             "precision": context.prec}
 
 
-def bar_plot(rows, limit=6):
+def category_label_lines(label, width=122):
+    """
+    Wrap full category names within the SVG label column
+
+    Conservative character widths match the 12 pixel Arial labels. Explicit
+    lines give the server enough information to reserve space without JavaScript.
+
+    Parameters
+    ----------
+    label : str
+        Complete category name.
+    width : int, optional
+        Available label width in SVG coordinates.
+
+    Returns
+    -------
+    list of str
+        Complete text split at spaces or within an oversized word.
+    """
+    lines = []
+    line = ""
+    widths = []
+    for character in " ".join(label.split()):
+        if character == " ":
+            advance = 4
+        elif character in "iljItfr.,:;!'|()[]":
+            advance = 4.5
+        elif character in "MWmw@%" or not character.isascii():
+            advance = 13
+        elif character.isupper():
+            advance = 9
+        else:
+            advance = 7
+        while widths and sum(widths) + advance > width:
+            space = line.rfind(" ")
+            if space >= 0:
+                lines.append(line[:space + 1])
+                line, widths = line[space + 1:], widths[space + 1:]
+            else:
+                lines.append(line)
+                line, widths = "", []
+        if character == " " and not line:
+            if lines:
+                lines[-1] += character
+            continue
+        line += character
+        widths.append(advance)
+    if line:
+        lines.append(line.rstrip())
+    return lines or [""]
+
+
+def bar_plot(rows, limit=6, wrap_labels=False):
     """
     Position category counts on one labelled count axis
 
@@ -65,6 +117,8 @@ def bar_plot(rows, limit=6):
         Labels, counts and links for the current object selection.
     limit : int, optional
         Maximum rows drawn in the initial or expanded category chart.
+    wrap_labels : bool, optional
+        Show full labels on multiple lines with enough room for each row.
 
     Returns
     -------
@@ -73,13 +127,22 @@ def bar_plot(rows, limit=6):
     """
     shown = rows[:limit]
     scale = axis_scale([row["count"] for row in shown], counts=True)
-    baseline = 26 + max(len(shown), 1) * 42
+    top = 14
     bars = []
-    for index, row in enumerate(shown):
+    for row in shown:
+        lines = category_label_lines(row["label"]) if wrap_labels else [row["label"]]
+        label_height = len(lines) * 16 if wrap_labels else 22
+        row_height = max(32, label_height)
+        y = top + (row_height - 22) / 2
         width = float(Decimal(row["count"]) / scale["maximum"]) * 172
-        bars.append({**row, "width": round(width, 2), "y": 19 + index * 42,
-                     "label_y": 34 + index * 42, "value_x": round(134 + width + 7, 2)})
+        bars.append({**row, "width": round(width, 2), "y": y,
+                     "label_y": y + 15, "value_x": round(134 + width + 7, 2),
+                     "label_lines": lines, "label_top": top + (row_height - label_height) / 2,
+                     "label_height": label_height, "row_top": top, "row_height": row_height})
+        top += row_height + 10
+    baseline = top + 12 if bars else 68
     return {"rows": bars, "all_rows": rows, "height": baseline + 43, "baseline": baseline,
+            "wrap_labels": wrap_labels,
             "ticks": [{**tick, "x": round(134 + tick["position"] * 172, 2)} for tick in scale["ticks"]]}
 
 

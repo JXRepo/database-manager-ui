@@ -1,10 +1,10 @@
-<svg class="charts-bar-svg{% if lollipop %} charts-lollipop-svg{% endif %}" viewBox="0 0 {% if lollipop %}420 {{ plot.height|add:'4' }}{% else %}340 {{ plot.height }}{% endif %}" role="group" aria-label="{% if category %}{{ category.title }} counts{% else %}Available mechanical results{% endif %}"{% if category %} data-category="{{ category.key }}"{% endif %} xmlns="http://www.w3.org/2000/svg">
+<svg class="charts-bar-svg{% if lollipop %} charts-lollipop-svg{% endif %}{% if plot.wrap_labels %} charts-wrap-labels{% endif %}" viewBox="0 0 {% if lollipop %}420 {{ plot.height|add:'4' }}{% else %}340 {{ plot.height }}{% endif %}" role="group" aria-label="{% if category %}{{ category.title }} counts{% else %}Available mechanical results{% endif %}"{% if category %} data-category="{{ category.key }}"{% endif %} xmlns="http://www.w3.org/2000/svg">
   {% for tick in plot.ticks %}<line x1="{{ tick.x }}" x2="{{ tick.x }}" y1="12" y2="{{ plot.baseline }}" class="charts-grid-line"/><text x="{{ tick.x }}" y="{{ plot.baseline|add:'20' }}" text-anchor="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
   {% for row in plot.rows %}
     <g class="charts-category-row">
     <g class="charts-bar" role="img" tabindex="0" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}, {{ row.percent|floatformat:'1u' }}% of selected objects." data-label="{{ row.label }}"{% if row.color %} style="--charts-bar-color: {{ row.color }}"{% endif %}>
       <title>{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}% of selected objects)</title>
-      <rect x="0" y="{{ row.y|add:'-5' }}" width="{% if lollipop %}418{% else %}338{% endif %}" height="34" fill="transparent"/>
+      <rect x="0" y="{{ row.row_top }}" width="{% if lollipop %}418{% else %}338{% endif %}" height="{{ row.row_height }}" fill="transparent"/>
       {% if lollipop %}
         <g transform="translate(134 {{ row.y|add:'11' }})">
           <line x1="0" x2="{{ row.width }}" y1="0" y2="0" class="charts-lollipop-stem"/>
@@ -16,7 +16,7 @@
         <text x="{{ row.value_x }}" y="{{ row.label_y }}" class="charts-bar-count">{{ row.count }}</text>
       {% endif %}
     </g>
-    <foreignObject x="0" y="{{ row.label_y|add:'-15' }}" width="122" height="22"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}% of selected objects)">{{ row.label }}</span></foreignObject>
+    <foreignObject x="0" y="{{ row.label_top }}" width="122" height="{{ row.label_height }}"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}% of selected objects)">{% if plot.wrap_labels %}{% for line in row.label_lines %}<span class="charts-label-line">{{ line }}</span>{% endfor %}{% else %}{{ row.label }}{% endif %}</span></foreignObject>
     </g>
   {% endfor %}
   <text x="220" y="{{ plot.height|add:'-2' }}" text-anchor="middle" class="charts-axis-text">Data objects</text>

@@ -349,10 +349,11 @@ function exactEighths(value) {
         ['phase', 'results', 'models', 'loading', 'temperature', 'grain_count', 'texture', 'software']);
       assert.equal(await evaluate('document.querySelectorAll("[data-statistic=outputs]").length'), 0);
     }
-    async function layout(label, width, expectedGraphs = 8) {
+    async function layout(label, width, expectedGraphs = 8, scriptsEnabled = true) {
       stage = `layout ${label} at ${width}`;
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
-      await settleLayout();
+      if (scriptsEnabled) await settleLayout();
+      else await evaluate("window.scrollTo({top: 0, left: 0, behavior: 'instant'})");
       const metrics = await evaluate(`(() => {
         const keys = ['phase', 'results', 'models', 'loading', 'temperature', 'grain_count', 'texture', 'software'];
         const panels = keys.map(key => document.querySelector('[data-statistic="' + key + '"]')).filter(Boolean);
@@ -463,11 +464,19 @@ function exactEighths(value) {
               coverage: panel.querySelector('.charts-context-label').textContent.trim(),
               summary: panel.querySelector('.charts-distribution-summary').textContent.trim()};
           })(),
-          categoryLabels: graphs.flatMap((svg, chart) => [...svg.querySelectorAll('.charts-svg-label')].map(label => {
+          categoryLabels: panels.flatMap(panel => [...panel.querySelectorAll('svg')]).filter(svg => svg.checkVisibility())
+            .flatMap((svg, chart) => [...svg.querySelectorAll('.charts-svg-label')].map(label => {
             const rect = label.getBoundingClientRect(), bounds = svg.getBoundingClientRect(), style = getComputedStyle(label);
+            const fullLabel = svg.dataset.category === 'models';
+            const region = label.closest('foreignObject').getBoundingClientRect();
+            const range = document.createRange();
+            range.selectNodeContents(label);
+            const fullText = [...range.getClientRects()].every(part => part.left >= region.left - 1
+              && part.right <= region.right + 1 && part.top >= region.top - 1 && part.bottom <= region.bottom + 1);
             return {chart, text: label.textContent, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              fullLabel, fullText,
               fontSize: parseFloat(style.fontSize) * svg.getScreenCTM().a,
-              bounded: style.overflow === 'hidden' && (style.textOverflow === 'ellipsis' || style.webkitLineClamp === '2'),
+              bounded: fullLabel ? fullText : style.overflow === 'hidden' && (style.textOverflow === 'ellipsis' || style.webkitLineClamp === '2'),
               clipped: rect.left < bounds.left - 1 || rect.top < bounds.top - 1 || rect.right > bounds.right + 1 || rect.bottom > bounds.bottom + 1};
           })),
           selection: (() => {
@@ -545,6 +554,7 @@ function exactEighths(value) {
         });
       }
       metrics.categoryLabels.forEach((label, index) => {
+        if (label.fullLabel) assert.ok(label.fullText, `Show the complete category name: ${JSON.stringify(label)}`);
         assert.ok(label.bounded && !label.clipped && label.fontSize >= 9.5,
           `${label}: category label must fit its region at ${width}: ${JSON.stringify(label)}`);
         for (const previous of metrics.categoryLabels.slice(0, index)) {
@@ -775,6 +785,10 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-bar").length'), 9);
     assert.equal(await evaluate('document.querySelectorAll(".charts-heatmap-svg g > .charts-heatmap-mark").length') > 0, true);
     for (const width of [1280, 1440, 1920]) await layout('varied-long-categories', width);
+    await evaluate('document.querySelector("[data-statistic=models] .charts-more-categories").open = true');
+    for (const width of [1280, 1440, 1920]) await layout('expanded-models', width);
+    await inspectCharts(['[data-statistic=models] .charts-more-categories .charts-bar',
+      '[data-statistic=models] .charts-more-categories .charts-svg-label']);
     await command('Network.setCookie', {name: process.env.CHARTS_COOKIE_NAME, value: process.env.CHARTS_PAIRED_SESSION,
       url: process.env.CHARTS_BASE_URL, path: '/'});
     await navigate('/charts/?scope=mine&include_private=1');
@@ -801,6 +815,8 @@ function exactEighths(value) {
     await assertPrivate();
     await command('Emulation.setScriptExecutionDisabled', {value: true});
     await navigate('/charts/?scope=mine&include_private=1', false);
+    await evaluate('document.querySelector("[data-statistic=models] .charts-more-categories").open = true');
+    await layout('expanded-models-without-javascript', 1280, 8, false);
     await evaluate('document.querySelector("[data-statistic=phase] .charts-more-categories > summary").focus()');
     await pressKey('Enter', 'Enter', 13);
     assert.equal(await evaluate('document.querySelector("[data-statistic=phase] .charts-more-categories").open'), true);

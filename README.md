@@ -417,7 +417,9 @@ Eight cards are visible directly, in four pairs:
   classes with and without matching components.
 - **Constitutive models** compares reported elastic and plastic model names
   with separately colored horizontal bars. Each family counts objects per name;
-  the coverage denominator counts objects reporting either family.
+  the coverage denominator counts objects reporting either family. Complete
+  model names wrap onto multiple lines, including under **More categories**;
+  row heights grow with the text so names and bars remain aligned.
 - **Loading types & modes** uses a heatmap of type and mode combinations reported
   together in the same mechanical boundary entry. Each object counts once per
   combination, even when several entries repeat it. Incomplete or nontext pairs

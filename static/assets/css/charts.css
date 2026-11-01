@@ -115,6 +115,8 @@
 .charts-bubble:focus-visible .charts-bubble-mark, .charts-column:focus-visible .charts-column-mark, .charts-heatmap-cell:focus-visible .charts-heatmap-mark, .charts-box-selection:focus-visible .charts-box-mark, .charts-box-selection:focus-visible .charts-box-point { stroke: #183e65; stroke-width: 3; }
 .charts-on-color { fill: #fff; }
 .charts-page .charts-svg-label { display: block; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--charts-ink); font: 12px/20px Arial, sans-serif; }
+.charts-page .charts-wrap-labels .charts-svg-label { overflow: visible; white-space: normal; text-overflow: clip; line-height: 16px; }
+.charts-label-line { display: block; white-space: nowrap; }
 .charts-svg-label-center { text-align: center; }
 .charts-svg-label-end { text-align: right; }
 .charts-heatmap-mode-axis, .charts-heatmap-type-axis { --charts-axis-gap: 12px; display: flex; align-items: center; gap: var(--charts-axis-gap); width: 100%; height: 100%; }

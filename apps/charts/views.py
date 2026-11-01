@@ -272,7 +272,7 @@ def index(request):
     for category in (categories["phase"], categories["texture"], categories["software"], model_category):
         remaining = category["rows"][6:]
         if remaining:
-            category["more_plot"] = bar_plot(remaining, limit=len(remaining))
+            category["more_plot"] = bar_plot(remaining, limit=len(remaining), wrap_labels=category["key"] == "models")
     loading_plot = heatmap_plot(loading)
     shown_pairs = {(cell["type"].casefold(), cell["mode"].casefold()) for cell in loading_plot["cells"]}
     remaining = [{**row, "label": f'{row["type"]} / {row["mode"]}'} for row in loading["pairs"]
@@ -383,7 +383,7 @@ def index(request):
         "phase_category": categories["phase"], "phase_plot": bar_plot(categories["phase"]["rows"]),
         "software_category": categories["software"], "software_plot": column_plot(categories["software"]["rows"]),
         "texture_category": categories["texture"], "texture_plot": bubble_plot(categories["texture"]["rows"]),
-        "model_category": model_category, "model_plot": bar_plot(model_rows),
+        "model_category": model_category, "model_plot": bar_plot(model_rows, wrap_labels=True),
         "loading_matrix": loading, "loading_plot": loading_plot,
         "primary_distributions": distributions[:2],
         "control_params": controls,
