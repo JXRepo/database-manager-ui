@@ -112,6 +112,65 @@ Optional host settings:
 - Leave `CSRF_TRUSTED_ORIGINS` blank for the initial Render hostname only
 - If you add extra hostnames later, set them as comma-separated values and use HTTPS origins only
 
+## Password recovery email
+
+The login page's Forgot Password? link opens the email recovery flow. Django
+provides tokens with a one hour lifetime, password validation and token
+invalidation after a password or saved email changes. A successful reset does not
+automatically sign the user in and invalidates that account's existing sessions
+on their next request. Account ownership, profiles and ORCID links stay unchanged.
+
+Render Free blocks outbound SMTP ports 25, 465 and 587. The production default is
+therefore the Resend HTTPS backend, which uses the existing requests dependency.
+See [Render's limitations](https://render.com/docs/free) and
+[Resend domain verification](https://resend.com/docs/dashboard/domains/introduction).
+
+Configure these in the Render service's environment, never in Git:
+
+| Key | Value |
+| --- | --- |
+| `RESEND_API_KEY` | A send-only key for your verified sender domain |
+| `DEFAULT_FROM_EMAIL` | `Materials Platform <accounts@your-verified-domain.example>` |
+| `PASSWORD_RESET_BASE_URL` | Optional canonical HTTPS origin; defaults to `https://` plus `RENDER_EXTERNAL_HOSTNAME` |
+
+The origin must have no credentials, query, fragment or path prefix. It keeps a
+visitor's Host header out of production reset links. Disable email click tracking
+for recovery mail. Provider credentials and message bodies are not included in
+delivery errors. The backend does not follow redirects or automatically retry.
+
+Until the sender, key and origin are configured, the form explains that recovery
+email is temporarily unavailable; POST returns 503 for every account. Production
+console, file and test mail backends cannot be used for recovery. Unknown,
+inactive and passwordless accounts receive no message and get the same neutral
+acknowledgement when delivery is enabled. The acknowledgement is not proof of
+delivery; provider failures are recorded for the operator without exposing them
+as an account lookup result.
+
+Requests are limited to five per IP per 15 minutes and three per normalized email
+per hour using the existing HMAC-backed database limiter. The email limit returns
+the same acknowledgement without another send. No background delivery queue is
+provided: the request performs the provider call with a ten second timeout.
+Eligible and unknown addresses therefore have different response timings even
+though their acknowledgement pages are identical. This is a remaining account
+enumeration risk constrained by the request limits. Eliminating the timing
+channel requires durable background delivery, not artificial delays or threads
+that can lose requests during a restart.
+
+On another host, select `django.core.mail.backends.smtp.EmailBackend` using
+`EMAIL_BACKEND`, then set `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`,
+`EMAIL_HOST_PASSWORD`, `EMAIL_USE_TLS` and `EMAIL_USE_SSL`. Production requires
+exactly one of TLS or SSL; plaintext SMTP is unavailable. The default port is 587
+with TLS. This does not bypass Render Free's port restrictions. The recovery
+form logs a generic failure for all mail transports without recipient addresses,
+provider diagnostics or exception tracebacks.
+
+Before announcing real email delivery, send a deliberate test to an authorized
+test recipient through the public form, open the email, change the test account's
+password, verify login with the new password and verify that the old link fails.
+Local mail-outbox tests do not prove inbox delivery. Accounts without a usable
+saved email can use an already connected ORCID identity or an established
+administrator contact; matching email addresses never merge accounts.
+
 ## Supabase Session Pooler Mapping
 
 Copy the Supabase Session Pooler values into Render like this:

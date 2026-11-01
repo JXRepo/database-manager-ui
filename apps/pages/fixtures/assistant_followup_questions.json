@@ -55,10 +55,10 @@
             "max_candidates": 4
           },
           "required_facts": [
-            "Email password recovery remains unavailable in the current pilot even if an email is present."
+            "Forgot Password? uses the saved accessible email to request a password reset link when email delivery is configured."
           ],
           "must_not_claim": [
-            "Adding an email enables a reset-password message."
+            "The old password is recovered or displayed, or delivery is guaranteed without a configured email service."
           ]
         }
       ]

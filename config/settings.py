@@ -274,12 +274,34 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "/search/"
 LOGIN_URL = "/login/"
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend" if DEBUG
+    else "apps.pages.email_backend.ResendEmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", "Materials Platform <no-reply@example.org>" if DEBUG else ""
+)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = str2bool(os.getenv("EMAIL_USE_TLS", "True"))
+EMAIL_USE_SSL = str2bool(os.getenv("EMAIL_USE_SSL", "False"))
+EMAIL_TIMEOUT = 10
+PASSWORD_RESET_TIMEOUT = 60 * 60
+PASSWORD_RESET_BASE_URL = os.getenv(
+    "PASSWORD_RESET_BASE_URL",
+    f"https://{RENDER_EXTERNAL_HOSTNAME}" if RENDER_EXTERNAL_HOSTNAME else "",
+).rstrip("/")
 
 PILOT_RATE_LIMITS = {
     "registration": {"limit": 5, "window_seconds": 3600},
     "credential_validation": {"limit": 120, "window_seconds": 60},
     "password_login": {"limit": 10, "window_seconds": 900},
+    "password_reset": {"limit": 5, "window_seconds": 900},
+    "password_reset_email": {"limit": 3, "window_seconds": 3600},
     "orcid_start": {"limit": 20, "window_seconds": 3600},
     "upload": {"limit": 20, "window_seconds": 3600},
 }

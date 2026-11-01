@@ -44,8 +44,15 @@ on the hosted website; deploying the code does not copy them to the cloud.
 - Passwords must contain at least 8 characters. Special characters are allowed,
   but no particular combination of character types is required. Passwords cannot
   consist only of numbers, be commonly used, or be too similar to account details.
-- Email is optional. Email verification and email password recovery are not
-  available during the pilot.
+- Email is optional. Forgot Password? sends a reset link to the email saved in
+  an eligible account when email delivery is configured. Links expire after one
+  hour and cannot be reused after a successful reset. The new password must pass
+  the normal validation checks; the user signs in again afterward and existing
+  sessions lose access. Email verification is not required for registration.
+  Recovery requests are limited to five per IP per 15 minutes and three per
+  destination address per hour. Unknown addresses receive the same acknowledgement.
+  Without access to a saved email, use an already connected ORCID account or
+  contact the platform administrator. Accounts are never merged by email.
 - Remember me is off by default. Without it, a password or ORCID login lasts
   30 days from sign in, even across browser restarts. Activity does not extend
   this limit. Selecting Remember me starts a persistent session lasting 365 days.
@@ -1129,6 +1136,15 @@ On Windows, replace `.venv/bin/python` with `.\.venv\Scripts\python.exe`.
 ORCID is optional for local development. It requires a client ID, client secret,
 and a registered redirect URI for the instance you are running. Do not reuse the
 hosted callback URL for a local server.
+
+Password recovery uses Django's console email backend with `DEBUG=True`; the
+local terminal contains the test reset link and no email is sent. Do not publish
+those links. Tests use the isolated in-memory email backend. Production delivery
+needs the sender and email service settings described in the
+[operator runbook](docs/deployment/public-pilot.md#password-recovery-email).
+Without usable production configuration, the recovery page explicitly reports
+that email is unavailable and refuses submissions instead of writing reset
+tokens to production logs.
 
 ## Hosted Deployment
 

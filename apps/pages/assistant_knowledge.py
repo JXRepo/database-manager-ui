@@ -974,8 +974,9 @@ TOPICS += (
                   "@ . + - _, with no spaces, up to 150 characters; names differing only in case are "
                   "not separate registrations. Passwords need at least eight characters and cannot be "
                   "all numeric, common or too similar to account details. There is no compulsory mixture "
-                  "of uppercase letters, lowercase letters and symbols. Email is optional; email "
-                  "verification and email password recovery are not available in this pilot. Repeated "
+                  "of uppercase letters, lowercase letters and symbols. Email is optional and email "
+                  "verification is not required. Save an address you can access to use email password "
+                  "recovery when delivery is available. Repeated "
                   "failed submissions can temporarily limit further attempts.",
         "route": "account_settings", "link": "Open Account Settings",
         "related": ("account.recovery", "account.orcid_connect", "account.profile"),
@@ -997,13 +998,15 @@ TOPICS += (
     {
         "id": "account.recovery", "question": "How do I recover a forgotten password?",
         "patterns": ("forgot password", "forgotten password", "password recovery", "忘记密码", "找回密码"),
-        "answer": "Self-service email password recovery is not available in this pilot. If ORCID was "
-                  "already connected to this account, you can try that sign-in method; an unlinked ORCID "
-                  "identity can create a separate account and will not recover your original data access. "
-                  "Changing a password still requires the current platform password. If you cannot sign "
-                  "in, use an administrator contact you already know; this assistant has no recovery "
-                  "or message-delivery function. Never send it your password.",
-        "route": "account_settings", "link": "Open Account Settings",
+        "answer": "For email password recovery, select Forgot Password? on the login page and enter "
+                  "the email saved in your account. If it matches an eligible account, the email contains "
+                  "a link valid for 1 hour that can be used once to set a new password. Check your spam "
+                  "folder; repeated requests are limited. The page tells you if email delivery is "
+                  "temporarily unavailable. Without an accessible saved email, try ORCID only if it was "
+                  "already connected to this account, or contact your platform administrator. An unlinked "
+                  "ORCID identity can create a separate account and will not recover your original data. "
+                  "This assistant cannot reset passwords or send recovery messages. Never send it your password.",
+        "route": "password_reset", "link": "Reset password",
         "related": ("account.orcid_connect", "account.password", "help.support"),
         "examples": ("I cannot remember my login credentials", "Where is the reset-password email?", "忘了网站密码怎么找回？"),
     },

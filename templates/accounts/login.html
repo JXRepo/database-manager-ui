@@ -47,7 +47,7 @@
                   {{ form.remember_me }}
                   <label class="form-check-label text-muted" for="{{ form.remember_me.id_for_label }}">{{ form.remember_me.label }}</label>
                 </div>
-                <span class="text-secondary f-w-400 mb-0">Forgot Password?</span>
+                <a href="{% url 'password_reset' %}" class="text-secondary f-w-400 mb-0">Forgot Password?</a>
               </div>
               <small id="remember-me-help" class="d-block mt-1 text-muted">Unchecked: 30 days. Checked: stay signed in while you keep using this site. Always sign out on shared or public computers.</small>
               <div class="text-center mt-4">

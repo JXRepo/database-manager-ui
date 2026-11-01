@@ -34,9 +34,9 @@ class PublicSurfaceTests(TestCase):
 
                 self.assertEqual(response.status_code, 404)
 
-    def test_password_reset_route_family_is_closed_for_the_pilot(self):
+    def test_password_reset_route_family_is_available(self):
         """
-        Every installed password reset route returns not found
+        Recovery pages are reachable and invalid tokens show a usable error page
         """
         reset_routes = (
             "/accounts/password-reset/",
@@ -49,7 +49,7 @@ class PublicSurfaceTests(TestCase):
             with self.subTest(route=route):
                 response = self.client.get(route)
 
-                self.assertEqual(response.status_code, 404)
+                self.assertEqual(response.status_code, 200)
 
     def test_login_and_registration_routes_remain_reachable(self):
         """

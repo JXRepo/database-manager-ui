@@ -37,6 +37,10 @@ class ProductionSettingsImportTests(SimpleTestCase):
                         "csrf_trusted_origins": settings.CSRF_TRUSTED_ORIGINS,
                         "database": settings.DATABASES["default"],
                         "debug": settings.DEBUG,
+                        "email_backend": settings.EMAIL_BACKEND,
+                        "default_from_email": settings.DEFAULT_FROM_EMAIL,
+                        "password_reset_base_url": settings.PASSWORD_RESET_BASE_URL,
+                        "password_reset_timeout": settings.PASSWORD_RESET_TIMEOUT,
                         "orcid_base_url": settings.ORCID_BASE_URL,
                         "secret_key": settings.SECRET_KEY,
                         "trusted_proxy_hops": settings.TRUSTED_PROXY_HOPS,
@@ -104,6 +108,9 @@ class ProductionSettingsImportTests(SimpleTestCase):
             },
         )
         self.assertFalse(payload["debug"])
+        self.assertEqual(payload["email_backend"], "apps.pages.email_backend.ResendEmailBackend")
+        self.assertEqual(payload["default_from_email"], "")
+        self.assertEqual(payload["password_reset_timeout"], 3600)
 
     def test_production_database_ignores_weaker_sslmode_values(self):
         """
@@ -220,6 +227,7 @@ class ProductionSettingsImportTests(SimpleTestCase):
                 "pilot-app.onrender.com",
             ],
         )
+        self.assertEqual(payload["password_reset_base_url"], "https://pilot-app.onrender.com")
 
     def test_production_uses_only_configured_https_csrf_origins(self):
         """
@@ -257,6 +265,8 @@ class ProductionSettingsImportTests(SimpleTestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("django.db.backends.sqlite3", result.stdout)
+        self.assertEqual(json.loads(result.stdout)["email_backend"],
+                         "django.core.mail.backends.console.EmailBackend")
 
     def test_parent_application_settings_cannot_poison_subprocess_import(self):
         """

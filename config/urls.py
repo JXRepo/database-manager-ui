@@ -14,35 +14,34 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
-from apps.pages.auth_views import (
-    pilot_disabled_auth_view,
-    rate_limited_admin_login,
-)
+from apps.pages.auth_views import rate_limited_admin_login
+from apps.pages.password_reset import PasswordRecoveryConfirmView, PasswordRecoveryView
 
 urlpatterns = [
     path('', include('apps.pages.urls')),
     path('charts/', include('apps.charts.urls')),
     path(
         "accounts/password-reset/",
-        pilot_disabled_auth_view,
-        name="pilot_password_reset_disabled",
+        PasswordRecoveryView.as_view(),
+        name="password_reset",
     ),
     path(
         "accounts/password-reset-done/",
-        pilot_disabled_auth_view,
-        name="pilot_password_reset_done_disabled",
+        auth_views.PasswordResetDoneView.as_view(template_name="accounts/password_reset_done.html"),
+        name="password_reset_done",
     ),
     path(
         "accounts/password-reset-confirm/<uidb64>/<token>/",
-        pilot_disabled_auth_view,
-        name="pilot_password_reset_confirm_disabled",
+        PasswordRecoveryConfirmView.as_view(),
+        name="password_reset_confirm",
     ),
     path(
         "accounts/password-reset-complete/",
-        pilot_disabled_auth_view,
-        name="pilot_password_reset_complete_disabled",
+        auth_views.PasswordResetCompleteView.as_view(template_name="accounts/password_reset_complete.html"),
+        name="password_reset_complete",
     ),
     path(
         "admin/login/",

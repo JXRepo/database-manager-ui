@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.views import LoginView, LogoutView
 from django.db import DatabaseError
-from django.http import Http404, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import redirect
 
 from .forms import SignInForm
@@ -66,27 +66,6 @@ def rate_limited_admin_login(request):
     ):
         apply_login_session_policy(request, browser_session=True)
     return response
-
-
-def pilot_disabled_auth_view(request, *args, **kwargs):
-    """
-    Return not found for authentication features disabled in the pilot
-
-    Parameters
-    ----------
-    request : HttpRequest
-        Incoming request for a disabled route.
-    *args : tuple
-        Positional route values.
-    **kwargs : dict
-        Named route values.
-
-    Raises
-    ------
-    Http404
-        Always raised so the disabled route is not exposed.
-    """
-    raise Http404
 
 
 class HomeLogoutView(LogoutView):

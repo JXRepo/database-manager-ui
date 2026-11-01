@@ -126,7 +126,9 @@ class AssistantCoverageTests(TestCase):
         """
         recovery = self.ask("How do I recover a forgotten password?")["answer"]
         self.assertIn("email password recovery", recovery)
-        self.assertIn("not available", recovery)
+        self.assertIn("Forgot Password?", recovery)
+        self.assertIn("1 hour", recovery)
+        self.assertIn("temporarily unavailable", recovery)
         visibility = self.ask("Can I change public or private access after upload?")["answer"]
         self.assertIn("no public/private switch", visibility)
         edit = self.ask("Can I edit an uploaded object?")["answer"]

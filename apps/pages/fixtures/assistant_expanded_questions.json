@@ -33,7 +33,7 @@
           },
           "required_facts": [
             "Email is optional for platform registration.",
-            "The pilot has no email verification or email password recovery."
+            "Registration does not require email verification; a saved email supports password recovery when delivery is configured."
           ],
           "must_not_claim": [
             "Email is required.",
@@ -201,11 +201,11 @@
             "max_candidates": 4
           },
           "required_facts": [
-            "Email password recovery is unavailable in the pilot.",
+            "Forgot Password? requests a reset link using the email saved in the account when delivery is configured.",
             "Changing a usable local password normally requires the current password."
           ],
           "must_not_claim": [
-            "A reset email can be requested here.",
+            "The assistant can send a reset email or reveal the old password.",
             "ORCID sign-in resets or bypasses the current local password."
           ]
         }
@@ -246,7 +246,7 @@
             "max_candidates": 4
           },
           "required_facts": [
-            "There is no email password recovery in this pilot.",
+            "Forgot Password? offers a separate reset flow through the saved email when delivery is configured.",
             "ORCID does not make the old-password requirement disappear."
           ],
           "must_not_claim": [
