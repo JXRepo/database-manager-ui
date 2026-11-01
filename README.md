@@ -512,6 +512,11 @@ validation results or evidence of physical comparability. Individual response
 curves and downloads stay on the detail page; stored JSON and exports are
 unchanged.
 
+Curve availability checks inspect numeric samples directly, without converting
+each sample to Decimal. Exact Decimal calculations remain in the numeric
+distributions. See the [Charts performance comparison](docs/qa/2026-11-01-charts-performance.md)
+for local measurements and verification.
+
 ## Data Object Details
 
 The FAIR Data Assistant button is available inside the signed in workspace,

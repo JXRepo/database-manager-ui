@@ -179,10 +179,14 @@ def curve_summary(data):
             values = group.get(key)
             if values is None or values == []:
                 continue
-            if not isinstance(values, list) or not values or any(
-                isinstance(value, bool) or not isinstance(value, (int, float)) or number(value) is None
-                for value in values
-            ):
+            try:
+                valid_values = isinstance(values, list) and bool(values) and all(
+                    isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+                    for value in values
+                )
+            except OverflowError:
+                valid_values = False
+            if not valid_values:
                 notes.add("invalid_curves")
                 continue
             valid.add(key)

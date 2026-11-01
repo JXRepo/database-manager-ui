@@ -1,3 +1,4 @@
+import cProfile
 import copy
 from decimal import Decimal
 from urllib.parse import parse_qs, urlsplit
@@ -7,6 +8,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from apps.pages.models import JSONData
+from .analytics import curve_summary, number
 from .views import FILTER_KEYS, VIEW_KEYS
 
 
@@ -945,6 +947,29 @@ class ChartsTests(TestCase):
         self.assertEqual(counts["stress"], 0)
         self.assertEqual(counts["total_strain"], 0)
 
+    def test_curve_availability_checks_every_sample_without_numeric_overflow(self):
+        """
+        Preserve finite sample checks for large numbers and malformed array tails
+        """
+        for value, valid in (
+            (0, True), (-1.5, True), (10 ** 308, True), (5e-324, True),
+            (10 ** 309, False), (-10 ** 309, False),
+            (float("inf"), False), (float("-inf"), False), (float("nan"), False),
+            (False, False), (True, False), (None, False), ("1", False), ([1], False),
+        ):
+            with self.subTest(value=value):
+                values = [0.0] * 4096 + [value]
+                available, lengths, notes, components = curve_summary({
+                    "stress": {"stress_11": values},
+                    "total_strain": {"strain_11": [0, 1]},
+                    "units": {"Stress": "MPa", "Strain": 1},
+                })
+                self.assertEqual("stress" in available, valid)
+                self.assertEqual("matching_response" in available, valid)
+                self.assertEqual("invalid_curves" in notes, not valid)
+                self.assertEqual(lengths, {2, len(values)} if valid else {2})
+                self.assertEqual(components, {"11"} if valid else set())
+
     def test_conflicting_functional_aliases_do_not_select_a_value(self):
         """
         Legacy conflicts remain accessible but do not drive statistics
@@ -1116,13 +1141,16 @@ class ChartsTests(TestCase):
 
     def test_result_coverage_preserves_large_arrays_and_original_precision(self):
         """
-        Statistical summaries never reduce or rewrite source mechanical arrays
+        Check long curves without rewriting or converting every sample to Decimal
         """
         values = [10 ** 50 + index for index in range(12000)]
         obj = self.create_object(stress={"stress_33": values},
                                  total_strain={"strain_33": list(range(12002))})
         original = copy.deepcopy(obj.data)
-        response = self.statistics(result="matching_response")
+        with cProfile.Profile() as profile:
+            response = self.statistics(result="matching_response")
+        conversions = sum(entry.callcount for entry in profile.getstats() if entry.code == number.__code__)
+        self.assertLess(conversions, 100)
         self.assertEqual(response.context["matching_count"], 1)
         self.assertEqual(response.context["objects_page"][0]["points"], "3–12,002 points")
         self.assertNotIn("curve", response.context)
