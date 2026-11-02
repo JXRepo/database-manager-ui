@@ -64,7 +64,8 @@ async function main() {
     let body = assets.get(request.url);
     if (body === undefined) {
       const response = await send('Fetch.getResponseBody', {requestId}, message.sessionId);
-      body = response.base64Encoded ? Buffer.from(response.body, 'base64').toString() : response.body;
+      body = (response.base64Encoded ? Buffer.from(response.body, 'base64').toString() : response.body)
+        .replace(/\r\n/g, '\n');
       const marker = '  state.resetCameraView();\n\n  const resetButton';
       assert.ok(body.includes(marker), 'Viewer test instrumentation point is missing');
       body = body.replace(marker, '  window.__bcTest = {state, items, tensorGroup, baseCube};\n' + marker);
@@ -287,7 +288,7 @@ async function main() {
   assert.equal(await evaluate('__bcTest.baseCube.children.slice(4).every(o=>o.material.color.getHexString()==="ffffff")'),true);
   assert.equal(await evaluate('document.querySelector("[data-bc-tensor-panel]").querySelectorAll("svg,canvas,[data-tensor-example-host]").length'),0);
   assert.match(await evaluate('document.querySelector("[data-tensor-filter=pull]").title'),/2 of 2/);
-  assert.equal(await tensorCount(),8);
+  assert.equal(await tensorCount(),10);
   assert.equal(await evaluate('document.querySelector("[data-tensor-load]").closest("label").hidden'),true);
   await checkTensorGeometry();
   await screenshot('original-glass-cube');

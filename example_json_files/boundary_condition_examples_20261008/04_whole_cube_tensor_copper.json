@@ -13,7 +13,7 @@
       "access_type": "all"
     }
   ],
-  "description": "Single nonzero whole cube stress tensor for local platform display testing. This example retains original recorded step 1 and all nine explicit symmetric tensor components from the original twelve-state copper reference. Every stress, total strain and plastic strain array retains only the same original sample index 1. Those one-point curves are the corresponding analytical isotropic small elastic strain reference, with zero plastic strain; no finite element model was solved. Material parameters and orientations are illustrative assumptions.",
+  "description": "Single whole cube stress tensor with tensile xx = 15 MPa and yy = 5 MPa, compressive zz = -5 MPa, and symmetric xy = yx = 2 MPa shear for Pull, Push and Shear display testing. This example derives from recorded step 1 of the original twelve-state copper reference, adding compression in zz and recalculating the corresponding stress and isotropic small elastic strain sample. All nine tensor components remain explicit, and plastic strain remains zero; no finite element model was solved. Material parameters and orientations are illustrative assumptions.",
   "rights": "Generated synthetic fixture for local platform testing",
   "rights_holder": [
     "Xue, Jun"
@@ -69,7 +69,7 @@
           "magnitude": {
             "xx": 15,
             "yy": 5,
-            "zz": 0,
+            "zz": -5,
             "xy": 2,
             "yx": 2,
             "xz": 0,
@@ -151,7 +151,7 @@
   ],
   "stress": {
     "equivalent_stress": [
-      13.674794331177344
+      17.663521732655695
     ],
     "stress_11": [
       15
@@ -160,7 +160,7 @@
       5
     ],
     "stress_33": [
-      0
+      -5
     ],
     "stress_12": [
       2
@@ -174,16 +174,16 @@
   },
   "total_strain": {
     "equivalent_strain": [
-      0.00010180124668765356
+      0.0001314951062319924
     ],
     "strain_11": [
-      0.00011083333333333333
+      0.000125
     ],
     "strain_22": [
-      -8.333333333333378e-7
+      0.00001333333333333333
     ],
     "strain_33": [
-      -0.00005666666666666667
+      -0.00009833333333333334
     ],
     "strain_12": [
       0.000022333333333333335
@@ -230,10 +230,10 @@
     "Time": "s"
   },
   "synthetic_recipe": {
-    "purpose": "Upload, immediate whole cube tensor display and exact export testing",
-    "content_origin": "One nonzero recorded state extracted unchanged from the original twelve-state analytical copper fixture",
+    "purpose": "Upload, whole cube Pull, Push and Shear display and exact export testing",
+    "content_origin": "Derived from original copper sample index 1 with zz changed from 0 to -5 MPa; stress and elastic strain curves recalculated for this modified tensor",
     "format_reference": "../a46fde6c.json; field names and structural layout only",
-    "source_curve_values_copied": true,
+    "source_curve_values_copied": false,
     "finite_element_solver_run": false,
     "assumptions": [
       "Illustrative material parameters; not fitted properties of a measured alloy",
@@ -270,10 +270,10 @@
         1
       ]
     },
-    "history_interpretation": "Sample 0 corresponds exactly to the sole applied_load[0] at recorded step 1; this is original sample index 1, with no intermediate steps or physical time invented",
+    "history_interpretation": "Sample 0 corresponds exactly to the sole applied_load[0] at step 1; it is derived from original sample index 1 with added zz compression, with no intermediate steps or physical time invented",
     "source_fixture_archive": "/tmp/whole-cube-examples-2bVB3HzL/04_whole_cube_tensor_copper_original_20261011.json",
     "source_fixture_identifier": "dcc6f242",
     "selected_original_sample_index": 1
   },
-  "identifier": "05-Whole-Cube-Stress-Copper"
+  "identifier": "05-Whole-Cube-Stress-Copper-Push"
 }

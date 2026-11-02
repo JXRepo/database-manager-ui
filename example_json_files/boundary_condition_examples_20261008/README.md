@@ -20,10 +20,13 @@ Existing uploaded objects are not changed by editing these local files.
 | 02_edge_compression_steel.json | `02-Edge-Force-Steel` | `22cdfdb0` |
 | 03_face_cyclic_shear_titanium.json | `03-Face-Force-Titanium` | `1f84367d` |
 | 04_whole_cube_force_displacement_copper.json | `04-Whole-Cube-Force-Copper` | `synthetic-whole-force-copper-20261011` |
-| 04_whole_cube_tensor_copper.json | `05-Whole-Cube-Stress-Copper` | `synthetic-whole-stress-copper-one-state-20261011` |
+| 04_whole_cube_tensor_copper.json | `05-Whole-Cube-Stress-Copper-Push` | `05-Whole-Cube-Stress-Copper` |
 
-Only the top-level `identifier` values changed in this rename. All other JSON
-content and the filenames remain unchanged.
+The 2026-10-27 rename changed only the top-level `identifier` values. On
+2026-11-03, the tensor example added `zz = -5 MPa` and received a `-Push` suffix
+so it can be uploaded alongside the previous example. Its corresponding stress
+and elastic strain sample was recalculated. The filename remains unchanged.
+To inspect compression alone, click Clear, then Push, then Play action.
 
 Each file now uses only one boundary target type, including fixed and free
 conditions: Point, Edge, Face, or Whole cube. The point file has one loaded point
@@ -34,8 +37,9 @@ contain either one stress tensor condition or one scalar force condition.
 
 The existing example JSON was used for field names and structural layout. All
 material parameters, dimensions, orientations, boundary conditions and curve
-values originated as generated synthetic references. The whole cube display
-examples retain selected or complete curves from the original copper reference.
+values originated as generated synthetic references. The whole cube tensor
+example recalculates one modified copper state; the scalar whole cube example
+retains the complete curves from the original copper reference.
 They are explicitly labeled synthetic test data. No finite element solver was run.
 
 | File | Loaded region and direction | Assumed material | Cube side | Load and reference curves |
@@ -43,7 +47,7 @@ They are explicitly labeled synthetic test data. No finite element solver was ru
 | 01_point_tension_aluminium.json | V111, +X point force | Aluminium reference | 0.8 mm | 32 N endpoint; 41 samples of nominal elastic tension |
 | 02_edge_compression_steel.json | V010 to V110, -X/-Y/-Z edge force components; X is parallel to the edge | Steel reference | 1.2 mm | -172.8 N per component; 51 samples of nominal elastic compression along X |
 | 03_face_cyclic_shear_titanium.json | Positive Z face, separate X, Y and Z force entries | Titanium reference | 1.5 mm | 405 N amplitude per direction, 0.5 Hz, 4 s; 121 samples of the original cyclic X-on-Z shear reference, not the combined XYZ response |
-| 04_whole_cube_tensor_copper.json | All eight vertices identify the whole RVE | Copper reference | 2.0 mm | One explicit symmetric stress tensor at step 1; one corresponding elastic curve sample |
+| 04_whole_cube_tensor_copper.json | All eight vertices identify the whole RVE | Copper reference | 2.0 mm | Pull: xx = 15 and yy = 5 MPa; Push: zz = -5 MPa; Shear: xy = yx = 2 MPa; one corresponding elastic sample at step 1 |
 | 04_whole_cube_force_displacement_copper.json | All eight vertices identify the whole cube; X and Z loaded, Y fixed | Copper reference | 2.0 mm | X = 12.5 N and Z = -7.5 N at step 1; 12 retained copper reference samples, not a response to these forces |
 
 ## Material and geometry assumptions
@@ -107,13 +111,13 @@ plastic strain accumulates `abs(delta_gamma_p)/sqrt(3)` in the shear case, so it
 remains nondecreasing even as signed plastic components reverse. All other
 files have zero plastic strain.
 
-The whole RVE tensor case retains one state from an ideal homogeneous periodic
-elastic reference. Its strain is calculated from the prescribed stress tensor
-using isotropic compliance. The full nine tensor entries include reciprocal
-shear components. The sole load entry and curve sample 0 correspond to original
-sample index 1 at recorded step 1. No intermediate step or physical time is
-inferred. Viewer arrows show component directions, while the numeric matrix
-retains actual values.
+The whole RVE tensor case derives one state from an ideal homogeneous periodic
+elastic reference and adds a compressive zz component. Its strain is calculated
+from the prescribed stress tensor using isotropic compliance. The full nine tensor entries include reciprocal
+shear components. The sole load entry and curve sample 0 derive from original
+sample index 1, retaining step 1. No intermediate step or physical time is
+inferred. The viewer illustrates Pull, Push and Shear on the original cube,
+while the numeric matrix retains actual values.
 
 The whole cube force example demonstrates scalar XYZ boundary display. It
 retains all 12 curve samples from the original copper tensor reference, including
