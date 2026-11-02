@@ -404,31 +404,34 @@ that scope, while **Search data** opens the existing detailed Search filters for
 all accessible objects, including received private shares. It starts a new
 search rather than carrying the Charts scope into Search. **View data** appears
 only when the scope contains objects; empty scopes keep search and upload guidance.
-Card headers use **With data: n / total objects** for the number of distinct
-objects contributing to that card out of all selected objects. Hover over the
-count for the specific inclusion rule. The stress–strain coverage card shows
-**Total: n objects**, since its two classes cover the entire selection.
+Card headings provide coverage counts and inclusion rules on hover or keyboard
+focus, with native titles when JavaScript is unavailable. Repeated per-card totals
+and explanatory footers are omitted from the visible dashboard.
 Eight cards are visible directly, in four pairs:
 
 - **Phase** counts objects for each phase name with a horizontal lollipop chart:
-  thin lines end in dots, with counts and percentages of all selected objects
-  beside them, for example `20 (40%)`. Expanded categories use the same labels.
+  thin lines end in dots, with an object count beside each dot. Percentages remain
+  in hover details. Full supplied names, including parenthetical qualifiers, wrap
+  onto multiple lines. Expanded categories use the same labels.
 - **Stress–strain coverage** uses a donut chart for the exhaustive, disjoint
   classes with and without matching components.
 - **Constitutive models** compares reported elastic and plastic model names
   with separately colored horizontal bars. Each family counts objects per name;
   the coverage denominator counts objects reporting either family. Complete
   model names wrap onto multiple lines, including under **More categories**;
-  row heights grow with the text so names and bars remain aligned.
+  row heights grow with the text so names and bars remain aligned. The Elastic /
+  Plastic color legend identifies families without repeating them after every
+  model name; hover details retain the family. Specific models remain separate.
 - **Loading types & modes** uses a heatmap of type and mode combinations reported
   together in the same mechanical boundary entry. Each object counts once per
   combination, even when several entries repeat it. Incomplete or nontext pairs
   do not enter the matrix or its axes. Hover over a cell to read the pair and its count.
-  Mode is centered above the columns; Type is vertical and centered beside the rows.
+  Mode is centered below the columns; Type is vertical and centered beside the rows.
   Both titles use the same gap from the names. The type label column fits its text
-  so short names do not leave a large blank area beside Type.
-- **Temperature** shows a histogram in kelvin. The header shows objects with a
-  usable temperature out of all selected objects. Median and Min–max include the
+  so short names do not leave a large blank area beside Type. Cells retain their
+  exact counts; the separate gradient scale is omitted.
+- **Temperature** shows a histogram in kelvin. The heading tooltip reports objects
+  with a usable temperature out of all selected objects. Median and Min–max include the
   K unit; Min–max displays both extrema, including `298–298 K` for a constant value.
   The chart uses 12px text at its maximum width of 420px, with Objects vertical
   beside the count axis and equal gaps between the two axis titles and their ticks.
@@ -437,17 +440,23 @@ Eight cards are visible directly, in four pairs:
   is the central observation or the mean of the two central observations.
   Whiskers show the actual minimum and maximum, with no outlier classification.
   A constant value is shown as one point, with no whiskers or box legend.
-  The header shows objects with a usable grain number out of all selected objects;
-  the caption explains that counts are per phase and keeps the phase and object
-  counts distinct. Min–max displays both extrema, including `343–343` for a
-  constant value. Hover details report the
-  quartiles, median, actual extrema and observation counts.
+  The heading tooltip keeps phase observations and distinct-object counts separate
+  and explains the box, median line and extrema. Min–max displays both extrema,
+  including `343–343` for a constant value. Hover details report the quartiles,
+  median, actual extrema and observation counts.
 - **Texture types** uses independently sized bubbles; circle area is
   proportional to object count, rather than a share of a disjoint whole.
-  The header labels objects reporting a texture type out of all selected objects;
-  the chart explains the sizes with “Larger circles = more objects”.
+  Counts and complete wrapped names appear beside the circles; the heading tooltip
+  explains their area and reports the number of objects with texture metadata.
 - **Software** compares reported software names with vertical columns.
-  The header labels objects reporting software out of all selected objects.
+  Complete names wrap below the columns. Abaqus and Abaqus CAE spellings, ignoring
+  case and separator punctuation (including `abaqus/cae`), share the **Abaqus**
+  category. Multiple aliases within one object count once; old software filters
+  use the same grouping. Other names stay distinct, and stored JSON, exports and
+  object-list descriptions retain the supplied names.
+
+Long category labels also wrap in expanded charts. Plot areas scroll vertically
+when unusually long uploaded text needs more space, keeping the dashboard compact.
 
 The dashboard has no chart filter strip, Filters form or category selector.
 Old overview URLs containing chart conditions or preferences redirect to the

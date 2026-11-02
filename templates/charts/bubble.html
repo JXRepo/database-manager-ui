@@ -1,4 +1,4 @@
-<svg class="charts-bubble-svg" viewBox="0 0 360 {{ plot.height }}" role="group" aria-label="Texture types: circle area represents the number of objects reporting each type" xmlns="http://www.w3.org/2000/svg">
+<svg class="charts-bubble-svg charts-wrap-labels" viewBox="0 0 360 {{ plot.height }}" role="group" aria-label="Texture types: circle area represents the number of objects reporting each type" xmlns="http://www.w3.org/2000/svg">
   {% for row in plot.rows %}
     <g class="charts-category-row">
     <g class="charts-bubble" role="img" tabindex="0" data-label="{{ row.label }}" data-count="{{ row.count }}" aria-label="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }}, {{ row.percent|floatformat:'1u' }}% of selected objects.">
@@ -6,8 +6,7 @@
       <circle cx="{{ row.x }}" cy="{{ row.y }}" r="{{ row.radius }}" fill="{{ row.color }}" class="charts-bubble-mark"/>
       <text x="{{ row.x }}" y="{{ row.count_y }}" text-anchor="middle" class="charts-bubble-count{% if row.inside %} charts-on-color{% endif %}">{{ row.count }}</text>
     </g>
-    <foreignObject x="{{ row.label_x }}" y="{{ row.label_y }}" width="108" height="20"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)">{{ row.label }}</span></foreignObject>
+    <foreignObject x="{{ row.label_x }}" y="{{ row.label_y }}" width="108" height="{{ row.label_height }}"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)">{% for line in row.label_lines %}<span class="charts-label-line">{{ line }}</span>{% endfor %}</span></foreignObject>
     </g>
   {% endfor %}
-  <text x="180" y="{{ plot.height|add:'-8' }}" text-anchor="middle" class="charts-axis-text">Larger circles = more objects</text>
 </svg>

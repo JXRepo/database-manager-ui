@@ -1,8 +1,8 @@
 <svg class="charts-heatmap-svg" viewBox="0 0 390 280" role="group" aria-label="Loading type and mode from the same mechanical boundary entry; counts are distinct objects" xmlns="http://www.w3.org/2000/svg">
-  <foreignObject x="116" y="4" width="249" height="40">
+  <foreignObject x="116" y="224" width="249" height="40">
     <div xmlns="http://www.w3.org/1999/xhtml" class="charts-heatmap-mode-axis">
-      <span class="charts-heatmap-axis-title">Mode</span>
       <div class="charts-heatmap-mode-labels">{% for row in loading_plot.modes %}<div class="charts-svg-label charts-svg-label-center" title="{{ row.label }}">{{ row.label }}</div>{% endfor %}</div>
+      <span class="charts-heatmap-axis-title">Mode</span>
     </div>
   </foreignObject>
   <foreignObject x="0" y="48" width="108" height="165">
@@ -18,7 +18,4 @@
       <text x="{{ cell.center_x }}" y="{{ cell.center_y }}" text-anchor="middle" dominant-baseline="middle" class="charts-bar-count{% if cell.dark %} charts-on-color{% endif %}">{{ cell.count }}</text>
     </g>
   {% endfor %}
-  <defs><linearGradient id="loading-count-scale"><stop offset="0" stop-color="#f1f5f8"/><stop offset="1" stop-color="#297ca7"/></linearGradient></defs>
-  <text x="116" y="247" class="charts-axis-text">0</text><rect x="133" y="237" width="85" height="10" rx="3" fill="url(#loading-count-scale)"/>
-  <text x="230" y="247" class="charts-axis-text">{{ loading_plot.maximum }} object{{ loading_plot.maximum|pluralize }}</text>
 </svg>

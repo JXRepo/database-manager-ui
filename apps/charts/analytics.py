@@ -88,6 +88,23 @@ def dictionaries(value):
     return []
 
 
+def software_name(label):
+    """
+    Group explicit Abaqus naming variants for statistics and saved filters
+
+    Parameters
+    ----------
+    label : str
+        Supplied software name with surrounding whitespace already removed.
+
+    Returns
+    -------
+    str
+        Canonical name for a known alias, otherwise the supplied name.
+    """
+    return "Abaqus" if field_name(label) in {"abaqus", "abaquscae"} else label
+
+
 def number(value, integer=False):
     """
     Read a finite scalar while excluding booleans and invalid counts
@@ -243,7 +260,8 @@ def summarize_object(obj):
         data = {}
         identifier = ""
     categories = {key: [] for key in CATEGORY_TITLES}
-    categories["software"] = text_values(data.get("software"))
+    software_labels = text_values(data.get("software"))
+    categories["software"] = [software_name(label) for label in software_labels]
     numeric = {key: [] for key in MEASURES}
     grain_conflicts = False
     phases = dictionaries(data.get("phase"))
@@ -309,7 +327,7 @@ def summarize_object(obj):
         "numeric": numeric, "results": available, "notes": notes,
         "curve_components": paired_components,
         "phase_label": " / ".join(categories["phase"]) or "Not supplied",
-        "software_label": " / ".join(categories["software"]) or "Not supplied",
+        "software_label": " / ".join(software_labels) or "Not supplied",
         "result_label": result_label, "points": points,
         "access": "Public" if obj.access_type == "all" else "Private",
     }

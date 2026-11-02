@@ -197,6 +197,8 @@ class ChartsTests(TestCase):
         self.assertEqual(category["available"], 2)
         self.assertEqual({row["label"]: row["count"] for row in category["rows"]},
                          {"Model A (Elastic)": 2, "Model A (Plastic)": 1, "Model B (Plastic)": 1})
+        self.assertEqual(["".join(row["label_lines"]) for row in response.context["model_plot"]["rows"]],
+                         ["Model A", "Model A", "Model B"])
         for row in category["rows"]:
             linked = self.get_statistics(row["url"])
             self.assertEqual(linked.context["total_objects"], row["count"])
@@ -296,7 +298,8 @@ class ChartsTests(TestCase):
         self.assertEqual([record["id"] for record in linked.context["objects_page"]], [multi.pk])
         self.assertEqual(grains["observation_count"], 4)
         self.assertEqual(sum(bucket["count"] for bucket in grains["bins"]), 4)
-        self.assertContains(response, "Whiskers: min–max")
+        self.assertNotContains(response, "Whiskers: min–max")
+        self.assertContains(response, "4 phase observations: one grain number per phase")
         multi.refresh_from_db()
         self.assertEqual([phase["orientation"]["grain_count"] for phase in multi.data["phase"]], [10, 20, 30])
 
@@ -411,10 +414,10 @@ class ChartsTests(TestCase):
         shared = self.create_object("shared-private", owner=self.other, access="c", software="Shared secret")
         shared.shared_users.add(self.viewer)
         self.create_object("hidden-private", owner=self.other, access="c", software="Hidden secret")
-        cases = [({}, {"Abaqus CAE", "Public solver"}),
-                 ({"phase": "Copper"}, {"Abaqus CAE"}),
-                 ({"scope": "mine"}, {"Abaqus CAE"}),
-                 ({"scope": "mine", "include_private": "1"}, {"Abaqus CAE", "Private solver"})]
+        cases = [({}, {"Abaqus", "Public solver"}),
+                 ({"phase": "Copper"}, {"Abaqus"}),
+                 ({"scope": "mine"}, {"Abaqus"}),
+                 ({"scope": "mine", "include_private": "1"}, {"Abaqus", "Private solver"})]
         for query, expected in cases:
             with self.subTest(query=query):
                 response = self.statistics(**query)
@@ -485,7 +488,7 @@ class ChartsTests(TestCase):
         shared.shared_users.add(self.viewer)
         response = self.statistics()
         software = {row["label"]: row["count"] for row in response.context["software_category"]["rows"]}
-        self.assertEqual(software, {"Abaqus CAE": 3, "DAMASK": 1})
+        self.assertEqual(software, {"Abaqus": 3, "DAMASK": 1})
         temperature, grains = response.context["primary_distributions"]
         self.assertEqual((temperature["object_count"], grains["object_count"]), (1, 1))
         self.assertEqual(grains["observation_count"], 2)
@@ -646,8 +649,34 @@ class ChartsTests(TestCase):
         self.assertEqual(phases, {"Copper": 2, "Nickel": 1})
         self.assertEqual({row["label"]: row["percent"] for row in response.context["categories"]["phase"]["rows"]},
                          {"Copper": 100, "Nickel": 50})
-        self.assertEqual(software, {"abaqus cae": 2, "damask": 1})
+        self.assertEqual(software, {"abaqus": 2, "damask": 1})
         self.assertEqual(response.context["phase_count"], 2)
+
+    def test_abaqus_aliases_share_one_category_without_changing_source_data(self):
+        """
+        Known software names deduplicate per object and keep old bookmarks usable
+        """
+        aliases = ["Abaqus", "abaqus/cae", "Abaqus CAE", " ABAQUS "]
+        objects = [self.create_object(str(index), software=name) for index, name in enumerate(aliases)]
+        repeated = self.create_object("repeated", software=aliases + ["DAMASK"])
+        self.create_object("different-product", software="Abaqus Explicit")
+        self.create_object("own-private-alias", access="c", software="Abaqus CAE")
+        shared = self.create_object("shared-alias", owner=self.other, access="c", software="abaqus/cae")
+        shared.shared_users.add(self.viewer)
+        response = self.statistics()
+        self.assertEqual({row["label"]: row["count"] for row in response.context["software_category"]["rows"]},
+                         {"Abaqus": 5, "Abaqus Explicit": 1, "DAMASK": 1})
+        for name in aliases:
+            with self.subTest(name=name):
+                selected = self.statistics(software=name)
+                self.assertEqual({row["id"] for row in selected.context["objects_page"]},
+                                 {obj.pk for obj in objects} | {repeated.pk})
+        self.assertEqual(self.statistics(software="aba").context["total_objects"], 0)
+        for obj, name in zip(objects, aliases):
+            obj.refresh_from_db()
+            self.assertEqual(obj.data["software"], name)
+        repeated.refresh_from_db()
+        self.assertEqual(repeated.data["software"], aliases + ["DAMASK"])
 
     def test_category_filters_match_exact_names_on_the_same_object(self):
         """
@@ -1033,7 +1062,7 @@ class ChartsTests(TestCase):
         self.assertEqual(response.context["material_group"], "phase")
         self.assertEqual(response.context["material_category"]["rows"][0]["label"], "Copper")
         self.assertEqual(response.context["group"], "software")
-        self.assertEqual(response.context["selected_category"]["rows"][0]["label"], "Abaqus CAE")
+        self.assertEqual(response.context["selected_category"]["rows"][0]["label"], "Abaqus")
         self.assertEqual(dict(response.context["material_options"]), {"phase": "Phase", "texture": "Texture"})
         self.assertEqual(set(dict(response.context["group_options"])),
                          {"software", "elastic_model", "plastic_model", "loading_type", "loading_mode"})

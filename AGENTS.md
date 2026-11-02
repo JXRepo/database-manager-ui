@@ -163,6 +163,7 @@ Current priority:
 - Validate a single include_private=0/1 value, reset pagination on scope changes, and preserve valid private inclusion in the object list; valid old all/shared scope links redirect to Public database
 - Use the shared metadata compatibility view, keep raw JSON out of retained statistical summaries, and never change stored data or exports while computing statistics
 - Count each object once per case-insensitive category label; multiple phases, models, descriptions or loading conditions may contribute to multiple labels
+- Charts groups explicit Abaqus and Abaqus CAE naming variants, ignoring case and separators, as Abaqus; deduplicate aliases within each object and apply the same grouping to saved software filters, without changing stored JSON, exports or object-list descriptions
 - Loading heatmap pairs require nonempty text loading_type and loading_mode in the same mechanical_BC entry; deduplicate each pair per object, exclude incomplete or ambiguous pairs from cells and axes, and retain existing object-level loading bookmarks
 - Chart marks, category labels and the coverage legend show visible immediate tooltips with JavaScript and native descriptions without JavaScript; keyboard focus shows the same information, and leaving, scrolling or Escape clears the tooltip; clicking must not navigate, add filters or reload the page
 - Charts has no chart selection strip; old overview condition and preference URLs clear those values and pagination while preserving scope and private-inclusion arguments, including repeated or invalid ones
@@ -174,14 +175,17 @@ Current priority:
 - Charts is a dataset coverage and discovery page: show separate materials/microstructure and simulation setup category charts, condition distributions and output availability; View data opens the accessible objects and their detail pages
 - Keep individual stress–strain plots and curve downloads on the detail page; do not duplicate a single object's response or infer scientific comparability from aggregate metadata
 - Count matching stress–strain availability only when the same component is available in both groups, including supplied or eligible calculated equivalents; keep the legacy result=paired filter's both-groups meaning
-- Use a disjoint, exhaustive matching/without_matching stress–strain coverage pie chart; overlapping phase, software, model and output counts use bars or tables with percentages of selected objects, never misleading pie proportions
+- Use a disjoint, exhaustive matching/without_matching stress–strain coverage pie chart; overlapping phase, software, model and output counts use bars or tables with percentages of selected objects available in hover details, never misleading pie proportions
 - Charts omits per-card Data table sections; preserve exact counts, hover details, and expandable charts for remaining categories and loading combinations
-- Show complete constitutive model names with wrapping and enough row height, including expanded categories; do not truncate these names with ellipses
+- Show complete phase, constitutive model, texture and software names with wrapping and enough space, including expanded categories; keep parenthetical phase qualifiers and use bounded scrolling for unusually long labels
+- Keep specific constitutive model names and the Elastic / Plastic color legend; omit repeated family suffixes from visible labels while retaining families in hover details
+- Omit repeated With data/Total card counts and explanatory footers; card-heading hover and keyboard focus retain coverage, inclusion rules and phase-observation denominators, with native titles without JavaScript
+- Phase marks show counts with percentages in hover details; loading Mode belongs below the columns, and exact cell counts replace the separate gradient scale
 - Use equal-width numeric histogram intervals with empty bins and an inclusive final maximum; constant temperatures use one frequency column and constant grain counts use one point; distinguish observations from distinct objects
-- Render aggregate charts as server-side SVG that remains visible without JavaScript; retain units, distinguishable ticks and exact numerical intervals in hover details, with each category's coverage and observation denominator visible
+- Render aggregate charts as server-side SVG that remains visible without JavaScript; retain units, distinguishable ticks and exact numerical intervals in hover details, with each category's coverage and observation denominator available from its heading
 - Do not infer physical comparability, combine mixed-unit mechanical extrema, or describe metadata and array availability as a validation pass
 - Preserve active filters and permissions in the object list and pagination; invalid filters show errors and no records, never a broader selection
-- Keep classification counts, distribution units and denominators visible; preserve empty states, long labels, expandable categories, keyboard operation and ordinary GET navigation without JavaScript
+- Keep classification counts and distribution units visible, with denominators in hover details; preserve empty states, long labels, expandable categories, keyboard operation and ordinary GET navigation without JavaScript
 - Verify desktop layout and drillthrough with `DEBUG=True ... manage.py test apps.charts`; the browser test needs Chromium and Node with global WebSocket and must not be skipped
 
 ## Search rules

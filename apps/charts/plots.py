@@ -80,9 +80,15 @@ def category_label_lines(label, width=122):
     for character in " ".join(label.split()):
         if character == " ":
             advance = 4
-        elif character in "iljItfr.,:;!'|()[]":
+        elif character in "ft":
+            advance = 4
+        elif character in "iljIr.,:;!'|()[]":
             advance = 4.5
-        elif character in "MWmw@%" or not character.isascii():
+        elif character == "w":
+            advance = 10
+        elif character == "m":
+            advance = 11
+        elif character in "MW@%" or not character.isascii():
             advance = 13
         elif character.isupper():
             advance = 9
@@ -127,23 +133,27 @@ def bar_plot(rows, limit=6, wrap_labels=False):
     """
     shown = rows[:limit]
     scale = axis_scale([row["count"] for row in shown], counts=True)
+    label_width = 200 if wrap_labels else 122
+    bar_x = label_width + 12
     top = 14
     bars = []
     for row in shown:
-        lines = category_label_lines(row["label"]) if wrap_labels else [row["label"]]
+        label = row.get("display_label", row["label"])
+        lines = category_label_lines(label, label_width) if wrap_labels else [label]
         label_height = len(lines) * 16 if wrap_labels else 22
         row_height = max(32, label_height)
         y = top + (row_height - 22) / 2
         width = float(Decimal(row["count"]) / scale["maximum"]) * 172
         bars.append({**row, "width": round(width, 2), "y": y,
-                     "label_y": y + 15, "value_x": round(134 + width + 7, 2),
+                     "label_y": y + 15, "value_x": round(bar_x + width + 7, 2),
                      "label_lines": lines, "label_top": top + (row_height - label_height) / 2,
                      "label_height": label_height, "row_top": top, "row_height": row_height})
         top += row_height + 10
     baseline = top + 12 if bars else 68
     return {"rows": bars, "all_rows": rows, "height": baseline + 43, "baseline": baseline,
-            "wrap_labels": wrap_labels,
-            "ticks": [{**tick, "x": round(134 + tick["position"] * 172, 2)} for tick in scale["ticks"]]}
+            "wrap_labels": wrap_labels, "width": bar_x + 206, "bar_x": bar_x,
+            "label_width": label_width, "axis_title_x": bar_x + 86,
+            "ticks": [{**tick, "x": round(bar_x + tick["position"] * 172, 2)} for tick in scale["ticks"]]}
 
 
 def histogram_plot(distribution):
@@ -253,7 +263,7 @@ def bubble_plot(rows, limit=6):
     rows : list of dict
         Category counts and filter links.
     limit : int, optional
-        Categories shown initially, with all others available in the table.
+        Categories shown initially, with all others in the expanded chart.
 
     Returns
     -------
@@ -264,22 +274,30 @@ def bubble_plot(rows, limit=6):
     maximum = max((row["count"] for row in shown), default=1)
     colors = ("#347bb5", "#31877c", "#7968aa", "#b87d35", "#4b899c", "#a85f7f")
     circles = []
+    y = 56
+    row_height = 0
     for index, row in enumerate(shown):
         radius = 43 * math.sqrt(row["count"] / maximum)
-        y = 56 + (index // 3) * 120
+        if index and index % 3 == 0:
+            y += 108 + row_height
+            row_height = 0
+        lines = category_label_lines(row["label"], 108)
+        label_height = len(lines) * 16
+        row_height = max(row_height, label_height)
         row_length = min(3, len(shown) - (index // 3) * 3)
         circles.append({**row, "x": 180 + ((index % 3) - (row_length - 1) / 2) * 118, "y": y, "radius": radius,
                         "color": colors[index % len(colors)], "count_y": y + 4 if radius >= 15 else y + 25,
                         "inside": radius >= 15, "label_y": y + 46,
+                        "label_lines": lines, "label_height": label_height,
                         "label_x": 126 + ((index % 3) - (row_length - 1) / 2) * 118})
-    return {"rows": circles, "maximum": maximum, "height": 280 if len(shown) > 3 else 160}
+    return {"rows": circles, "maximum": maximum, "height": y + 46 + row_height + 12}
 
 
 def column_plot(rows, limit=6):
     """
     Draw software counts on a common vertical axis starting at zero
 
-    Full category names remain in link titles and the expanded category chart.
+    Full category names wrap beneath their columns without truncation.
 
     Parameters
     ----------
@@ -300,11 +318,15 @@ def column_plot(rows, limit=6):
     for index, row in enumerate(shown):
         height = float(Decimal(row["count"]) / scale["maximum"]) * 150
         center = 48 + slot * (index + .5)
+        lines = category_label_lines(row["label"], slot - 4)
         columns.append({**row, "x": round(center - min(slot * .6, 64) / 2, 2), "center": round(center, 2),
                         "width": round(min(slot * .6, 64), 2), "height": round(height, 2),
                         "y": round(192 - height, 2), "count_y": round(184 - height, 2),
-                        "label_x": round(48 + index * slot + 2, 2), "label_width": round(slot - 4, 2)})
-    return {"rows": columns, "ticks": [{**tick, "y": round(192 - tick["position"] * 150, 2)}
+                        "label_x": round(48 + index * slot + 2, 2), "label_width": round(slot - 4, 2),
+                        "label_lines": lines, "label_height": len(lines) * 16})
+    axis_y = 228 + max((row["label_height"] for row in columns), default=16)
+    return {"rows": columns, "height": axis_y + 15, "axis_y": axis_y,
+            "ticks": [{**tick, "y": round(192 - tick["position"] * 150, 2)}
                                         for tick in scale["ticks"]]}
 
 
@@ -325,7 +347,7 @@ def heatmap_plot(matrix, limit=6):
     Returns
     -------
     dict
-        Bounded cells, shortened axis labels and a visible count scale.
+        Bounded cells with exact counts and loading axis labels.
     """
     types, modes = matrix["types"][:limit], matrix["modes"][:min(limit, 4)]
     counts = {(row["type"].casefold(), row["mode"].casefold()): row for row in matrix["pairs"]}

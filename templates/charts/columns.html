@@ -1,4 +1,4 @@
-<svg class="charts-column-svg" viewBox="0 0 410 280" role="group" aria-label="Software counts by data object" xmlns="http://www.w3.org/2000/svg">
+<svg class="charts-column-svg charts-wrap-labels" viewBox="0 0 410 {{ plot.height }}" role="group" aria-label="Software counts by data object" xmlns="http://www.w3.org/2000/svg">
   <text x="48" y="19" class="charts-axis-text">Data objects</text>
   {% for tick in plot.ticks %}<line x1="48" x2="388" y1="{{ tick.y }}" y2="{{ tick.y }}" class="charts-grid-line"/><text x="38" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" class="charts-axis-text">{{ tick.label }}</text>{% endfor %}
   {% for row in plot.rows %}
@@ -8,8 +8,8 @@
       <rect x="{{ row.x }}" y="{{ row.y }}" width="{{ row.width }}" height="{{ row.height }}" rx="4" class="charts-column-mark"/>
       <text x="{{ row.center }}" y="{{ row.count_y }}" text-anchor="middle" class="charts-bar-count">{{ row.count }}</text>
     </g>
-    <foreignObject x="{{ row.label_x }}" y="204" width="{{ row.label_width }}" height="36"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-column-label" data-count="{{ row.count }}" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)">{{ row.label }}</span></foreignObject>
+    <foreignObject x="{{ row.label_x }}" y="204" width="{{ row.label_width }}" height="{{ row.label_height }}"><span xmlns="http://www.w3.org/1999/xhtml" class="charts-svg-label charts-svg-label-center" data-count="{{ row.count }}" title="{{ row.label }}: {{ row.count }} object{{ row.count|pluralize }} ({{ row.percent|floatformat:'1u' }}%)">{% for line in row.label_lines %}<span class="charts-label-line">{{ line }}</span>{% endfor %}</span></foreignObject>
     </g>
   {% endfor %}
-  <text x="218" y="265" text-anchor="middle" class="charts-axis-text">Software</text>
+  <text x="218" y="{{ plot.axis_y }}" text-anchor="middle" class="charts-axis-text">Software</text>
 </svg>

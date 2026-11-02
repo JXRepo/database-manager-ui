@@ -60,7 +60,7 @@
 
       <div class="charts-dashboard-grid">
         <section class="charts-panel" data-statistic="phase" aria-labelledby="phase-heading">
-          <div class="charts-panel-heading"><h2 id="phase-heading">Phase</h2><span class="charts-context-label" title="Objects reporting a phase name / selected objects">With data: {{ phase_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="phase-heading" tabindex="0" title="{{ phase_category.available }} of {{ total_objects }} objects report a phase name. Each object is counted once per phase name.">Phase</h2></div>
           <div class="charts-plot-stage">
             {% if phase_category.rows %}{% include 'charts/category.html' with plot=phase_plot category=phase_category lollipop=True %}{% else %}<div class="charts-plot-empty"><strong>No phase reported</strong></div>{% endif %}
           </div>
@@ -68,13 +68,12 @@
         </section>
 
         <section class="charts-panel charts-results" data-statistic="results" aria-labelledby="results-heading">
-          <div class="charts-panel-heading"><h2 id="results-heading">Stress–strain coverage</h2><span class="charts-context-label" title="All objects in the current selection">Total: {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="results-heading" tabindex="0" title="{{ total_objects }} objects in this scope. Available means stress and total strain are supplied for the same component.">Stress–strain coverage</h2></div>
           <div class="charts-plot-stage">{% include 'charts/pie.html' %}</div>
-          <p class="charts-distribution-caption">Available = stress and total strain for the same component.</p>
         </section>
 
         <section class="charts-panel" data-statistic="models" aria-labelledby="models-heading">
-          <div class="charts-panel-heading"><h2 id="models-heading">Constitutive models</h2><span class="charts-context-label" title="Objects reporting an elastic or plastic model / selected objects">With data: {{ model_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="models-heading" tabindex="0" title="{{ model_category.available }} of {{ total_objects }} objects report an elastic or plastic model. Each object is counted once per model in each family.">Constitutive models</h2></div>
           {% if model_category.rows %}<div class="charts-model-key"><span><i class="charts-key-elastic" aria-hidden="true"></i>Elastic</span><span><i class="charts-key-plastic" aria-hidden="true"></i>Plastic</span></div>{% endif %}
           <div class="charts-plot-stage">
             {% if model_category.rows %}{% include 'charts/category.html' with plot=model_plot category=model_category %}{% else %}<div class="charts-plot-empty"><strong>No constitutive models reported</strong></div>{% endif %}
@@ -83,9 +82,8 @@
         </section>
 
         <section class="charts-panel" data-statistic="loading" aria-labelledby="loading-heading">
-          <div class="charts-panel-heading"><h2 id="loading-heading">Loading types &amp; modes</h2><span class="charts-context-label" title="Objects reporting a complete type and mode pair in the same mechanical boundary entry / selected objects">With data: {{ loading_matrix.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="loading-heading" tabindex="0" title="{{ loading_matrix.available }} of {{ total_objects }} objects report a type and mode together in a mechanical boundary entry. Each cell counts distinct objects; darker cells have more objects.">Loading types &amp; modes</h2></div>
           {% if loading_matrix.pairs %}
-            <p class="charts-distribution-caption charts-loading-caption">Objects with each loading combination</p>
             <div class="charts-plot-stage">{% include 'charts/heatmap.html' %}</div>
             {% include 'charts/more_categories.html' with category=loading_matrix %}
           {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>No complete loading combinations reported</strong></div></div>{% endif %}
@@ -94,19 +92,17 @@
         {% for item in primary_distributions %}
           <section class="charts-panel charts-distributions" data-statistic="{{ item.key }}" aria-labelledby="{{ item.key }}-heading">
             <div class="charts-panel-heading">
-              <h2 id="{{ item.key }}-heading">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</h2>
-              <span class="charts-context-label"{% if item.key == 'temperature' %} title="Objects with a usable temperature / selected objects"{% elif item.key == 'grain_count' %} title="Objects with a usable grain number / selected objects"{% endif %}>With data: {{ item.object_count }} / {{ total_objects }} object{{ total_objects|pluralize }}</span>
+              <h2 id="{{ item.key }}-heading" tabindex="0" title="{{ item.object_count }} of {{ total_objects }} objects report a usable {{ item.title|lower }}.{% if item.key == 'grain_count' %} {{ item.observation_count }} phase observations: one grain number per phase. Box: middle 50%; line: median; ends: minimum and maximum.{% endif %}">{{ item.title }}{% if item.unit %} ({{ item.unit }}){% endif %}</h2>
             </div>
             {% if item.observation_count %}
               <div class="charts-distribution-summary"><span>Median <strong>{{ item.median }}{% if item.key == 'temperature' %} K{% endif %}</strong></span><span>Min–max <strong>{{ item.minimum }}–{{ item.maximum }}{% if item.key == 'temperature' %} K{% endif %}</strong></span></div>
               <div class="charts-plot-stage">{% if item.key == 'grain_count' %}{% include 'charts/box.html' with box=item.box_plot %}{% else %}{% include 'charts/histogram.html' with histogram=item.plot %}{% endif %}</div>
-              {% if item.observation_unit == 'phases' %}<p class="charts-distribution-caption">One grain number per phase · {{ item.observation_count }} phase{{ item.observation_count|pluralize }} from {{ item.object_count }} object{{ item.object_count|pluralize }}</p>{% endif %}
             {% else %}<div class="charts-plot-stage"><div class="charts-plot-empty"><strong>{% if item.key == 'temperature' %}No usable temperature{% else %}No usable grain number{% endif %}</strong></div></div>{% endif %}
           </section>
         {% endfor %}
 
         <section class="charts-panel" data-statistic="texture" aria-labelledby="texture-heading">
-          <div class="charts-panel-heading"><h2 id="texture-heading">Texture types</h2><span class="charts-context-label" title="Objects reporting a texture type / selected objects">With data: {{ texture_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="texture-heading" tabindex="0" title="{{ texture_category.available }} of {{ total_objects }} objects report a texture type. Circle area represents the number of objects; each object is counted once per type.">Texture types</h2></div>
           <div class="charts-plot-stage">
             {% if texture_category.rows %}{% include 'charts/bubble.html' with plot=texture_plot %}{% else %}<div class="charts-plot-empty"><strong>No texture type reported</strong></div>{% endif %}
           </div>
@@ -114,7 +110,7 @@
         </section>
 
         <section class="charts-panel" data-statistic="software" aria-labelledby="software-heading">
-          <div class="charts-panel-heading"><h2 id="software-heading">Software</h2><span class="charts-context-label" title="Objects reporting software / selected objects">With data: {{ software_category.available }} / {{ total_objects }} object{{ total_objects|pluralize }}</span></div>
+          <div class="charts-panel-heading"><h2 id="software-heading" tabindex="0" title="{{ software_category.available }} of {{ total_objects }} objects report software. Abaqus and Abaqus CAE naming variants are grouped as Abaqus; each object is counted once per software name.">Software</h2></div>
           <div class="charts-plot-stage">
             {% if software_category.rows %}{% include 'charts/columns.html' with plot=software_plot %}{% else %}<div class="charts-plot-empty"><strong>No software reported</strong></div>{% endif %}
           </div>

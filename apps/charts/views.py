@@ -13,7 +13,7 @@ from django.views.decorators.cache import never_cache
 from apps.pages.models import JSONData
 from .analytics import (
     CATEGORY_TITLES, COVERAGE_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
-    distribution, format_number, in_bin, loading_matrix, number, summarize_object,
+    distribution, format_number, in_bin, loading_matrix, number, software_name, summarize_object,
 )
 from .plots import bar_plot, box_plot, bubble_plot, column_plot, heatmap_plot, histogram_plot, pie_plot
 
@@ -175,7 +175,8 @@ def matches_filters(record, query, intervals):
         Whether the object belongs to the selected statistical scope.
     """
     for key in CATEGORY_TITLES:
-        selected = {value.casefold() for value in query.get(key, [])}
+        selected = {(software_name(value) if key == "software" else value).casefold()
+                    for value in query.get(key, [])}
         if not selected.issubset({value.casefold() for value in record["categories"][key]}):
             return False
     if not set(query.get("result", [])).issubset(record["results"]):
@@ -261,7 +262,8 @@ def index(request):
     for key, family, color in (("elastic_model", "Elastic", "#7968aa"),
                                ("plastic_model", "Plastic", "#31877c")):
         for row in categories[key]["rows"]:
-            model_rows.append({**row, "label": f'{row["label"]} ({family})', "color": color})
+            model_rows.append({**row, "label": f'{row["label"]} ({family})',
+                               "display_label": row["label"], "color": color})
     model_rows.sort(key=lambda row: (-row["count"], row["label"].casefold()))
     model_category = {
         "key": "models", "title": "Constitutive models", "rows": model_rows,
@@ -272,7 +274,7 @@ def index(request):
     for category in (categories["phase"], categories["texture"], categories["software"], model_category):
         remaining = category["rows"][6:]
         if remaining:
-            category["more_plot"] = bar_plot(remaining, limit=len(remaining), wrap_labels=category["key"] == "models")
+            category["more_plot"] = bar_plot(remaining, limit=len(remaining), wrap_labels=True)
     loading_plot = heatmap_plot(loading)
     shown_pairs = {(cell["type"].casefold(), cell["mode"].casefold()) for cell in loading_plot["cells"]}
     remaining = [{**row, "label": f'{row["type"]} / {row["mode"]}'} for row in loading["pairs"]
@@ -380,7 +382,7 @@ def index(request):
         "selected_category": selected_category,
         "category_plot": bar_plot(selected_category["rows"]), "group": group,
         "selected_distribution": selected_distribution, "histogram": histogram_plot(selected_distribution),
-        "phase_category": categories["phase"], "phase_plot": bar_plot(categories["phase"]["rows"]),
+        "phase_category": categories["phase"], "phase_plot": bar_plot(categories["phase"]["rows"], wrap_labels=True),
         "software_category": categories["software"], "software_plot": column_plot(categories["software"]["rows"]),
         "texture_category": categories["texture"], "texture_plot": bubble_plot(categories["texture"]["rows"]),
         "model_category": model_category, "model_plot": bar_plot(model_rows, wrap_labels=True),

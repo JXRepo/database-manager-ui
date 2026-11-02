@@ -344,6 +344,8 @@ function exactEighths(value) {
       assert.equal(await evaluate('document.querySelectorAll(".charts-panel-purpose, .charts-section-help, .charts-page-footnote, .charts-subtle-note").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-curve-svg, #curve-object, #curve-component, #download-curve").length'), 0);
       assert.equal(await evaluate('document.querySelectorAll(".charts-data-notes").length'), 0);
+      assert.equal(await evaluate('document.querySelectorAll(".charts-context-label, .charts-distribution-caption, #loading-count-scale").length'), 0);
+      assert.equal(await evaluate('/With data:|Available =|Objects with each loading combination|Larger circles =|Box: Q1–Q3|One grain number per phase/.test(document.querySelector(".charts-dashboard-grid").innerText)'), false);
       assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-statistic]')]
         .map(panel => panel.dataset.statistic)`),
         ['phase', 'results', 'models', 'loading', 'temperature', 'grain_count', 'texture', 'software']);
@@ -378,12 +380,16 @@ function exactEighths(value) {
           cards: panels.map(panel => {
             const rect = panel.getBoundingClientRect();
             const heading = panel.querySelector('h2').getBoundingClientRect();
-            const coverage = panel.querySelector('.charts-context-label').getBoundingClientRect();
+            const title = panel.querySelector('h2');
             return {key: panel.dataset.statistic, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-              headingGap: coverage.left - heading.right};
+              headingFits: heading.left >= rect.left && heading.right <= rect.right,
+              description: title.dataset.chartTooltip || title.getAttribute('title'), focusable: title.tabIndex === 0};
           }),
           primary: graphs.filter(svg => ['phase', 'results'].includes(svg.closest('[data-statistic]').dataset.statistic))
-            .map(svg => ({top: svg.getBoundingClientRect().top, bottom: svg.getBoundingClientRect().bottom})),
+            .map(svg => {
+              const stage = svg.closest('.charts-plot-stage').getBoundingClientRect();
+              return {top: stage.top, bottom: stage.bottom};
+            }),
           graphCount: graphs.length,
           graphTypes: {bar: graphs.filter(svg => svg.classList.contains('charts-bar-svg') && !svg.classList.contains('charts-lollipop-svg')).length,
             lollipop: graphs.filter(svg => svg.classList.contains('charts-lollipop-svg')).length,
@@ -399,7 +405,7 @@ function exactEighths(value) {
             const dotRect = dot.getBoundingClientRect(), count = link.querySelector('.charts-bar-count');
             const countRect = count.getBoundingClientRect();
             return {label: link.dataset.label, dotPosition: dot.cx.baseVal.value, stemEnd: stem.x2.baseVal.value,
-              count: count.textContent, dotRight: dotRect.right, countLeft: countRect.left,
+              count: count.textContent, description: link.getAttribute('aria-label'), dotRight: dotRect.right, countLeft: countRect.left,
               clipped: dotRect.left < bounds.left || dotRect.right > bounds.right || countRect.right > bounds.right,
               fontSize: parseFloat(getComputedStyle(count).fontSize) * svg.getScreenCTM().a};
           }),
@@ -430,7 +436,8 @@ function exactEighths(value) {
             const types = [...svg.querySelectorAll('.charts-svg-label-end')].map(textBounds);
             const modes = [...svg.querySelectorAll('.charts-svg-label-center')].map(textBounds);
             return {typeGap: Math.min(...types.map(rect => rect.left)) - type.right,
-              modeGap: Math.min(...modes.map(rect => rect.top)) - mode.bottom};
+              modeGap: mode.top - Math.max(...modes.map(rect => rect.bottom)),
+              belowCells: mode.top > Math.max(...[...svg.querySelectorAll('.charts-heatmap-mark')].map(cell => cell.getBoundingClientRect().bottom))};
           }),
           temperature: (() => {
             const panel = document.querySelector('[data-statistic=temperature]');
@@ -455,26 +462,25 @@ function exactEighths(value) {
               return {text: element.textContent.trim(), fontSize: parseFloat(getComputedStyle(element).fontSize) * svg.getScreenCTM().a,
                 clipped: rect.left < bounds.left - 1 || rect.right > bounds.right + 1 || rect.top < bounds.top - 1 || rect.bottom > bounds.bottom + 1};
             });
-            const heading = panel.querySelector('h2').getBoundingClientRect();
-            const coverage = panel.querySelector('.charts-context-label').getBoundingClientRect();
+            const heading = panel.querySelector('h2');
             return {yTitle, xTitle, xLabels, texts,
               yGap: Math.min(...yLabels.map(rect => rect.left)) - yTitle.right,
               xGap: xTitle.top - Math.max(...xLabels.map(rect => rect.bottom)),
-              headingOverlap: heading.right > coverage.left,
-              coverage: panel.querySelector('.charts-context-label').textContent.trim(),
+              coverage: heading.dataset.chartTooltip || heading.getAttribute('title'),
               summary: panel.querySelector('.charts-distribution-summary').textContent.trim()};
           })(),
           categoryLabels: panels.flatMap(panel => [...panel.querySelectorAll('svg')]).filter(svg => svg.checkVisibility())
             .flatMap((svg, chart) => [...svg.querySelectorAll('.charts-svg-label')].map(label => {
             const rect = label.getBoundingClientRect(), bounds = svg.getBoundingClientRect(), style = getComputedStyle(label);
-            const fullLabel = svg.dataset.category === 'models';
+            const fullLabel = svg.classList.contains('charts-wrap-labels');
+            const fullName = fullLabel ? label.closest('.charts-category-row').querySelector('[role="img"]').dataset.label : '';
             const region = label.closest('foreignObject').getBoundingClientRect();
             const range = document.createRange();
             range.selectNodeContents(label);
             const fullText = [...range.getClientRects()].every(part => part.left >= region.left - 1
               && part.right <= region.right + 1 && part.top >= region.top - 1 && part.bottom <= region.bottom + 1);
             return {chart, text: label.textContent, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-              fullLabel, fullText,
+              fullLabel, fullText, expectedName: svg.dataset.category === 'models' ? fullName.slice(0, fullName.lastIndexOf(' (')) : fullName,
               fontSize: parseFloat(style.fontSize) * svg.getScreenCTM().a,
               bounded: fullLabel ? fullText : style.overflow === 'hidden' && (style.textOverflow === 'ellipsis' || style.webkitLineClamp === '2'),
               clipped: rect.left < bounds.left - 1 || rect.top < bounds.top - 1 || rect.right > bounds.right + 1 || rect.bottom > bounds.bottom + 1};
@@ -512,7 +518,8 @@ function exactEighths(value) {
         assert.equal(metrics.cards.length, 8);
         for (const card of metrics.cards) {
           assert.ok(card.left >= metrics.mainLeft && card.right <= width, `${label}: card outside desktop ${JSON.stringify(card)}`);
-          assert.ok(card.headingGap >= 11, `${label}: card title and coverage need space at ${width}: ${JSON.stringify(card)}`);
+          assert.ok(card.headingFits && card.description && card.focusable,
+            `${label}: card title fits and keeps coverage available on hover and focus at ${width}: ${JSON.stringify(card)}`);
         }
       }
       if (expectedGraphs === 8) assert.deepEqual(metrics.graphTypes,
@@ -521,10 +528,9 @@ function exactEighths(value) {
         assert.equal(mark.dotPosition, mark.stemEnd, `${label}: the dot must mark its count position`);
         assert.ok(!mark.clipped && mark.countLeft > mark.dotRight && mark.fontSize >= 9.5,
           `${label}: readable lollipop count at ${width}: ${JSON.stringify(mark)}`);
-        const values = mark.count.match(/^(\d+) \((\d+(?:\.\d+)?)%\)$/);
-        assert.ok(values, `${label}: show the count and percentage for ${mark.label}`);
-        assert.equal(Number(values[2]), Number((Number(values[1]) * 100 / metrics.totalObjects).toFixed(1)),
-          `${label}: phase percentage uses all selected objects`);
+        assert.match(mark.count, /^\d+$/, `${label}: show only the count beside ${mark.label}`);
+        const percentage = Number((Number(mark.count) * 100 / metrics.totalObjects).toFixed(1));
+        assert.ok(mark.description.includes(percentage.toFixed(1) + '%'), `${label}: retain phase percentage in hover details`);
       }
       for (const text of metrics.numericLabels) {
         assert.ok(text.fontSize >= 9.5 && !text.clipped, `${label}: readable numeric label at ${width}: ${JSON.stringify(text)}`);
@@ -534,7 +540,7 @@ function exactEighths(value) {
           `${label}: box axis labels overlap at ${width}: ${JSON.stringify(metrics.boxTicks)}`);
       });
       for (const spacing of metrics.heatmapSpacing) {
-        assert.ok(spacing.typeGap > 0 && spacing.modeGap > 0 && Math.abs(spacing.typeGap - spacing.modeGap) <= 1,
+        assert.ok(spacing.belowCells && spacing.typeGap > 0 && spacing.modeGap > 0 && Math.abs(spacing.typeGap - spacing.modeGap) <= 1,
           `${label}: Type and Mode need the same visible gap from their names at ${width}: ${JSON.stringify(spacing)}`);
       }
       if (metrics.temperature) {
@@ -545,8 +551,7 @@ function exactEighths(value) {
           `${label}: Objects belongs vertically beside the count axis at ${width}`);
         assert.ok(temperature.yGap > 0 && temperature.xGap > 0 && Math.abs(temperature.yGap - temperature.xGap) <= 1,
           `${label}: temperature axis titles need equal visible gaps at ${width}: ${JSON.stringify(temperature)}`);
-        assert.ok(!temperature.headingOverlap, `${label}: temperature heading and coverage overlap at ${width}`);
-        assert.match(temperature.coverage, /^With data:/);
+        assert.match(temperature.coverage, /^\d+ of \d+ objects report a usable temperature/);
         assert.match(temperature.summary, /Min–max/);
         temperature.xLabels.forEach((tick, index) => {
           assert.ok(!index || tick.left > temperature.xLabels[index - 1].right + 3,
@@ -554,7 +559,11 @@ function exactEighths(value) {
         });
       }
       metrics.categoryLabels.forEach((label, index) => {
-        if (label.fullLabel) assert.ok(label.fullText, `Show the complete category name: ${JSON.stringify(label)}`);
+        if (label.fullLabel) {
+          assert.ok(label.fullText, `Show the complete category name: ${JSON.stringify(label)}`);
+          assert.equal(label.text.replace(/\s+/g, ' ').trim(), label.expectedName.replace(/\s+/g, ' ').trim(),
+            'Category labels keep the complete supplied name; models omit the repeated family suffix');
+        }
         assert.ok(label.bounded && !label.clipped && label.fontSize >= 9.5,
           `${label}: category label must fit its region at ${width}: ${JSON.stringify(label)}`);
         for (const previous of metrics.categoryLabels.slice(0, index)) {
@@ -569,7 +578,7 @@ function exactEighths(value) {
         assert.equal(metrics.primary.length, 2);
         for (const chart of metrics.primary) {
           assert.ok(chart.top >= metrics.headerBottom && chart.bottom < 1000,
-            `Phase and coverage charts must remain visible on the first screen: ${JSON.stringify(metrics)}`);
+            `Phase and coverage chart areas must remain visible on the first screen: ${JSON.stringify(metrics)}`);
         }
       }
       if (metrics.selection) assert.ok(metrics.selection.height < 140, `Applied conditions must remain compact: ${JSON.stringify(metrics.selection)}`);
@@ -637,7 +646,9 @@ function exactEighths(value) {
     }
     await searchData();
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=phase] .charts-more-categories").length'), 0);
-    await inspectCharts(['.charts-lollipop-dot', '[data-statistic=models] .charts-bar', '.charts-pie-slice',
+    await inspectCharts(['#phase-heading', '#results-heading', '#models-heading', '#loading-heading',
+      '#temperature-heading', '#grain_count-heading', '#texture-heading', '#software-heading',
+      '.charts-lollipop-dot', '[data-statistic=models] .charts-bar', '.charts-pie-slice',
       '.charts-heatmap-cell', '.charts-bin', '.charts-box-selection', '.charts-bubble', '.charts-column',
       '.charts-svg-label', '.charts-coverage-link']);
     assert.equal(await evaluate('document.querySelectorAll(".charts-filter").length'), 0);
@@ -744,7 +755,9 @@ function exactEighths(value) {
       && document.readyState === 'complete' && !!document.querySelector('.charts-records')`);
     assert.equal(await evaluate('document.querySelector(".charts-page").classList.contains("charts-js")'), false);
     await navigate('/charts/?scope=mine', false);
-    await inspectCharts(['.charts-lollipop-dot', '[data-statistic=models] .charts-bar', '.charts-pie-slice',
+    await inspectCharts(['#phase-heading', '#results-heading', '#models-heading', '#loading-heading',
+      '#temperature-heading', '#grain_count-heading', '#texture-heading', '#software-heading',
+      '.charts-lollipop-dot', '[data-statistic=models] .charts-bar', '.charts-pie-slice',
       '.charts-heatmap-cell', '.charts-bin', '.charts-box-selection', '.charts-bubble', '.charts-column']);
     await assertLegacyListCount({path: '/charts/?scope=mine&phase=Copper&software=Software+7&coverage=matching', count: 2}, false);
     assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '12');
@@ -857,10 +870,10 @@ function exactEighths(value) {
       assert.equal(await evaluate('document.querySelector(".charts-metric-total strong").textContent'), '1');
       await assertFixedDashboard();
       assert.equal((await categorySummary('phase', 'Copper')).count, 1);
-      assert.equal((await categorySummary('software', 'Abaqus CAE')).count, 1);
+      assert.equal((await categorySummary('software', 'Abaqus')).count, 1);
       assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Median\s+298/);
       assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-distribution-summary").textContent'), /Min–max\s+298–298 K/);
-      assert.match(await evaluate('document.querySelector("[data-statistic=temperature] .charts-context-label").textContent'), /With data:\s+1 \/ 1 object/);
+      assert.match(await evaluate('document.querySelector("[data-statistic=temperature] h2").dataset.chartTooltip'), /1 of 1 objects report a usable temperature/);
       assert.ok(await evaluate('document.querySelector("[data-statistic=temperature] h2").textContent.includes("(K)")'));
       assert.deepEqual(await evaluate(`[...document.querySelectorAll('.charts-metric dd')]
         .map(value => value.textContent.trim())`), ['1', '1', '1', '1']);
@@ -907,7 +920,7 @@ function exactEighths(value) {
       assert.equal(sampleRows[0].href, process.env.CHARTS_SAMPLE_DETAIL_URL);
       assert.equal(await evaluate(`fetch(${JSON.stringify(process.env.CHARTS_SAMPLE_DETAIL_URL)}).then(response => response.status)`), 200);
       assert.equal(await evaluate('document.querySelector("[data-overview=texture] dd").textContent'), '1');
-      console.log('Charts local sample checks passed: Copper, Abaqus CAE, Goss, 298 K, 343 grains, 2,744 cells, exact combined links, detail navigation, and 3 desktop layouts.');
+      console.log('Charts local sample checks passed: Copper, Abaqus grouping with the legacy Abaqus CAE bookmark, Goss, 298 K, 343 grains, 2,744 cells, exact combined links, detail navigation, and 3 desktop layouts.');
     }
     assert.deepEqual(exceptions, []);
     console.log('Charts browser checks passed: eight cards with visible hover tooltips, obsolete chart selections cleared, no click navigation, legacy object-list bookmarks, keyboard operation without JavaScript, public/private scopes, precise intervals, record navigation and desktop layouts.');

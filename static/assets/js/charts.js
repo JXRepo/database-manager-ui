@@ -18,7 +18,7 @@
   document.body.append(tooltip);
 
   const targets = page.querySelectorAll('.charts-dashboard-grid [role="img"], .charts-box-svg, '
-    + '.charts-dashboard-grid .charts-svg-label[title], .charts-coverage-link[title], .charts-context-label[title]');
+    + '.charts-dashboard-grid .charts-svg-label[title], .charts-coverage-link[title], .charts-panel-heading h2[title]');
   for (const target of targets) {
     const svgTitle = target.querySelector(':scope > title');
     const description = target.getAttribute('title') || svgTitle?.textContent || target.getAttribute('aria-label');

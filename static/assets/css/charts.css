@@ -52,12 +52,14 @@
 .charts-dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
 .charts-panel { display: flex; flex-direction: column; padding: 16px 20px; border: 1px solid var(--charts-rule); border-radius: 8px; background: #fff; }
 .charts-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; margin-bottom: 10px; }
-.charts-context-label { font-size: 11px; color: var(--charts-muted); white-space: nowrap; }
+.charts-panel-heading h2:focus-visible { outline: 3px solid #84ace0; outline-offset: 3px; }
 .charts-tooltip { position: fixed; z-index: 1100; max-width: min(360px, calc(100vw - 24px)); padding: 8px 10px; border: 1px solid #cbd8e4; border-radius: 5px; background: #fff; color: #284664; box-shadow: 0 3px 12px #28466426; font: 12px/1.5 Arial, sans-serif; white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; }
 .charts-tooltip[hidden] { display: none; }
-.charts-plot-stage { display: flex; align-items: center; justify-content: center; flex: 1; min-height: 225px; }
+.charts-plot-stage { display: flex; align-items: safe center; justify-content: center; flex: 1; min-height: 225px; max-height: 420px; overflow: auto; }
+.charts-plot-stage > svg { flex-shrink: 0; }
 .charts-bar-svg { display: block; width: 100%; max-width: 360px; height: auto; }
 .charts-lollipop-svg { max-width: 420px; }
+.charts-bar-svg.charts-wrap-labels { max-width: 440px; }
 .charts-grid-line { stroke: #e7edf3; stroke-width: 1; }
 .charts-axis-text { font: 12px Arial, sans-serif; fill: #607c99; }
 .charts-bar-label { font: 12px Arial, sans-serif; fill: #284664; }
@@ -127,7 +129,6 @@
 .charts-heatmap-mode-labels { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; width: 100%; }
 .charts-heatmap-type-labels { display: grid; grid-auto-rows: minmax(0, 1fr); align-items: center; gap: 3px; width: max-content; height: 100%; }
 .charts-heatmap-svg .charts-svg-label { line-height: 14px; }
-.charts-page .charts-column-label { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 16px; }
 .charts-category-row:hover .charts-lollipop-dot, .charts-category-row:hover .charts-lollipop-stem { fill: #205f9a; stroke: #2c78bf; }
 .charts-category-row:hover .charts-bar-mark, .charts-category-row:hover .charts-bubble-mark, .charts-category-row:hover .charts-column-mark { opacity: .8; }
 .charts-coverage-table th:first-child { width: 47%; }
