@@ -367,7 +367,8 @@ Results only include records you own, public records, and private records
 explicitly shared with you. Public results appear before private results, with
 the newest uploads first within each group. Each result shows Public or Private
 without expanding it, and the Search Results heading shows the total number of
-matching objects. **Live Data Objects** is a separate, compact feed of
+matching objects. Search results appear directly below the search form, above
+**Live Data Objects**, a separate, compact feed of
 the latest 20 public uploads; it excludes all private data, including your own
 and data shared with you. Its total counts all public objects, including those
 beyond the latest 20, and refreshes with the list every ten seconds while the

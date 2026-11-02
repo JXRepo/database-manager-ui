@@ -931,22 +931,6 @@
           </form>
 
 
-          <div class="live-data-panel" aria-live="polite">
-            <div class="live-data-header">
-              <div>
-                <div class="live-data-title">Live Data Objects <span class="text-muted small fw-normal" id="liveDataCount" hidden></span></div>
-                <div class="live-data-subtitle" id="liveDataSubtitle">Latest public uploads</div>
-              </div>
-              <div class="live-data-status" id="liveDataStatus">Loading</div>
-            </div>
-            <div class="live-data-list" id="liveDataList">
-              <div class="live-data-empty">Loading data objects</div>
-            </div>
-          </div>
-
-
-
-
         </div>
       </div>
     </div>
@@ -1099,6 +1083,25 @@
       </div>
       {% endif %}
     {% endif %}
+
+    <div class="card search-bar-card mt-4">
+      <div class="card-body py-4">
+        <div class="search-hero-wrap">
+          <div class="live-data-panel mt-0 pt-0 border-0" aria-live="polite">
+            <div class="live-data-header">
+              <div>
+                <div class="live-data-title">Live Data Objects <span class="text-muted small fw-normal" id="liveDataCount" hidden></span></div>
+                <div class="live-data-subtitle" id="liveDataSubtitle">Latest public uploads</div>
+              </div>
+              <div class="live-data-status" id="liveDataStatus">Loading</div>
+            </div>
+            <div class="live-data-list" id="liveDataList">
+              <div class="live-data-empty">Loading data objects</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
