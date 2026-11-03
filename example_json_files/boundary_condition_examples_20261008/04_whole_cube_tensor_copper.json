@@ -25,8 +25,8 @@
     "Single stress tensor",
     "Copper"
   ],
-  "software": "Analytical synthetic fixture generator",
-  "software_version": "2.0",
+  "software": "Python",
+  "software_version": "3.10.12",
   "system": "Linux",
   "system_version": "5.15.0-133-generic",
   "processor_specifications": "x86_64; Python analytical calculation, no finite element solver",
@@ -136,7 +136,7 @@
           ]
         },
         "grain_count": 8,
-        "texture_type": "Synthetic preferred orientations",
+        "texture_type": "Preferred orientation",
         "frame": "lab",
         "rotation_type": "active",
         "software": "Python standard library random.Random",

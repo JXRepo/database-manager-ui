@@ -42,6 +42,14 @@ example recalculates one modified copper state; the scalar whole cube example
 retains the complete curves from the original copper reference.
 They are explicitly labeled synthetic test data. No finite element solver was run.
 
+All five examples identify the calculation software as `Python`, using the
+`3.10.12` version already recorded in their orientation metadata. The aluminium
+and steel examples use `Random` for their dispersed orientations; the titanium
+and both copper examples use `Preferred orientation` for their clustered
+orientations. These metadata labels were updated on 2026-11-03 without changing
+identifiers, orientation arrays, boundary conditions or curves. Replace existing
+uploads with the same identifiers before reuploading these files.
+
 | File | Loaded region and direction | Assumed material | Cube side | Load and reference curves |
 | --- | --- | --- | --- | --- |
 | 01_point_tension_aluminium.json | V111, +X point force | Aluminium reference | 0.8 mm | 32 N endpoint; 41 samples of nominal elastic tension |

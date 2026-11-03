@@ -26,8 +26,8 @@
     "Independent reference curves",
     "Copper"
   ],
-  "software": "Synthetic boundary display fixture",
-  "software_version": "1.0",
+  "software": "Python",
+  "software_version": "3.10.12",
   "system": "Linux",
   "system_version": "5.15.0-133-generic",
   "processor_specifications": "x86_64; metadata display fixture with retained analytical reference arrays; no finite element solver",
@@ -133,7 +133,7 @@
           ]
         },
         "grain_count": 8,
-        "texture_type": "Synthetic preferred orientations",
+        "texture_type": "Preferred orientation",
         "frame": "lab",
         "rotation_type": "active",
         "software": "Python standard library random.Random",
