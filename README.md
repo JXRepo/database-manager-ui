@@ -422,12 +422,17 @@ Eight cards are visible directly, in four pairs:
 - **Stress–strain coverage** uses a donut chart for the exhaustive, disjoint
   classes with and without matching components.
 - **Constitutive models** compares reported elastic and plastic model names
-  with separately colored horizontal bars. Each family counts objects per name;
-  the coverage denominator counts objects reporting either family. Complete
-  model names wrap onto multiple lines, including under **More categories**;
-  row heights grow with the text so names and bars remain aligned. The Elastic /
-  Plastic color legend identifies families without repeating them after every
-  model name; hover details retain the family. Specific models remain separate.
+  with separately colored horizontal bars. Elastic models come first, then
+  plastic models; each family is ordered by object count. Up to three models
+  from each family appear initially, with the rest under **More categories**.
+  Each object counts once per model and can appear in both families. The heading
+  reports how many objects name at least one model. The explicit fixture marker
+  `No plasticity in this elastic reference` is excluded from model counts;
+  original metadata, downloads and saved filters retain it. Complete model names
+  wrap onto multiple lines, including expanded categories; row heights grow with
+  the text so names and bars remain aligned. The Elastic and Plastic color legend
+  identifies families without repeating them after every model name; hover
+  details retain the family. Specific models remain separate.
 - **Loading types & modes** uses a heatmap of type and mode combinations reported
   together in the same mechanical boundary entry. Each object counts once per
   combination, even when several entries repeat it. Incomplete or nontext pairs

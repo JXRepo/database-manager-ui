@@ -13,7 +13,8 @@ from django.views.decorators.cache import never_cache
 from apps.pages.models import JSONData
 from .analytics import (
     CATEGORY_TITLES, COVERAGE_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
-    distribution, format_number, in_bin, loading_matrix, number, phase_name, software_name, summarize_object,
+    distribution, format_number, in_bin, loading_matrix, number, phase_name, plastic_model_names,
+    software_name, summarize_object,
 )
 from .plots import bar_plot, box_plot, bubble_plot, column_plot, heatmap_plot, histogram_plot, pie_plot
 
@@ -264,19 +265,27 @@ def index(request):
             row["url"] = refine_url(query, key, row["label"])
         categories[key] = category
     model_rows = []
+    visible_models = []
+    additional_models = []
     for key, family, color in (("elastic_model", "Elastic", "#7968aa"),
                                ("plastic_model", "Plastic", "#31877c")):
+        family_rows = []
         for row in categories[key]["rows"]:
-            model_rows.append({**row, "label": f'{row["label"]} ({family})',
-                               "display_label": row["label"], "color": color})
-    model_rows.sort(key=lambda row: (-row["count"], row["label"].casefold()))
+            family_rows.append({**row, "label": f'{row["label"]} ({family})',
+                                "display_label": row["label"], "color": color})
+        model_rows.extend(family_rows)
+        visible_models.extend(family_rows[:3])
+        additional_models.extend(family_rows[3:])
     model_category = {
         "key": "models", "title": "Constitutive models", "rows": model_rows,
-        "available": sum(bool(record["categories"]["elastic_model"] or record["categories"]["plastic_model"])
+        "available": sum(bool(record["categories"]["elastic_model"]
+                              or plastic_model_names(record["categories"]["plastic_model"]))
                          for record in records),
     }
+    if additional_models:
+        model_category["more_plot"] = bar_plot(additional_models, limit=len(additional_models), wrap_labels=True)
     loading = loading_matrix(records)
-    for category in (categories["phase"], categories["texture"], categories["software"], model_category):
+    for category in (categories["phase"], categories["texture"], categories["software"]):
         remaining = category["rows"][6:]
         if remaining:
             category["more_plot"] = bar_plot(remaining, limit=len(remaining), wrap_labels=True)
@@ -390,7 +399,7 @@ def index(request):
         "phase_category": categories["phase"], "phase_plot": bar_plot(categories["phase"]["rows"], wrap_labels=True),
         "software_category": categories["software"], "software_plot": column_plot(categories["software"]["rows"]),
         "texture_category": categories["texture"], "texture_plot": bubble_plot(categories["texture"]["rows"]),
-        "model_category": model_category, "model_plot": bar_plot(model_rows, wrap_labels=True),
+        "model_category": model_category, "model_plot": bar_plot(visible_models, wrap_labels=True),
         "loading_matrix": loading, "loading_plot": loading_plot,
         "primary_distributions": distributions[:2],
         "control_params": controls,

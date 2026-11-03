@@ -73,7 +73,7 @@
         </section>
 
         <section class="charts-panel" data-statistic="models" aria-labelledby="models-heading">
-          <div class="charts-panel-heading"><h2 id="models-heading" tabindex="0" title="{{ model_category.available }} of {{ total_objects }} objects report an elastic or plastic model. Each object is counted once per model in each family.">Constitutive models</h2></div>
+          <div class="charts-panel-heading"><h2 id="models-heading" tabindex="0" title="{{ model_category.available }} of {{ total_objects }} objects report a named elastic or plastic model. Each bar counts objects reporting that model. The same object may appear in both families.">Constitutive models</h2></div>
           {% if model_category.rows %}<div class="charts-model-key"><span><i class="charts-key-elastic" aria-hidden="true"></i>Elastic</span><span><i class="charts-key-plastic" aria-hidden="true"></i>Plastic</span></div>{% endif %}
           <div class="charts-plot-stage">
             {% if model_category.rows %}{% include 'charts/category.html' with plot=model_plot category=model_category %}{% else %}<div class="charts-plot-empty"><strong>No constitutive models reported</strong></div>{% endif %}

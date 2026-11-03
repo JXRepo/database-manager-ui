@@ -180,6 +180,8 @@ Current priority:
 - Show complete phase, constitutive model, texture and software names with wrapping and enough space, including expanded categories; use bounded scrolling for unusually long labels
 - Charts phase categories and saved phase filters ignore only the trailing `(synthetic reference)` marker, ignoring case, and count each object once per resulting name; preserve other parenthetical qualifiers and keep original names in object lists, detail pages, stored JSON and exports
 - Keep specific constitutive model names and the Elastic / Plastic color legend; omit repeated family suffixes from visible labels while retaining families in hover details
+- Group constitutive model bars with Elastic first and Plastic second, ordering each family by object count; show up to three per family initially and retain the remaining names in More categories
+- Exclude the explicit `No plasticity in this elastic reference` marker from model chart rows and model coverage counts, ignoring case and surrounding whitespace; retain original metadata, exports and saved filter matching, and do not hide actual models reported by the same object
 - Omit repeated With data/Total card counts and explanatory footers; card-heading hover and keyboard focus retain coverage, inclusion rules and phase-observation denominators, with native titles without JavaScript
 - Phase marks show counts with percentages in hover details; loading Mode belongs below the columns, and exact cell counts replace the separate gradient scale
 - Use equal-width numeric histogram intervals with empty bins and an inclusive final maximum; constant temperatures use one frequency column and constant grain counts use one point; distinguish observations from distinct objects

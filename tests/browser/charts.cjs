@@ -3,7 +3,7 @@ const {spawn} = require('node:child_process');
 const {once} = require('node:events');
 const {mkdirSync, mkdtempSync, rmSync, writeFileSync} = require('node:fs');
 const {tmpdir} = require('node:os');
-const {join} = require('node:path');
+const {basename, dirname, join, resolve} = require('node:path');
 
 function exactEighths(value) {
   const match = value.replaceAll(',', '').trim().match(/^([+-]?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i);
@@ -638,6 +638,7 @@ function exactEighths(value) {
       .map(link => Number(link.getAttribute('aria-label').match(/: (\\d+) (?:objects?|records?)/)[1])).sort((a, b) => a - b)`);
     assert.deepEqual(pieCounts, [6, 7]);
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-bar").length'), 2);
+    assert.equal(await evaluate('document.querySelector("[data-statistic=models]").textContent.includes("No plasticity in this elastic reference")'), false);
     assert.equal(await evaluate('document.querySelectorAll(".charts-donut-svg").length'), 1);
     const tableHeaders = await evaluate('[...document.querySelectorAll("table.charts-statistics-table th")].map(header => header.textContent)');
     assert.ok(tableHeaders.some(header => /Objects|Records/.test(header)));
@@ -799,6 +800,8 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.querySelectorAll(".charts-bubble").length'), 6);
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=texture] .charts-bubble, [data-statistic=texture] .charts-more-categories .charts-bar").length'), 8);
     assert.equal(await evaluate('document.querySelectorAll("[data-statistic=models] .charts-bar").length'), 9);
+    assert.deepEqual(await evaluate(`[...document.querySelectorAll('[data-statistic=models] > .charts-plot-stage .charts-bar')]
+      .map(bar => bar.dataset.label.match(/\\((Elastic|Plastic)\\)$/)[1])`), ['Elastic', 'Elastic', 'Elastic', 'Plastic']);
     assert.equal(await evaluate('document.querySelectorAll(".charts-heatmap-svg g > .charts-heatmap-mark").length') > 0, true);
     for (const width of [1280, 1440, 1920]) await layout('varied-long-categories', width);
     await evaluate('document.querySelector("[data-statistic=models] .charts-more-categories").open = true');
@@ -934,6 +937,8 @@ function exactEighths(value) {
       browser.kill('SIGTERM');
       await exited;
     }
-    rmSync(profile, {recursive: true, force: true});
+    assert.equal(dirname(resolve(profile)), resolve(tmpdir()));
+    assert.ok(basename(profile).startsWith('charts-browser-'));
+    rmSync(profile, {recursive: true, force: true, maxRetries: 5, retryDelay: 100});
   }
 })().catch(error => {console.error(error); process.exitCode = 1;});

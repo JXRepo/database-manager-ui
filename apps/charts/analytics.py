@@ -128,6 +128,26 @@ def phase_name(label):
     return label
 
 
+def plastic_model_names(labels):
+    """
+    Exclude the explicit absence marker from plastic model statistics
+
+    The reference fixtures use this sentence to describe no plasticity. Raw
+    category labels remain available for saved filters and original data views.
+
+    Parameters
+    ----------
+    labels : list of str
+        Distinct reported labels with surrounding whitespace removed.
+
+    Returns
+    -------
+    list of str
+        Original names without the known absence description.
+    """
+    return [label for label in labels if label.casefold() != "no plasticity in this elastic reference"]
+
+
 def number(value, integer=False):
     """
     Read a finite scalar while excluding booleans and invalid counts
@@ -379,6 +399,8 @@ def category_rows(records, field):
     present = 0
     for record in records:
         values = record["categories"][field]
+        if field == "plastic_model":
+            values = plastic_model_names(values)
         present += bool(values)
         for value in values:
             key = value.casefold()

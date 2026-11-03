@@ -205,6 +205,69 @@ class ChartsTests(TestCase):
             self.assertAlmostEqual(row["percent"], row["count"] * 100 / 3, places=1)
             self.assertIn(wanted.pk, [record["id"] for record in linked.context["objects_page"]])
 
+    def test_model_chart_groups_families_in_the_initial_and_expanded_rows(self):
+        """
+        Keep both families visible even when one has more reported model names
+        """
+        for index in range(4):
+            self.create_object(f"models-{index}", phase=[{
+                "phase_name": "Copper",
+                "constitutive_model": {
+                    "elastic_model_name": f"Elastic model {index + 1}",
+                    "plastic_model_name": "Common plastic model",
+                },
+            }])
+        response = self.statistics()
+        self.assertEqual([row["label"] for row in response.context["model_plot"]["rows"]],
+                         ["Elastic model 1 (Elastic)", "Elastic model 2 (Elastic)",
+                          "Elastic model 3 (Elastic)", "Common plastic model (Plastic)"])
+        category = response.context["model_category"]
+        self.assertEqual([row["label"] for row in category["more_plot"]["rows"]],
+                         ["Elastic model 4 (Elastic)"])
+        self.assertEqual([row["count"] for row in category["rows"]], [1, 1, 1, 1, 4])
+        self.assertEqual(category["available"], 4)
+
+    def test_no_plasticity_marker_is_not_counted_as_a_constitutive_model(self):
+        """
+        Exclude the reference fixture marker while retaining its data and bookmarks
+        """
+        marker = "No plasticity in this elastic reference"
+        obj = self.create_object(phase=[{"constitutive_model": {"plastic_model_name": marker}}])
+        original = copy.deepcopy(obj.data)
+        response = self.statistics()
+        self.assertEqual(response.context["total_objects"], 1)
+        self.assertEqual(response.context["categories"]["plastic_model"]["available"], 0)
+        self.assertEqual(response.context["model_category"]["available"], 0)
+        self.assertEqual(response.context["model_category"]["rows"], [])
+        self.assertContains(response, "No constitutive models reported")
+
+        self.create_object("private-marker", owner=self.other, access="c",
+                           phase=[{"constitutive_model": {"plastic_model_name": marker}}])
+        selected = self.statistics(plastic_model=marker)
+        self.assertEqual([row["id"] for row in selected.context["objects_page"]], [obj.pk])
+        self.assertContains(self.client.get(reverse("json_data_detail", args=[obj.pk])), marker)
+        self.assertEqual(self.client.get(reverse("json_data_export", args=[obj.pk])).json(), original)
+        obj.refresh_from_db()
+        self.assertEqual(obj.data, original)
+
+    def test_no_plasticity_marker_does_not_hide_real_models_in_other_phases(self):
+        """
+        Count real models once while ignoring repeated absence descriptions
+        """
+        self.create_object(phase=[
+            {"constitutive_model": {
+                "elastic_model_name": "Isotropic linear elasticity",
+                "plastic_model_name": " NO PLASTICITY IN THIS ELASTIC REFERENCE ",
+            }},
+            {"constitutive_model": {"plastic_model_name": "Crystal plasticity"}},
+            {"constitutive_model": {"plastic_model_name": "crystal plasticity"}},
+        ])
+        response = self.statistics()
+        self.assertEqual({row["label"]: row["count"] for row in response.context["model_category"]["rows"]},
+                         {"Isotropic linear elasticity (Elastic)": 1, "Crystal plasticity (Plastic)": 1})
+        self.assertEqual(response.context["model_category"]["available"], 1)
+        self.assertEqual(response.context["categories"]["plastic_model"]["available"], 1)
+
     def test_loading_heatmap_pairs_within_boundary_entries_and_deduplicates_objects(self):
         """
         Separate boundary entries cannot create unreported loading combinations

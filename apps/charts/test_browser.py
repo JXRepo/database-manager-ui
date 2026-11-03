@@ -66,7 +66,8 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         long_data = valid_upload_object(
             identifier="long-identifier-" * 25,
             title="A detailed simulation title with long metadata " * 15,
-            phase=[{"phase_name": "Titanium with a very long descriptive phase name " * 12}],
+            phase=[{"phase_name": "Titanium with a very long descriptive phase name " * 12,
+                    "constitutive_model": {"plastic_model_name": "No plasticity in this elastic reference"}}],
             software="A solver with a very long uploaded descriptive name " * 14,
             global_temperature=300,
         )
@@ -77,7 +78,10 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
         JSONData.objects.create(owner=owner, data=valid_upload_object(identifier="hidden-private-marker"), access_type="c")
         JSONData.objects.create(owner=sparse, data=valid_upload_object(
             identifier="optional-values-absent",
-            phase=[{"phase_name": "Copper", "constitutive_model": {"elastic_parameters": {"E": 100}}}],
+            phase=[{"phase_name": "Copper", "constitutive_model": {
+                "elastic_parameters": {"E": 100},
+                "plastic_model_name": "No plasticity in this elastic reference",
+            }}],
         ), access_type="c")
         for index in range(8):
             wide_label = "W" * 40 if index % 2 == 0 else "材料模拟" * 20
