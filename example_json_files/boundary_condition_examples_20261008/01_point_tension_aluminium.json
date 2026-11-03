@@ -2,7 +2,7 @@
   "$schema": "https://github.com/Ronakshoghi/MiMeDat/blob/main/microstructure_sensitive_mechanical_metadata_schema.json",
   "title": "[TEST SYNTHETIC] Point tension in X — aluminium reference",
   "creator": [
-    "Xue, Jun"
+    "Ronak, Shoghi"
   ],
   "creator_affiliation": [
     "Local platform testing"
@@ -16,7 +16,7 @@
   "description": "Generated synthetic reference data for platform testing. A +X point force reaches 32 N at V111; four separate corner points on X = 0 (V000, V010, V001 and V011) are fixed in X, Y and Z. Only point conditions are supplied; the face between these points is not clamped. Curves are nominal uniaxial references, excluding point stress concentrations and bending. Curves follow the embedded analytical recipe; no finite element model was solved. All material parameters and orientations are illustrative assumptions.",
   "rights": "Generated synthetic fixture for local platform testing",
   "rights_holder": [
-    "Xue, Jun"
+    "Ronak, Shoghi"
   ],
   "keywords": [
     "TEST DATA",
