@@ -48,7 +48,7 @@
           <dt>Data objects</dt><dd><strong>{{ total_objects }}</strong></dd>
         </div>
         <div class="charts-metric" data-overview="phase">
-          <dt title="Distinct reported phase names">Material phases</dt><dd><strong>{{ phase_count }}</strong></dd>
+          <dt title="Distinct phase names, ignoring the synthetic reference suffix">Material phases</dt><dd><strong>{{ phase_count }}</strong></dd>
         </div>
         <div class="charts-metric" data-overview="texture">
           <dt title="Distinct reported texture types">Texture types</dt><dd><strong>{{ texture_count }}</strong></dd>
@@ -60,7 +60,7 @@
 
       <div class="charts-dashboard-grid">
         <section class="charts-panel" data-statistic="phase" aria-labelledby="phase-heading">
-          <div class="charts-panel-heading"><h2 id="phase-heading" tabindex="0" title="{{ phase_category.available }} of {{ total_objects }} objects report a phase name. Each object is counted once per phase name.">Phase</h2></div>
+          <div class="charts-panel-heading"><h2 id="phase-heading" tabindex="0" title="{{ phase_category.available }} of {{ total_objects }} objects report a phase name. Each object is counted once per phase name, ignoring the synthetic reference suffix.">Phase</h2></div>
           <div class="charts-plot-stage">
             {% if phase_category.rows %}{% include 'charts/category.html' with plot=phase_plot category=phase_category lollipop=True %}{% else %}<div class="charts-plot-empty"><strong>No phase reported</strong></div>{% endif %}
           </div>

@@ -39,6 +39,8 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
             AccountProfile.objects.create(user=user, getting_started_dismissed_at=timezone.now())
         for index in range(24):
             phase = ("Copper", "Nickel", "Steel")[index % 3]
+            if index % 4 == 0:
+                phase += " (synthetic reference)"
             data = valid_upload_object(
                 identifier=f"charts-browser-{index}", title=f"{phase} simulation {index + 1}",
                 software=f"Software {index % 12 + 1}", global_temperature=273 + index * 25,
@@ -81,7 +83,7 @@ class ChartsBrowserTests(StaticLiveServerTestCase):
             wide_label = "W" * 40 if index % 2 == 0 else "材料模拟" * 20
             data = valid_upload_object(
                 identifier=f"varied-charts-{index}", software=f"{index + 1} {wide_label}",
-                phase=[{"phase_name": f"{index + 1} {wide_label}", "constitutive_model": {
+                phase=[{"phase_name": f"{index + 1} {wide_label} (synthetic reference)", "constitutive_model": {
                     "elastic_model_name": f"{index + 1} {wide_label}",
                     "plastic_model_name": "Crystal plasticity"},
                     "orientation": {"grain_count": (index + 1) * 100,

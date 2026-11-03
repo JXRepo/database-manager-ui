@@ -105,6 +105,29 @@ def software_name(label):
     return "Abaqus" if field_name(label) in {"abaqus", "abaquscae"} else label
 
 
+def phase_name(label):
+    """
+    Group phase names without the synthetic reference suffix
+
+    The test data marker does not create a separate phase category. Other
+    qualifiers and the original object metadata remain unchanged.
+
+    Parameters
+    ----------
+    label : str
+        Supplied phase name with surrounding whitespace already removed.
+
+    Returns
+    -------
+    str
+        Phase category name, retaining any meaningful qualifiers.
+    """
+    suffix = "(synthetic reference)"
+    if label.casefold().endswith(suffix):
+        return label[:-len(suffix)].rstrip() or label
+    return label
+
+
 def number(value, integer=False):
     """
     Read a finite scalar while excluding booleans and invalid counts
@@ -287,6 +310,8 @@ def summarize_object(obj):
                 numeric["grain_count"].append(counts.pop())
     if not phases:
         categories["phase"] = text_values(data.get("phase"))
+    phase_labels = text_values(categories["phase"])
+    categories["phase"] = [phase_name(label) for label in phase_labels]
     loading_pairs = {}
     for condition in dictionaries(data.get("mechanical_BC")):
         for key in ("loading_type", "loading_mode"):
@@ -326,7 +351,7 @@ def summarize_object(obj):
         "categories": categories, "loading_pairs": list(loading_pairs.values()),
         "numeric": numeric, "results": available, "notes": notes,
         "curve_components": paired_components,
-        "phase_label": " / ".join(categories["phase"]) or "Not supplied",
+        "phase_label": " / ".join(phase_labels) or "Not supplied",
         "software_label": " / ".join(software_labels) or "Not supplied",
         "result_label": result_label, "points": points,
         "access": "Public" if obj.access_type == "all" else "Private",

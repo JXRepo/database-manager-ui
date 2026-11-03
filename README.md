@@ -412,8 +412,13 @@ Eight cards are visible directly, in four pairs:
 
 - **Phase** counts objects for each phase name with a horizontal lollipop chart:
   thin lines end in dots, with an object count beside each dot. Percentages remain
-  in hover details. Full supplied names, including parenthetical qualifiers, wrap
-  onto multiple lines. Expanded categories use the same labels.
+  in hover details. The trailing `(synthetic reference)` test marker is ignored
+  when grouping names: `Copper` and `Copper (synthetic reference)` share one
+  category, and each object counts once even if it supplies both names. Saved
+  phase filters use the same grouping. Other parenthetical qualifiers remain
+  part of the name. Full names wrap onto multiple lines, including in expanded
+  categories. Object lists, detail pages, stored JSON and downloads keep the
+  original names.
 - **Stress–strain coverage** uses a donut chart for the exhaustive, disjoint
   classes with and without matching components.
 - **Constitutive models** compares reported elastic and plastic model names

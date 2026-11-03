@@ -13,7 +13,7 @@ from django.views.decorators.cache import never_cache
 from apps.pages.models import JSONData
 from .analytics import (
     CATEGORY_TITLES, COVERAGE_TITLES, MEASURES, NOTE_DETAILS, RESULT_TITLES, category_rows,
-    distribution, format_number, in_bin, loading_matrix, number, software_name, summarize_object,
+    distribution, format_number, in_bin, loading_matrix, number, phase_name, software_name, summarize_object,
 )
 from .plots import bar_plot, box_plot, bubble_plot, column_plot, heatmap_plot, histogram_plot, pie_plot
 
@@ -175,8 +175,13 @@ def matches_filters(record, query, intervals):
         Whether the object belongs to the selected statistical scope.
     """
     for key in CATEGORY_TITLES:
-        selected = {(software_name(value) if key == "software" else value).casefold()
-                    for value in query.get(key, [])}
+        selected = set()
+        for value in query.get(key, []):
+            if key == "software":
+                value = software_name(value)
+            elif key == "phase":
+                value = phase_name(value)
+            selected.add(value.casefold())
         if not selected.issubset({value.casefold() for value in record["categories"][key]}):
             return False
     if not set(query.get("result", [])).issubset(record["results"]):

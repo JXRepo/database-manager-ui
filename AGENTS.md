@@ -177,7 +177,8 @@ Current priority:
 - Count matching stress–strain availability only when the same component is available in both groups, including supplied or eligible calculated equivalents; keep the legacy result=paired filter's both-groups meaning
 - Use a disjoint, exhaustive matching/without_matching stress–strain coverage pie chart; overlapping phase, software, model and output counts use bars or tables with percentages of selected objects available in hover details, never misleading pie proportions
 - Charts omits per-card Data table sections; preserve exact counts, hover details, and expandable charts for remaining categories and loading combinations
-- Show complete phase, constitutive model, texture and software names with wrapping and enough space, including expanded categories; keep parenthetical phase qualifiers and use bounded scrolling for unusually long labels
+- Show complete phase, constitutive model, texture and software names with wrapping and enough space, including expanded categories; use bounded scrolling for unusually long labels
+- Charts phase categories and saved phase filters ignore only the trailing `(synthetic reference)` marker, ignoring case, and count each object once per resulting name; preserve other parenthetical qualifiers and keep original names in object lists, detail pages, stored JSON and exports
 - Keep specific constitutive model names and the Elastic / Plastic color legend; omit repeated family suffixes from visible labels while retaining families in hover details
 - Omit repeated With data/Total card counts and explanatory footers; card-heading hover and keyboard focus retain coverage, inclusion rules and phase-observation denominators, with native titles without JavaScript
 - Phase marks show counts with percentages in hover details; loading Mode belongs below the columns, and exact cell counts replace the separate gradient scale

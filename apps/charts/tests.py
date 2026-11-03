@@ -652,6 +652,73 @@ class ChartsTests(TestCase):
         self.assertEqual(software, {"abaqus": 2, "damask": 1})
         self.assertEqual(response.context["phase_count"], 2)
 
+    def test_phase_reference_suffix_groups_names_once_per_object(self):
+        """
+        Count a phase once even when an object repeats it with the test suffix
+        """
+        self.create_object("plain-phase")
+        self.create_object("reference-phase", phase=[{"phase_name": "Copper (synthetic reference)"}])
+        repeated = self.create_object("repeated-phase", phase=[
+            {"phase_name": "Copper"},
+            {"phase_name": " copper (SYNTHETIC REFERENCE) "},
+            {"phase_name": "Steel (synthetic reference)"},
+            {"phase_name": "Titanium (synthetic reference)"},
+            {"phase_name": "Aluminium (synthetic reference)"},
+        ])
+        original = copy.deepcopy(repeated.data)
+
+        response = self.statistics()
+        rows = response.context["phase_category"]["rows"]
+        self.assertEqual({row["label"]: row["count"] for row in rows},
+                         {"Copper": 3, "Steel": 1, "Titanium": 1, "Aluminium": 1})
+        self.assertEqual(response.context["phase_count"], 4)
+        self.assertEqual(rows[0]["percent"], 100)
+        self.assertEqual(["".join(row["label_lines"]) for row in response.context["phase_plot"]["rows"]],
+                         ["Copper", "Aluminium", "Steel", "Titanium"])
+        repeated.refresh_from_db()
+        self.assertEqual(repeated.data, original)
+        self.assertEqual(self.client.get(reverse("json_data_export", args=[repeated.pk])).json(), original)
+
+    def test_phase_grouping_preserves_other_parenthetical_qualifiers(self):
+        """
+        Remove only the trailing test marker without inventing an empty name
+        """
+        self.create_object(phase=[
+            {"phase_name": "Copper (FCC)"},
+            {"phase_name": "Copper (FCC) (synthetic reference)"},
+            {"phase_name": "Steel (austenite)"},
+            {"phase_name": "Copper (synthetic reference) aged"},
+            {"phase_name": "(synthetic reference)"},
+        ])
+        response = self.statistics()
+        self.assertEqual({row["label"]: row["count"] for row in response.context["phase_category"]["rows"]},
+                         {"Copper (FCC)": 1, "Steel (austenite)": 1,
+                          "Copper (synthetic reference) aged": 1, "(synthetic reference)": 1})
+
+    def test_phase_alias_bookmarks_keep_scope_and_original_object_descriptions(self):
+        """
+        Match grouped phase names without exposing private data or rewriting labels
+        """
+        plain = self.create_object("plain-phase")
+        reference = self.create_object("reference-phase", phase=[{"phase_name": "Copper (synthetic reference)"}])
+        private = self.create_object("private-phase", access="c", phase=[{"phase_name": "Copper (synthetic reference)"}])
+        shared = self.create_object("received-phase", owner=self.other, access="c",
+                                    phase=[{"phase_name": "Copper (synthetic reference)"}])
+        shared.shared_users.add(self.viewer)
+        self.create_object("different-phase", phase=[{"phase_name": "Copper (FCC)"}])
+        for scope, include_private, expected in (
+            ("public", "0", {plain.pk, reference.pk}),
+            ("mine", "0", {plain.pk, reference.pk}),
+            ("mine", "1", {plain.pk, reference.pk, private.pk}),
+        ):
+            for label in ("Copper", " copper (SYNTHETIC REFERENCE) ", ["Copper", "Copper (synthetic reference)"]):
+                with self.subTest(scope=scope, include_private=include_private, label=label):
+                    response = self.statistics(scope=scope, include_private=include_private, phase=label)
+                    objects = {row["id"]: row for row in response.context["objects_page"]}
+                    self.assertEqual(set(objects), expected)
+                    self.assertEqual(objects[reference.pk]["phase_label"], "Copper (synthetic reference)")
+        self.assertEqual(self.statistics(phase="Cop").context["total_objects"], 0)
+
     def test_abaqus_aliases_share_one_category_without_changing_source_data(self):
         """
         Known software names deduplicate per object and keep old bookmarks usable

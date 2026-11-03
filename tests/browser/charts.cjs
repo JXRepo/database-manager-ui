@@ -624,6 +624,8 @@ function exactEighths(value) {
     assert.equal(await evaluate('document.body.textContent.includes("shared-record")'), false);
     await assertFixedDashboard();
     assert.deepEqual(await evaluate('[...document.querySelectorAll(".charts-metric dd")].map(value => Number(value.textContent))'), [13, 4, 1, 7]);
+    assert.equal((await categorySummary('phase', 'Copper')).count, 4);
+    assert.equal(await evaluate('document.querySelector("[data-statistic=phase]").textContent.includes("(synthetic reference)")'), false);
     assert.equal(await evaluate('document.querySelectorAll(".charts-pie-svg path").length'), 2);
     assert.ok(await evaluate('[...document.querySelectorAll(".charts-pie-svg path")].every(path => path.getTotalLength() > 0)'));
     const matching = await coverageSummary('matching');
@@ -674,6 +676,7 @@ function exactEighths(value) {
     await assertLegacyListCount({path: '/charts/?elastic_model=Anisotropic+elasticity&loading_type=force&loading_mode=cyclic&texture=Goss&range=grain_count:65:200:1', count: 6});
     const selectedRows = await assertLegacyListCount({path: '/charts/?phase=Copper&software=Software+7&coverage=matching', count: 2});
     assert.ok(selectedRows.every(row => row.text.includes('Copper') && row.text.includes('Software 7')));
+    await assertLegacyListCount({path: '/charts/?phase=Copper+%28synthetic+reference%29&software=Software+7&coverage=matching', count: 2});
     await assertLegacyListCount({path: '/charts/?phase=Copper&phase=Nickel', count: 0});
     await assertLegacyListCount({path: '/charts/?phase=Copper&coverage=matching&coverage=without_matching', count: 0});
     await assertLegacyListCount({path: '/charts/?range=temperature:273:335.5:0', count: 3});
