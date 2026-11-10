@@ -671,7 +671,10 @@ frame is drawn. Each range covers the paired data extrema and zero independently
 without making signed ranges symmetric. An entirely zero coordinate uses a
 positive range. Small signed values retain their actual signs and scale.
 Tick labels sit beside the actual axes, on the side closest to the plotting
-edge; titles stay outside the plotting area, with a vertical Y title. Axis text
+edge; range endpoints are labelled even when they do not fall on a regular tick.
+Nearby regular ticks are omitted to leave room for the endpoint labels.
+Axes and numbers are black, with 16px tick labels. Titles stay outside the
+plotting area, with a vertical Y title. Axis text
 is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
 all exports.
@@ -686,7 +689,10 @@ canvas margins, or outside the canvas clears the highlight and tooltip.
 Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
 scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
-Axis labels and units use 18px text with 13px subscripts. Stress units come from
+Axis labels and units use 18px text with 13px subscripts. Sigma and epsilon use
+the same italic serif font. PNG downloads redraw the plot at three pixels per
+CSS pixel, with equal white margins and no active hover marker or tooltip;
+the interactive chart keeps its displayed dimensions. Stress units come from
 the uploaded `units.Stress` value. For total and plastic strain, an explicit
 `units.Strain` value of `1` is displayed as `(-)` on the axes. Missing units stay
 unspecified; stored JSON and CSV exports retain their existing values and format.
@@ -703,10 +709,11 @@ quantity names, units or an `x/y/z directions` label.
 
 Whole cube stress and strain tensors retain the original translucent purple 3D
 cube, glass edges and eight white corner spheres. The matrix stays to its right,
-with lowercase `x/y/z` direction rows and uppercase `X/Y/Z` face columns.
-Component labels use `xX`, `xY`, and so on: the first letter is the direction,
-and the second identifies the opposing face pair. This is a display convention;
-original JSON keys such as `xx` and `xy` remain unchanged in storage and exports.
+with `x/y/z` direction rows and `X/Y/Z` face columns.
+Stress components use sigma and strain components use epsilon, with traditional
+lowercase mathematical subscripts such as σ<sub>xy</sub> and ε<sub>xy</sub>.
+The first subscript is the direction; the second is the face normal.
+Original JSON keys such as `xx` and `xy` remain unchanged in storage and exports.
 Face labels retain signs (`+X` and `-X`); direction signs use lowercase (`+x`
 and `-x`). The bottom-right `x/y/z` guide keeps its existing orientation.
 The scalar boundary table and hover labels also use lowercase directions.
@@ -714,13 +721,13 @@ No replacement cube or right-side examples are drawn. On opening a condition,
 all supplied nonzero components are selected and the cube remains undeformed
 until `Play action` is clicked.
 
-Pull, Push and Shear are independent group toggles, with Select all and Clear.
-Users can combine any groups or individual matrix components. Selected/available
-counts are in button titles and accessible labels instead of adding visible text.
-Positive normal stress is Pull, negative is Push; strain uses Extend and Shorten.
-Matching reciprocal shear entries toggle together. Distinct xY/yX values remain
-visible and independently selectable, without averaging or inventing entries.
-The complete matrix remains visible; faded cells are unselected. Its row/column
+Select all, Clear and individual component buttons support multiple selections.
+The panel omits repeated Pull, Push and Shear group/action labels.
+Supplied, equal reciprocal components share one upper triangle button; their
+lower triangle cell is blank. Selecting or hovering that button links both
+components and both pairs of opposing faces. The symmetry appears in the button
+title. Missing, invalid or unequal counterparts keep their own cells, without
+averaging or inventing entries. Faded cells are unselected. The row/column
 labels distinguish directions from face pairs. Hover/focus link values to opposing
 faces; shared faces retain all components and use purple for mixed actions.
 Zero, missing and invalid components produce no highlighted faces.
@@ -754,7 +761,7 @@ labels rather than physical time; frequency/duration never create a load history
 The interactive tensor panel omits the supplementary Load details disclosure.
 All supplied metadata remains in JSON downloads. Until initialization succeeds,
 a native expandable fallback in the upper area retains all supplied load details,
-including magnitude content outside the nine matrix cells, without JavaScript
+including magnitude content outside the component cells, without JavaScript
 or when the viewer cannot initialize.
 
 Values and face hover use two decimals with half-up rounding; cell titles retain

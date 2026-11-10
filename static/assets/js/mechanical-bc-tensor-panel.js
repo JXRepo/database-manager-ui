@@ -1,4 +1,4 @@
-import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, tensorComponentLabel, tensorComponentMeaning, tensorComponentVisible} from './mechanical-bc-tensor.js';
+import {TENSOR_COMPONENTS, isTensorNumber, formatTensorValue, tensorComponentLabel, createTensorComponentLabel, tensorComponentMeaning} from './mechanical-bc-tensor.js';
 
 export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditions = items.map((item, index) => ({item, index})).filter(({item}) => item.is_tensor_load);
@@ -6,7 +6,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
   const conditionSelect = panel.querySelector('[data-tensor-condition]');
   const loadSelect = panel.querySelector('[data-tensor-load]');
   const matrix = panel.querySelector('[data-tensor-matrix]');
-  const buttons = Array.from(panel.querySelectorAll('[data-tensor-filter]'));
+  const selectAll = panel.querySelector('[data-tensor-filter="all"]');
   let current = conditions[0];
   let loadIndex = 0;
   let selected = null;
@@ -14,16 +14,22 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
 
   function highlight(components) {
     const keys = Array.isArray(components) ? components : [components];
-    cells.forEach(cell => cell.classList.toggle('is-hovered', keys.includes(cell.dataset.component)));
+    const linked = new Set();
+    cells.forEach(cell => {
+      const members = cell.dataset.components.split(',');
+      const matching = members.some(key => keys.includes(key));
+      cell.classList.toggle('is-hovered', matching);
+      if (matching) members.forEach(key => linked.add(key));
+    });
+    return [...linked];
   }
   function hover(component) {
     highlight(component);
     onHighlight(component);
   }
-  function members(mode = 'all') {
+  function members() {
     const magnitude = current.item.tensor_loads?.[loadIndex]?.magnitude;
-    return TENSOR_COMPONENTS.filter(key => tensorComponentMeaning(key, magnitude?.[key])
-      && tensorComponentVisible(key, magnitude[key], mode));
+    return TENSOR_COMPONENTS.filter(key => tensorComponentMeaning(key, magnitude?.[key]));
   }
   function render() {
     const load = current.item.tensor_loads?.[loadIndex];
@@ -39,7 +45,7 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       const heading = document.createElement('span');
       heading.className = 'bc-tensor-axis';
       heading.textContent = text;
-      if (text === 'Direction / Face') heading.title = 'Lowercase x/y/z indicates direction; uppercase X/Y/Z identifies opposite face pairs.';
+      if (text === 'Direction / Face') heading.title = 'The first subscript is the direction; the second is the face normal.';
       heading.setAttribute('aria-hidden', 'true');
       matrix.appendChild(heading);
     }
@@ -52,19 +58,31 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       }
       const value = magnitude?.[key];
       const supplied = magnitude && Object.hasOwn(magnitude, key);
-      const componentLabel = tensorComponentLabel(key);
+      const reverse = key[1] + key[0];
+      const paired = reverse !== key && isTensorNumber(value) && isTensorNumber(magnitude?.[reverse]) && magnitude[reverse] === value;
+      if (paired && key > reverse) {
+        const space = document.createElement('span');
+        space.setAttribute('aria-hidden', 'true');
+        matrix.appendChild(space);
+        continue;
+      }
+      const keys = paired ? [key, reverse] : [key];
+      const selectedCount = keys.filter(component => selected.has(component)).length;
+      const fullySelected = selectedCount === keys.length;
+      const componentLabel = tensorComponentLabel(key, isStrain);
+      const symmetry = paired ? ` · ${componentLabel} = ${tensorComponentLabel(reverse, isStrain)}` : '';
       const cell = document.createElement('button');
       cell.type = 'button';
       cell.className = 'bc-tensor-cell';
       cell.dataset.component = key;
+      cell.dataset.components = keys.join(',');
       cell.disabled = !isTensorNumber(value);
-      cell.setAttribute('aria-pressed', String(selected.has(key)));
-      cell.classList.toggle('is-filtered', !selected.has(key));
+      cell.setAttribute('aria-pressed', selectedCount && !fullySelected ? 'mixed' : String(fullySelected));
+      cell.classList.toggle('is-filtered', !selectedCount);
       const raw = typeof value === 'object' ? JSON.stringify(value) : String(value);
       cell.title = (supplied ? `${componentLabel}: ${raw}${unit ? ` ${unit}` : ''}` : `${componentLabel}: not supplied`)
-        + (selected.has(key) ? ' · Selected' : ' · Not selected');
-      const label = document.createElement('span');
-      label.textContent = componentLabel;
+        + (fullySelected ? ' · Selected' : selectedCount ? ' · Partly selected' : ' · Not selected') + symmetry;
+      const label = createTensorComponentLabel(key, isStrain);
       const number = document.createElement('strong');
       number.textContent = supplied ? formatTensorValue(value) : '—';
       cell.append(label, number);
@@ -72,51 +90,41 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
       if (meaning) {
         cell.dataset.effect = meaning.effect;
         cell.style.setProperty('--bc-component-color', meaning.color);
-        const action = document.createElement('small');
-        action.dataset.tensorAction = '';
-        action.textContent = meaning.effect === 'shear' ? 'Shear' : meaning.action;
-        cell.appendChild(action);
       }
-      cell.setAttribute('aria-label', `${componentLabel}, ${key[0]} direction on ${key[1].toUpperCase()} faces: ${supplied ? number.textContent : 'Not supplied'}${unit && supplied ? ` ${unit}` : ''}${meaning ? ` · ${meaning.action}` : ''}`);
+      const directions = keys.map(component => `${component[0]} direction on ${component[1].toUpperCase()} faces`).join('; ');
+      cell.setAttribute('aria-label', `${componentLabel}, ${directions}: ${supplied ? number.textContent : 'Not supplied'}${unit && supplied ? ` ${unit}` : ''}${symmetry}`);
       cell.addEventListener('click', () => {
-        const reverse = key[1] + key[0];
-        const keys = reverse !== key && isTensorNumber(magnitude?.[reverse]) && magnitude[reverse] === value ? [key, reverse] : [key];
-        const remove = selected.has(key);
-        keys.forEach(component => remove ? selected.delete(component) : selected.add(component));
+        keys.forEach(component => fullySelected ? selected.delete(component) : selected.add(component));
         render();
         cells.find(button => button.dataset.component === key)?.focus({preventScroll: true});
       });
-      cell.addEventListener('pointerenter', () => hover(key));
+      cell.addEventListener('pointerenter', () => hover(keys));
       cell.addEventListener('pointerleave', () => hover(''));
-      cell.addEventListener('focus', () => hover(key));
+      cell.addEventListener('focus', () => hover(keys));
       cell.addEventListener('blur', () => hover(''));
       matrix.appendChild(cell);
       cells.push(cell);
     }
-    const labels = {all: 'Select all', pull: isStrain ? 'Extend' : 'Pull', push: isStrain ? 'Shorten' : 'Push', slide: 'Shear'};
-    buttons.forEach(button => {
-      const mode = button.dataset.tensorFilter;
-      (button.querySelector('[data-tensor-filter-label]') || button).textContent = labels[mode];
-      const available = members(mode);
-      const included = available.filter(key => selected.has(key)).length;
-      button.setAttribute('aria-pressed', String(available.length > 0 && included === available.length));
-      button.classList.toggle('is-partial', included > 0 && included < available.length);
-      if (mode !== 'all') {
-        button.disabled = !available.length;
-        button.title = available.length ? `${included} of ${available.length} components selected. Toggle this group independently.` : 'No nonzero components';
-        button.setAttribute('aria-label', `${labels[mode]}: ${included} of ${available.length} components selected`);
-      }
-    });
+    const available = members();
+    const included = available.filter(key => selected.has(key)).length;
+    selectAll.setAttribute('aria-pressed', String(available.length > 0 && included === available.length));
+    selectAll.classList.toggle('is-partial', included > 0 && included < available.length);
     const active = TENSOR_COMPONENTS.filter(key => selected.has(key));
-    const actions = ['pull','push','slide'].filter(mode => members(mode).some(key => selected.has(key))).map(mode => labels[mode]);
     const unavailable = active.filter(key => !isTensorNumber(magnitude?.[key]));
     const status = panel.querySelector('[data-tensor-status]');
-    status.textContent = unavailable.length ? `Selected but missing or invalid in this record: ${unavailable.map(tensorComponentLabel).join(', ')}`
-      : actions.length ? '' : 'Select a nonzero component to animate.';
+    status.replaceChildren();
+    if (unavailable.length) {
+      status.append('Selected but missing or invalid in this record: ');
+      unavailable.forEach((key, index) => {
+        if (index) status.append(', ');
+        status.appendChild(createTensorComponentLabel(key, isStrain));
+      });
+    } else if (!included) {
+      status.textContent = 'Select a nonzero component to animate.';
+    }
     status.hidden = !status.textContent;
     onHighlight('');
-    onChange({item: current.item, itemIndex: current.index, load, filter: 'all', selected: new Set(selected), unit,
-      actionLabel: actions.join(' + ')});
+    onChange({item: current.item, itemIndex: current.index, load, filter: 'all', selected: new Set(selected), unit});
   }
   function selectCondition(index, record = 0) {
     const next = conditions.find(entry => entry.index === Number(index)) || conditions[0];
@@ -144,15 +152,10 @@ export function createTensorPanel(panel, items, units, onChange, onHighlight) {
     loadIndex = Number(loadSelect.value);
     render();
   });
-  buttons.forEach(button => button.addEventListener('click', () => {
-    const keys = members(button.dataset.tensorFilter);
-    if (button.dataset.tensorFilter === 'all') selected = new Set(keys);
-    else {
-      const remove = keys.every(key => selected.has(key));
-      keys.forEach(key => remove ? selected.delete(key) : selected.add(key));
-    }
+  selectAll.addEventListener('click', () => {
+    selected = new Set(members());
     render();
-  }));
+  });
   panel.querySelector('[data-tensor-clear]').addEventListener('click', () => { selected.clear(); render(); });
   selectCondition(current.index);
   panel.hidden = false;

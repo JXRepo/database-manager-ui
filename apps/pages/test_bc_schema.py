@@ -187,6 +187,31 @@ class MechanicalBCSchemaTests(TestCase):
         self.assertIn('"yy": 2.00', magnitude["display"])
         self.assertEqual(magnitude["value"], load["magnitude"])
 
+    def test_tensor_fallback_uses_quantity_symbols_without_losing_magnitude_metadata(self):
+        """
+        Show tensor subscripts without changing supplied magnitude values or extra fields
+        """
+        owner = User.objects.create_user(username="tensor-symbol-owner")
+        self.client.force_login(owner)
+        for kind, symbol in (("stress", "σ"), ("strain", "ε")):
+            with self.subTest(kind=kind):
+                data = self._tensor_data(kind)
+                magnitude = data["mechanical_BC"][0]["applied_load"][0]["magnitude"]
+                magnitude["extra"] = "<unknown>"
+                original = deepcopy(data)
+                item = _build_mechanical_bc_items(data)[0]
+                components = item["tensor_loads"][0]["tensor_components"]
+                self.assertEqual([component["key"] for component in components],
+                                 ["xx", "xy", "xz", "yx", "yy", "yz", "zx", "zy", "zz"])
+                self.assertEqual(components[0]["value"], -1.23456789)
+                self.assertEqual(components[0]["display"], "-1.23")
+                obj = JSONData.objects.create(owner=owner, data=data)
+                response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+                self.assertContains(response, f'{symbol}<sub>xx</sub>')
+                self.assertContains(response, "&lt;unknown&gt;")
+                self.assertEqual(self.client.get(reverse("json_data_export", args=[obj.pk])).json(), original)
+                self.assertEqual(data, original)
+
     def test_detail_page_shows_all_tensor_steps_and_preserves_download(self):
         """
         Render full cube tensor steps without misleading free or loaded axes

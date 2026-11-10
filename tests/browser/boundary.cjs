@@ -207,10 +207,41 @@ async function main() {
     const original=await evaluate(capture);
     assert.ok(original.grips.length>=2);
     assert.equal(original.gripsVisible,false,'Grip pads are hidden while the cube is at rest');
-    const start=await evaluate(`(()=>{document.querySelector('[data-bc-motion]').click();return performance.now()})()`);
-    await waitFor(`performance.now()-${start}>500`,'Action did not reach its tug');
-    await evaluate('document.querySelector("[data-bc-motion]").click()');
-    const tug=await evaluate(capture);
+    const tug=await evaluate(`new Promise((resolve,reject)=>{
+      const button=document.querySelector('[data-bc-motion]');
+      const {state,baseCube}=__bcTest;
+      const grips=state.root.children.find(object=>object.userData.tensorActionGrips);
+      const originalGrips=${JSON.stringify(original.grips)};
+      const originalPoint=${JSON.stringify(original.point)};
+      let frame=null,largestGripMovement=0,largestScreenMovement=0;
+      const timeout=setTimeout(()=>{
+        cancelAnimationFrame(frame);
+        reject(new Error('Action did not reach a visible tug; grip movement='+largestGripMovement+', screen movement='+largestScreenMovement));
+      },20000);
+      function inspect(){
+        state.root.updateMatrixWorld(true);
+        const gripMovement=Math.max(...grips.children.flatMap((grip,index)=>
+          grip.position.toArray().map((value,axis)=>Math.abs(value-originalGrips[index].position[axis]))));
+        const point=new __bcThree.Vector3().fromBufferAttribute(baseCube.children[0].geometry.attributes.position,window.actionVertex);
+        baseCube.children[0].localToWorld(point).project(state.camera);
+        const rect=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();
+        const screenMovement=Math.hypot((point.x+1)*rect.width/2-originalPoint[0],(1-point.y)*rect.height/2-originalPoint[1]);
+        largestGripMovement=Math.max(largestGripMovement,gripMovement);
+        largestScreenMovement=Math.max(largestScreenMovement,screenMovement);
+        if(grips.visible&&gripMovement>.15&&screenMovement>15){
+          button.click();
+          clearTimeout(timeout);
+          resolve(${capture});
+        }else if(button.getAttribute('aria-pressed')!=='true'){
+          clearTimeout(timeout);
+          reject(new Error('Action ended before a visible tug; grip movement='+largestGripMovement+', screen movement='+largestScreenMovement));
+        }else{
+          frame=requestAnimationFrame(inspect);
+        }
+      }
+      button.click();
+      frame=requestAnimationFrame(inspect);
+    })`);
     assert.equal(tug.gripsVisible,true,'Grips appear only during the action');
     assert.deepEqual(tug.matrix,identity,'Action animates vertices, without scaling the whole cube matrix');
     assert.notDeepEqual(tug.data,original.data,'The original surface is locally deformed');
@@ -287,7 +318,9 @@ async function main() {
   assert.equal(await evaluate('__bcTest.baseCube.children[0].material.transparent'),true);
   assert.equal(await evaluate('__bcTest.baseCube.children.slice(4).every(o=>o.material.color.getHexString()==="ffffff")'),true);
   assert.equal(await evaluate('document.querySelector("[data-bc-tensor-panel]").querySelectorAll("svg,canvas,[data-tensor-example-host]").length'),0);
-  assert.match(await evaluate('document.querySelector("[data-tensor-filter=pull]").title'),/2 of 2/);
+  assert.equal(await evaluate('document.querySelectorAll("[data-tensor-filter=pull],[data-tensor-filter=push],[data-tensor-filter=slide],[data-tensor-action]").length'),0);
+  assert.equal(await evaluate('document.querySelector("[data-component=yx]")'),null);
+  assert.equal(await evaluate('document.querySelector("[data-component=xy] sub").textContent'),'xy');
   assert.equal(await tensorCount(),10);
   assert.equal(await evaluate('document.querySelector("[data-tensor-load]").closest("label").hidden'),true);
   await checkTensorGeometry();
@@ -298,11 +331,12 @@ async function main() {
     assert.equal(await evaluate(`(()=>{const cube=document.querySelector('.bc-cube-wrap').getBoundingClientRect(),matrix=document.querySelector('[data-tensor-matrix]').getBoundingClientRect();return matrix.left>cube.right&&matrix.right<=innerWidth})()`),true);
     assert.equal(await evaluate('document.querySelector("[data-bc-motion]").getBoundingClientRect().right < document.querySelector("[data-bc-reset]").getBoundingClientRect().left'),true,'Playback and Reset controls must not overlap');
     const values=await evaluate('document.querySelector("[data-tensor-matrix]").textContent');
-    await selectOnly('[data-tensor-filter=pull]');
+    await selectOnly('[data-component=xx]');
+    await evaluate('document.querySelector("[data-component=yy]").click();document.activeElement.blur()');
     assert.deepEqual(await tensorComponents(),['xx','xx','yy','yy']);
-    await evaluate('document.querySelector("[data-tensor-filter=slide]").click();document.activeElement.blur()');
+    await evaluate('document.querySelector("[data-component=xy]").click();document.activeElement.blur()');
     assert.equal(await tensorCount(),8);
-    await evaluate('document.querySelector("[data-tensor-filter=pull]").click();document.activeElement.blur()');
+    await evaluate('document.querySelector("[data-component=xx]").click();document.querySelector("[data-component=yy]").click();document.activeElement.blur()');
     assert.deepEqual(await tensorComponents(),['xy','xy','yx','yx']);
     assert.equal(await evaluate('document.querySelector("[data-tensor-matrix]").textContent'),values);
     assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false);
@@ -315,7 +349,8 @@ async function main() {
   await selectOnly('[data-component=xx]');
   const tensorHover=await evaluate(`(()=>{const mesh=__bcTest.state.tensorMeshes.find(m=>m.userData.components.includes('xx')&&m.position.x>0);const p=new __bcThree.Box3().setFromObject(mesh).getCenter(new __bcThree.Vector3()).project(__bcTest.state.camera);const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();return {x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2}})()`);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',...tensorHover});
-  assert.match(await evaluate(`${visibleTooltip}?.textContent||''`),/Stress on \+X face[\s\S]*xX: 15\.00 MPa[\s\S]*Pull/);
+  assert.match(await evaluate(`${visibleTooltip}?.textContent||''`),/Stress on \+X face[\s\S]*σxx: 15\.00 MPa · \+x direction/);
+  assert.equal(await evaluate(`${visibleTooltip}?.querySelector('sub')?.textContent`),'xx');
   assert.equal(await evaluate('document.querySelector("[data-component=xx]").classList.contains("is-hovered")'),true);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:0,y:0});
   assert.equal(await evaluate(`!!(${visibleTooltip})`),false);
@@ -329,16 +364,16 @@ async function main() {
   const sharedFaceHover=await evaluate(`(()=>{const mesh=__bcTest.state.tensorMeshes.find(m=>m.userData.normal==='x'&&m.userData.faceSign===1);const p=mesh.position.clone().project(__bcTest.state.camera);const r=document.querySelector('#mechanical-bc-cube').getBoundingClientRect();return{x:r.x+(p.x+1)*r.width/2,y:r.y+(1-p.y)*r.height/2}})()`);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',...sharedFaceHover});
   const sharedTooltip=await evaluate(`${visibleTooltip}?.textContent||''`);
-  assert.match(sharedTooltip,/xX: -15\.00 MPa · Push · -x direction/);
-  assert.match(sharedTooltip,/yX: -7\.00 MPa · Slide · -y direction/);
-  assert.match(sharedTooltip,/zX: 6\.00 MPa · Slide · \+z direction/);
+  assert.match(sharedTooltip,/σxx: -15\.00 MPa · -x direction/);
+  assert.match(sharedTooltip,/σyx: -7\.00 MPa · -y direction/);
+  assert.match(sharedTooltip,/σzx: 6\.00 MPa · \+z direction/);
   assert.deepEqual(await evaluate('Array.from(document.querySelectorAll("[data-component].is-hovered")).map(c=>c.dataset.component)'),['xx','yx','zx']);
   await command('Input.dispatchMouseEvent',{type:'mouseMoved',x:0,y:0});
   await selectOnly('[data-component=yx]');
   assert.equal(await tensorCount(),2);
   await evaluate('document.querySelector("[data-tensor-load]").value="1";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
   assert.equal(await tensorCount(),0);
-  assert.match(await evaluate('document.querySelector("[data-tensor-status]").textContent'),/missing or invalid.*yX/);
+  assert.match(await evaluate('document.querySelector("[data-tensor-status]").textContent'),/missing or invalid.*σyx/);
   assert.match(await evaluate('document.querySelector("[data-tensor-load]").selectedOptions[0].textContent'),/step 3$/);
   assert.equal(await evaluate('document.querySelector("[data-bc-motion]").disabled'),true);
   await evaluate('document.querySelector("[data-tensor-load]").value="2";document.querySelector("[data-tensor-load]").dispatchEvent(new Event("change"))');
@@ -474,6 +509,8 @@ async function main() {
   await command('Input.dispatchMouseEvent',{type:'mouseReleased',...details,button:'left',clickCount:1});
   assert.equal(await evaluate('document.querySelector(".bc-tensor-loads details").open'),true);
   assert.equal(await evaluate('document.querySelector(".bc-tensor-loads .bc-load-list").checkVisibility()'),true);
+  assert.equal(await evaluate('document.querySelector(".bc-tensor-loads .bc-tensor-symbol").textContent'),'σxx');
+  assert.equal(await evaluate('document.querySelector(".bc-tensor-loads .bc-tensor-symbol sub").textContent'),'xx');
   report.push('without JavaScript: supplied tensor values and step remain available in native expandable details');
   assert.deepEqual(errors,[],'Browser errors');
   console.log(JSON.stringify({checks:report,errors},null,2));

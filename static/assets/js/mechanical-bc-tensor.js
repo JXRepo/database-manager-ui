@@ -1,8 +1,18 @@
 export const TENSOR_COMPONENTS = ['xx', 'xy', 'xz', 'yx', 'yy', 'yz', 'zx', 'zy', 'zz'];
 export const TENSOR_COLORS = {x: '#b45309', y: '#0f766e', z: '#7c3aed'};
 
-export function tensorComponentLabel(component) {
-  return component[0] + component[1].toUpperCase();
+export function tensorComponentLabel(component, isStrain = false) {
+  return (isStrain ? 'ε' : 'σ') + component;
+}
+
+export function createTensorComponentLabel(component, isStrain = false) {
+  const label = document.createElement('span');
+  label.className = 'bc-tensor-symbol';
+  label.textContent = isStrain ? 'ε' : 'σ';
+  const subscript = document.createElement('sub');
+  subscript.textContent = component;
+  label.appendChild(subscript);
+  return label;
 }
 
 export function isTensorNumber(value) {

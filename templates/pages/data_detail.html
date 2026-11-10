@@ -883,17 +883,19 @@ details[open] > .detail-group-summary {
     .bc-tensor-axis { display: flex; align-items: center; justify-content: center; color: #536176; font-size: 0.75rem; font-weight: 600; text-align: center; }
     .bc-tensor-cell {
       display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 2px 6px;
-      min-width: 0; min-height: 58px; padding: 7px 9px; background: #fff; border: 1px solid #dbe4f0;
+      min-width: 0; min-height: 46px; padding: 7px 9px; background: #fff; border: 1px solid #dbe4f0;
       border-left: 3px solid var(--bc-component-color, #dbe4f0);
       border-radius: 6px; color: #334155;
     }
-    .bc-tensor-cell span { font-size: 0.78rem; font-weight: 600; }
+    .bc-tensor-symbol { font-family: "Cambria Math", "Times New Roman", serif; font-style: italic; white-space: nowrap; }
+    .bc-tensor-symbol sub { font-size: 0.72em; }
+    .bc-tensor-cell .bc-tensor-symbol { font-size: 1.1rem; }
     .bc-tensor-cell strong { font-size: 0.84rem; overflow-wrap: anywhere; min-width: 0; text-align: right; }
-    .bc-tensor-cell small { grid-column: 1 / -1; color: var(--bc-component-color); font-size: 0.72rem; text-align: left; font-weight: 600; }
     .bc-tensor-cell:disabled { color: #64748b; background: #f1f5f9; }
     .bc-tensor-cell:disabled strong { font-size: 0.7rem; font-weight: 400; }
     .bc-tensor-cell[aria-pressed="true"], .bc-tensor-cell.is-hovered { outline: 2px solid var(--bc-component-color, #a21caf); outline-offset: -2px; background: #f1f5f9; }
     .bc-tensor-cell.is-filtered { opacity: 0.5; }
+    .bc-tensor-cell[aria-pressed="mixed"] { border-style: dashed; }
     .bc-tensor-cell:focus-visible { outline: 3px solid var(--bc-component-color, #a21caf); outline-offset: 2px; }
     .bc-tensor-help { font-size: 0.77rem; color: #536176; margin-top: 8px; overflow-wrap: anywhere; }
     .bc-tensor-help p { margin: 6px 0; }
@@ -1703,14 +1705,11 @@ details[open] > .detail-group-summary {
                   <label>Boundary condition<select class="form-select" data-tensor-condition></select></label>
                   <label>Load record<select class="form-select" data-tensor-load></select></label>
                 </div>
-                <div class="bc-tensor-filters" role="group" aria-label="Actions to combine on the cube">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="pull" aria-pressed="false"><span data-tensor-filter-label>Pull</span></button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="push" aria-pressed="false"><span data-tensor-filter-label>Push</span></button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="slide" aria-pressed="false"><span data-tensor-filter-label>Shear</span></button>
+                <div class="bc-tensor-filters" role="group" aria-label="Tensor component selection">
                   <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-filter="all" aria-pressed="false">Select all</button>
                   <button type="button" class="btn btn-sm btn-outline-secondary" data-tensor-clear>Clear</button>
                 </div>
-                <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: lowercase x/y/z indicates direction; uppercase X/Y/Z identifies opposite face pairs. Faded cells are unselected." title="Toggle components to combine actions. Matching reciprocal shear entries toggle together. Values use two decimals; hover a value for full precision."></div>
+                <div class="bc-tensor-matrix" data-tensor-matrix aria-label="Supplied tensor components: the first subscript is the direction; the second is the face normal. Faded cells are unselected." title="Equal supplied reciprocal components share one upper triangle button. Values use two decimals; hover a value for full precision."></div>
                 <div class="bc-tensor-status" data-tensor-status role="status"></div>
               </section>
               {% if mechanical_bc_tensors %}
@@ -1721,6 +1720,13 @@ details[open] > .detail-group-summary {
                     {% for load in item.tensor_loads %}
                       <details class="bc-load-detail">
                         <summary>{% if item.tensor_loads|length > 1 %}Load record {{ forloop.counter }}{% else %}Load details{% endif %}</summary>
+                        {% if load.tensor_components %}
+                          <ul class="bc-load-list" aria-label="Supplied tensor components">
+                            {% for component in load.tensor_components %}
+                              <li><span class="bc-tensor-symbol">{% if item.loading_type == "strain" %}ε{% else %}σ{% endif %}<sub>{{ component.key }}</sub></span>: <span title="{{ component.value }}">{{ component.display }}</span>{% if item.unit %} {{ item.unit }}{% endif %}</li>
+                            {% endfor %}
+                          </ul>
+                        {% endif %}
                         <ul class="bc-load-list">
                           {% for detail in load.details %}
                             <li><span class="bc-load-key">{{ detail.key }}</span>: {{ detail.display }}</li>
@@ -2210,7 +2216,9 @@ details[open] > .detail-group-summary {
   function getPlotTextRuns(text, size, weight = 400) {
     return String(text).split(/([σε])/).filter(Boolean).map(part => ({
       text: part,
-      font: `${/^[σε]$/.test(part) ? "italic " : ""}${weight} ${size}px sans-serif`,
+      font: /^[σε]$/.test(part)
+        ? `italic ${weight} ${size}px "Times New Roman", serif`
+        : `${weight} ${size}px sans-serif`,
     }));
   }
 
@@ -2293,13 +2301,16 @@ function buildPlotScale(values) {
     ? Math.trunc(minimum / offsetMagnitude) * offsetMagnitude : 0;
   const first = Math.ceil((minimum - offset) / step);
   const last = Math.floor((maximum - offset) / step);
-  const ticks = [];
+  const ticks = [minimum, maximum];
   for (let index = first; index <= last; index += 1) {
     const value = offset + cleanScaleNumber(index * step);
-    if (value >= minimum && value <= maximum && !ticks.includes(value)) ticks.push(value);
+    const besideEndpoint = Math.min(value - minimum, maximum - value) < step / 5;
+    if (value >= minimum && value <= maximum && !ticks.includes(value)
+      && (value === 0 || !besideEndpoint)) ticks.push(value);
   }
+  ticks.sort((left, right) => left - right);
   const labelMagnitude = Math.max(Math.abs(minimum - offset), Math.abs(maximum - offset));
-  const labelPrecision = Math.min(15, Math.max(4,
+  const labelPrecision = Math.min(15, Math.max(6,
     Math.floor(Math.log10(labelMagnitude)) - Math.floor(Math.log10(step)) + 2));
 
   return {
@@ -2327,10 +2338,10 @@ function formatPlotTickLabel(value, precision) {
 function measurePlotTickLabel(ctx, value, precision) {
   const label = formatPlotTickLabel(value, precision);
   ctx.save();
-  ctx.font = "400 13px sans-serif";
+  ctx.font = "400 16px sans-serif";
   let width = ctx.measureText(label.type === "plain" ? label.text : `${label.mantissa} × 10`).width;
   if (label.type === "scientific") {
-    ctx.font = "400 10px sans-serif";
+    ctx.font = "400 11px sans-serif";
     width += ctx.measureText(label.exponent).width + 1;
   }
   ctx.restore();
@@ -2377,9 +2388,9 @@ const cornerAxisPlugin = {
     const axisY = scales.y.getPixelForValue(0);
     const arrowLength = 12;
     ctx.save();
-    ctx.strokeStyle = "#93a7b8";
-    ctx.fillStyle = "#93a7b8";
-    ctx.lineWidth = 1.25;
+    ctx.strokeStyle = "#111111";
+    ctx.fillStyle = "#111111";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(chartArea.left, axisY);
     ctx.lineTo(chartArea.right + arrowLength, axisY);
@@ -2414,13 +2425,13 @@ const cornerAxisPlugin = {
     const xLabelSide = axisY < (chartArea.top + chartArea.bottom) / 2 ? -1 : 1;
     const yLabelSide = axisX > (chartArea.left + chartArea.right) / 2 ? 1 : -1;
     const yLabelX = yLabelSide < 0 ? chartArea.left : chartArea.right;
-    const axisColor = "#93a7b8";
-    const labelColor = "#63788a";
-    const tickLength = 4;
-    const xTickLabelOffset = 18;
+    const axisColor = "#111111";
+    const labelColor = "#111111";
+    const tickLength = 5;
+    const xTickLabelOffset = 20;
     const yTickLabelOffset = 10;
-    const tickLabelFontSize = 13;
-    const tickExponentFontSize = 10;
+    const tickLabelFontSize = 16;
+    const tickExponentFontSize = 11;
 
     function drawTickLabel(x, y, value, align, precision) {
       const label = formatPlotTickLabel(value, precision);
@@ -2579,6 +2590,36 @@ const cornerAxisPlugin = {
       return values;
     }
 
+    function spacedAxisTickValues(scale, horizontal) {
+      const values = buildAxisTickValues(scale);
+      const required = new Set([scale.min, scale.max, 0]);
+      const kept = values.filter(value => required.has(value));
+      const origin = scale.getPixelForValue(0);
+
+      function interval(value) {
+        let center = scale.getPixelForValue(value);
+        const half = horizontal
+          ? measurePlotTickLabel(ctx, value - scale.options.customOffset, scale.options.customLabelPrecision) / 2
+          : 12;
+        if (horizontal && value !== 0 && Math.abs(center - origin) < half + 24) {
+          center += Math.sign(value) * (half + 12);
+        } else if (!horizontal && value !== 0 && Math.abs(center - origin) < 36) {
+          center -= Math.sign(value) * 46;
+        }
+        return {start: center - half - 6, end: center + half + 6};
+      }
+
+      const occupied = kept.map(interval);
+      for (const value of values) {
+        if (required.has(value)) continue;
+        const candidate = interval(value);
+        if (occupied.some(other => candidate.start < other.end && candidate.end > other.start)) continue;
+        occupied.push(candidate);
+        kept.push(value);
+      }
+      return kept.sort((left, right) => left - right);
+    }
+
     ctx.save();
     ctx.strokeStyle = axisColor;
     ctx.fillStyle = labelColor;
@@ -2588,7 +2629,7 @@ const cornerAxisPlugin = {
     ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
     ctx.textAlign = "center";
 
-    buildAxisTickValues(xScale).forEach(value => {
+    spacedAxisTickValues(xScale, true).forEach(value => {
       value = Number(value);
 
       if (!Number.isFinite(value) || value === 0) {
@@ -2601,18 +2642,23 @@ const cornerAxisPlugin = {
         return;
       }
 
+      const labelWidth = measurePlotTickLabel(ctx, value - xScale.options.customOffset,
+        xScale.options.customLabelPrecision);
+      const nearOrigin = Math.abs(x - axisX) < labelWidth / 2 + 24;
+      const labelX = nearOrigin ? x + Math.sign(value) * 12 : x;
+      const align = nearOrigin ? (value < 0 ? "right" : "left") : "center";
       drawTick(x, axisY, x, axisY + xLabelSide * tickLength);
       drawTickLabel(
-        x,
+        labelX,
         axisY + xLabelSide * xTickLabelOffset,
         value - xScale.options.customOffset,
-        "center",
+        align,
         Number(xScale.options.customLabelPrecision || 4)
       );
     });
 
     ctx.textAlign = yLabelSide < 0 ? "right" : "left";
-    buildAxisTickValues(yScale).forEach(value => {
+    spacedAxisTickValues(yScale, false).forEach(value => {
       value = Number(value);
 
       if (!Number.isFinite(value) || value === 0) {
@@ -2625,10 +2671,11 @@ const cornerAxisPlugin = {
         return;
       }
 
+      const nearOrigin = Math.abs(y - axisY) < 36;
       drawTick(axisX, y, axisX + yLabelSide * tickLength, y);
       drawTickLabel(
         axisX + yLabelSide * yTickLabelOffset,
-        y,
+        nearOrigin ? y - Math.sign(value) * 46 : y,
         value - yScale.options.customOffset,
         yLabelSide < 0 ? "right" : "left",
         Number(yScale.options.customLabelPrecision || 4)
@@ -2636,9 +2683,7 @@ const cornerAxisPlugin = {
     });
 
     drawTickLabel(axisX - yLabelSide * 8, axisY + xLabelSide * xTickLabelOffset, 0, "center", 4);
-    const zeroYSide = axisY <= chartArea.top + 1 || axisY >= chartArea.bottom - 1
-      ? xLabelSide : -xLabelSide;
-    drawTickLabel(axisX + yLabelSide * yTickLabelOffset, axisY + zeroYSide * 8, 0,
+    drawTickLabel(axisX + yLabelSide * yTickLabelOffset, axisY - xLabelSide * 8, 0,
       yLabelSide < 0 ? "right" : "left", 4);
 
     ctx.font = "400 11px sans-serif";
@@ -2652,7 +2697,7 @@ const cornerAxisPlugin = {
       const offset = xScale.options.customOffset;
       ctx.fillText(`Offset ${offset > 0 ? "+" : ""}${offset}`, chartArea.right, chartArea.bottom + 54);
     }
-    ctx.fillStyle = "#415c75";
+    ctx.fillStyle = "#111111";
     drawXAxisTitle(ctx, xScale.options.title.text, chartArea);
     drawYAxisTitle(ctx, yScale.options.title.text, chartArea);
 
@@ -2698,11 +2743,26 @@ function downloadCurrentPlot() {
   const link = document.createElement("a");
   const fileName =
     `${sanitizeFileName(yVariable.symbol_label || yVariable.short_label)}_vs_${sanitizeFileName(xVariable.symbol_label || xVariable.short_label)}.png`;
-  const sourceCanvas = chartInstance.canvas;
-  const exportPadding = 48;
+  const resolution = 3;
+  const exportPadding = 24 * resolution;
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = chartInstance.width;
+  sourceCanvas.height = chartInstance.height;
+  const options = Chart.helpers.clone(chartInstance.config.options);
+  options.responsive = false;
+  options.animation = false;
+  options.devicePixelRatio = resolution;
+  options.events = [];
+  options.plugins.tooltip.enabled = false;
+  const exportChart = new Chart(sourceCanvas, {
+    type: "line",
+    data: Chart.helpers.clone(chartInstance.data),
+    options,
+    plugins: [canvasBackgroundPlugin, cornerAxisPlugin],
+  });
+  exportChart.update("none");
   const exportCanvas = document.createElement("canvas");
   const exportContext = exportCanvas.getContext("2d", { alpha: false });
-  const exportPlotOffsetX = 42;
 
   exportCanvas.width = sourceCanvas.width + (exportPadding * 2);
   exportCanvas.height = sourceCanvas.height + (exportPadding * 2);
@@ -2712,12 +2772,9 @@ function downloadCurrentPlot() {
   exportContext.fillStyle = "#ffffff";
   exportContext.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
 
-  exportContext.drawImage(
-    sourceCanvas,
-    exportPadding + exportPlotOffsetX,
-    exportPadding
-  );
+  exportContext.drawImage(sourceCanvas, exportPadding, exportPadding);
   exportContext.restore();
+  exportChart.destroy();
 
   link.href = exportCanvas.toDataURL("image/png", 1);
   link.download = fileName;
@@ -2781,12 +2838,17 @@ function updateRawValues(xVariable, yVariable, pointCount) {
       measurePlotTickLabel(plotContext, value - yScaleConfig.offset, yScaleConfig.labelPrecision)));
     const xLabelsAbove = yScaleConfig.chartMax < -yScaleConfig.chartMin;
     const yLabelsRight = -xScaleConfig.chartMin > xScaleConfig.chartMax;
-    const sidePadding = Math.max(84, yTickWidth + 64, xTickWidth / 2 + 16);
+    const xSpan = xScaleConfig.chartMax - xScaleConfig.chartMin;
+    const nearMinimum = xScaleConfig.chartMin < 0 && -xScaleConfig.chartMin / xSpan < .15;
+    const nearMaximum = xScaleConfig.chartMax > 0 && xScaleConfig.chartMax / xSpan < .15;
+    const leftTickPadding = Math.max(24, xTickWidth * (nearMinimum ? 1 : .5) + 16);
+    const rightTickPadding = Math.max(24, xTickWidth * (nearMaximum ? 1 : .5) + 16);
+    const sidePadding = Math.max(84, yTickWidth + 64);
     const plotLayoutPadding = {
       top: xLabelsAbove ? 68 : 24,
-      right: yLabelsRight ? sidePadding : Math.max(24, xTickWidth / 2 + 16),
+      right: yLabelsRight ? Math.max(sidePadding, rightTickPadding) : rightTickPadding,
       bottom: xLabelsAbove ? 24 : 66,
-      left: yLabelsRight ? Math.max(24, xTickWidth / 2 + 16) : sidePadding,
+      left: yLabelsRight ? leftTickPadding : Math.max(sidePadding, leftTickPadding),
     };
 
     if (chartInstance) {

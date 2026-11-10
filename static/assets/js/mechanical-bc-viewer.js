@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import {tensorFaceLoads, formatTensorValue, tensorComponentLabel, tensorComponentMeaning} from './mechanical-bc-tensor.js';
+import {tensorFaceLoads, formatTensorValue, tensorComponentLabel, createTensorComponentLabel, tensorComponentMeaning} from './mechanical-bc-tensor.js';
 import {createTensorPanel} from './mechanical-bc-tensor-panel.js';
 import {createTensorMotion} from './mechanical-bc-motion.js';
 import {createTensorAction} from './mechanical-bc-action-view.js';
@@ -844,6 +844,15 @@ function setupTooltip(container, camera, selectableMeshes, tooltip, onHighlight 
 
     onHighlight(hit.object.userData.components || hit.object.userData.component || '');
     tooltip.textContent = hit.object.userData.tooltip;
+    if (hit.object.userData.tensorFace) {
+      const face = hit.object.userData;
+      tooltip.replaceChildren(face.heading);
+      for (const entry of face.entries) {
+        tooltip.append('\n', createTensorComponentLabel(entry.component, face.isStrain),
+          ': ' + formatTensorValue(entry.value) + (face.unit ? ' ' + face.unit : '')
+          + ' · ' + (entry.sign > 0 ? '+' : '-') + entry.direction + ' direction');
+      }
+    }
     tooltip.style.maxWidth = `${Math.max(rect.width - 16, 1)}px`;
     tooltip.style.transform = 'none';
     const left = Math.max(8, Math.min(x - tooltip.offsetWidth / 2, rect.width - tooltip.offsetWidth - 8));
@@ -889,15 +898,16 @@ function drawTensorLoading(view, group, selectableMeshes) {
     }));
     face.position.copy(normal).multiplyScalar(0.506);
     face.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
-    face.userData = {tensorFace: true, normal: load.normal, faceSign: load.faceSign,
-      entries: load.components, components: load.components.map(entry => entry.component)};
     const name = (load.faceSign > 0 ? '+' : '-') + load.normal.toUpperCase() + ' face';
+    const heading = (isStrain ? 'Strain on ' : 'Stress on ') + name;
+    face.userData = {tensorFace: true, normal: load.normal, faceSign: load.faceSign,
+      entries: load.components, components: load.components.map(entry => entry.component),
+      isStrain, unit: view.unit, heading};
     const values = load.components.map(entry => {
-      const meaning = tensorComponentMeaning(entry.component, entry.value, isStrain);
-      return tensorComponentLabel(entry.component) + ': ' + formatTensorValue(entry.value) + (view.unit ? ' ' + view.unit : '')
-        + ' · ' + meaning.action + ' · ' + (entry.sign > 0 ? '+' : '-') + entry.direction + ' direction';
+      return tensorComponentLabel(entry.component, isStrain) + ': ' + formatTensorValue(entry.value) + (view.unit ? ' ' + view.unit : '')
+        + ' · ' + (entry.sign > 0 ? '+' : '-') + entry.direction + ' direction';
     });
-    addMesh(group, face, (isStrain ? 'Strain on ' : 'Stress on ') + name + '\n' + values.join('\n'), selectableMeshes);
+    addMesh(group, face, heading + '\n' + values.join('\n'), selectableMeshes);
     const corners = [
       new THREE.Vector3(-0.48, -0.48, 0), new THREE.Vector3(0.48, -0.48, 0),
       new THREE.Vector3(0.48, 0.48, 0), new THREE.Vector3(-0.48, 0.48, 0),
@@ -1160,12 +1170,12 @@ function renderMechanicalBcViewer() {
   if (wholeItems.length) createWholeCubeControls(container, wholeItems, state, materials, tooltip);
   const staticMeshCount = selectableMeshes.length;
   function highlight(component) {
+    if (tensorPanel) component = tensorPanel.highlight(component);
     const key = Array.isArray(component) ? component.join(',') : component;
     if (highlighted === key) return;
     tensorMotion?.pause();
     highlighted = key;
     highlightTensor(tensorGroup, component);
-    tensorPanel?.highlight(component);
     state.renderSceneOnce();
   }
   if (tensorItems.length) {

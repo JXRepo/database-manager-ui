@@ -75,6 +75,8 @@ class MechanicalPlotBrowserTests(StaticLiveServerTestCase):
             ("zero", [0], [0], "+", "+"),
             ("small", [-2e-16, 3e-16], [-3e-14, 4e-14], "-+", "-+"),
             ("away-from-zero", [10, 10.5, 11], [102, 100, 101], "+", "+"),
+            ("near-endpoint", [0, .00110001], [0, 90], "+", "+"),
+            ("wide-endpoints", [0, .00110001], [0, .00110001], "+", "+"),
             ("near-zero-reversal", [-5e-4, -1e-4, 9e-8], [-1.4e-5, -3e-6, 1.7e-13], "-+", "-+"),
             ("narrow-offset", [1e8, 1e8 + .001, 1e8 + .002],
              [2e8, 2e8 + .002, 2e8 + .001], "+", "+"),

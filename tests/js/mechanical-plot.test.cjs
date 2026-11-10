@@ -107,6 +107,21 @@ test('single-sign curves include zero without extending beyond their data extrem
   }
 });
 
+test('range endpoints are labelled even when they are not regular tick multiples', () => {
+  for (const values of [[0, 87], [-.0137, .0203], [-1.4e-5, 1.7e-13], [1e8, 1e8 + .002]]) {
+    const scale = plotScale(values);
+    assert.ok(scale.ticks.includes(scale.chartMin));
+    assert.ok(scale.ticks.includes(scale.chartMax));
+    assert.equal(new Set(scale.ticks).size, scale.ticks.length);
+    assert.ok(scale.ticks.every((value, index) => !index || value > scale.ticks[index - 1]));
+    for (const value of scale.ticks) {
+      if (value === 0 || value === scale.chartMin || value === scale.chartMax) continue;
+      assert.ok(Math.abs(value - scale.chartMin) >= scale.step / 5);
+      assert.ok(Math.abs(value - scale.chartMax) >= scale.step / 5);
+    }
+  }
+});
+
 test('near-zero reversals never expand into a large opposite-sign half of the plot', () => {
   for (const values of [[-1.4e-5, -1e-6, 1.7e-13], [-9.5e-16, .02, .03]]) {
     const scale = plotScale(values);

@@ -4136,6 +4136,17 @@ def _build_mechanical_bc_items(data):
             for load in applied_loads:
                 normalized_load = _normalize_applied_load(load)
                 if normalized_load is not None:
+                    magnitude = normalized_load.get("magnitude")
+                    components = []
+                    if isinstance(magnitude, dict):
+                        for key in ("xx", "xy", "xz", "yx", "yy", "yz", "zx", "zy", "zz"):
+                            if key in magnitude:
+                                components.append({
+                                    "key": key,
+                                    "value": magnitude[key],
+                                    "display": _format_compact_value(magnitude[key]),
+                                })
+                    normalized_load["tensor_components"] = components
                     tensor_loads.append(normalized_load)
             items.append({
                 "vertex": "Whole cube",

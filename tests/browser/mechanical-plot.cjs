@@ -89,9 +89,8 @@ const {join} = require('node:path');
         function hasAxis(px, py) {
           const pixels = ctx.getImageData(Math.floor(px) - 2, Math.floor(py) - 2, 5, 5).data;
           for (let i = 0; i < pixels.length; i += 4) {
-            const coverage = (255 - pixels[i]) / 108;
-            if (coverage > .1 && Math.abs(pixels[i + 1] - (255 - coverage * 88)) < 4
-              && Math.abs(pixels[i + 2] - (255 - coverage * 71)) < 4) return true;
+            if (pixels[i] < 225 && Math.abs(pixels[i + 1] - pixels[i]) < 4
+              && Math.abs(pixels[i + 2] - pixels[i]) < 4) return true;
           }
           return false;
         }
@@ -133,6 +132,8 @@ const {join} = require('node:path');
           radii: chart.getDatasetMeta(0).data.map(point => point.options.radius), gaps,
           xGrid: x.options.grid.display, yGrid: y.options.grid.display,
           data, texts: window.plotTexts,
+          endpointLabels: [x, y].flatMap(scale => [scale.min, scale.max].map(value =>
+            formatPlotTickLabel(value, scale.options.customLabelPrecision))),
           overflow: document.documentElement.scrollWidth > innerWidth};
       })()`);
       if (expected) {
@@ -162,6 +163,20 @@ const {join} = require('node:path');
       assert.equal(metrics.yGrid, false);
       assert.equal(metrics.overflow, false, `${label}: desktop width`);
       assert.ok(metrics.texts.length > 5, `${label}: visible ticks and titles`);
+      for (const endpoint of metrics.endpointLabels) {
+        const text = endpoint.type === 'plain' ? endpoint.text : `${endpoint.mantissa} × 10`;
+        assert.ok(metrics.texts.some(item => item.text === text), `${label}: visible range endpoint ${text}`);
+      }
+      const numbers = metrics.texts.filter(item => /^[-\d]/.test(item.text) && /(?:16|11)px/.test(item.font));
+      for (let first = 0; first < numbers.length; first++) {
+        for (let second = first + 1; second < numbers.length; second++) {
+          const a = numbers[first], b = numbers[second];
+          const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          assert.ok(overlapX < .5 || overlapY < .5,
+            `${label}: tick labels overlap: ${JSON.stringify([a, b])}`);
+        }
+      }
       const zeros = metrics.texts.filter(text => text.text === '0');
       assert.equal(zeros.length, 2, `${label}: separate zero labels for X and Y`);
       assert.ok(zeros.every(text => Math.abs((text.left + text.right) / 2 - metrics.originX) < 25
@@ -218,12 +233,14 @@ const {join} = require('node:path');
       const state = await evaluate(`(() => {
         const chart = Chart.getChart('mechanical-plot'), active = chart.getActiveElements()[0];
         const point = active.element, center = point.getCenterPoint(true);
-        const pixels = chart.ctx.getImageData(Math.floor(center.x) - 8, Math.floor(center.y) - 8, 17, 17).data;
+        const ratio = chart.currentDevicePixelRatio;
+        const pixels = chart.ctx.getImageData(Math.floor(center.x * ratio) - 8 * ratio,
+          Math.floor(center.y * ratio) - 8 * ratio, 17 * ratio, 17 * ratio).data;
         let bluePixels = 0;
         for (let i = 0; i < pixels.length; i += 4) {
           if (pixels[i + 2] > 120 && pixels[i + 2] - pixels[i] > 55) bluePixels++;
         }
-        return {radius: point.options.radius, border: point.options.borderColor, bluePixels,
+        return {radius: point.options.radius, border: point.options.borderColor, bluePixels: bluePixels / ratio ** 2,
           title: chart.tooltip.title, body: chart.tooltip.body.flatMap(row => row.lines),
           raw: chart.data.datasets[0].data[active.index], tooltipIndex: chart.tooltip.getActiveElements()[0].index};
       })()`);
@@ -324,6 +341,10 @@ const {join} = require('node:path');
     assert.equal(await evaluate('document.getElementById("download-selected-csv").disabled'), true);
     await evaluate('document.getElementById("csv-select-all").click()');
     assert.equal(await evaluate('document.getElementById("download-selected-csv").disabled'), false);
+    await command('Emulation.setDeviceMetricsOverride', {width: 1440, height: 900, deviceScaleFactor: 2, mobile: false});
+    await evaluate('Chart.getChart("mechanical-plot").resize()');
+    await until('canvas.width === 1440');
+    await hover('PNG excludes the active sample marker', 0, .7, 1);
     await evaluate('document.getElementById("download-plot-btn").click()');
     await evaluate('document.getElementById("download-xy-csv-btn").click()');
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -334,9 +355,25 @@ const {join} = require('node:path');
     const csvName = readdirSync(profile).find(name => name.endsWith('.csv'));
     assert.ok(pngName && csvName, 'PNG and selected X/Y CSV both download');
     const png = readFileSync(join(profile, pngName));
-    const size = await evaluate('({width: canvas.width, height: canvas.height})');
-    assert.equal(png.readUInt32BE(16), size.width + 96);
-    assert.equal(png.readUInt32BE(20), size.height + 96);
+    assert.equal(png.readUInt32BE(16), (720 + 48) * 3, 'PNG uses three pixels per CSS pixel with equal margins');
+    assert.equal(png.readUInt32BE(20), (480 + 48) * 3);
+    assert.equal(await evaluate('Chart.getChart("mechanical-plot").width'), 720, 'export preserves the interactive chart size');
+    const exportedHoverEdge = await evaluate(`new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => {
+        const check = document.createElement('canvas');
+        check.width = image.width; check.height = image.height;
+        const ctx = check.getContext('2d');
+        ctx.drawImage(image, 0, 0);
+        const chart = Chart.getChart('mechanical-plot');
+        const point = chart.data.datasets[0].data[1];
+        const x = (chart.scales.x.getPixelForValue(point.x) + 24) * 3;
+        const y = (chart.scales.y.getPixelForValue(point.y) + 24 + 6) * 3;
+        resolve(Array.from(ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data));
+      };
+      image.src = ${JSON.stringify('data:image/png;base64,' + png.toString('base64'))};
+    })`);
+    assert.ok(exportedHoverEdge.slice(0, 3).every(channel => channel > 245), 'PNG omits the enlarged hover marker');
     const csv = readFileSync(join(profile, csvName), 'utf8');
     assert.match(csv, /total_strain.strain_11/);
     assert.match(csv, /stress.stress_11/);
