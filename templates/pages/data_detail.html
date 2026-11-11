@@ -2467,14 +2467,18 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
   const ticks = [];
   const tickGap = 13;
   const titleGap = 16;
-  const arrowGap = 24, arrowLength = 8, arrowHalfWidth = 4;
+  const axisEndGap = 24, arrowLength = 8, arrowHalfWidth = 4;
   const arrows = {
-    x: [{x: area.right + arrowGap + arrowLength, y: axisY},
-      {x: area.right + arrowGap, y: axisY - arrowHalfWidth},
-      {x: area.right + arrowGap, y: axisY + arrowHalfWidth}],
-    y: [{x: axisX, y: area.top - arrowGap - arrowLength},
-      {x: axisX - arrowHalfWidth, y: area.top - arrowGap},
-      {x: axisX + arrowHalfWidth, y: area.top - arrowGap}],
+    x: [{x: area.right + axisEndGap + arrowLength, y: axisY},
+      {x: area.right + axisEndGap, y: axisY - arrowHalfWidth},
+      {x: area.right + axisEndGap, y: axisY + arrowHalfWidth}],
+    y: [{x: axisX, y: area.top - axisEndGap - arrowLength},
+      {x: axisX - arrowHalfWidth, y: area.top - axisEndGap},
+      {x: axisX + arrowHalfWidth, y: area.top - axisEndGap}],
+  };
+  const axisSegments = {
+    x: [{x: area.left - (xScale.min < 0 ? axisEndGap : 0), y: axisY}, arrows.x[0]],
+    y: [{x: axisX, y: area.bottom + (yScale.min < 0 ? axisEndGap : 0)}, arrows.y[0]],
   };
   const arrowBoxes = Object.values(arrows).map(points => ({
     left: Math.min(...points.map(point => point.x)),
@@ -2537,7 +2541,9 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
 
   const xTitle = plotTitleText(ctx, xScale.title.text);
   const yTitle = plotTitleText(ctx, yScale.title.text);
-  const envelope = [...ticks, ...arrowBoxes, area];
+  const axisEnds = Object.values(axisSegments).flat()
+    .map(point => ({left: point.x, right: point.x, top: point.y, bottom: point.y}));
+  const envelope = [...ticks, ...arrowBoxes, ...axisEnds, area];
   const xTitleTop = xSide < 0
     ? Math.min(...envelope.map(box => box.top)) - titleGap - xTitle.height
     : Math.max(...envelope.map(box => box.bottom)) + titleGap;
@@ -2548,7 +2554,7 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
     x: placePlotText(xTitle, (area.left + area.right - xTitle.width) / 2, xTitleTop),
     y: placePlotText(yTitle, yTitleLeft, (area.top + area.bottom - yTitle.width) / 2, -Math.PI / 2),
   };
-  return {ticks, titles, arrows, area, axes: {x: axisX, y: axisY}, xSide, ySide};
+  return {ticks, titles, arrows, axisSegments, area, axes: {x: axisX, y: axisY}, xSide, ySide};
 }
 
 function drawPlotText(ctx, placed) {
@@ -2580,12 +2586,12 @@ const cornerAxisPlugin = {
       const area = {left: padding.left, top: padding.top, right: width - padding.right, bottom: height - padding.bottom};
       const layout = buildMechanicalPlotLayout(ctx, area, x, y);
       const boxes = [...layout.ticks, ...Object.values(layout.titles)];
-      const arrows = Object.values(layout.arrows).flat();
+      const axisPoints = [...Object.values(layout.arrows).flat(), ...Object.values(layout.axisSegments).flat()];
       const overflow = {
-        left: Math.max(0, 8 - Math.min(...boxes.map(box => box.left), ...arrows.map(point => point.x))),
-        right: Math.max(0, Math.max(...boxes.map(box => box.right), ...arrows.map(point => point.x)) + 8 - width),
-        top: Math.max(0, 8 - Math.min(...boxes.map(box => box.top), ...arrows.map(point => point.y))),
-        bottom: Math.max(0, Math.max(...boxes.map(box => box.bottom), ...arrows.map(point => point.y)) + 8 - height),
+        left: Math.max(0, 8 - Math.min(...boxes.map(box => box.left), ...axisPoints.map(point => point.x))),
+        right: Math.max(0, Math.max(...boxes.map(box => box.right), ...axisPoints.map(point => point.x)) + 8 - width),
+        top: Math.max(0, 8 - Math.min(...boxes.map(box => box.top), ...axisPoints.map(point => point.y))),
+        bottom: Math.max(0, Math.max(...boxes.map(box => box.bottom), ...axisPoints.map(point => point.y)) + 8 - height),
       };
       if (Object.values(overflow).every(value => value < .01)) break;
       for (const side of Object.keys(padding)) padding[side] += overflow[side];
@@ -2602,16 +2608,16 @@ const cornerAxisPlugin = {
   beforeDraw(chart) {
     const {ctx, $mechanicalPlotLayout: layout} = chart;
     if (!layout) return;
-    const {area, axes, arrows} = layout;
+    const {axisSegments, arrows} = layout;
     ctx.save();
     ctx.strokeStyle = "#111111";
     ctx.fillStyle = "#111111";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(area.left, axes.y);
-    ctx.lineTo(arrows.x[0].x, axes.y);
-    ctx.moveTo(axes.x, area.bottom);
-    ctx.lineTo(axes.x, arrows.y[0].y);
+    for (const [start, end] of Object.values(axisSegments)) {
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+    }
     ctx.stroke();
     for (const points of Object.values(arrows)) {
       ctx.beginPath();

@@ -73,10 +73,38 @@ const {join} = require('node:path');
         document.getElementById(${JSON.stringify(id)}).dispatchEvent(new Event('change', {bubbles: true}));
         Chart.getChart('mechanical-plot').stop(); Chart.getChart('mechanical-plot').update('none')`);
     }
+    function verifyAxisSegments(metrics, label) {
+      const {area, axes, arrows} = metrics.plotLayout;
+      const segments = {
+        x: [{x: area.left - (metrics.xMin < 0 ? 24 : 0), y: axes.y}, {x: arrows.x[0].x, y: axes.y}],
+        y: [{x: axes.x, y: area.bottom + (metrics.yMin < 0 ? 24 : 0)}, {x: axes.x, y: arrows.y[0].y}],
+      };
+      for (const axis of ['x', 'y']) {
+        const expected = segments[axis];
+        const matches = points => points.length === 2 && points.every((point, index) =>
+          Math.hypot(point.x - expected[index].x, point.y - expected[index].y) < .15);
+        const actual = metrics.strokePaths.find(path => path.color === '#111111' && path.points.length === 2
+          && Math.hypot(path.points[1].x - expected[1].x, path.points[1].y - expected[1].y) < .15);
+        assert.ok(actual, `${label}: ${axis} axis has a real stroke ending at its arrow tip`);
+        const gap = axis === 'x' ? area.left - actual.points[0].x : actual.points[0].y - area.bottom;
+        const expectedGap = metrics[axis + 'Min'] < 0 ? 24 : 0;
+        assert.ok(Math.abs(gap - expectedGap) < .15,
+          `${label}: ${axis} minimum-to-axis-end gap is ${gap}px; expected ${expectedGap}px`);
+        assert.ok(matches(actual.points), `${label}: ${axis} axis remains aligned with its true zero coordinate`);
+        if (metrics.plotLayout.axisSegments) {
+          assert.ok(matches(metrics.plotLayout.axisSegments[axis]), `${label}: ${axis} measured segment matches its actual stroke`);
+        }
+        assert.ok(expected.every(point => point.x >= .75 && point.y >= .75
+          && point.x <= metrics.width - .75 && point.y <= metrics.height - .75),
+        `${label}: ${axis} axis stroke remains inside the canvas`);
+      }
+      return segments;
+    }
     function verifyTextLayout(metrics, label) {
       const planned = metrics.plotLayout;
       assert.ok(planned && planned.ticks.length && planned.titles.x && planned.titles.y,
         `${label}: the drawing exposes its measured text layout`);
+      const axisSegments = verifyAxisSegments(metrics, label);
       const fontSize = font => Number(font.match(/([\d.]+)px/)[1]);
       const close = (actual, expected, message) => assert.ok(Math.abs(actual - expected) <= .15,
         `${label}: ${message}: ${actual} instead of ${expected}`);
@@ -176,15 +204,15 @@ const {join} = require('node:path');
             `${label}: ${axis} arrow overlaps text: ${JSON.stringify({group, arrowBox})}`);
         }
       }
-      const arrowPoints = [...planned.arrows.x, ...planned.arrows.y];
+      const arrowPoints = [...planned.arrows.x, ...planned.arrows.y, ...axisSegments.x, ...axisSegments.y];
       const xTitleGap = planned.xSide < 0
         ? Math.min(metrics.area.top, ...planned.ticks.map(tick => tick.top), ...arrowPoints.map(point => point.y)) - planned.titles.x.bottom
         : planned.titles.x.top - Math.max(metrics.area.bottom, ...planned.ticks.map(tick => tick.bottom), ...arrowPoints.map(point => point.y));
       const yTitleGap = planned.ySide < 0
         ? Math.min(metrics.area.left, ...planned.ticks.map(tick => tick.left), ...arrowPoints.map(point => point.x)) - planned.titles.y.right
         : planned.titles.y.left - Math.max(metrics.area.right, ...planned.ticks.map(tick => tick.right), ...arrowPoints.map(point => point.x));
-      close(xTitleGap, 16, 'X title gap from the plot, tick and arrow envelope');
-      close(yTitleGap, 16, 'Y title gap from the plot, tick and arrow envelope');
+      close(xTitleGap, 16, 'X title gap from the plot, tick, arrow and axis endpoint envelope');
+      close(yTitleGap, 16, 'Y title gap from the plot, tick, arrow and axis endpoint envelope');
       for (const axis of ['x', 'y']) {
         for (const run of planned.titles[axis].group.runs) {
           if (run.text === 'σ' || run.text === 'ε') continue;
@@ -204,6 +232,7 @@ const {join} = require('node:path');
         chart.resize();
         window.plotTexts = [];
         window.plotFilledPaths = [];
+        window.plotStrokePaths = [];
         chart.update('none');
         const {x, y} = chart.scales;
         const area = chart.chartArea;
@@ -257,7 +286,7 @@ const {join} = require('node:path');
           vertical: hasAxis(originX, area.top + area.height * .25),
           radii: chart.getDatasetMeta(0).data.map(point => point.options.radius), gaps,
           xGrid: x.options.grid.display, yGrid: y.options.grid.display,
-          data, texts: window.plotTexts, filledPaths: window.plotFilledPaths,
+          data, texts: window.plotTexts, filledPaths: window.plotFilledPaths, strokePaths: window.plotStrokePaths,
           plotLayout: chart.$mechanicalPlotLayout,
           tickLabels: chart.$mechanicalPlotLayout.ticks.map(tick => ({
             axis: tick.axis, value: tick.value,
@@ -371,6 +400,31 @@ const {join} = require('node:path');
       await until(`(() => {const chart = Chart.getChart('mechanical-plot');
         return chart.getActiveElements().length === 0 && chart.tooltip.opacity === 0;})()`);
     }
+    async function downloadMeasuredPNG(label) {
+      const directory = mkdtempSync(join(profile, 'plot-download-'));
+      await send('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: directory});
+      try {
+        await evaluate('window.capturePlotExport = true; window.plotExportStrokePaths = []; window.plotExportGeometry = null; document.getElementById("download-plot-btn").click(); window.capturePlotExport = false');
+        let name;
+        for (let attempt = 0; attempt < 100; attempt++) {
+          name = readdirSync(directory).find(file => file.endsWith('.png'));
+          if (name) break;
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        assert.ok(name, `${label}: PNG downloads`);
+        const geometry = await evaluate('({...window.plotExportGeometry, strokePaths: window.plotExportStrokePaths})');
+        verifyAxisSegments(geometry, `${label} PNG`);
+        const png = readFileSync(join(directory, name));
+        assert.equal(png.readUInt32BE(16), 2304);
+        assert.equal(png.readUInt32BE(20), 1584);
+        if (process.env.PLOT_SCREENSHOT_DIR) {
+          mkdirSync(process.env.PLOT_SCREENSHOT_DIR, {recursive: true});
+          writeFileSync(join(process.env.PLOT_SCREENSHOT_DIR, `${label}-download.png`), png);
+        }
+      } finally {
+        await send('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: profile});
+      }
+    }
     await command('Page.enable');
     await command('Runtime.enable');
     await command('Network.enable');
@@ -380,9 +434,12 @@ const {join} = require('node:path');
       window.plotTexts = [];
       window.plotExportTexts = [];
       window.plotFilledPaths = [];
+      window.plotStrokePaths = [];
+      window.plotExportStrokePaths = [];
+      const isPlotExport = context => window.capturePlotExport && context.canvas.width === 2160 && context.canvas.height === 1440;
       const drawText = CanvasRenderingContext2D.prototype.fillText;
       CanvasRenderingContext2D.prototype.fillText = function(text, x, y, ...args) {
-        const exporting = window.capturePlotExport && this.canvas.width === 2160 && this.canvas.height === 1440;
+        const exporting = isPlotExport(this);
         if (this.canvas.id === 'mechanical-plot' || exporting) {
           const m = this.measureText(text);
           const matrix = this.getTransform();
@@ -403,16 +460,16 @@ const {join} = require('node:path');
       };
       const beginPath = CanvasRenderingContext2D.prototype.beginPath;
       CanvasRenderingContext2D.prototype.beginPath = function(...args) {
-        if (this.canvas.id === 'mechanical-plot') this.plotTestPath = [];
+        if (this.canvas.id === 'mechanical-plot' || isPlotExport(this)) this.plotTestPath = [];
         return beginPath.apply(this, args);
       };
       for (const method of ['moveTo', 'lineTo']) {
         const original = CanvasRenderingContext2D.prototype[method];
         CanvasRenderingContext2D.prototype[method] = function(x, y, ...args) {
-          if (this.canvas.id === 'mechanical-plot' && this.plotTestPath) {
+          if ((this.canvas.id === 'mechanical-plot' || isPlotExport(this)) && this.plotTestPath) {
             const matrix = this.getTransform();
             this.plotTestPath.push({x: matrix.a * x + matrix.c * y + matrix.e,
-              y: matrix.b * x + matrix.d * y + matrix.f});
+              y: matrix.b * x + matrix.d * y + matrix.f, move: method === 'moveTo'});
           }
           return original.call(this, x, y, ...args);
         };
@@ -423,6 +480,31 @@ const {join} = require('node:path');
           window.plotFilledPaths.push(this.plotTestPath.slice());
         }
         return fill.apply(this, args);
+      };
+      const stroke = CanvasRenderingContext2D.prototype.stroke;
+      CanvasRenderingContext2D.prototype.stroke = function(...args) {
+        const exporting = isPlotExport(this);
+        if ((this.canvas.id === 'mechanical-plot' || exporting) && this.plotTestPath) {
+          const paths = exporting ? window.plotExportStrokePaths : window.plotStrokePaths;
+          const ratio = exporting ? 3 : 1;
+          let points = [];
+          for (const point of this.plotTestPath) {
+            if (point.move && points.length) {
+              paths.push({points, color: this.strokeStyle});
+              points = [];
+            }
+            points.push({x: point.x / ratio, y: point.y / ratio});
+          }
+          if (points.length) paths.push({points, color: this.strokeStyle});
+          if (exporting) {
+            const chart = Chart.getChart(this.canvas);
+            if (chart?.$mechanicalPlotLayout) window.plotExportGeometry = {
+              plotLayout: chart.$mechanicalPlotLayout, width: chart.width, height: chart.height,
+              xMin: chart.scales.x.min, yMin: chart.scales.y.min,
+            };
+          }
+        }
+        return stroke.apply(this, args);
       };`});
     await command('Network.setCookie', {name: process.env.PLOT_COOKIE_NAME, value: process.env.PLOT_SESSION,
       url: process.env.PLOT_BASE_URL, path: '/'});
@@ -501,6 +583,7 @@ const {join} = require('node:path');
     assert.equal(png.readUInt32BE(16), (720 + 48) * 3, 'PNG uses three pixels per CSS pixel with equal margins');
     assert.equal(png.readUInt32BE(20), (480 + 48) * 3);
     const exportTexts = await evaluate('window.plotExportTexts');
+    verifyAxisSegments(await evaluate('({...window.plotExportGeometry, strokePaths: window.plotExportStrokePaths})'), 'positive PNG');
     assert.ok(exportTexts.length > 5, 'PNG redraws its labels on the full resolution canvas');
     assert.ok(exportTexts.every(text => Math.abs(text.scaleX - 3) < 1e-6 && Math.abs(text.scaleY - 3) < 1e-6),
       'PNG uses a genuine threefold text transform rather than scaling an existing bitmap');
@@ -530,11 +613,16 @@ const {join} = require('node:path');
     assert.match(csv, /stress.stress_11/);
     assert.match(csv, /1,0.01,40/);
     if (process.env.PLOT_SCREENSHOT_DIR) writeFileSync(join(process.env.PLOT_SCREENSHOT_DIR, 'download.png'), png);
+    await navigate(cases.find(item => item.name === 'third').path);
+    await select('plot-x-select', 'total_strain.strain_11');
+    await layout('negative-axis-png', 1440);
+    await downloadMeasuredPNG('negative-axis');
     if (process.env.PLOT_SAMPLE_PATH) {
       await navigate(process.env.PLOT_SAMPLE_PATH);
       for (const component of ['33', '22', '13', '23']) {
         await select('plot-x-select', `total_strain.strain_${component}`);
         await layout(`sample-${component}`, 1440);
+        if (component === '33') await downloadMeasuredPNG('sample-33');
       }
       assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), 242);
     }

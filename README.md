@@ -678,10 +678,14 @@ decimal places with half-up rounding; small or large scales use scientific
 notation with two decimal places in the mantissa. The two origin labels remain
 `0`. This formatting does not round the data, hover values or CSV exports.
 Titles stay outside the plotting area, with a vertical Y title. Their visible
-text edges sit 16 CSS pixels beyond the outer envelope of the ticks, arrowheads
-and plotting area, using measured glyph bounds rather than fixed text baselines.
+text edges sit 16 CSS pixels beyond the outer envelope of the ticks, axis ends,
+arrowheads and plotting area, using measured glyph bounds rather than fixed text baselines.
 Arrowheads start 24 CSS pixels beyond each positive range endpoint and extend
-another 8 pixels, leaving room around the maximum tick. Axis text
+another 8 pixels, leaving room around the maximum tick. When a range includes
+negative values, its axis also extends 24 CSS pixels beyond the minimum tick
+to the left or below, without adding another arrow. A zero minimum stays at
+the origin. These extensions leave data bounds and tick coordinates unchanged
+and are included in the page and PNG layout. Axis text
 is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
 all exports.
