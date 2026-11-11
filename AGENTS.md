@@ -114,6 +114,10 @@ Current priority:
 - My Data combines selected filters on the same object, matches complete names ignoring case and surrounding whitespace, and counts each object once per option under the other selected filters
 - Keep My Data filters and Clear available for empty results, preserve selected values in GET URLs, and limit bulk selection to the displayed records
 - Detail pages may include management actions for the owner
+- Detail Relationships is a read only graph of the current accessible object, using the shared metadata compatibility view; retain original JSON and exports and never infer links to other records
+- Relationship model nodes belong to their supplied phase entry; keep equal phase names separate and never use phase_id as a name
+- Relationship output nodes reuse the detail plot's available series, show complete sample counts and supplied units, and distinguish calculated equivalents without copying curve arrays into the graph
+- Keep Relationships initially collapsed, bound graph scrolling, retain full names in node details, and support keyboard and native links without JavaScript
 - Detail metadata orders all supplied schema fields by properties declaration order at every level, including fields from the referenced constitutive and microstructure schemas, without prioritizing required fields
 - Place supplied top-level $schema, $id, version, type, and description before identifier in that order; show uploaded values, do not add missing header fields, and show description only once
 - Omit top-level mechanical_BC, stress, total_strain, and plastic_strain from the metadata list while retaining their visualizations and complete export; same-named nested fields remain visible

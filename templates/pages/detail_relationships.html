@@ -1,0 +1,54 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'assets/css/detail-relationships.css' %}">
+<script src="{% static 'assets/js/detail-relationships.js' %}" defer></script>
+<details class="relationship-panel" id="detail-relationships">
+  <summary class="relationship-summary">
+    <span id="relationship-heading">Relationships</span>
+    <span class="relationship-count">{{ relationship_graph.count }} connection{{ relationship_graph.count|pluralize }}</span>
+    <span class="relationship-readonly">Read only</span>
+  </summary>
+  {% if relationship_graph.count %}
+    <p class="relationship-hint">Select a node to explore this object's metadata. Models connect to their own phase.</p>
+    <div class="relationship-viewport" tabindex="0" role="region" aria-label="Scrollable relationship graph">
+      <svg class="relationship-svg" viewBox="0 0 {{ relationship_graph.width }} {{ relationship_graph.height }}"
+           width="{{ relationship_graph.width }}" height="{{ relationship_graph.height }}"
+           style="max-width: {{ relationship_graph.width }}px"
+           role="group" aria-labelledby="relationship-heading">
+        <defs>
+          <marker id="relationship-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#a3afc2"></path>
+          </marker>
+        </defs>
+        {% for edge in relationship_graph.edges %}
+          <path class="relationship-edge" d="{{ edge.path }}" data-source="{{ edge.source }}" data-target="{{ edge.target }}" marker-end="url(#relationship-arrow)"></path>
+        {% endfor %}
+        {% for node in relationship_graph.nodes %}
+          <g transform="translate({{ node.x }} {{ node.y }})">
+            <a class="relationship-node relationship-node-{{ node.kind }}" href="#{{ node.id }}-info"
+               data-node="{{ node.id }}" aria-label="{{ node.category }}: {{ node.label }}" tabindex="0">
+              <title>{{ node.category }}: {{ node.label }}{% if node.relation %} — {{ node.relation }}{% endif %}</title>
+              <rect width="200" height="72" rx="10"></rect>
+              <text class="relationship-category" x="14" y="20">{{ node.category }}</text>
+              <foreignObject x="14" y="28" width="172" height="36">
+                <div xmlns="http://www.w3.org/1999/xhtml" class="relationship-label">{{ node.label }}</div>
+              </foreignObject>
+            </a>
+          </g>
+        {% endfor %}
+      </svg>
+    </div>
+    <div class="relationship-info" aria-label="Relationship details" aria-live="polite">
+      {% for node in relationship_graph.nodes %}
+        <section id="{{ node.id }}-info" class="relationship-info-item" aria-labelledby="{{ node.id }}-heading">
+          <h6 id="{{ node.id }}-heading"><span>{{ node.category }}</span>{{ node.label }}</h6>
+          {% if node.parent %}<p class="relationship-parent">{{ node.parent_label }} <span>→ {{ node.relation }} →</span> {{ node.label }}</p>{% endif %}
+          {% if node.details %}
+            <dl>{% for item in node.details %}<div><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>{% endfor %}</dl>
+          {% endif %}
+        </section>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="relationship-empty">No related metadata is available for this object.</p>
+  {% endif %}
+</details>

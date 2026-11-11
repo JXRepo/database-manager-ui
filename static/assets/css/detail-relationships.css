@@ -1,0 +1,65 @@
+.relationship-panel {
+  margin-bottom: 20px;
+  border: 1px solid #e3e9f1;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.relationship-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #f8faff;
+  color: #354665;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.relationship-summary::-webkit-details-marker { display: none; }
+.relationship-summary::before { content: "+"; width: 12px; color: #6881a6; }
+.relationship-panel[open] > summary::before { content: "−"; }
+.relationship-count, .relationship-readonly { font-size: 12px; font-weight: 400; color: #66758b; }
+.relationship-readonly { margin-left: auto; }
+.relationship-hint, .relationship-empty { margin: 12px 16px; color: #66758b; font-size: 13px; }
+.relationship-viewport { max-height: 360px; overflow: auto; background: #fcfdff; }
+.relationship-svg { display: block; width: 100%; min-width: 740px; height: auto; margin: 0 auto; }
+.relationship-edge { fill: none; stroke: #a3afc2; stroke-width: 1.5; }
+.relationship-edge.is-active { stroke: #4f7fd1; stroke-width: 2.5; }
+.relationship-node rect { fill: #fff; stroke: #d8e1ec; stroke-width: 1.5; }
+.relationship-node { cursor: pointer; text-decoration: none; }
+.relationship-node-record rect { fill: #edf3ff; stroke: #90ace0; }
+.relationship-node-phase rect { fill: #f2f8f5; stroke: #bbd9c9; }
+.relationship-node-model rect { fill: #f8f4fc; stroke: #d6c8e4; }
+.relationship-node-output rect { fill: #fff8ee; stroke: #e8d6b9; }
+.relationship-category { fill: #68778d; font-size: 11px; font-weight: 600; }
+.relationship-label {
+  color: #2b3d58;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 17px;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  max-height: 34px;
+}
+.relationship-node:hover rect, .relationship-node:focus rect,
+.relationship-node[aria-current="true"] rect { stroke: #416fc2; stroke-width: 2.5; }
+.relationship-node:focus { outline: none; }
+.relationship-summary:focus-visible, .relationship-viewport:focus-visible { outline: 2px solid #416fc2; outline-offset: -3px; }
+.relationship-info { padding: 12px 16px; border-top: 1px solid #e3e9f1; max-height: 220px; overflow: auto; }
+.relationship-info-item { scroll-margin-top: 80px; overflow-wrap: anywhere; }
+.relationship-info-item + .relationship-info-item { margin-top: 16px; }
+.relationship-panel.is-interactive .relationship-info-item { margin-top: 0; }
+.relationship-info-item[hidden] { display: none; }
+.relationship-info h6 { margin: 0 0 6px; line-height: 1.5; }
+.relationship-info h6 > span { display: inline-block; color: #68778d; font-size: 12px; font-weight: 400; margin-right: 12px; }
+.relationship-parent { font-size: 12px; color: #526580; margin: 0 0 8px; }
+.relationship-parent span { color: #66758b; }
+.relationship-info dl { display: grid; gap: 5px 20px; margin: 0; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); font-size: 12px; }
+.relationship-info dl > div { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.relationship-info dt { color: #68778d; font-weight: 500; }
+.relationship-info dd { color: #354665; margin: 0; white-space: pre-wrap; }

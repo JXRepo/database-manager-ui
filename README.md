@@ -9,8 +9,8 @@ materials simulation data as JSON.
 
 The platform is currently a public pilot for a small group of research users.
 Development focuses on the core data workflow and access control. Ontology,
-knowledge graphs, full Studio integration, and production AI features remain
-future enhancements.
+knowledge graphs across records, full Studio integration, and production AI
+features remain future enhancements.
 
 ## Try the Platform
 
@@ -540,6 +540,23 @@ distributions. See the [Charts performance comparison](docs/qa/2026-11-01-charts
 for local measurements and verification.
 
 ## Data Object Details
+
+The **Relationships** panel above the metadata list shows a read only graph of
+the current data object. Expand it to see its supplied creators, software,
+phases, constitutive models and available mechanical outputs. Models connect
+to their own phase; equal phase names do not merge distinct phase entries.
+Select a node with the mouse or Tab and Enter to read its complete name and
+details. Output nodes report each available series' full sample count and units,
+distinguishing supplied series from calculated equivalents used by the plots.
+The graph summarizes metadata and availability, not scientific comparability or
+validation results.
+
+The panel starts collapsed. Large graphs scroll inside it, long names wrap in
+the details, and records without related metadata have an explicit empty state.
+Without JavaScript, the graph remains visible and its node links reach ordinary
+detail sections. It uses the shared metadata compatibility view and the existing
+detail permission check. It does not modify uploaded JSON, infer links to other
+records, or require an ontology service or graph database.
 
 The FAIR Data Assistant button is available inside the signed in workspace,
 including search, upload, details, My Data, and account settings. It is absent
