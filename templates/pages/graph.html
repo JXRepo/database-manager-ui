@@ -1,0 +1,87 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block title %}Graph{% endblock title %}
+{% block extrastyle %}<link rel="stylesheet" href="{% static 'assets/css/detail-relationships.css' %}">{% endblock extrastyle %}
+{% block content %}
+<main class="pc-container graph-page">
+  <div class="pc-content">
+    <div class="page-header">
+      <div class="page-block">
+        <div class="row align-items-center">
+          <div class="col-md-12">
+            <div class="page-header-title"><h1 class="h5 m-b-10">Graph</h1></div>
+            <ul class="breadcrumb" aria-label="Breadcrumb">
+              <li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li>
+              <li class="breadcrumb-item" aria-current="page">Graph</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% if selection_error %}
+      <div class="alert alert-warning" role="alert">{{ selection_error }} <a href="{% url 'graph' %}">Choose data</a></div>
+    {% endif %}
+
+    <section class="graph-object-bar" aria-label="Current data object">
+      <div class="graph-current-object">
+        <span class="graph-overline">Data object</span>
+        {% if data_object %}
+          <h2 title="{{ current_object.title|default:current_object.identifier }}">{{ current_object.title|default:current_object.identifier|default:"Untitled data object" }}</h2>
+          {% if current_object.identifier %}<p>{{ current_object.identifier }}</p>{% endif %}
+        {% else %}<h2>Choose a data object</h2>{% endif %}
+      </div>
+      {% if data_object %}
+        <div class="graph-object-actions">
+          <a class="btn btn-outline-primary btn-sm" href="{% url 'graph' %}?object={{ data_object.pk }}&amp;choose=1" id="graph-change-data">Change data</a>
+          <a class="btn btn-outline-secondary btn-sm" href="{% url 'json_data_detail' data_object.pk %}" id="graph-view-details">View data details</a>
+        </div>
+      {% endif %}
+    </section>
+
+    {% if choose_object %}
+      <section class="graph-picker" aria-label="Choose a data object">
+        <form class="graph-find-form" method="get" action="{% url 'graph' %}">
+          <input type="hidden" name="choose" value="1">
+          {% if data_object %}<input type="hidden" name="object" value="{{ data_object.pk }}">{% endif %}
+          <label for="graph-query">Find data</label>
+          <input class="form-control form-control-sm" type="search" id="graph-query" name="q" value="{{ object_query }}" placeholder="Title or identifier words">
+          <button type="submit" class="btn btn-outline-primary btn-sm">Find</button>
+          {% if object_query %}<a href="{% url 'graph' %}?choose=1{% if data_object %}&amp;object={{ data_object.pk }}{% endif %}" class="graph-clear">Clear</a>{% endif %}
+          {% if data_object %}<a href="{% url 'graph' %}?object={{ data_object.pk }}" class="graph-close-picker">Close</a>{% endif %}
+        </form>
+        {% if object_options %}
+          <form class="graph-select-form" method="get" action="{% url 'graph' %}">
+            <label for="graph-object">Data object</label>
+            <select class="form-select form-select-sm" id="graph-object" name="object" required>
+              {% if not data_object %}<option value="" selected disabled>Select a data object</option>{% endif %}
+              {% if data_object and not current_in_options %}<option value="{{ data_object.pk }}" selected>{{ current_object.title|default:current_object.identifier|default:"Untitled data object" }}{% if current_object.identifier and current_object.title %} — {{ current_object.identifier }}{% endif %}</option>{% endif %}
+              {% for option in object_options %}<option value="{{ option.pk }}"{% if option.pk == data_object.pk %} selected{% endif %}>{{ option.title|default:option.identifier|default:"Untitled data object" }}{% if option.identifier and option.title %} — {{ option.identifier }}{% endif %}</option>{% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">Open graph</button>
+          </form>
+          <nav class="graph-object-pages" aria-label="Data object pages">
+            <span>{{ option_page.paginator.count }} data object{{ option_page.paginator.count|pluralize }} · Page {{ option_page.number }} of {{ option_page.paginator.num_pages }}</span>
+            {% if previous_objects_url %}<a href="{{ previous_objects_url }}">Previous</a>{% endif %}
+            {% if next_objects_url %}<a href="{{ next_objects_url }}">Next</a>{% endif %}
+          </nav>
+        {% elif object_query %}
+          <p class="graph-picker-empty">No data objects match these words.</p>
+        {% else %}
+          <p class="graph-picker-empty">No accessible data objects are available. <a href="{% url 'upload_json' %}">Upload data</a> to get started.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if relationship_graph %}
+      {% include "pages/detail_relationships.html" %}
+    {% elif not selection_error %}
+      <section class="graph-welcome" aria-label="Graph workspace">
+        <i data-feather="git-branch" aria-hidden="true"></i>
+        <h2>Explore data relationships</h2>
+        <p>Select a data object above to see its creators, software, phases, models and outputs.</p>
+      </section>
+    {% endif %}
+  </div>
+</main>
+{% endblock content %}

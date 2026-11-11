@@ -1508,6 +1508,8 @@ details[open] > .detail-group-summary {
 
     <div class="card detail-page-card">
       <div class="card-header">
+        <div class="d-flex align-items-start justify-content-between gap-3">
+        <div class="flex-grow-1" style="min-width: 0">
         {% if detail_title %}
           <h5>{{ detail_title }}</h5>
         {% elif metadata.identifier %}
@@ -1518,12 +1520,14 @@ details[open] > .detail-group-summary {
         {% if metadata.identifier %}
           <div class="text-muted small mt-1">Identifier: {{ metadata.identifier }}</div>
         {% endif %}
+        </div>
+        <a href="{% url 'graph' %}?object={{ data_object.pk }}" class="btn btn-outline-primary btn-sm flex-shrink-0">Open in Graph</a>
+        </div>
       </div>
 
 
 
       <div class="card-body">
-{% include "pages/detail_relationships.html" %}
 <div class="detail-metadata-list">
 {% for row in detail_rows %}
   <div class="detail-row-card">

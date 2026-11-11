@@ -1,18 +1,17 @@
 {% load static %}
-<link rel="stylesheet" href="{% static 'assets/css/detail-relationships.css' %}">
 <script src="{% static 'assets/js/detail-relationships.js' %}" defer></script>
-<details class="relationship-panel" id="detail-relationships">
-  <summary class="relationship-summary">
-    <span id="relationship-heading">Relationships</span>
+<section class="relationship-panel" id="detail-relationships" aria-label="Graph workspace">
+  <div class="relationship-toolbar">
+    <h2 id="relationship-heading">Relationships</h2>
     <span class="relationship-count">{{ relationship_graph.count }} connection{{ relationship_graph.count|pluralize }}</span>
     <span class="relationship-readonly">Read only</span>
-  </summary>
+  </div>
   {% if relationship_graph.count %}
-    <p class="relationship-hint">Select a node to explore this object's metadata. Models connect to their own phase.</p>
+  <div class="graph-workspace">
     <div class="relationship-viewport" tabindex="0" role="region" aria-label="Scrollable relationship graph">
       <svg class="relationship-svg" viewBox="0 0 {{ relationship_graph.width }} {{ relationship_graph.height }}"
            width="{{ relationship_graph.width }}" height="{{ relationship_graph.height }}"
-           style="max-width: {{ relationship_graph.width }}px"
+           style="min-width: {{ relationship_graph.width }}px; max-width: {{ relationship_graph.width }}px"
            role="group" aria-labelledby="relationship-heading">
         <defs>
           <marker id="relationship-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -37,7 +36,9 @@
         {% endfor %}
       </svg>
     </div>
-    <div class="relationship-info" aria-label="Relationship details" aria-live="polite">
+    <aside class="relationship-inspector" aria-labelledby="relationship-info-heading">
+      <h2 id="relationship-info-heading">Node details</h2>
+      <div class="relationship-info" aria-label="Relationship details" aria-live="polite">
       {% for node in relationship_graph.nodes %}
         <section id="{{ node.id }}-info" class="relationship-info-item" aria-labelledby="{{ node.id }}-heading">
           <h6 id="{{ node.id }}-heading"><span>{{ node.category }}</span>{{ node.label }}</h6>
@@ -47,8 +48,10 @@
           {% endif %}
         </section>
       {% endfor %}
-    </div>
+      </div>
+    </aside>
+  </div>
   {% else %}
     <p class="relationship-empty">No related metadata is available for this object.</p>
   {% endif %}
-</details>
+</section>

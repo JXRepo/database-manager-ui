@@ -28,7 +28,7 @@ class DetailRelationshipTests(TestCase):
 
     def detail(self, data):
         """
-        Read a stored record through its normal detail route
+        Read a stored record through the independent graph workspace
 
         Parameters
         ----------
@@ -41,9 +41,9 @@ class DetailRelationshipTests(TestCase):
             Record, rendered response and relationship graph.
         """
         obj = JSONData.objects.create(owner=self.owner, data=data)
-        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        response = self.client.get("/graph/", {"object": obj.pk})
         self.assertEqual(response.status_code, 200)
-        self.assertTrue("relationship_graph" in response.context, "Detail page must include its relationship graph")
+        self.assertTrue("relationship_graph" in response.context, "Graph workspace must include the selected record")
         return obj, response, response.context["relationship_graph"]
 
     def test_models_stay_attached_to_their_own_phase(self):
@@ -171,7 +171,7 @@ class DetailRelationshipTests(TestCase):
         Require login and explicit access before returning relationship metadata
         """
         obj, _, _ = self.detail({"creator": "Private relationship creator"})
-        url = reverse("json_data_detail", args=[obj.pk])
+        url = f"/graph/?object={obj.pk}"
         self.client.logout()
         self.assertEqual(self.client.get(url).status_code, 302)
         self.client.force_login(self.reader)
@@ -184,3 +184,97 @@ class DetailRelationshipTests(TestCase):
         obj.access_type = "all"
         obj.save(update_fields=["access_type"])
         self.assertContains(self.client.get(url), "Private relationship creator")
+
+    def test_detail_links_to_graph_without_embedding_the_workspace(self):
+        """
+        Carry the current object to Graph while keeping the detail page focused
+        """
+        obj = JSONData.objects.create(owner=self.owner, data={"title": "Graph entry"})
+        response = self.client.get(reverse("json_data_detail", args=[obj.pk]))
+        self.assertContains(response, f'href="/graph/?object={obj.pk}"')
+        self.assertContains(response, "Open in Graph")
+        self.assertNotContains(response, 'id="detail-relationships"')
+        self.assertNotContains(response, "detail-relationships.js")
+        self.assertFalse("relationship_graph" in response.context)
+
+    def test_picker_lists_only_accessible_objects_once(self):
+        """
+        Offer owned, public and explicitly shared objects without private leaks
+        """
+        own = JSONData.objects.create(owner=self.owner, data={"Title": "My record"})
+        public = JSONData.objects.create(owner=self.reader, access_type="all", data={"title": "Public record"})
+        shared = JSONData.objects.create(owner=self.reader, data={"title": "Received record"})
+        hidden = JSONData.objects.create(owner=self.reader, data={"title": "Private hidden title"})
+        shared.shared_users.add(self.owner)
+        public.shared_users.add(self.owner)
+        response = self.client.get("/graph/")
+        self.assertEqual(response.status_code, 200)
+        options = response.context["object_options"]
+        self.assertCountEqual([option["pk"] for option in options], [own.pk, public.pk, shared.pk])
+        self.assertNotContains(response, hidden.data["title"])
+        self.assertIsNone(response.context["relationship_graph"])
+        self.assertContains(response, "Choose a data object")
+        self.assertContains(response, 'aria-current="page"')
+        self.client.logout()
+        self.assertEqual(self.client.get("/graph/").status_code, 302)
+
+    def test_invalid_or_repeated_selection_does_not_open_another_object(self):
+        """
+        Reject ambiguous object arguments instead of silently choosing a record
+        """
+        obj = JSONData.objects.create(owner=self.owner, data={"title": "Do not select automatically"})
+        for query in ("object=bad", "object=-1", "object=0", "object=99999999999999999999999999",
+                      f"object={obj.pk}&object={obj.pk}", f"object=&object={obj.pk}"):
+            with self.subTest(query=query):
+                response = self.client.get(f"/graph/?{query}")
+                self.assertEqual(response.status_code, 400)
+                self.assertNotContains(response, "Do not select automatically", status_code=400)
+                self.assertNotContains(response, 'data-node="', status_code=400)
+        self.assertEqual(self.client.get("/graph/?object=999999").status_code, 404)
+
+    def test_picker_search_uses_complete_words_and_compatible_descriptions(self):
+        """
+        Find title or identifier variants without matching substrings or partial queries
+        """
+        match = JSONData.objects.create(owner=self.owner, data={
+            "Display Title": "Steel reference", "Other Title": "Tension", "Identifier": ["run-abc"],
+        })
+        JSONData.objects.create(owner=self.owner, data={"title": "Steel compression"})
+        JSONData.objects.create(owner=self.owner, data={"title": "Steel tensioning"})
+        response = self.client.get("/graph/", {"q": "TENSION STEEL"})
+        self.assertEqual([option["pk"] for option in response.context["object_options"]], [match.pk])
+        response = self.client.get("/graph/", {"q": "run abc"})
+        self.assertEqual([option["pk"] for option in response.context["object_options"]], [match.pk])
+        response = self.client.get("/graph/", {"q": "unmatched"})
+        self.assertContains(response, "No data objects match")
+        self.assertContains(response, 'name="q"')
+        self.assertIsNone(response.context["relationship_graph"])
+
+    def test_picker_pagination_keeps_the_selected_graph(self):
+        """
+        Browse a bounded object list without replacing the current graph
+        """
+        records = []
+        for index in range(28):
+            records.append(JSONData.objects.create(owner=self.owner, data={"title": f"Record {index}"}))
+        selected = records[0]
+        first = self.client.get("/graph/", {"object": selected.pk, "choose": "1"})
+        self.assertEqual(len(first.context["object_options"]), 25)
+        self.assertNotIn(selected.pk, [option["pk"] for option in first.context["object_options"]])
+        self.assertEqual(first.context["data_object"].pk, selected.pk)
+        next_url = first.context["next_objects_url"]
+        second = self.client.get(next_url)
+        self.assertEqual(len(second.context["object_options"]), 3)
+        self.assertEqual(second.context["relationship_graph"]["nodes"][0]["label"], "Record 0")
+        self.assertEqual(second.context["data_object"].pk, selected.pk)
+        self.assertTrue(second.context["previous_objects_url"])
+
+    def test_graph_works_with_no_accessible_objects(self):
+        """
+        Keep the standalone entry useful when the viewer has no data to open
+        """
+        response = self.client.get("/graph/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No accessible data objects")
+        self.assertContains(response, reverse("upload_json"))
+        self.assertIsNone(response.context["relationship_graph"])

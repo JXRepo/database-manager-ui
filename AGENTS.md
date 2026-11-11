@@ -114,10 +114,13 @@ Current priority:
 - My Data combines selected filters on the same object, matches complete names ignoring case and surrounding whitespace, and counts each object once per option under the other selected filters
 - Keep My Data filters and Clear available for empty results, preserve selected values in GET URLs, and limit bulk selection to the displayed records
 - Detail pages may include management actions for the owner
-- Detail Relationships is a read only graph of the current accessible object, using the shared metadata compatibility view; retain original JSON and exports and never infer links to other records
+- Graph is an independent sidebar workspace beside Charts; detail pages offer Open in Graph with the current object selected instead of embedding the graph
+- Graph remains read only and uses the shared metadata compatibility view for the current accessible object; retain original JSON and exports and never infer links to other records
+- Graph selection and direct URLs enforce the same owner, public and explicit share permissions as details; reject malformed or repeated object selections without falling back to another record
+- Keep the Graph picker bounded to 25 objects per page, search title and identifier with the shared whole word matcher, and retain the current graph while browsing choices
 - Relationship model nodes belong to their supplied phase entry; keep equal phase names separate and never use phase_id as a name
 - Relationship output nodes reuse the detail plot's available series, show complete sample counts and supplied units, and distinguish calculated equivalents without copying curve arrays into the graph
-- Keep Relationships initially collapsed, bound graph scrolling, retain full names in node details, and support keyboard and native links without JavaScript
+- Graph keeps a large canvas open with node details on the right; bound scrolling, retain full names in the inspector, and support keyboard, ordinary GET selection and native links without JavaScript
 - Detail metadata orders all supplied schema fields by properties declaration order at every level, including fields from the referenced constitutive and microstructure schemas, without prioritizing required fields
 - Place supplied top-level $schema, $id, version, type, and description before identifier in that order; show uploaded values, do not add missing header fields, and show description only once
 - Omit top-level mechanical_BC, stress, total_strain, and plastic_strain from the metadata list while retaining their visualizations and complete export; same-named nested fields remain visible

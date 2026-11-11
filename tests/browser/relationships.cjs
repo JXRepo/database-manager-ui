@@ -10,7 +10,7 @@ const {join} = require('node:path');
     ? readFileSync(process.env.CHARTJS_TEST_BUNDLE, 'utf8')
     : await (await fetch('https://cdn.jsdelivr.net/npm/chart.js', {signal: AbortSignal.timeout(30000)})).text();
   const profile = mkdtempSync(join(tmpdir(), 'relationship-browser-'));
-  const artifacts = process.env.RELATIONSHIP_ARTIFACT_DIR || join(tmpdir(), 'detail-relationships-qa');
+  const artifacts = process.env.RELATIONSHIP_ARTIFACT_DIR || join(tmpdir(), 'graph-workspace-qa');
   mkdirSync(artifacts, {recursive: true});
   const browser = spawn(process.env.CHROMIUM_BIN || '/usr/bin/chromium', [
     '--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
@@ -66,7 +66,7 @@ const {join} = require('node:path');
       const url = process.env.RELATIONSHIP_BASE_URL + path;
       await command('Page.navigate', {url});
       await until(`location.href === ${JSON.stringify(url)} && document.readyState === 'complete'
-        && !!document.querySelector('#detail-relationships')`);
+        && !!document.querySelector('.pc-content')`);
     }
     async function click(selector) {
       const point = await evaluate(`(() => {
@@ -79,17 +79,22 @@ const {join} = require('node:path');
       await command('Input.dispatchMouseEvent', {type: 'mouseReleased', button: 'left', clickCount: 1, ...point});
     }
     async function screenshot(name) {
-      await evaluate(`document.querySelector('#detail-relationships').scrollIntoView({block: 'start'})`);
+      await evaluate(`window.scrollTo(0, 0)`);
       const capture = await command('Page.captureScreenshot', {format: 'png'});
       writeFileSync(join(artifacts, `${name}.png`), Buffer.from(capture.data, 'base64'));
     }
     async function layout(label) {
       const metrics = await evaluate(`(() => {
-        const graph = document.querySelector('#detail-relationships');
+        const graph = document.querySelector('.graph-page');
         const viewport = graph.querySelector('.relationship-viewport');
+        const inspector = graph.querySelector('.relationship-inspector');
+        const canvas = viewport?.getBoundingClientRect();
+        const side = inspector?.getBoundingClientRect();
         return {
           documentWidth: document.documentElement.scrollWidth, width: innerWidth,
-          viewportHeight: viewport?.getBoundingClientRect().height || 0,
+          viewportHeight: canvas?.height || 0,
+          inspectorBesideGraph: !canvas || (side.left >= canvas.right - 1
+            && Math.abs(side.top - canvas.top) < 1 && Math.abs(side.height - canvas.height) < 1),
           nodes: Array.from(graph.querySelectorAll('[data-node]')).map(node => {
             const rect = node.querySelector('rect').getBoundingClientRect();
             const text = node.querySelector('.relationship-label').getBoundingClientRect();
@@ -99,7 +104,9 @@ const {join} = require('node:path');
         };
       })()`);
       assert.ok(metrics.documentWidth <= metrics.width, `${label}: the page must not overflow horizontally`);
-      assert.ok(metrics.viewportHeight <= 361, `${label}: graph scrolling stays within the panel`);
+      assert.ok(metrics.viewportHeight === 0 || (metrics.viewportHeight >= 480 && metrics.viewportHeight <= 880),
+        `${label}: the workspace gives the graph a large bounded canvas`);
+      assert.ok(metrics.inspectorBesideGraph, `${label}: node details must remain beside the canvas`);
       assert.ok(metrics.nodes.every(node => node.inside), `${label}: labels must stay inside their nodes: ${JSON.stringify(metrics.nodes)}`);
     }
 
@@ -113,11 +120,15 @@ const {join} = require('node:path');
     const cases = JSON.parse(process.env.RELATIONSHIP_CASES);
     for (const width of [1280, 1440, 1920]) {
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
-      await navigate(cases.sample);
-      assert.equal(await evaluate(`document.querySelector('#detail-relationships').open`), false,
-        'The new panel starts compact');
-      await click('.relationship-summary');
-      await until(`document.querySelector('#detail-relationships').open`);
+      await navigate(cases.detail);
+      assert.equal(await evaluate(`!!document.querySelector('#detail-relationships')`), false,
+        'The detail page links to the workspace instead of embedding it');
+      await click('a[href="' + cases.sample + '"]');
+      await until(`location.pathname === '/graph/' && document.readyState === 'complete'
+        && !!document.querySelector('.graph-workspace')`);
+      assert.equal(await evaluate('location.search'), new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).search);
+      assert.equal(await evaluate(`document.querySelector('.pc-sidebar a[href="/graph/"]').getAttribute('aria-current')`), 'page');
+      assert.equal(await evaluate(`document.querySelector('#detail-relationships').tagName`), 'SECTION');
       await layout(`sample-${width}`);
       await click('.relationship-node-model');
       assert.equal(await evaluate(`document.querySelectorAll('.relationship-info-item:not([hidden])').length`), 1);
@@ -130,12 +141,14 @@ const {join} = require('node:path');
       await click('.relationship-node-output');
       assert.match(await evaluate(`document.querySelector('.relationship-info-item:not([hidden])').innerText`), /3 samples.*MPa.*Supplied/s);
       await screenshot(`sample-${width}`);
+      await click('#graph-view-details');
+      await until(`location.pathname === ${JSON.stringify(cases.detail)} && document.readyState === 'complete'`);
+      assert.equal(await evaluate(`!!document.querySelector('#detail-relationships')`), false);
     }
 
     for (const width of [1280, 1440, 1920]) {
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
       await navigate(cases.long);
-      await click('.relationship-summary');
       await layout(`long-labels-${width}`);
       assert.equal(await evaluate('window.graphInjection'), undefined);
       assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-phase').length`), 12);
@@ -143,22 +156,47 @@ const {join} = require('node:path');
       assert.ok(await evaluate(`document.querySelector('.relationship-info-item:not([hidden])').textContent.includes('WWW'.repeat(100))`));
       await screenshot(`long-labels-${width}`);
       await navigate(cases.empty);
-      await click('.relationship-summary');
       assert.match(await evaluate(`document.querySelector('.relationship-empty').innerText`), /No related metadata/);
       await layout(`empty-${width}`);
       await screenshot(`empty-${width}`);
     }
 
+    await click('.pc-sidebar a[href="/graph/"]');
+    await until(`location.pathname === '/graph/' && location.search === '' && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`!!document.querySelector('#detail-relationships')`), false);
+    await evaluate(`document.querySelector('#graph-query').value = 'steel uniaxial'`);
+    await click('.graph-find-form button');
+    await until(`location.search.includes('q=steel') && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`document.querySelectorAll('#graph-object option[value]:not([value=""])').length`), 1);
+    await evaluate(`document.querySelector('#graph-object').value = ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))}`);
+    await click('.graph-select-form button');
+    await until(`location.search === ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).search)} && document.readyState === 'complete'`);
+    await click('#graph-change-data');
+    await until(`location.search.includes('choose=1') && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`!!document.querySelector('.graph-workspace')`), true,
+      'Choosing another object must retain the current graph until submission');
+    await screenshot('change-data');
+    await evaluate(`document.querySelector('#graph-object').value = ${JSON.stringify(new URL(cases.long, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))}`);
+    await click('.graph-select-form button');
+    await until(`location.search === ${JSON.stringify(new URL(cases.long, process.env.RELATIONSHIP_BASE_URL).search)} && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-phase').length`), 12);
+    await navigate(cases.picker + '?q=unmatched');
+    assert.match(await evaluate(`document.querySelector('.graph-picker-empty').innerText`), /No data objects match/);
+    assert.equal(await evaluate(`!!document.querySelector('#graph-query')`), true);
+    await screenshot('empty-picker');
+
     await command('Emulation.setScriptExecutionDisabled', {value: true});
-    await navigate(cases.sample);
-    await click('.relationship-summary');
+    await navigate(cases.picker);
+    await evaluate(`document.querySelector('#graph-object').value = ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))}`);
+    await click('.graph-select-form button');
+    await until(`location.search === ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).search)} && document.readyState === 'complete'`);
     await click('.relationship-node-model');
     assert.ok(await evaluate(`location.hash.endsWith('-info')`), 'Native links must reach relationship details without JavaScript');
     assert.match(await evaluate(`document.querySelector(location.hash).innerText`), /Cubic elasticity.*Ferrite/s);
     assert.ok(await evaluate(`document.querySelector(location.hash).getBoundingClientRect().height > 0`));
     await screenshot('without-javascript');
     assert.deepEqual(exceptions, []);
-    console.log('Relationship browser checks passed: 3 desktop widths, node selection, keyboard activation, phase/model links, full long names, 12 phases, empty metadata, escaped HTML and native links without JavaScript.');
+    console.log('Graph workspace browser checks passed: detail/sidebar entry, current object context, object search/switching, large canvas with a right inspector at 3 desktop widths, node selection, keyboard activation, long names, 12 phases, empty states, escaped HTML and native forms/links without JavaScript.');
     console.log(`Screenshots: ${artifacts}`);
   } finally {
     socket?.close();

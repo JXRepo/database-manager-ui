@@ -539,24 +539,38 @@ each sample to Decimal. Exact Decimal calculations remain in the numeric
 distributions. See the [Charts performance comparison](docs/qa/2026-11-01-charts-performance.md)
 for local measurements and verification.
 
+## Graph
+
+**Graph** is an independent workspace in the sidebar, next to Charts. Choose
+an accessible data object to view its supplied creators, software, phases,
+constitutive models and available mechanical outputs. The large canvas remains
+open, with node details on the right and the current data object above it.
+**Change data** opens a picker with title or identifier search and 25 objects per
+page. Searches require all entered whole words, ignoring case and word order.
+Only owned, public or explicitly shared records appear. Browsing picker pages
+keeps the current graph until another object is opened.
+
+Models connect to their own phase; equal phase names do not merge distinct
+entries. Select a node with the mouse or Tab and Enter to read its complete name
+and details. Output nodes report each available series' full sample count and
+units, distinguishing supplied series from calculated equivalents used by the
+plots. The graph summarizes metadata and availability, not scientific
+comparability or validation results.
+
+Large graphs scroll inside the canvas and long names wrap in the inspector.
+Empty selectors and records without related metadata have explicit empty states.
+Without JavaScript, GET forms still select data and graph links reach ordinary
+node detail sections. Graph uses the shared metadata compatibility view and the
+same access rules as detail pages; malformed or repeated object selections are
+rejected. It does not modify uploaded JSON, infer links to other records, or
+require an ontology service or graph database.
+
 ## Data Object Details
 
-The **Relationships** panel above the metadata list shows a read only graph of
-the current data object. Expand it to see its supplied creators, software,
-phases, constitutive models and available mechanical outputs. Models connect
-to their own phase; equal phase names do not merge distinct phase entries.
-Select a node with the mouse or Tab and Enter to read its complete name and
-details. Output nodes report each available series' full sample count and units,
-distinguishing supplied series from calculated equivalents used by the plots.
-The graph summarizes metadata and availability, not scientific comparability or
-validation results.
-
-The panel starts collapsed. Large graphs scroll inside it, long names wrap in
-the details, and records without related metadata have an explicit empty state.
-Without JavaScript, the graph remains visible and its node links reach ordinary
-detail sections. It uses the shared metadata compatibility view and the existing
-detail permission check. It does not modify uploaded JSON, infer links to other
-records, or require an ontology service or graph database.
+**Open in Graph** beside the record title opens its graph in the independent
+workspace with the current object already selected. **View data details** returns
+to the same record. Detail pages retain their metadata, boundary conditions,
+curves and exports without an embedded relationship panel.
 
 The FAIR Data Assistant button is available inside the signed in workspace,
 including search, upload, details, My Data, and account settings. It is absent

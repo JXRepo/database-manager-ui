@@ -35,7 +35,6 @@ from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
 from .assistant import help_reply, read_context, sign_context
 from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
-from .detail_relationships import build_relationship_graph
 from .mechanical_csv import write_mechanical_csv
 from .advanced_search import (
     DATA_FIELD_CHOICES,
@@ -4471,7 +4470,6 @@ def json_data_detail_view(request, pk):
         "detail_title": _assistant_text(metadata.get("title")),
         "detail_rows": display_rows,
         "plot_variables": plot_variables,
-        "relationship_graph": build_relationship_graph(metadata, plot_variables),
         "mechanical_bc_items": mechanical_bc_items,
         "mechanical_bc_tensors": [item for item in mechanical_bc_items if item.get("is_tensor_load")],
         "mechanical_bc_groups": _group_mechanical_bc_items(mechanical_bc_items),

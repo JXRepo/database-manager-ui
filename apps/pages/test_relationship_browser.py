@@ -25,7 +25,7 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
 
     def test_relationship_graph_interaction_and_native_fallback(self):
         """
-        Keep the graph readable, keyboard accessible and usable without scripts
+        Navigate the independent workspace and retain access without scripts
         """
         self.assertTrue(shutil.which("node"), "Relationship browser checks require Node")
         self.assertTrue(Path(os.environ.get("CHROMIUM_BIN", "/usr/bin/chromium")).is_file())
@@ -54,13 +54,15 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
                 "elastic_model_name": f"Elastic model {index}: {long_name}",
             }})
         long_record = JSONData.objects.create(owner=viewer, data={
-            "title": "Long names and many phases", "creator": long_name,
+            "title": "Long names and many phases " * 30, "creator": long_name,
             "phase": phases,
         })
         empty = JSONData.objects.create(owner=viewer, data={"title": "No related metadata"})
-        cases = {"sample": reverse("json_data_detail", args=[sample.pk]),
-                 "long": reverse("json_data_detail", args=[long_record.pk]),
-                 "empty": reverse("json_data_detail", args=[empty.pk])}
+        cases = {"sample": f"{reverse('graph')}?object={sample.pk}",
+                 "long": f"{reverse('graph')}?object={long_record.pk}",
+                 "empty": f"{reverse('graph')}?object={empty.pk}",
+                 "detail": reverse("json_data_detail", args=[sample.pk]),
+                 "picker": reverse("graph")}
         self.client.force_login(viewer)
         environment = dict(os.environ, RELATIONSHIP_BASE_URL=self.live_server_url,
                            RELATIONSHIP_SESSION=self.client.cookies[settings.SESSION_COOKIE_NAME].value,

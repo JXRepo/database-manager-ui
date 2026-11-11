@@ -5,6 +5,7 @@ from . import views
 from .auth_views import HomeLogoutView, RateLimitedLoginView
 from .credential_validation import validate_account_credentials
 from .getting_started import getting_started_view
+from .graph import graph_view
 from .views import account_settings_view, register_view
 from .forms import StyledPasswordChangeForm
 from .views import upload_json_view
@@ -78,6 +79,7 @@ urlpatterns = [
     path("upload/jobs/<uuid:job_id>/", upload_job_view, name="upload_job"),
     path("assistant/ask/", fair_assistant_ask_view, name="fair_assistant_ask"),
     path("search/", search_view, name="search"),
+    path("graph/", graph_view, name="graph"),
     path("search/live-data/", search_live_data_objects_view, name="search_live_data_objects"),
     path("search/export-selected/", export_selected_search_results_view, name="export_selected_search_results"),
     path("search/export-csv/", views.export_selected_search_csv_view, name="export_selected_search_csv"),

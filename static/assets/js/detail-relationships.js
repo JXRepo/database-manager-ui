@@ -32,5 +32,10 @@
   graph.classList.add('is-interactive');
   const linked = nodes.find(node => node.getAttribute('href') === window.location.hash);
   select(linked || nodes[0]);
-  if (linked) graph.open = true;
+  const initial = linked || nodes[0];
+  const viewport = graph.querySelector('.relationship-viewport');
+  const bounds = viewport.getBoundingClientRect();
+  const nodeBounds = initial.getBoundingClientRect();
+  viewport.scrollLeft += nodeBounds.left + nodeBounds.width / 2 - bounds.left - bounds.width / 2;
+  viewport.scrollTop += nodeBounds.top + nodeBounds.height / 2 - bounds.top - bounds.height / 2;
 })();
