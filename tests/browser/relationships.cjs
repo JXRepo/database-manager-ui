@@ -83,9 +83,9 @@ const {join} = require('node:path');
       const capture = await command('Page.captureScreenshot', {format: 'png'});
       writeFileSync(join(artifacts, `${name}.png`), Buffer.from(capture.data, 'base64'));
     }
-    async function downloaded(extension, graphPath = cases.sample) {
+    async function downloaded(extension, graphPath = cases.sample, view = 'compact') {
       const object = new URL(graphPath, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object');
-      const path = join(artifacts, `data-${object}-relationships.${extension}`);
+      const path = join(artifacts, `data-${object}-relationships-${view}.${extension}`);
       for (let attempt = 0; attempt < 100; attempt++) {
         if (existsSync(path) && !existsSync(path + '.crdownload')) return readFileSync(path);
         await new Promise(resolve => setTimeout(resolve, 50));
@@ -107,8 +107,11 @@ const {join} = require('node:path');
           nodes: Array.from(graph.querySelectorAll('[data-node]')).map(node => {
             const rect = node.querySelector('rect').getBoundingClientRect();
             const text = node.querySelector('.relationship-label').getBoundingClientRect();
+            const previews = Array.from(node.querySelectorAll('.relationship-preview-item')).filter(item => item.getBoundingClientRect().height > 0);
+            const caption = node.querySelector('.relationship-category').getBoundingClientRect();
             return {id: node.dataset.node, inside: text.left >= rect.left && text.right <= rect.right
-              && text.top >= rect.top && text.bottom <= rect.bottom};
+              && text.top >= rect.top && text.bottom <= rect.bottom && caption.left >= rect.left && caption.right <= rect.right
+              && previews.every(item => {const box = item.getBoundingClientRect(); return box.left >= rect.left && box.right <= rect.right && box.bottom <= rect.bottom;})};
           }),
         };
       })()`);
@@ -130,7 +133,9 @@ const {join} = require('node:path');
     await send('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: artifacts});
     for (const name of ['sample', 'large']) {
       const objectId = new URL(cases[name], process.env.RELATIONSHIP_BASE_URL).searchParams.get('object');
-      for (const extension of ['png', 'svg']) rmSync(join(artifacts, `data-${objectId}-relationships.${extension}`), {force: true});
+      for (const view of ['compact', 'detailed']) {
+        for (const extension of ['png', 'svg']) rmSync(join(artifacts, `data-${objectId}-relationships-${view}.${extension}`), {force: true});
+      }
     }
     for (const width of [1280, 1440, 1920]) {
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
@@ -157,6 +162,11 @@ const {join} = require('node:path');
       await click('.relationship-node-output');
       assert.match(await evaluate(`document.querySelector('.relationship-info-item:not([hidden])').innerText`), /3 samples.*MPa.*Supplied/s);
       await screenshot(`sample-${width}`);
+      await click('[data-graph-view="detailed"]');
+      await layout(`detailed-${width}`);
+      assert.equal(await evaluate(`document.querySelector('.relationship-node-output[aria-current="true"]') !== null`), true);
+      assert.ok(await evaluate(`document.querySelector('.relationship-node-output .relationship-preview').getBoundingClientRect().height > 0`));
+      await screenshot(`detailed-${width}`);
       await click('#graph-view-details');
       await until(`location.pathname === ${JSON.stringify(cases.detail)} && document.readyState === 'complete'`);
       assert.equal(await evaluate(`!!document.querySelector('#detail-relationships')`), false);
@@ -171,6 +181,8 @@ const {join} = require('node:path');
       await click('.relationship-node-creator');
       assert.ok(await evaluate(`document.querySelector('.relationship-info-item:not([hidden])').textContent.includes('WWW'.repeat(100))`));
       await screenshot(`long-labels-${width}`);
+      await click('[data-graph-view="detailed"]');
+      await layout(`detailed-long-${width}`);
       await navigate(cases.empty);
       assert.match(await evaluate(`document.querySelector('.relationship-empty').innerText`), /No related metadata/);
       await layout(`empty-${width}`);
@@ -249,6 +261,46 @@ const {join} = require('node:path');
     assert.equal(png.readUInt32BE(20), graphSize.height * 2);
     await until(`document.querySelector('#graph-status').textContent.includes('downloaded as PNG')`);
     await screenshot('explorer-download');
+
+    await evaluate(`window.graphViewContinuity = 'same document'`);
+    const beforeMode = await evaluate(selectedId);
+    await click('[data-graph-view="detailed"]');
+    assert.equal(await evaluate('window.graphViewContinuity'), 'same document', 'View changes must not reload the graph');
+    assert.equal(await evaluate(selectedId), beforeMode);
+    assert.ok(await evaluate(selectedVisible));
+    const detailedBookmark = await evaluate('location.pathname + location.search + location.hash');
+    assert.ok(detailedBookmark.includes('view=detailed'));
+    await evaluate('history.back()');
+    await until(`document.querySelector('#detail-relationships').dataset.view === 'compact'`);
+    assert.equal(await evaluate(selectedId), beforeMode);
+    await evaluate('history.forward()');
+    await until(`document.querySelector('#detail-relationships').dataset.view === 'detailed'`);
+    await click('#graph-copy-link');
+    assert.equal(await evaluate(`document.querySelector('#graph-link-fallback').value`), process.env.RELATIONSHIP_BASE_URL + detailedBookmark);
+    await click('.graph-download summary');
+    await click('#graph-save-svg');
+    const detailedSVG = (await downloaded('svg', cases.sample, 'detailed')).toString('utf8');
+    assert.ok(detailedSVG.includes('Uses elastic model'));
+    const detailExport = await evaluate(`(() => {
+      const document = new DOMParser().parseFromString(${JSON.stringify(detailedSVG)}, 'image/svg+xml');
+      const model = document.querySelector('[data-node="relationship-phase-0-model-0-elastic"]');
+      return {html: document.querySelectorAll('foreignObject').length, error: document.querySelectorAll('parsererror').length,
+        values: model.textContent, height: Number(document.documentElement.getAttribute('height'))};
+    })()`);
+    assert.equal(detailExport.html, 0);
+    assert.equal(detailExport.error, 0);
+    assert.match(detailExport.values, /MPa/);
+    assert.match(detailExport.values, /233000/);
+    assert.ok(detailExport.height > graphSize.height, 'Detailed exports use the complete expanded geometry');
+    await click('.graph-download summary');
+    await click('#graph-save-png');
+    const detailedPNG = await downloaded('png', cases.sample, 'detailed');
+    assert.equal(detailedPNG.readUInt32BE(20), detailExport.height * 2);
+    await navigate(cases.empty);
+    await navigate(detailedBookmark);
+    assert.equal(await evaluate(`document.querySelector('#detail-relationships').dataset.view`), 'detailed');
+    assert.equal(await evaluate(selectedId), beforeMode);
+    assert.ok(await evaluate(selectedVisible));
     await click('.relationship-node-output');
     await click('.relationship-info-item:not([hidden]) .graph-source-link');
     await until(`location.hash === '#data-curves' && document.readyState === 'complete' && !!document.querySelector('#data-curves')`);
@@ -294,24 +346,55 @@ const {join} = require('node:path');
     assert.ok(largePNG.readUInt32BE(16) * largePNG.readUInt32BE(20) <= 16000000);
     assert.ok(largePNG.readUInt32BE(16) > 1000, 'Full graph width survives focused-view export');
 
+    for (const example of cases.examples) {
+      await navigate(example.url + '&view=detailed');
+      await click('.relationship-node-model');
+      await layout(example.name);
+      assert.equal(await evaluate(`parseInt(document.querySelector('#graph-zoom-reset').textContent) >= 100`), true,
+        'Detailed cards start with readable text rather than shrinking their values');
+      assert.match(await evaluate(`document.querySelector('.relationship-info-item:not([hidden])').textContent`), /Recorded model units/);
+      assert.match(await evaluate(`document.querySelector('.relationship-node-model .relationship-preview').textContent`), /Recorded model units/);
+      await screenshot(`example-${example.name}`);
+    }
+
     await click('.pc-sidebar a[href="/graph/"]');
     await until(`location.pathname === '/graph/' && location.search === '' && document.readyState === 'complete'`);
     assert.equal(await evaluate(`!!document.querySelector('#detail-relationships')`), false);
+    for (const width of [1280, 1440, 1920]) {
+      await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
+      await layout(`picker-${width}`);
+      assert.equal(await evaluate(`document.querySelectorAll('.graph-object-option').length`), 25);
+      assert.equal(await evaluate(`!!document.querySelector('.graph-welcome, .graph-object-bar, #graph-object')`), false);
+      assert.ok(await evaluate(`document.querySelector('.graph-object-list').clientHeight <= 480`));
+      assert.ok(await evaluate(`document.querySelector('.graph-picker').getBoundingClientRect().bottom <= innerHeight`));
+      await screenshot(`picker-${width}`);
+    }
+    await click('.graph-object-pages a');
+    await until(`location.search.includes('page=2') && document.readyState === 'complete'`);
+    assert.match(await evaluate(`document.querySelector('.graph-object-pages').innerText`), /26–50 of 109/);
     await evaluate(`document.querySelector('#graph-query').value = 'steel uniaxial'`);
     await click('.graph-find-form button');
     await until(`location.search.includes('q=steel') && document.readyState === 'complete'`);
-    assert.equal(await evaluate(`document.querySelectorAll('#graph-object option[value]:not([value=""])').length`), 1);
-    await evaluate(`document.querySelector('#graph-object').value = ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))}`);
-    await click('.graph-select-form button');
+    assert.equal(await evaluate(`document.querySelectorAll('.graph-object-option').length`), 1);
+    await click('.graph-object-option');
     await until(`location.search === ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).search)} && document.readyState === 'complete'`);
+    await click('.relationship-node-model');
+    await click('[data-graph-view="detailed"]');
+    const currentNode = await evaluate(selectedId);
     await click('#graph-change-data');
     await until(`location.search.includes('choose=1') && document.readyState === 'complete'`);
     assert.equal(await evaluate(`!!document.querySelector('.graph-workspace')`), true,
       'Choosing another object must retain the current graph until submission');
+    assert.equal(await evaluate(selectedId), currentNode);
+    assert.equal(await evaluate(`document.querySelector('#detail-relationships').dataset.view`), 'detailed');
     await screenshot('change-data');
-    await evaluate(`document.querySelector('#graph-object').value = ${JSON.stringify(new URL(cases.long, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))}`);
-    await click('.graph-select-form button');
-    await until(`location.search === ${JSON.stringify(new URL(cases.long, process.env.RELATIONSHIP_BASE_URL).search)} && document.readyState === 'complete'`);
+    await evaluate(`document.querySelector('#graph-query').value = 'Long names'`);
+    await click('.graph-find-form button');
+    await until(`location.search.includes('q=Long') && document.readyState === 'complete'`);
+    assert.equal(await evaluate(selectedId), currentNode, 'Searching other records must retain the selected node');
+    await click('.graph-object-option');
+    await until(`new URL(location.href).searchParams.get('object') === ${JSON.stringify(new URL(cases.long, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))} && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`document.querySelector('#detail-relationships').dataset.view`), 'detailed');
     assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-phase').length`), 12);
     await navigate(cases.picker + '?q=unmatched');
     assert.match(await evaluate(`document.querySelector('.graph-picker-empty').innerText`), /No data objects match/);
@@ -320,16 +403,22 @@ const {join} = require('node:path');
 
     await command('Emulation.setScriptExecutionDisabled', {value: true});
     await navigate(cases.picker);
-    await evaluate(`document.querySelector('#graph-object').value = ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))}`);
-    await click('.graph-select-form button');
+    await evaluate(`document.querySelector('#graph-query').value = 'steel uniaxial'`);
+    await click('.graph-find-form button');
+    await until(`location.search.includes('q=steel') && document.readyState === 'complete'`);
+    await click('.graph-object-option');
     await until(`location.search === ${JSON.stringify(new URL(cases.sample, process.env.RELATIONSHIP_BASE_URL).search)} && document.readyState === 'complete'`);
     await click('.relationship-node-model');
     assert.ok(await evaluate(`location.hash.endsWith('-info')`), 'Native links must reach relationship details without JavaScript');
     assert.match(await evaluate(`document.querySelector(location.hash).innerText`), /Cubic elasticity.*Ferrite/s);
     assert.ok(await evaluate(`document.querySelector(location.hash).getBoundingClientRect().height > 0`));
+    await click('[data-graph-view="detailed"]');
+    await until(`location.search.includes('view=detailed') && document.readyState === 'complete'`);
+    assert.ok(await evaluate(`document.querySelector('.relationship-node-model .relationship-preview').getBoundingClientRect().height > 0`));
+    await layout('native-detailed');
     await screenshot('without-javascript');
     assert.deepEqual(exceptions, []);
-    console.log('Graph workspace browser checks passed: detail/sidebar entry, object search/switching, 3 desktop widths, node text/type search, parameters, keyboard selection, connection navigation, curve/loading links, stable bookmarks/back, fit/zoom/drag/focus, clipboard fallback, actual complete SVG/PNG downloads, 12 and 80 phases, bounded large PNG, long names, empty states, escaped HTML and native forms/links without JavaScript.');
+    console.log(`Graph workspace browser checks passed: 109-record direct picker, 3 desktop widths, compact/detailed cards and exports, ${cases.examples.length} local JSON examples, view/node continuity through history/chooser/search/share, relationship labels, parameters, keyboard selection, curve/loading links, fit/zoom/drag/focus, actual complete SVG/PNG downloads, 12 and 80 phases, bounded large PNG, long names, empty states, escaped HTML and native forms/views/links without JavaScript.`);
     console.log(`Screenshots: ${artifacts}`);
   } finally {
     socket?.close();

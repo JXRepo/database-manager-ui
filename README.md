@@ -546,10 +546,13 @@ an accessible data object to view its supplied creators, software, phases,
 constitutive models, loading conditions and available mechanical outputs. The
 large canvas remains open, with node details on the right and the current data
 object above it.
-**Change data** opens a picker with title or identifier search and 25 objects per
-page. Searches require all entered whole words, ignoring case and word order.
+The entry page combines title or identifier search with a bounded list of 25
+objects per page. Click a record row to open its graph directly. **Change data**
+opens the same list above the current graph, and **Close chooser** returns to the
+canvas. Searches require all entered whole words, ignoring case and word order.
 Only owned, public or explicitly shared records appear. Browsing picker pages
-keeps the current graph until another object is opened.
+keeps the current graph until another object is opened. With JavaScript, the
+selected node and card view also survive chooser navigation and searches.
 
 Models connect to their own phase; equal phase names do not merge distinct
 entries. Select a node with the mouse or Tab and Enter to read its complete name
@@ -563,25 +566,39 @@ nodes report each available series' full sample count and units, distinguishing
 supplied series from calculated equivalents used by the plots. Links return to
 the record's metadata, available loading panel or curves and downloads.
 
+Incoming relationship names appear at each card's connection header, so links
+such as **Has phase** and **Uses elastic model** can be read directly on the
+canvas. **Compact** shows names and relationships. **Detailed** adds up to three
+supplied fields per card, including available model units before parameter
+previews. Full labels and all inspector details remain available in both views.
+Cards use only the space needed for their supplied previews; no missing fields
+are added. Switching views updates the layout immediately and retains the
+selected node. Detailed inspection starts at a readable zoom of at least 100%;
+use Fit for a full overview.
+
 The **Find nodes** tab searches node names and displayed details using all
 entered words and an optional node type. Selecting a result brings a readable
 node into view. The **Details** tab lists incoming and outgoing connections as
 links. Selection is bookmarkable with **Copy link**, survives reload and browser
-Back, and keeps the record's existing access requirements.
+Back, and keeps the record's existing access requirements. The optional
+`view=detailed` URL argument preserves the expanded cards in shared links.
 
 Drag the canvas background to pan, use **+ / −**, **100%**, **Fit**, **Center node**
 or Ctrl/Command + scroll to navigate, and use **Focus connections** to emphasize
 the selected node's immediate neighbors. With the canvas focused, + / − zoom,
 0 fits and / opens node search. **Download** saves the complete graph as SVG or
-PNG, including nodes outside the current view or focus. SVG contains complete
-names in node titles; PNG is bounded to 8,192 pixels per side and 16 million
-pixels total. Original JSON uses the existing permission checked export.
+PNG, including nodes outside the current viewport or focus. Exported images use
+the chosen Compact or Detailed layout and include its visible relationship
+names and field previews; filenames identify the layout. SVG contains complete
+names and preview values in titles; PNG is bounded to 8,192 pixels per side and
+16 million pixels total. Original JSON uses the existing permission checked export.
 
 Large graphs scroll inside the canvas and long names wrap in the inspector.
 Empty selectors and records without related metadata have explicit empty states.
-Without JavaScript, GET forms still select data and graph links reach ordinary
-node detail sections. Graph uses the shared metadata compatibility view and the
-same access rules as detail pages; malformed or repeated object selections are
+Without JavaScript, GET search, record links and the two view links remain
+usable, and graph links reach ordinary node detail sections. Graph uses the
+shared metadata compatibility view and the same access rules as detail pages;
+malformed or repeated object selections are
 rejected. The graph summarizes metadata and availability, not scientific
 comparability or validation results. It does not modify uploaded JSON, infer
 links to other records, or require an ontology service or graph database.

@@ -1,12 +1,19 @@
 {% load static %}
 <script src="{% static 'assets/js/detail-relationships.js' %}" defer></script>
-<section class="relationship-panel" id="detail-relationships" aria-label="Graph workspace" data-object="{{ data_object.pk }}">
+<section class="relationship-panel" id="detail-relationships" aria-label="Graph workspace" data-object="{{ data_object.pk }}" data-view="{{ relationship_graph.view }}">
   <div class="relationship-toolbar">
     <h2 id="relationship-heading">Relationships</h2>
     <span class="relationship-count">{{ relationship_graph.nodes|length }} nodes · {{ relationship_graph.count }} connection{{ relationship_graph.count|pluralize }}</span>
+    {% if relationship_graph.count %}
+    <div class="graph-view-modes" role="group" aria-label="Node presentation">
+      <a href="{{ graph_compact_url }}" data-graph-view="compact" role="button" aria-pressed="{% if relationship_graph.view == 'compact' %}true{% else %}false{% endif %}" title="Show names and relationships">Compact</a>
+      <a href="{{ graph_detailed_url }}" data-graph-view="detailed" role="button" aria-pressed="{% if relationship_graph.view == 'detailed' %}true{% else %}false{% endif %}" title="Include key metadata on each card">Detailed</a>
+    </div>
+    {% endif %}
     <span class="relationship-readonly">Read only</span>
   </div>
   {% if relationship_graph.count %}
+  {{ relationship_graph.layouts|json_script:"graph-layouts" }}
   <div class="graph-controls" hidden>
     <div class="graph-zoom-controls" role="group" aria-label="Graph zoom">
       <button type="button" id="graph-zoom-out" aria-label="Zoom out" title="Zoom out (−)">−</button>
@@ -46,11 +53,19 @@
                data-node="{{ node.id }}" data-legacy-node="{{ node.legacy_id }}" data-kind="{{ node.kind }}"
                aria-label="{{ node.category }}: {{ node.label }}" tabindex="0">
               <title>{{ node.category }}: {{ node.label }}{% if node.relation %} — {{ node.relation }}{% endif %}</title>
-              <rect width="200" height="72" rx="10"></rect>
-              <text class="relationship-category" x="14" y="20">{{ node.category }}</text>
-              <foreignObject x="14" y="28" width="172" height="36">
+              <rect width="{{ relationship_graph.node_width }}" height="{{ node.height }}" rx="10"></rect>
+              <text class="relationship-category" x="14" y="18">{{ node.relation|default:node.category }}</text>
+              <line class="relationship-divider" x1="0" y1="26" x2="232" y2="26"></line>
+              <foreignObject class="relationship-title-box" x="14" y="34" width="204" height="36">
                 <div xmlns="http://www.w3.org/1999/xhtml" class="relationship-label">{{ node.label }}</div>
               </foreignObject>
+              {% if node.preview %}
+              <foreignObject class="relationship-preview" x="14" y="82" width="204" height="{{ node.preview_height }}">
+                <div xmlns="http://www.w3.org/1999/xhtml">
+                  {% for item in node.preview %}<div class="relationship-preview-item"><span title="{{ item.label }}">{{ item.label }}</span><strong title="{{ item.value }}">{{ item.value }}</strong></div>{% endfor %}
+                </div>
+              </foreignObject>
+              {% endif %}
             </a>
           </g>
         {% endfor %}

@@ -90,7 +90,7 @@ def graph_view(request):
     Parameters
     ----------
     request : HttpRequest
-        A GET request with optional object, choose, q and page arguments.
+        A GET request with optional object, view, choose, q and page arguments.
 
     Returns
     -------
@@ -116,12 +116,13 @@ def graph_view(request):
         Q(owner=request.user) | Q(access_type="all") | Q(shared_with_viewer=True),
     )
     obj = get_object_or_404(accessible, pk=int(value)) if value else None
+    view = "detailed" if request.GET.getlist("view") == ["detailed"] else "compact"
     graph = None
     current = None
     if obj is not None:
         metadata = metadata_view(obj.data)
         graph = build_relationship_graph(
-            metadata, _extract_plot_variables(metadata, units=metadata.get("units", {})),
+            metadata, _extract_plot_variables(metadata, units=metadata.get("units", {})), view=view,
         )
         has_loading = any(node["kind"] == "loading" for node in graph["nodes"])
         graph["has_loading_details"] = has_loading and any(
@@ -134,14 +135,22 @@ def graph_view(request):
     context = {
         "data_object": obj, "current_object": current, "relationship_graph": graph,
         "choose_object": choose, "object_query": query, "object_options": [],
+        "graph_view_mode": view,
     }
+    if obj is not None:
+        params = request.GET.copy()
+        params["object"] = obj.pk
+        for mode in ("compact", "detailed"):
+            params["view"] = mode
+            context[f"graph_{mode}_url"] = reverse("graph") + "?" + params.urlencode()
     if choose:
         page, options = _object_choices(accessible, query, request.GET.get("page"))
         params = {"choose": "1", "q": query}
+        if view == "detailed":
+            params["view"] = view
         if obj is not None:
             params["object"] = obj.pk
-        context.update(object_options=options, option_page=page,
-                       current_in_options=any(option["pk"] == obj.pk for option in options) if obj else False)
+        context.update(object_options=options, option_page=page)
         if page.has_previous():
             context["previous_objects_url"] = reverse("graph") + "?" + urlencode(
                 {**params, "page": page.previous_page_number()},

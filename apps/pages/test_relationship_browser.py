@@ -71,11 +71,21 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
                 }} for index in range(80)
             ],
         })
+        examples = []
+        example_directory = settings.BASE_DIR / "example_json_files/boundary_condition_examples_20261008"
+        for path in sorted(example_directory.glob("*.json")):
+            record = JSONData.objects.create(owner=viewer, data=json.loads(path.read_text()))
+            examples.append({"name": path.stem, "url": f"{reverse('graph')}?object={record.pk}"})
+        for index in range(max(0, 105 - len(examples))):
+            JSONData.objects.create(owner=viewer, data={
+                "title": f"Reference simulation {index}", "identifier": f"reference-{index}",
+            })
         cases = {"sample": f"{reverse('graph')}?object={sample.pk}",
                  "long": f"{reverse('graph')}?object={long_record.pk}",
                  "empty": f"{reverse('graph')}?object={empty.pk}",
                  "large": f"{reverse('graph')}?object={large_record.pk}",
                  "detail": reverse("json_data_detail", args=[sample.pk]),
+                 "examples": examples,
                  "picker": reverse("graph")}
         self.client.force_login(viewer)
         environment = dict(os.environ, RELATIONSHIP_BASE_URL=self.live_server_url,

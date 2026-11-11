@@ -1,5 +1,5 @@
 .graph-page .pc-content { padding-bottom: 24px; }
-.graph-object-bar, .graph-picker, .relationship-panel, .graph-welcome {
+.graph-object-bar, .graph-picker, .relationship-panel {
   border: 1px solid #e3e9f1;
   border-radius: 10px;
   background: #fff;
@@ -10,27 +10,37 @@
 .graph-current-object h2 { margin: 4px 0 0; font-size: 17px; line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .graph-current-object p { color: #68778d; font-size: 12px; margin: 5px 0 0; overflow-wrap: anywhere; }
 .graph-object-actions { display: flex; gap: 8px; flex-shrink: 0; }
-.graph-picker { padding: 16px 20px; margin-bottom: 16px; }
-.graph-find-form, .graph-select-form { display: flex; align-items: center; gap: 12px; }
-.graph-find-form { margin-bottom: 12px; }
-.graph-picker label { width: 80px; flex-shrink: 0; font-size: 13px; margin: 0; }
-.graph-picker .form-control, .graph-picker .form-select { min-width: 0; flex: 1; width: 0; }
-.graph-find-form .form-control { max-width: 480px; }
+.graph-picker { padding: 20px; margin-bottom: 16px; }
+.graph-picker-heading h2 { font-size: 17px; line-height: 1.5; margin: 0 0 4px; }
+.graph-picker-heading p { font-size: 13px; color: #68778d; margin: 0 0 16px; }
+.graph-find-form { display: flex; align-items: center; gap: 10px; max-width: 680px; margin-bottom: 16px; }
+.graph-find-form .form-control { min-width: 0; flex: 1; }
 .graph-picker .btn { white-space: nowrap; }
-.graph-close-picker { margin-left: auto; }
+.graph-clear { font-size: 13px; }
+.graph-object-list { list-style: none; padding: 0; margin: 0 -20px; max-height: min(52vh, 480px); overflow: auto; overscroll-behavior: contain; border-block: 1px solid #e3e9f1; }
+.graph-picker-with-object .graph-object-list { max-height: 230px; }
+.graph-object-option { display: flex; align-items: center; gap: 20px; padding: 12px 20px; border-bottom: 1px solid #edf0f5; color: #354665; text-decoration: none; }
+.graph-object-list li:last-child .graph-object-option { border-bottom: 0; }
+.graph-object-option:hover, .graph-object-option.is-current { background: #f3f7fd; color: #265cac; }
+.graph-option-description { min-width: 0; flex: 1; }
+.graph-option-description strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 14px; font-weight: 500; line-height: 1.5; }
+.graph-option-description > span { display: block; font-size: 12px; color: #68778d; margin-top: 3px; overflow-wrap: anywhere; }
+.graph-option-action { font-size: 12px; color: #3466b7; flex-shrink: 0; }
 .graph-object-pages { display: flex; gap: 16px; align-items: center; margin-top: 12px; font-size: 12px; color: #68778d; }
-.graph-object-pages > span { margin-right: auto; }
-.graph-picker-empty { margin: 0; color: #68778d; font-size: 13px; }
-.graph-welcome { min-height: 440px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px; }
-.graph-welcome svg { width: 36px; height: 36px; color: #7894bf; margin-bottom: 16px; }
-.graph-welcome h2 { font-size: 20px; margin-bottom: 10px; }
-.graph-welcome p { color: #68778d; font-size: 14px; }
+.graph-object-pages > span:first-child { margin-right: auto; }
+.graph-picker-empty { margin: 0; padding: 24px 0 12px; color: #68778d; font-size: 13px; }
 .relationship-panel { overflow: hidden; }
 .relationship-panel [hidden] { display: none !important; }
 .relationship-toolbar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid #e3e9f1; }
 .relationship-toolbar h2 { margin: 0; font-size: 15px; font-weight: 600; color: #354665; }
 .relationship-count, .relationship-readonly { font-size: 12px; color: #66758b; }
 .relationship-readonly { margin-left: auto; background: #f1f4f9; border-radius: 5px; padding: 3px 8px; }
+.graph-view-modes { display: flex; margin-left: auto; }
+.graph-view-modes a { border: 1px solid #dce3ed; padding: 5px 10px; font-size: 12px; color: #526580; text-decoration: none; }
+.graph-view-modes a:first-child { border-radius: 5px 0 0 5px; }
+.graph-view-modes a:last-child { border-left: 0; border-radius: 0 5px 5px 0; }
+.graph-view-modes a[aria-pressed="true"] { color: #265cac; background: #edf3ff; }
+.graph-view-modes + .relationship-readonly { margin-left: 0; }
 .graph-controls { display: flex; align-items: center; gap: 8px; padding: 9px 16px; border-bottom: 1px solid #e3e9f1; }
 .graph-controls button, .graph-download summary, .graph-info-heading button, .graph-node-result-bar button { font: inherit; font-size: 12px; color: #526580; border: 1px solid #dce3ed; border-radius: 5px; background: white; padding: 5px 9px; white-space: nowrap; }
 .graph-controls button:hover, .graph-download summary:hover, .graph-info-heading button:hover { background: #f1f5fb; }
@@ -65,9 +75,15 @@
 .relationship-node-loading rect { fill: #eef8fa; stroke: #b8dbe0; }
 .relationship-node.is-muted, .relationship-edge.is-muted { opacity: .18; }
 .relationship-category { fill: #68778d; font-size: 11px; font-weight: 600; }
+.relationship-divider { stroke: #d8e1ec; stroke-width: 1; }
+.relationship-panel[data-view="compact"] .relationship-preview { display: none; }
+.relationship-preview-item { height: 28px; overflow: hidden; }
+.relationship-preview-item span, .relationship-preview-item strong { display: block; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.relationship-preview-item span { color: #68778d; font-size: 10px; line-height: 12px; }
+.relationship-preview-item strong { color: #354665; font-size: 12px; line-height: 14px; font-weight: 500; }
 .relationship-label {
   color: #2b3d58;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 17px;
   overflow-wrap: anywhere;
@@ -81,6 +97,8 @@
 .relationship-node[aria-current="true"] rect { stroke: #416fc2; stroke-width: 2.5; }
 .relationship-node:focus { outline: none; }
 .relationship-viewport:focus-visible { outline: 2px solid #416fc2; outline-offset: -3px; }
+.graph-page a:focus-visible, .graph-page button:focus-visible { outline: 2px solid #416fc2; outline-offset: 2px; }
+.graph-object-option:focus-visible { outline-offset: -3px; }
 .relationship-inspector { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid #e3e9f1; }
 .graph-info-heading { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; gap: 8px; }
 .graph-info-heading h2 { font-size: 13px; font-weight: 600; color: #526580; margin: 0; }
@@ -118,4 +136,4 @@
 .relationship-info dl { display: grid; gap: 12px; margin: 0; font-size: 12px; }
 .relationship-info dt { color: #68778d; font-weight: 500; margin-bottom: 3px; }
 .relationship-info dd { color: #354665; margin: 0; white-space: pre-wrap; }
-.relationship-empty { min-height: 440px; display: flex; align-items: center; justify-content: center; color: #68778d; padding: 24px; margin: 0; }
+.relationship-empty { min-height: 160px; display: flex; align-items: center; justify-content: center; color: #68778d; padding: 24px; margin: 0; }

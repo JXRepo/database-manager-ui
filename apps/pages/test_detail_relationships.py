@@ -1,4 +1,5 @@
 from copy import deepcopy
+from urllib.parse import parse_qs, urlsplit
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -339,14 +340,75 @@ class DetailRelationshipTests(TestCase):
         self.assertEqual(len(first.context["object_options"]), 25)
         self.assertNotIn(selected.pk, [option["pk"] for option in first.context["object_options"]])
         self.assertEqual(first.context["data_object"].pk, selected.pk)
-        self.assertContains(first, 'value="" selected disabled>Select a data object from these results')
-        self.assertNotContains(first, f'<option value="{selected.pk}"')
+        self.assertContains(first, 'class="graph-object-option', count=25)
+        self.assertNotContains(first, '<select')
         next_url = first.context["next_objects_url"]
         second = self.client.get(next_url)
         self.assertEqual(len(second.context["object_options"]), 3)
         self.assertEqual(second.context["relationship_graph"]["nodes"][0]["label"], "Record 0")
         self.assertEqual(second.context["data_object"].pk, selected.pk)
         self.assertTrue(second.context["previous_objects_url"])
+
+    def test_view_modes_keep_relationships_and_fit_supplied_card_details(self):
+        """
+        Keep both card layouts readable without changing nodes or their metadata
+        """
+        obj, compact_response, compact = self.detail({
+            "identifier": "view-mode-example", "title": "Mode comparison", "creator": "Alice",
+            "software": "DAMASK", "software_version": "3.0",
+            "phase": [{"phase_name": "Ferrite", "phase_id": 0, "orientation": {
+                "grain_count": 343, "texture_type": "Random",
+            }, "constitutive_model": {
+                "elastic_model_name": "Cubic", "units": {"Stiffness": "MPa"},
+                "elastic_parameters": {"C11": 233000, "C12": 135000},
+                "plastic_model_name": "Crystal plasticity",
+            }}, {"phase_name": "Martensite"}],
+        })
+        detailed_response = self.client.get("/graph/", {"object": obj.pk, "view": "detailed"})
+        detailed = detailed_response.context["relationship_graph"]
+        self.assertContains(compact_response, 'data-view="compact"')
+        self.assertContains(detailed_response, 'data-view="detailed"')
+        self.assertEqual([node["id"] for node in compact["nodes"]], [node["id"] for node in detailed["nodes"]])
+        self.assertEqual(compact["count"], detailed["count"])
+        self.assertGreater(detailed["height"], compact["height"])
+        for graph in (compact, detailed):
+            for node in graph["nodes"]:
+                self.assertGreaterEqual(node["x"], 0)
+                self.assertGreaterEqual(node["y"], 0)
+                self.assertLessEqual(node["x"] + graph["node_width"], graph["width"])
+                self.assertLessEqual(node["y"] + node["height"], graph["height"])
+                if node["parent"]:
+                    self.assertContains(detailed_response, f'>{node["relation"]}</text>')
+                for other in graph["nodes"]:
+                    if other["id"] == node["id"] or other["x"] != node["x"]:
+                        continue
+                    self.assertTrue(node["y"] + node["height"] < other["y"] or
+                                    other["y"] + other["height"] < node["y"])
+        model = next(node for node in detailed["nodes"] if node["kind"] == "model")
+        self.assertIn({"label": "C11", "value": "233000"}, model["preview"])
+        self.assertIn({"label": "Recorded model units", "value": '{"Stiffness": "MPa"}'}, model["preview"])
+        self.assertEqual(set(detailed["layouts"]), {"compact", "detailed"})
+
+    def test_picker_is_one_direct_list_and_preserves_the_view_mode(self):
+        """
+        Open a result directly and retain the view while searching and paging
+        """
+        records = []
+        for index in range(28):
+            records.append(JSONData.objects.create(owner=self.owner, data={"title": f"Reference {index}"}))
+        initial = self.client.get("/graph/")
+        self.assertContains(initial, 'class="graph-object-option', count=25)
+        self.assertNotContains(initial, 'class="graph-object-bar"')
+        self.assertNotContains(initial, 'class="graph-welcome"')
+        selected = records[0]
+        response = self.client.get("/graph/", {"object": selected.pk, "choose": "1", "q": "Reference", "view": "detailed"})
+        next_query = parse_qs(urlsplit(response.context["next_objects_url"]).query)
+        self.assertEqual(next_query["view"], ["detailed"])
+        self.assertEqual(next_query["object"], [str(selected.pk)])
+        self.assertEqual(next_query["q"], ["Reference"])
+        self.assertContains(response, 'name="view" value="detailed"')
+        self.assertContains(response, f'href="/graph/?object={records[-1].pk}&amp;view=detailed"')
+        self.assertEqual(self.client.get("/graph/", {"object": selected.pk, "view": "unknown"}).context["graph_view_mode"], "compact")
 
     def test_graph_works_with_no_accessible_objects(self):
         """

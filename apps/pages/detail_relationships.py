@@ -122,20 +122,27 @@ def _add_node(nodes, kind, label, parent="", relation="", details=(), key=None):
     return node
 
 
-def _layout(nodes):
+def _geometry(nodes, detailed):
     """
-    Position metadata branches while retaining phase to model connections
+    Arrange cards without overlaps and connect each incoming relationship header
 
     Parameters
     ----------
     nodes : list of dict
-        Nodes with local parent IDs.
+        Nodes with parent IDs and supplied preview fields.
+    detailed : bool
+        Whether cards include their supplied field previews.
 
     Returns
     -------
     dict
-        Nodes, curved edges and the bounded viewport's drawing dimensions.
+        Positions and paths for one view, without duplicating metadata.
     """
+    node_width = 232
+    gap = 24
+    heights = {}
+    for node in nodes:
+        heights[node["id"]] = 88 + len(node["preview"]) * 28 if detailed and node["preview"] else 80
     left = []
     branches = []
     children = {}
@@ -147,36 +154,80 @@ def _layout(nodes):
         else:
             branches.append(node)
 
+    positions = {}
     cursor = 0
     for node in branches:
         models = children.get(node["id"], [])
-        span = max(1, len(models)) * 90
-        node.update(x=540, y=cursor + (span - 90) // 2)
-        for index, model in enumerate(models):
-            model.update(x=800, y=cursor + index * 90)
-        cursor += span
+        model_span = sum(heights[model["id"]] for model in models) + max(0, len(models) - 1) * gap
+        span = max(heights[node["id"]], model_span)
+        positions[node["id"]] = {"x": 612, "y": cursor + (span - heights[node["id"]]) // 2}
+        model_cursor = cursor + (span - model_span) // 2
+        for model in models:
+            positions[model["id"]] = {"x": 908, "y": model_cursor}
+            model_cursor += heights[model["id"]] + gap
+        cursor += span + gap
 
-    height = max(270, cursor + 22)
-    offset = (height - cursor + 18) // 2
+    branch_span = max(0, cursor - gap)
+    left_span = sum(heights[node["id"]] for node in left) + max(0, len(left) - 1) * gap
+    height = max(220, branch_span, left_span, heights[nodes[0]["id"]]) + 40
+    for position in positions.values():
+        position["y"] += (height - branch_span) // 2
+    left_cursor = (height - left_span) // 2
+    for node in left:
+        positions[node["id"]] = {"x": 20, "y": left_cursor}
+        left_cursor += heights[node["id"]] + gap
+    positions[nodes[0]["id"]] = {"x": 316, "y": (height - heights[nodes[0]["id"]]) // 2}
+    for node_id, position in positions.items():
+        position["height"] = heights[node_id]
+
+    paths = []
     for node in nodes[1:]:
-        if node["kind"] not in ("creator", "software"):
-            node["y"] += offset
-    for index, node in enumerate(left):
-        node.update(x=20, y=(height - len(left) * 90 + 18) // 2 + index * 90)
-    nodes[0].update(x=280, y=(height - 72) // 2)
+        parent = positions[node["parent"]]
+        child = positions[node["id"]]
+        parent_x = parent["x"] + (node_width if child["x"] > parent["x"] else 0)
+        node_x = child["x"] + (0 if child["x"] > parent["x"] else node_width)
+        middle = (parent_x + node_x) // 2
+        parent_y = parent["y"] + parent["height"] // 2
+        node_y = child["y"] + 14
+        paths.append(f"M {parent_x} {parent_y} C {middle} {parent_y}, {middle} {node_y}, {node_x} {node_y}")
+    return {"width": 1160 if children else 864, "height": height,
+            "positions": positions, "paths": paths}
 
+
+def _layout(nodes, view):
+    """
+    Prepare compact and detailed views of the same nodes and relationships
+
+    Parameters
+    ----------
+    nodes : list of dict
+        Nodes with their complete inspector details.
+    view : str
+        Initial compact or detailed view for ordinary HTML navigation.
+
+    Returns
+    -------
+    dict
+        Graph metadata with shared geometry for native and interactive views.
+    """
+    for node in nodes:
+        details = [item for item in node["details"] if item["label"] != "Model family"]
+        if node["kind"] == "model":
+            details.sort(key=lambda item: item["label"].casefold() not in {"recorded model units", "units"})
+        node["preview"] = details[:3]
+        node["preview_height"] = len(node["preview"]) * 28
+    layouts = {"compact": _geometry(nodes, False), "detailed": _geometry(nodes, True)}
+    layout = layouts[view]
+    for node in nodes:
+        node.update(layout["positions"][node["id"]])
     by_id = {node["id"]: node for node in nodes}
     edges = []
-    for node in nodes[1:]:
+    for index, node in enumerate(nodes[1:]):
         parent = by_id[node["parent"]]
-        parent_x = parent["x"] + (200 if node["x"] > parent["x"] else 0)
-        node_x = node["x"] + (0 if node["x"] > parent["x"] else 200)
-        middle = (parent_x + node_x) // 2
-        parent_y, node_y = parent["y"] + 36, node["y"] + 36
         edges.append({
             "source": parent["id"], "target": node["id"],
             "label": f'{parent["label"]} → {node["relation"]} → {node["label"]}',
-            "path": f"M {parent_x} {parent_y} C {middle} {parent_y}, {middle} {node_y}, {node_x} {node_y}",
+            "path": layout["paths"][index],
         })
         node["parent_label"] = parent["label"]
         parent["connections"].append({"id": node["id"], "label": node["label"],
@@ -188,11 +239,12 @@ def _layout(nodes):
         category = categories.setdefault(node["kind"], {"kind": node["kind"],
                                                        "label": node["category"], "count": 0})
         category["count"] += 1
-    return {"nodes": nodes, "edges": edges, "width": 1020 if children else 760,
-            "height": height, "count": len(nodes) - 1, "categories": list(categories.values())}
+    return {"nodes": nodes, "edges": edges, "width": layout["width"], "height": layout["height"],
+            "node_width": 232, "count": len(nodes) - 1, "categories": list(categories.values()),
+            "layouts": layouts, "view": view}
 
 
-def build_relationship_graph(metadata, plot_variables):
+def build_relationship_graph(metadata, plot_variables, view="compact"):
     """
     Build a read only graph from the detail page's existing compatibility view
 
@@ -205,6 +257,8 @@ def build_relationship_graph(metadata, plot_variables):
         The shared metadata compatibility view for an accessible record.
     plot_variables : list of dict
         Supplied and calculated series already prepared by the detail page.
+    view : str, optional
+        Initial compact or detailed card presentation.
 
     Returns
     -------
@@ -316,4 +370,4 @@ def build_relationship_graph(metadata, plot_variables):
             details.append({"label": "Load records", "value": str(len(loads) if isinstance(loads, list) else 1)})
         _add_node(nodes, "loading", label or f"Loading condition {index + 1}", root["id"],
                   "Has loading condition", details, key=f"loading-{index}")
-    return _layout(nodes)
+    return _layout(nodes, view)
