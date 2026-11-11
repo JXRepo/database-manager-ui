@@ -88,11 +88,118 @@ checked on 2026-11-11.
 For this example, the numerical results are loading-path slopes. The negative
 11-component slope and the different 22-component slope illustrate why a
 component plot must not automatically label its fitted slope as E. The three
-supplied stiffness constants, without the corresponding orientation,
-homogenization and test conditions, do not directly establish the effective
-Young's modulus of this polycrystal. This diagnosis does not reconstruct
-elastic strain by assuming that the stored total and plastic strain arrays
-can be subtracted in the finite-strain regime.
+supplied stiffness constants alone do not directly establish the effective
+Young's modulus of this polycrystal. The orientation based verification below
+now uses the 343 supplied orientations to make an independent estimate and
+quantifies the small transverse stress correction for component 33. This
+diagnosis does not reconstruct elastic strain by assuming that the stored
+total and plastic strain arrays can be subtracted in the finite-strain regime.
+
+## Independent elasticity check
+
+The initial 33 slope is consistent with the elastic constants and texture in
+the source. With equal grain volumes and the default MTEX Bunge convention,
+the Hill estimate predicts `131.14 GPa` along the recorded stress path,
+compared with the measured initial slope of `131.03 GPa`: a difference of
+`−0.08159%`. This is a quantitative consistency check, not an exact rerun of
+the original CPFEM simulation or a measurement of the complete effective tensor.
+
+### Source and assumptions
+
+The publicly deposited
+[Goss dataset, Zenodo 13885748](https://zenodo.org/records/13885748), contains
+`c779c1a4.json` (204,021 bytes, MD5 `0e032c6aa4ebc3e5a5bdead1f598c338`).
+Its complete stress, total strain and plastic strain arrays are identical to
+the local `a46fde6c.json`. The orientations and constitutive parameters also
+match exactly. Both use input path `../DataBase/Keys/592bb0abb1/inputs`.
+The differing identifiers and top-level `material`/`phase` names do not change
+these compared numerical inputs.
+
+The [associated metadata paper, section 5 and figure 6](https://advanced.onlinelibrary.wiley.com/doi/10.1002/adem.202401876)
+describes this Goss example as 343 grains with eight elements per grain,
+structured discretization and periodic boundary conditions. For this check,
+each supplied orientation receives weight `1/343`. The JSON has no explicit
+per-grain volumes, so equal volumes remain a stated modeling assumption. The
+initial orientations are used only for the small initial strain range.
+
+The input constants are `C11 = 170`, `C12 = 124`, `C44 = 75 GPa`. Each grain's
+cubic stiffness is rotated into specimen coordinates using its three Euler
+angles in radians. The rotation maps crystal to specimen, following the
+[MTEX convention](https://mtex-toolbox.github.io/MTEXvsBungeConvention.html).
+The metadata names MTEX but does not explicitly specify a nondefault Euler
+convention or an additional specimen-frame rotation; this check assumes neither.
+
+### Calculation independent of the strain curve
+
+Use an orthonormal Mandel basis ordered `11, 22, 33, 23, 13, 12`, with both
+stress and strain shear entries multiplied by `sqrt(2)`. Compute the rotated
+grain stiffness matrices `C_g`, then the
+[Voigt, Reuss and Hill estimates](https://mtex-toolbox.github.io/TensorAverage.html):
+
+```text
+C_V = mean(C_g)
+C_R = inverse(mean(inverse(C_g)))
+C_H = (C_V + C_R) / 2
+S = inverse(C)
+E_3 = 1 / S[2, 2]
+```
+
+None of these estimates uses the recorded strain values. To account for the
+actual loading path, regress each stress component against `sigma_33` over
+indices 0–24, with a free intercept. The resulting slope ratios are
+`r_11 = 0.00698205542`, `r_22 = 0.0101596070`, `r_33 = 1`; shear terms are
+negligible but retained. For this proportional stress path, the initial
+elastic prediction is `M_33 = 1 / (S @ r)[2]`. Recorded strains are used only
+for the separate observed slope and subsequent comparison.
+
+| Elasticity estimate | Uniaxial E₃ (GPa) | Predicted actual-path slope (GPa) |
+| --- | ---: | ---: |
+| Reuss | 127.87 | 128.45 |
+| Voigt | 133.21 | 133.81 |
+| Hill | 130.55 | 131.14 |
+| Observed first 25 samples | Not independently measured | 131.03 |
+
+Within the stated assumptions, Reuss and Voigt bound uniaxial `E_3`. The
+actual-path column contains corresponding predictions, not an asserted
+rigorous bound on a general multiaxial component slope. Hill is an estimate
+inside the elastic energy bounds; it is not an exact homogenization solution.
+
+For Hill, the transverse stresses increase the predicted slope from
+`130.553361 GPa` to `131.140743 GPa`, about `0.44992%`. Thus multiaxial coupling
+is small for this particular 33 response. It does not prevent a meaningful
+comparison to directional Young's modulus. It still does not make every
+component slope a Young's modulus.
+
+Fits using the first 5, 10, 15, 20 and 25 samples give respectively
+`131.063133`, `131.055892`, `131.048664`, `131.041414` and `131.033742 GPa`.
+The conclusion is therefore stable across these initial windows, not specific
+to selecting exactly 25 points. These are numerical sensitivity checks, not
+independent experiments or uncertainty intervals.
+
+### Reproduction and limits
+
+Run the offline NumPy script from the repository root:
+
+```bash
+.venv/bin/python docs/qa/verify_initial_elasticity.py example_json_files/a46fde6c.json
+```
+
+Optionally add `--public-copy /path/to/c779c1a4.json` to compare a locally
+downloaded copy of the public deposit. The script does not download or alter
+any data. It checks the rotation against MTEX's documented 10°, 50°, 20°
+example, proper rotation matrices, positive stiffness, isotropic rotation
+invariance, the Voigt/Reuss ordering, and the cubic directional compliance
+identity for all 343 orientations. These checks and the public-source
+comparisons passed on 2026-11-11.
+
+The result supports an initial response dominated by elasticity whose slope
+agrees closely with a texture based elastic prediction. Together with the
+tiny plastic component and the full-range compression calculated above, it
+answers the missing-elastic-segment concern for component 33 without changing
+the curve or the website. The exact effective `E_3` would require the full
+original model and a uniaxial elastic calculation, or its independently
+determined effective compliance tensor. A close Hill estimate does not
+validate every component, later plastic response, or the entire simulation.
 
 ## Withdrawn webpage feature
 
