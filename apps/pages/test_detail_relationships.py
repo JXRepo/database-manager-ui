@@ -166,6 +166,83 @@ class DetailRelationshipTests(TestCase):
         self.assertNotIn("Other private creator", str(graph))
         self.assertNotContains(response, "Other private creator")
 
+    def test_inspector_keeps_model_parameters_orientation_and_loading_context(self):
+        """
+        Expose supplied context without inventing pairings or copying large arrays
+        """
+        data = {
+            "title": "Inspection", "creator": ["Alice", "Bob"],
+            "creator_affiliation": ["Institute A", "Institute B"],
+            "phase": [{"phase_name": "Ferrite", "orientation": {
+                "grain_number": [0], "texture_type": "Random",
+                "euler_angles": {"Phi1": list(range(5000))},
+            }, "constitutive_model": {
+                "units": {"Stiffness": "MPa"},
+                "elastic_model_name": "Cubic", "elastic_parameters": {
+                    "C11": 233000, "units": "MPa", "extra": list(range(5000)),
+                },
+            }}],
+            "mechanical_BC": [
+                {"loading_type": "stress", "loading_mode": "tensor",
+                 "vertex_list": ["V000", "V100", "V010", "V110", "V001", "V101", "V011", "V111"],
+                 "constraints": ["loaded"], "applied_load": [
+                    {"step": 0, "magnitude": {"xy": -5, "yx": 7}},
+                    {"step": 0.5, "magnitude": {"xy": 4}},
+                ]},
+                {"loading_type": "displacement", "loading_mode": "X"},
+            ],
+        }
+        original = deepcopy(data)
+        obj, response, graph = self.detail(data)
+        phase = next(node for node in graph["nodes"] if node["kind"] == "phase")
+        self.assertIn({"label": "Grain number", "value": "0"}, phase["details"])
+        self.assertIn({"label": "Texture", "value": "Random"}, phase["details"])
+        model = next(node for node in graph["nodes"] if node["kind"] == "model")
+        self.assertIn({"label": "C11", "value": "233000"}, model["details"])
+        self.assertIn({"label": "Recorded model units", "value": '{"Stiffness": "MPa"}'}, model["details"])
+        self.assertIn({"label": "units", "value": "MPa"}, model["details"])
+        self.assertIn({"label": "extra", "value": "5000 items · View data details for all values"}, model["details"])
+        loading = [node for node in graph["nodes"] if node["kind"] == "loading"]
+        self.assertEqual([node["label"] for node in loading], ["stress · tensor", "displacement · X"])
+        self.assertIn({"label": "Load records", "value": "2"}, loading[0]["details"])
+        self.assertTrue(all(node["parent"] == graph["nodes"][0]["id"] for node in loading))
+        self.assertNotIn("4999", str(graph))
+        self.assertNotIn("compression", str(graph))
+        self.assertContains(response, f'{reverse("json_data_detail", args=[obj.pk])}#data-loading')
+        obj.refresh_from_db()
+        self.assertEqual(obj.data, original)
+
+    def test_loading_without_a_cube_target_links_to_existing_details(self):
+        """
+        Return incomplete boundary metadata to details instead of an empty cube
+        """
+        obj, response, graph = self.detail({"mechanical_BC": [
+            {"loading_type": "force", "loading_mode": "static"},
+        ]})
+        self.assertFalse(graph["has_loading_details"])
+        self.assertNotContains(response, '#data-loading')
+        self.assertContains(response, f'{reverse("json_data_detail", args=[obj.pk])}#data-metadata')
+
+    def test_node_links_survive_unrelated_optional_metadata_and_list_all_connections(self):
+        """
+        Keep shared node links stable when other metadata categories are added
+        """
+        data = {"phase": [{"phase_name": "Steel", "constitutive_model": {
+            "elastic_model_name": "Cubic",
+        }}]}
+        _, _, first = self.detail(data)
+        _, response, expanded = self.detail({**data, "creator": "Alice", "software": "DAMASK"})
+        for kind in ("record", "phase", "model"):
+            before = next(node for node in first["nodes"] if node["kind"] == kind)
+            after = next(node for node in expanded["nodes"] if node["kind"] == kind)
+            self.assertEqual(before["id"], after["id"])
+            self.assertContains(response, f'href="#{after["id"]}-info"')
+        nodes = {node["id"]: node for node in expanded["nodes"]}
+        for edge in expanded["edges"]:
+            self.assertTrue(any(link["id"] == edge["target"] for link in nodes[edge["source"]]["connections"]))
+            self.assertTrue(any(link["id"] == edge["source"] for link in nodes[edge["target"]]["connections"]))
+            self.assertTrue(edge["label"])
+
     def test_graph_obeys_existing_detail_access(self):
         """
         Require login and explicit access before returning relationship metadata
@@ -262,6 +339,8 @@ class DetailRelationshipTests(TestCase):
         self.assertEqual(len(first.context["object_options"]), 25)
         self.assertNotIn(selected.pk, [option["pk"] for option in first.context["object_options"]])
         self.assertEqual(first.context["data_object"].pk, selected.pk)
+        self.assertContains(first, 'value="" selected disabled>Select a data object from these results')
+        self.assertNotContains(first, f'<option value="{selected.pk}"')
         next_url = first.context["next_objects_url"]
         second = self.client.get(next_url)
         self.assertEqual(len(second.context["object_options"]), 3)

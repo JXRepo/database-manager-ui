@@ -55,7 +55,7 @@
             <label for="graph-object">Data object</label>
             <select class="form-select form-select-sm" id="graph-object" name="object" required>
               {% if not data_object %}<option value="" selected disabled>Select a data object</option>{% endif %}
-              {% if data_object and not current_in_options %}<option value="{{ data_object.pk }}" selected>{{ current_object.title|default:current_object.identifier|default:"Untitled data object" }}{% if current_object.identifier and current_object.title %} — {{ current_object.identifier }}{% endif %}</option>{% endif %}
+              {% if data_object and not current_in_options %}<option value="" selected disabled>Select a data object from these results</option>{% endif %}
               {% for option in object_options %}<option value="{{ option.pk }}"{% if option.pk == data_object.pk %} selected{% endif %}>{{ option.title|default:option.identifier|default:"Untitled data object" }}{% if option.identifier and option.title %} — {{ option.identifier }}{% endif %}</option>{% endfor %}
             </select>
             <button type="submit" class="btn btn-primary btn-sm">Open graph</button>
@@ -79,7 +79,7 @@
       <section class="graph-welcome" aria-label="Graph workspace">
         <i data-feather="git-branch" aria-hidden="true"></i>
         <h2>Explore data relationships</h2>
-        <p>Select a data object above to see its creators, software, phases, models and outputs.</p>
+        <p>Select a data object above to explore its creators, software, phases, models, loading conditions and outputs.</p>
       </section>
     {% endif %}
   </div>

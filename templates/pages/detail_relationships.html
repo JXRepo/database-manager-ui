@@ -1,17 +1,36 @@
 {% load static %}
 <script src="{% static 'assets/js/detail-relationships.js' %}" defer></script>
-<section class="relationship-panel" id="detail-relationships" aria-label="Graph workspace">
+<section class="relationship-panel" id="detail-relationships" aria-label="Graph workspace" data-object="{{ data_object.pk }}">
   <div class="relationship-toolbar">
     <h2 id="relationship-heading">Relationships</h2>
-    <span class="relationship-count">{{ relationship_graph.count }} connection{{ relationship_graph.count|pluralize }}</span>
+    <span class="relationship-count">{{ relationship_graph.nodes|length }} nodes · {{ relationship_graph.count }} connection{{ relationship_graph.count|pluralize }}</span>
     <span class="relationship-readonly">Read only</span>
   </div>
   {% if relationship_graph.count %}
+  <div class="graph-controls" hidden>
+    <div class="graph-zoom-controls" role="group" aria-label="Graph zoom">
+      <button type="button" id="graph-zoom-out" aria-label="Zoom out" title="Zoom out (−)">−</button>
+      <button type="button" id="graph-zoom-reset" title="Reset to 100%" aria-label="Reset zoom to 100%">100%</button>
+      <button type="button" id="graph-zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
+    </div>
+    <button type="button" id="graph-fit" title="Fit the visible connections (0)">Fit</button>
+    <button type="button" id="graph-center" title="Center and read the selected node">Center node</button>
+    <button type="button" id="graph-focus" aria-pressed="false" title="Emphasize this node and its immediate connections">Focus connections</button>
+    <details class="graph-download">
+      <summary>Download</summary>
+      <div>
+        <button type="button" id="graph-save-svg">Graph as SVG</button>
+        <button type="button" id="graph-save-png">Graph as PNG</button>
+        <a href="{% url 'json_data_export' data_object.pk %}">Original JSON</a>
+      </div>
+    </details>
+  </div>
   <div class="graph-workspace">
-    <div class="relationship-viewport" tabindex="0" role="region" aria-label="Scrollable relationship graph">
+    <div class="graph-canvas">
+    <div class="relationship-viewport" tabindex="0" role="region" aria-label="Relationship graph" aria-describedby="graph-navigation-help">
+      <div class="relationship-stage">
       <svg class="relationship-svg" viewBox="0 0 {{ relationship_graph.width }} {{ relationship_graph.height }}"
            width="{{ relationship_graph.width }}" height="{{ relationship_graph.height }}"
-           style="min-width: {{ relationship_graph.width }}px; max-width: {{ relationship_graph.width }}px"
            role="group" aria-labelledby="relationship-heading">
         <defs>
           <marker id="relationship-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -19,12 +38,13 @@
           </marker>
         </defs>
         {% for edge in relationship_graph.edges %}
-          <path class="relationship-edge" d="{{ edge.path }}" data-source="{{ edge.source }}" data-target="{{ edge.target }}" marker-end="url(#relationship-arrow)"></path>
+          <path class="relationship-edge" d="{{ edge.path }}" data-source="{{ edge.source }}" data-target="{{ edge.target }}" marker-end="url(#relationship-arrow)"><title>{{ edge.label }}</title></path>
         {% endfor %}
         {% for node in relationship_graph.nodes %}
           <g transform="translate({{ node.x }} {{ node.y }})">
             <a class="relationship-node relationship-node-{{ node.kind }}" href="#{{ node.id }}-info"
-               data-node="{{ node.id }}" aria-label="{{ node.category }}: {{ node.label }}" tabindex="0">
+               data-node="{{ node.id }}" data-legacy-node="{{ node.legacy_id }}" data-kind="{{ node.kind }}"
+               aria-label="{{ node.category }}: {{ node.label }}" tabindex="0">
               <title>{{ node.category }}: {{ node.label }}{% if node.relation %} — {{ node.relation }}{% endif %}</title>
               <rect width="200" height="72" rx="10"></rect>
               <text class="relationship-category" x="14" y="20">{{ node.category }}</text>
@@ -35,22 +55,57 @@
           </g>
         {% endfor %}
       </svg>
+      </div>
+    </div>
+    <p class="graph-navigation-help" id="graph-navigation-help"><span class="graph-native-help">Scroll to explore. Select a node for details.</span><span class="graph-interactive-help" hidden>Drag background to pan · Ctrl + scroll to zoom · + / − / 0 with canvas focused</span></p>
     </div>
     <aside class="relationship-inspector" aria-labelledby="relationship-info-heading">
-      <h2 id="relationship-info-heading">Node details</h2>
-      <div class="relationship-info" aria-label="Relationship details" aria-live="polite">
+      <div class="graph-inspector-tabs" role="tablist" aria-label="Explore graph" hidden>
+        <button type="button" id="graph-details-tab" role="tab" aria-selected="true" aria-controls="graph-details">Details</button>
+        <button type="button" id="graph-find-tab" role="tab" aria-selected="false" aria-controls="graph-node-browser" tabindex="-1">Find nodes</button>
+      </div>
+      <div id="graph-node-browser" role="tabpanel" aria-labelledby="graph-find-tab" hidden>
+        <div class="graph-node-filters">
+          <label for="graph-node-query">Find a node</label>
+          <input type="search" id="graph-node-query" class="form-control form-control-sm" placeholder="Name or detail words">
+          <label for="graph-node-kind">Node type</label>
+          <select id="graph-node-kind" class="form-select form-select-sm">
+            <option value="">All types ({{ relationship_graph.nodes|length }})</option>
+            {% for category in relationship_graph.categories %}<option value="{{ category.kind }}">{{ category.label }} ({{ category.count }})</option>{% endfor %}
+          </select>
+          <div class="graph-node-result-bar"><span id="graph-node-count" role="status"></span><button type="button" id="graph-clear-search">Clear</button></div>
+        </div>
+        <ul class="graph-node-results">
+          {% for node in relationship_graph.nodes %}<li data-result="{{ node.id }}"><a href="#{{ node.id }}-info" class="graph-node-link"><span>{{ node.category }}</span>{{ node.label }}</a></li>{% endfor %}
+        </ul>
+        <p id="graph-no-nodes" hidden>No nodes match. Try fewer words or another type.</p>
+      </div>
+      <div id="graph-details" role="tabpanel" aria-labelledby="graph-details-tab">
+      <div class="graph-info-heading"><h2 id="relationship-info-heading">Node details</h2><button type="button" id="graph-copy-link" hidden>Copy link</button></div>
+      <input id="graph-link-fallback" class="form-control form-control-sm" type="text" readonly aria-label="Link to selected node" hidden>
+      <div class="relationship-info" aria-label="Relationship details">
       {% for node in relationship_graph.nodes %}
         <section id="{{ node.id }}-info" class="relationship-info-item" aria-labelledby="{{ node.id }}-heading">
           <h6 id="{{ node.id }}-heading"><span>{{ node.category }}</span>{{ node.label }}</h6>
-          {% if node.parent %}<p class="relationship-parent">{{ node.parent_label }} <span>→ {{ node.relation }} →</span> {{ node.label }}</p>{% endif %}
           {% if node.details %}
             <dl>{% for item in node.details %}<div><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>{% endfor %}</dl>
           {% endif %}
+          {% if node.connections %}
+          <nav class="graph-connections" aria-label="Connections for {{ node.label }}">
+            <h3>Connections</h3>
+            {% for connection in node.connections %}
+              <a href="#{{ connection.id }}-info" class="graph-node-link"><strong>{{ connection.label }}</strong><span>{{ connection.direction }} · {{ connection.relation }}</span></a>
+            {% endfor %}
+          </nav>
+          {% endif %}
+          <a class="graph-source-link" href="{% url 'json_data_detail' data_object.pk %}{% if node.kind == 'output' %}#data-curves{% elif node.kind == 'loading' and relationship_graph.has_loading_details %}#data-loading{% else %}#data-metadata{% endif %}">{% if node.kind == 'output' %}View curves and download data{% elif node.kind == 'loading' and relationship_graph.has_loading_details %}View loading details{% else %}View data details{% endif %}</a>
         </section>
       {% endfor %}
       </div>
+      </div>
     </aside>
   </div>
+  <p id="graph-status" role="status" class="graph-status" hidden></p>
   {% else %}
     <p class="relationship-empty">No related metadata is available for this object.</p>
   {% endif %}

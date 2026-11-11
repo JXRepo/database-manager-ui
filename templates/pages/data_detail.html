@@ -1528,7 +1528,7 @@ details[open] > .detail-group-summary {
 
 
       <div class="card-body">
-<div class="detail-metadata-list">
+<div class="detail-metadata-list" id="data-metadata">
 {% for row in detail_rows %}
   <div class="detail-row-card">
 
@@ -1648,7 +1648,7 @@ details[open] > .detail-group-summary {
 
 
 {% if mechanical_bc_items %}
-        <div class="bc-panel">
+        <div class="bc-panel" id="data-loading">
           <div class="bc-panel-title">Mechanical Boundary Condition Cube</div>
 
           <div class="bc-layout">
@@ -1850,7 +1850,7 @@ details[open] > .detail-group-summary {
 {% endif %}
 
 
-          <div class="plot-panel">
+          <div class="plot-panel" id="data-curves">
       <div class="plot-panel-title">Mechanical Variable Plot Viewer</div>
 
       {% if plot_variables %}

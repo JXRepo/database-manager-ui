@@ -16,7 +16,7 @@ from apps.dyn_api.metadata_compat import field_value, metadata_view
 from .advanced_search import matches_whole_words
 from .detail_relationships import build_relationship_graph
 from .models import JSONData
-from .views import _assistant_text, _extract_plot_variables, _split_keyword_terms
+from .views import _assistant_text, _build_mechanical_bc_items, _extract_plot_variables, _split_keyword_terms
 
 
 def _object_option(obj):
@@ -122,6 +122,10 @@ def graph_view(request):
         metadata = metadata_view(obj.data)
         graph = build_relationship_graph(
             metadata, _extract_plot_variables(metadata, units=metadata.get("units", {})),
+        )
+        has_loading = any(node["kind"] == "loading" for node in graph["nodes"])
+        graph["has_loading_details"] = has_loading and any(
+            item["is_defined"] for item in _build_mechanical_bc_items(metadata)
         )
         current = _object_option(obj)
 

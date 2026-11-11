@@ -543,8 +543,9 @@ for local measurements and verification.
 
 **Graph** is an independent workspace in the sidebar, next to Charts. Choose
 an accessible data object to view its supplied creators, software, phases,
-constitutive models and available mechanical outputs. The large canvas remains
-open, with node details on the right and the current data object above it.
+constitutive models, loading conditions and available mechanical outputs. The
+large canvas remains open, with node details on the right and the current data
+object above it.
 **Change data** opens a picker with title or identifier search and 25 objects per
 page. Searches require all entered whole words, ignoring case and word order.
 Only owned, public or explicitly shared records appear. Browsing picker pages
@@ -552,18 +553,38 @@ keeps the current graph until another object is opened.
 
 Models connect to their own phase; equal phase names do not merge distinct
 entries. Select a node with the mouse or Tab and Enter to read its complete name
-and details. Output nodes report each available series' full sample count and
-units, distinguishing supplied series from calculated equivalents used by the
-plots. The graph summarizes metadata and availability, not scientific
-comparability or validation results.
+and details. The inspector shows supplied model parameters and model units,
+phase texture and grain number, recorded creator affiliations and software
+versions. Large parameter containers are labelled summaries with a link to the
+complete data; model parameters show up to 20 fields before a remaining count.
+Loading conditions stay separate and show their supplied type, mode, vertices,
+constraints and load record count without interpreting signs or steps. Output
+nodes report each available series' full sample count and units, distinguishing
+supplied series from calculated equivalents used by the plots. Links return to
+the record's metadata, available loading panel or curves and downloads.
+
+The **Find nodes** tab searches node names and displayed details using all
+entered words and an optional node type. Selecting a result brings a readable
+node into view. The **Details** tab lists incoming and outgoing connections as
+links. Selection is bookmarkable with **Copy link**, survives reload and browser
+Back, and keeps the record's existing access requirements.
+
+Drag the canvas background to pan, use **+ / −**, **100%**, **Fit**, **Center node**
+or Ctrl/Command + scroll to navigate, and use **Focus connections** to emphasize
+the selected node's immediate neighbors. With the canvas focused, + / − zoom,
+0 fits and / opens node search. **Download** saves the complete graph as SVG or
+PNG, including nodes outside the current view or focus. SVG contains complete
+names in node titles; PNG is bounded to 8,192 pixels per side and 16 million
+pixels total. Original JSON uses the existing permission checked export.
 
 Large graphs scroll inside the canvas and long names wrap in the inspector.
 Empty selectors and records without related metadata have explicit empty states.
 Without JavaScript, GET forms still select data and graph links reach ordinary
 node detail sections. Graph uses the shared metadata compatibility view and the
 same access rules as detail pages; malformed or repeated object selections are
-rejected. It does not modify uploaded JSON, infer links to other records, or
-require an ontology service or graph database.
+rejected. The graph summarizes metadata and availability, not scientific
+comparability or validation results. It does not modify uploaded JSON, infer
+links to other records, or require an ontology service or graph database.
 
 ## Data Object Details
 

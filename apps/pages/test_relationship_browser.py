@@ -37,6 +37,7 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
             "software_version": "3.0", "phase": [
                 {"phase_name": "Ferrite", "phase_id": 0, "constitutive_model": {
                     "elastic_model_name": "Cubic elasticity",
+                    "elastic_parameters": {"C11": 233000, "units": "MPa"},
                     "plastic_model_name": "Phenomenological crystal plasticity",
                 }},
                 {"phase_name": "Martensite", "phase_id": 1, "constitutive_model": {
@@ -45,6 +46,11 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
             ],
             "stress": {"stress_11": [0, 80, 160]},
             "total_strain": {"strain_11": [0, .01, .02, .03]},
+            "mechanical_BC": [{
+                "vertex_list": ["V000"], "constraints": ["fixed", "loaded", "free"],
+                "loading_type": "force", "loading_mode": "static",
+                "applied_load": [{"magnitude": -4, "step": 10001}],
+            }],
             "units": {"Stress": "MPa", "Strain": "1"},
         })
         long_name = "WWW" * 100 + " <script>window.graphInjection = true</script>"
@@ -58,9 +64,17 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
             "phase": phases,
         })
         empty = JSONData.objects.create(owner=viewer, data={"title": "No related metadata"})
+        large_record = JSONData.objects.create(owner=viewer, data={
+            "title": "Eighty distinct phase entries", "phase": [
+                {"phase_name": f"Phase {index}", "constitutive_model": {
+                    "elastic_model_name": f"Elastic model {index}",
+                }} for index in range(80)
+            ],
+        })
         cases = {"sample": f"{reverse('graph')}?object={sample.pk}",
                  "long": f"{reverse('graph')}?object={long_record.pk}",
                  "empty": f"{reverse('graph')}?object={empty.pk}",
+                 "large": f"{reverse('graph')}?object={large_record.pk}",
                  "detail": reverse("json_data_detail", args=[sample.pk]),
                  "picker": reverse("graph")}
         self.client.force_login(viewer)
@@ -70,7 +84,7 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
                            RELATIONSHIP_CASES=json.dumps(cases))
         result = subprocess.run(
             [shutil.which("node"), str(settings.BASE_DIR / "tests/browser/relationships.cjs")],
-            env=environment, capture_output=True, text=True, timeout=90, check=False,
+            env=environment, capture_output=True, text=True, timeout=120, check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         print(result.stdout)

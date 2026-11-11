@@ -1,10 +1,11 @@
 """
-Describe one data object's supplied metadata as a small relationship graph
+Describe one data object's supplied metadata as an explorable relationship graph
 """
 
 import json
+from itertools import islice
 
-from apps.dyn_api.metadata_compat import field_value
+from apps.dyn_api.metadata_compat import field_name, field_value, unwrap_single_value
 from apps.dyn_api.required_schema import is_empty
 
 
@@ -59,7 +60,29 @@ def _details(data, fields):
     return details
 
 
-def _add_node(nodes, kind, label, parent="", relation="", details=()):
+def _summary(value):
+    """
+    Summarize containers without copying large parameter or orientation arrays
+
+    Parameters
+    ----------
+    value : object
+        A supplied parameter value.
+
+    Returns
+    -------
+    str
+        A complete scalar, small flat container or explicitly labelled summary.
+    """
+    if isinstance(value, (dict, list)):
+        values = value.values() if isinstance(value, dict) else value
+        if len(value) > 8 or any(isinstance(item, (dict, list)) for item in values):
+            unit = "fields" if isinstance(value, dict) else "items"
+            return f"{len(value)} {unit} · View data details for all values"
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
+
+
+def _add_node(nodes, kind, label, parent="", relation="", details=(), key=None):
     """
     Append a node with a local identity and a complete accessible label
 
@@ -77,6 +100,8 @@ def _add_node(nodes, kind, label, parent="", relation="", details=()):
         Human readable description of the outgoing relationship.
     details : sequence, optional
         Additional supplied metadata or output summaries.
+    key : str, optional
+        Stable field and entry identity for shareable links within the record.
 
     Returns
     -------
@@ -84,11 +109,13 @@ def _add_node(nodes, kind, label, parent="", relation="", details=()):
         The appended node.
     """
     node = {
-        "id": f"relationship-{len(nodes)}", "kind": kind, "label": label,
+        "id": f"relationship-{key or kind}", "kind": kind, "label": label,
         "parent": parent, "relation": relation, "details": list(details),
+        "connections": [], "legacy_id": f"relationship-{len(nodes)}",
         "category": {
             "record": "Data object", "creator": "Creator", "software": "Software",
             "phase": "Phase", "model": "Constitutive model", "output": "Output",
+            "loading": "Loading condition",
         }[kind],
     }
     nodes.append(node)
@@ -148,11 +175,21 @@ def _layout(nodes):
         parent_y, node_y = parent["y"] + 36, node["y"] + 36
         edges.append({
             "source": parent["id"], "target": node["id"],
+            "label": f'{parent["label"]} → {node["relation"]} → {node["label"]}',
             "path": f"M {parent_x} {parent_y} C {middle} {parent_y}, {middle} {node_y}, {node_x} {node_y}",
         })
         node["parent_label"] = parent["label"]
+        parent["connections"].append({"id": node["id"], "label": node["label"],
+                                      "relation": node["relation"], "direction": "Outgoing"})
+        node["connections"].append({"id": parent["id"], "label": parent["label"],
+                                    "relation": node["relation"], "direction": "Incoming"})
+    categories = {}
+    for node in nodes:
+        category = categories.setdefault(node["kind"], {"kind": node["kind"],
+                                                       "label": node["category"], "count": 0})
+        category["count"] += 1
     return {"nodes": nodes, "edges": edges, "width": 1020 if children else 760,
-            "height": height, "count": len(nodes) - 1}
+            "height": height, "count": len(nodes) - 1, "categories": list(categories.values())}
 
 
 def build_relationship_graph(metadata, plot_variables):
@@ -177,12 +214,15 @@ def build_relationship_graph(metadata, plot_variables):
     nodes = []
     root = _add_node(
         nodes, "record", _text(metadata.get("title")) or _text(metadata.get("identifier")) or "Data object",
-        details=_details(metadata, (("identifier", "Identifier"), ("date", "Date"))),
+        details=_details(metadata, (("identifier", "Identifier"), ("date", "Date"),
+                                   ("description", "Description"), ("rights", "Rights"))),
     )
     for field, relation in (("creator", "Created by"), ("software", "Uses software")):
         label = _text(metadata.get(field))
         if label:
-            fields = (("software_version", "Recorded versions"),) if field == "software" else ()
+            fields = (("software_version", "Recorded versions"),) if field == "software" else (
+                ("creator_affiliation", "Recorded affiliations"), ("creator_ORCID", "Recorded ORCIDs"),
+            )
             _add_node(nodes, field, label, root["id"], relation, _details(metadata, fields))
 
     phases = metadata.get("phase", [])
@@ -190,7 +230,7 @@ def build_relationship_graph(metadata, plot_variables):
         phases = [phases]
     for index, phase in enumerate(phases):
         if isinstance(phase, str) and phase.strip():
-            _add_node(nodes, "phase", phase.strip(), root["id"], "Has phase")
+            _add_node(nodes, "phase", phase.strip(), root["id"], "Has phase", key=f"phase-{index}")
             continue
         if not isinstance(phase, dict) or not phase:
             continue
@@ -201,12 +241,25 @@ def build_relationship_graph(metadata, plot_variables):
         phase_node = _add_node(
             nodes, "phase", label or f"Phase {index + 1}", root["id"], "Has phase",
             _details(phase, (("phase_id", "Phase ID"), ("lattice_structure", "Lattice structure"),
-                             ("volume_fraction", "Volume fraction"))),
+                             ("volume_fraction", "Volume fraction"))), key=f"phase-{index}",
         )
+        orientation = phase.get("orientation")
+        if isinstance(orientation, dict):
+            phase_node["details"].extend(_details(orientation, (
+                ("texture_type", "Texture"),
+                ("frame", "Orientation frame"), ("rotation_type", "Rotation type"),
+                ("orientation_identifier", "Orientation identifier"),
+            )))
+            grains = [(name, unwrap_single_value(value)) for name, value in orientation.items()
+                      if field_name(name) in {"graincount", "grainnumber"} and not is_empty(value)]
+            phase_node["details"].extend({
+                "label": "Grain number" if len(grains) == 1 else f"Grain number · {name}",
+                "value": _summary(value),
+            } for name, value in grains)
         models = phase.get("constitutive_model", [])
         if not isinstance(models, list):
             models = [models]
-        for model in models:
+        for model_index, model in enumerate(models):
             if not isinstance(model, dict):
                 continue
             for family in ("elastic", "plastic", "damage"):
@@ -216,8 +269,20 @@ def build_relationship_graph(metadata, plot_variables):
                 if family == "plastic" and label.casefold() == "no plasticity in this elastic reference":
                     phase_node["details"].append({"label": "Plasticity", "value": label})
                     continue
-                _add_node(nodes, "model", label, phase_node["id"], f"Uses {family} model",
-                          [{"label": "Model family", "value": family.capitalize()}])
+                details = [{"label": "Model family", "value": family.capitalize()}]
+                if not is_empty(model.get("units")):
+                    details.append({"label": "Recorded model units", "value": _summary(model["units"])})
+                parameters = model.get(f"{family}_parameters")
+                if isinstance(parameters, dict):
+                    details.extend({"label": name, "value": _summary(value)}
+                                   for name, value in islice(parameters.items(), 20))
+                    if len(parameters) > 20:
+                        details.append({"label": "More parameters", "value":
+                                        f"{len(parameters) - 20} fields · View data details for all values"})
+                elif not is_empty(parameters):
+                    details.append({"label": "Parameters", "value": _summary(parameters)})
+                _add_node(nodes, "model", label, phase_node["id"], f"Uses {family} model", details,
+                          key=f"phase-{index}-model-{model_index}-{family}")
 
     for group, label in (("stress", "Stress"), ("total_strain", "Total strain"),
                          ("plastic_strain", "Plastic strain")):
@@ -232,5 +297,23 @@ def build_relationship_graph(metadata, plot_variables):
             summary += " · Calculated" if variable.get("calculated") else " · Supplied"
             series.append({"label": variable["short_label"], "value": summary})
         if series:
-            _add_node(nodes, "output", label, root["id"], "Contains results", series)
+            _add_node(nodes, "output", label, root["id"], "Contains results", series, key=group)
+
+    conditions = metadata.get("mechanical_BC", [])
+    if not isinstance(conditions, list):
+        conditions = [conditions]
+    for index, condition in enumerate(conditions):
+        if not isinstance(condition, dict) or is_empty(condition):
+            continue
+        label = " · ".join(filter(None, (_text(condition.get("loading_type")),
+                                         _text(condition.get("loading_mode")))))
+        details = _details(condition, (("loading_type", "Loading type"), ("loading_mode", "Loading mode")))
+        for field, name in (("vertex_list", "Vertices"), ("constraints", "Constraints")):
+            if not is_empty(condition.get(field)):
+                details.append({"label": name, "value": _summary(condition[field])})
+        loads = condition.get("applied_load")
+        if not is_empty(loads):
+            details.append({"label": "Load records", "value": str(len(loads) if isinstance(loads, list) else 1)})
+        _add_node(nodes, "loading", label or f"Loading condition {index + 1}", root["id"],
+                  "Has loading condition", details, key=f"loading-{index}")
     return _layout(nodes)

@@ -121,6 +121,9 @@ Current priority:
 - Relationship model nodes belong to their supplied phase entry; keep equal phase names separate and never use phase_id as a name
 - Relationship output nodes reuse the detail plot's available series, show complete sample counts and supplied units, and distinguish calculated equivalents without copying curve arrays into the graph
 - Graph keeps a large canvas open with node details on the right; bound scrolling, retain full names in the inspector, and support keyboard, ordinary GET selection and native links without JavaScript
+- Graph supports fit, zoom, background dragging, connection focus, node word/type search and incoming/outgoing navigation; keep stable field/entry node anchors, history navigation and copied links within the selected accessible object
+- Graph model parameters retain explicitly supplied model units without inferring mappings; summarize large containers, preserve complete detail/JSON access, and keep separate loading conditions with their recorded type, mode, targets and counts without inventing steps or physical interpretation
+- Graph SVG/PNG downloads include the complete graph regardless of the current viewport or focus; use portable SVG text and bound PNG to 8,192 pixels per side and 16 million pixels total
 - Detail metadata orders all supplied schema fields by properties declaration order at every level, including fields from the referenced constitutive and microstructure schemas, without prioritizing required fields
 - Place supplied top-level $schema, $id, version, type, and description before identifier in that order; show uploaded values, do not add missing header fields, and show description only once
 - Omit top-level mechanical_BC, stress, total_strain, and plastic_strain from the metadata list while retaining their visualizations and complete export; same-named nested fields remain visible
