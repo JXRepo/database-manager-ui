@@ -673,8 +673,15 @@ positive range. Small signed values retain their actual signs and scale.
 Tick labels sit beside the actual axes, on the side closest to the plotting
 edge; range endpoints are labelled even when they do not fall on a regular tick.
 Nearby regular ticks are omitted to leave room for the endpoint labels.
-Axes and numbers are black, with 16px tick labels. Titles stay outside the
-plotting area, with a vertical Y title. Axis text
+Axes and numbers are black, with 16px tick labels. Nonzero tick labels use two
+decimal places with half-up rounding; small or large scales use scientific
+notation with two decimal places in the mantissa. The two origin labels remain
+`0`. This formatting does not round the data, hover values or CSV exports.
+Titles stay outside the plotting area, with a vertical Y title. Their visible
+text edges sit 16 CSS pixels beyond the outer envelope of the ticks, arrowheads
+and plotting area, using measured glyph bounds rather than fixed text baselines.
+Arrowheads start 24 CSS pixels beyond each positive range endpoint and extend
+another 8 pixels, leaving room around the maximum tick. Axis text
 is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
 all exports.
@@ -690,7 +697,8 @@ Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
 scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
 Axis labels and units use 18px text with 13px subscripts. Sigma and epsilon use
-the same italic serif font. PNG downloads redraw the plot at three pixels per
+the same italic serif font, with their visible glyph heights matched. PNG
+downloads use the same measured layout and redraw the plot at three pixels per
 CSS pixel, with equal white margins and no active hover marker or tooltip;
 the interactive chart keeps its displayed dimensions. Stress units come from
 the uploaded `units.Stress` value. For total and plastic strain, an explicit

@@ -73,6 +73,129 @@ const {join} = require('node:path');
         document.getElementById(${JSON.stringify(id)}).dispatchEvent(new Event('change', {bubbles: true}));
         Chart.getChart('mechanical-plot').stop(); Chart.getChart('mechanical-plot').update('none')`);
     }
+    function verifyTextLayout(metrics, label) {
+      const planned = metrics.plotLayout;
+      assert.ok(planned && planned.ticks.length && planned.titles.x && planned.titles.y,
+        `${label}: the drawing exposes its measured text layout`);
+      const fontSize = font => Number(font.match(/([\d.]+)px/)[1]);
+      const close = (actual, expected, message) => assert.ok(Math.abs(actual - expected) <= .15,
+        `${label}: ${message}: ${actual} instead of ${expected}`);
+      const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > .5
+        && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > .5;
+      const union = boxes => ({
+        left: Math.min(...boxes.map(box => box.left)), top: Math.min(...boxes.map(box => box.top)),
+        right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
+      });
+      const used = new Set();
+      const groups = [...planned.ticks, planned.titles.x, planned.titles.y];
+      for (const position of groups) {
+        const bounds = position.group.bounds;
+        const drawnRuns = [];
+        for (const run of position.group.runs) {
+          const local = run.bounds;
+          const rotated = Math.abs((position.rotation || 0) + Math.PI / 2) < 1e-6;
+          const expected = rotated ? {
+            left: position.left + local.top - bounds.top,
+            right: position.left + local.bottom - bounds.top,
+            top: position.top - local.right + bounds.right,
+            bottom: position.top - local.left + bounds.right,
+          } : {
+            left: position.left + local.left - bounds.left,
+            right: position.left + local.right - bounds.left,
+            top: position.top + local.top - bounds.top,
+            bottom: position.top + local.bottom - bounds.top,
+          };
+          const index = metrics.texts.findIndex((text, index) => !used.has(index)
+            && text.text === run.text && fontSize(text.font) === fontSize(run.font)
+            && ['left', 'top', 'right', 'bottom'].every(edge => Math.abs(text[edge] - expected[edge]) <= .15));
+          assert.ok(index >= 0, `${label}: fillText does not match the measured run ${JSON.stringify({run, expected})}`);
+          used.add(index);
+          drawnRuns.push(metrics.texts[index]);
+        }
+        const actual = union(drawnRuns);
+        for (const edge of ['left', 'top', 'right', 'bottom']) {
+          close(actual[edge], position[edge], `${position.axis || 'title'} group ${edge}`);
+        }
+        assert.ok(position.left >= 0 && position.top >= 0
+          && position.right <= metrics.width && position.bottom <= metrics.height,
+        `${label}: text group is clipped: ${JSON.stringify(position)}`);
+      }
+      for (let first = 0; first < groups.length; first++) {
+        for (let second = first + 1; second < groups.length; second++) {
+          assert.equal(overlap(groups[first], groups[second]), false,
+            `${label}: measured labels overlap: ${JSON.stringify([groups[first], groups[second]])}`);
+        }
+      }
+      for (const axis of ['x', 'y']) {
+        const ticks = planned.ticks.filter(tick => tick.axis === axis);
+        for (const endpoint of [metrics[axis + 'Min'], metrics[axis + 'Max']]) {
+          assert.ok(ticks.some(tick => tick.value === endpoint), `${label}: ${axis} endpoint remains labelled: ${endpoint}`);
+        }
+        const labels = metrics.tickLabels.filter(tick => tick.axis === axis);
+        const visibleLabels = labels.map(({value, label: tickLabel}) => {
+          if (value === 0) {
+            assert.deepEqual(tickLabel, {type: 'plain', text: '0'}, `${label}: true zero remains plain`);
+            return '0';
+          }
+          if (tickLabel.type === 'plain') {
+            assert.match(tickLabel.text, /^-?\d+\.\d{2}$/, `${label}: ordinary ticks use exactly two decimals`);
+            assert.notEqual(Number(tickLabel.text), 0, `${label}: a nonzero tick must not round to a false zero`);
+            return tickLabel.text;
+          }
+          assert.match(tickLabel.mantissa, /^-?\d+\.\d{2}$/, `${label}: scientific mantissas use two decimals`);
+          assert.match(tickLabel.exponent, /^-?\d+$/, `${label}: scientific exponents remain integers`);
+          return `${tickLabel.mantissa}e${tickLabel.exponent}`;
+        });
+        assert.equal(new Set(visibleLabels).size, visibleLabels.length, `${label}: ${axis} tick labels remain distinct`);
+        for (const tick of ticks) {
+          const formatted = labels.find(item => item.value === tick.value).label;
+          const main = formatted.type === 'plain' ? formatted.text : `${formatted.mantissa} × 10`;
+          assert.ok(tick.group.runs.some(run => run.text === main && fontSize(run.font) === 16),
+            `${label}: ${axis} tick is drawn at 16px with the expected number: ${main}`);
+          if (formatted.type === 'scientific') {
+            assert.ok(tick.group.runs.some(run => run.text === formatted.exponent && fontSize(run.font) === 11),
+              `${label}: ${axis} scientific exponent is drawn at 11px`);
+          }
+        }
+        const arrow = planned.arrows[axis];
+        assert.equal(arrow.length, 3, `${label}: ${axis} arrow has three vertices`);
+        assert.ok(metrics.filledPaths.some(path => path.length === arrow.length
+          && path.every((point, index) => Math.hypot(point.x - arrow[index].x, point.y - arrow[index].y) < .15)),
+        `${label}: ${axis} arrow's actual filled vertices match the layout`);
+        const arrowBox = union(arrow.map(point => ({left: point.x, right: point.x, top: point.y, bottom: point.y})));
+        assert.ok(arrowBox.left >= 0 && arrowBox.top >= 0
+          && arrowBox.right <= metrics.width && arrowBox.bottom <= metrics.height,
+        `${label}: ${axis} arrow remains inside the canvas`);
+        const rangeEnd = axis === 'x' ? metrics.area.right : metrics.area.top;
+        const baseGap = axis === 'x' ? arrowBox.left - rangeEnd : rangeEnd - arrowBox.bottom;
+        assert.ok(baseGap >= 24 - .15, `${label}: ${axis} arrow base stays 24px beyond the range endpoint`);
+        close(axis === 'x' ? arrowBox.right - arrowBox.left : arrowBox.bottom - arrowBox.top, 8,
+          `${axis} arrow length`);
+        for (const group of groups) {
+          assert.equal(overlap(group, arrowBox), false,
+            `${label}: ${axis} arrow overlaps text: ${JSON.stringify({group, arrowBox})}`);
+        }
+      }
+      const arrowPoints = [...planned.arrows.x, ...planned.arrows.y];
+      const xTitleGap = planned.xSide < 0
+        ? Math.min(metrics.area.top, ...planned.ticks.map(tick => tick.top), ...arrowPoints.map(point => point.y)) - planned.titles.x.bottom
+        : planned.titles.x.top - Math.max(metrics.area.bottom, ...planned.ticks.map(tick => tick.bottom), ...arrowPoints.map(point => point.y));
+      const yTitleGap = planned.ySide < 0
+        ? Math.min(metrics.area.left, ...planned.ticks.map(tick => tick.left), ...arrowPoints.map(point => point.x)) - planned.titles.y.right
+        : planned.titles.y.left - Math.max(metrics.area.right, ...planned.ticks.map(tick => tick.right), ...arrowPoints.map(point => point.x));
+      close(xTitleGap, 16, 'X title gap from the plot, tick and arrow envelope');
+      close(yTitleGap, 16, 'Y title gap from the plot, tick and arrow envelope');
+      for (const axis of ['x', 'y']) {
+        for (const run of planned.titles[axis].group.runs) {
+          if (run.text === 'σ' || run.text === 'ε') continue;
+          assert.ok([13, 18].includes(fontSize(run.font)), `${label}: title and subscript sizes are consistent`);
+        }
+      }
+      const sigma = metrics.texts.find(text => text.text === 'σ');
+      const epsilon = metrics.texts.find(text => text.text === 'ε');
+      assert.ok(sigma && epsilon && Math.abs(sigma.glyphHeight - epsilon.glyphHeight) <= 1,
+        `${label}: sigma and epsilon have matching visible glyph heights`);
+    }
     async function layout(label, width, expected = null) {
       await command('Emulation.setDeviceMetricsOverride', {width, height: 900, deviceScaleFactor: 1, mobile: false});
       await evaluate(`new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
@@ -80,6 +203,7 @@ const {join} = require('node:path');
         const chart = Chart.getChart('mechanical-plot');
         chart.resize();
         window.plotTexts = [];
+        window.plotFilledPaths = [];
         chart.update('none');
         const {x, y} = chart.scales;
         const area = chart.chartArea;
@@ -96,14 +220,18 @@ const {join} = require('node:path');
         }
         const data = chart.data.datasets[0].data;
         const originX = x.getPixelForValue(0), originY = y.getPixelForValue(0);
+        const insideText = (px, py) => window.plotTexts.some(text => px >= text.left - 3
+          && px <= text.right + 3 && py >= text.top - 3 && py <= text.bottom + 3);
         const framePixels = [];
         for (const fraction of [.25, .5, .75]) {
           const px = area.left + area.width * fraction, py = area.top + area.height * fraction;
           for (const edge of [area.top, area.bottom]) {
-            if (Math.abs(edge - originY) > 5 && Math.abs(px - originX) > 5 && hasAxis(px, edge)) framePixels.push({px, py: edge});
+            if (Math.abs(edge - originY) > 5 && Math.abs(px - originX) > 5
+              && !insideText(px, edge) && hasAxis(px, edge)) framePixels.push({px, py: edge});
           }
           for (const edge of [area.left, area.right]) {
-            if (Math.abs(edge - originX) > 5 && Math.abs(py - originY) > 5 && hasAxis(edge, py)) framePixels.push({px: edge, py});
+            if (Math.abs(edge - originX) > 5 && Math.abs(py - originY) > 5
+              && !insideText(edge, py) && hasAxis(edge, py)) framePixels.push({px: edge, py});
           }
         }
         const gaps = [];
@@ -127,15 +255,28 @@ const {join} = require('node:path');
           originX, originY, framePixels,
           horizontal: hasAxis(area.left + area.width * .25, originY),
           vertical: hasAxis(originX, area.top + area.height * .25),
-          xArrow: hasAxis(area.right + 8, originY + 2),
-          yArrow: hasAxis(originX + 2, area.top - 8),
           radii: chart.getDatasetMeta(0).data.map(point => point.options.radius), gaps,
           xGrid: x.options.grid.display, yGrid: y.options.grid.display,
-          data, texts: window.plotTexts,
-          endpointLabels: [x, y].flatMap(scale => [scale.min, scale.max].map(value =>
-            formatPlotTickLabel(value, scale.options.customLabelPrecision))),
+          data, texts: window.plotTexts, filledPaths: window.plotFilledPaths,
+          plotLayout: chart.$mechanicalPlotLayout,
+          tickLabels: chart.$mechanicalPlotLayout.ticks.map(tick => ({
+            axis: tick.axis, value: tick.value,
+            label: formatPlotTickLabel(tick.value - Number(chart.scales[tick.axis].options.customOffset || 0),
+              chart.scales[tick.axis].options.customTickFormat),
+          })),
           overflow: document.documentElement.scrollWidth > innerWidth};
       })()`);
+      if (process.env.PLOT_SCREENSHOT_DIR) {
+        mkdirSync(process.env.PLOT_SCREENSHOT_DIR, {recursive: true});
+        await evaluate(`document.querySelector('.plot-panel').scrollIntoView({block: 'start', behavior: 'instant'});
+          scrollBy({top: -88, behavior: 'instant'});
+          new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
+        const shot = await command('Page.captureScreenshot', {format: 'png'});
+        const filename = width === 1440 ? `${label}.png` : `${label}-${width}.png`;
+        writeFileSync(join(process.env.PLOT_SCREENSHOT_DIR, filename), Buffer.from(shot.data, 'base64'));
+        assert.ok(await evaluate(`(() => {const r = document.getElementById('mechanical-plot').getBoundingClientRect();
+          return r.top >= 0 && r.bottom <= innerHeight;})()`), `${label}: canvas is visible in the screenshot`);
+      }
       if (expected) {
         assert.equal(metrics.xSigns, expected.xSigns, `${label}: X quadrants`);
         assert.equal(metrics.ySigns, expected.ySigns, `${label}: Y quadrants`);
@@ -155,7 +296,6 @@ const {join} = require('node:path');
       assert.ok(Math.abs(metrics.displayWidth - metrics.width) < 1
         && Math.abs(metrics.displayHeight - metrics.height) < 1,
         `${label}: displayed canvas and pointer coordinates share the same size`);
-      assert.ok(metrics.xArrow && metrics.yArrow, `${label}: positive-direction arrowheads`);
       assert.deepEqual(metrics.framePixels, [], `${label}: no additional rectangular frame`);
       assert.ok(metrics.radii.every(radius => radius === 0), `${label}: no endpoint circles`);
       assert.deepEqual(metrics.gaps, [], `${label}: labels never erase curve segments`);
@@ -163,20 +303,7 @@ const {join} = require('node:path');
       assert.equal(metrics.yGrid, false);
       assert.equal(metrics.overflow, false, `${label}: desktop width`);
       assert.ok(metrics.texts.length > 5, `${label}: visible ticks and titles`);
-      for (const endpoint of metrics.endpointLabels) {
-        const text = endpoint.type === 'plain' ? endpoint.text : `${endpoint.mantissa} × 10`;
-        assert.ok(metrics.texts.some(item => item.text === text), `${label}: visible range endpoint ${text}`);
-      }
-      const numbers = metrics.texts.filter(item => /^[-\d]/.test(item.text) && /(?:16|11)px/.test(item.font));
-      for (let first = 0; first < numbers.length; first++) {
-        for (let second = first + 1; second < numbers.length; second++) {
-          const a = numbers[first], b = numbers[second];
-          const overlapX = Math.min(a.right, b.right) - Math.max(a.left, b.left);
-          const overlapY = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
-          assert.ok(overlapX < .5 || overlapY < .5,
-            `${label}: tick labels overlap: ${JSON.stringify([a, b])}`);
-        }
-      }
+      verifyTextLayout(metrics, label);
       const zeros = metrics.texts.filter(text => text.text === '0');
       assert.equal(zeros.length, 2, `${label}: separate zero labels for X and Y`);
       assert.ok(zeros.every(text => Math.abs((text.left + text.right) / 2 - metrics.originX) < 25
@@ -184,11 +311,6 @@ const {join} = require('node:path');
       for (const text of metrics.texts) {
         assert.ok(text.left >= -1 && text.right <= metrics.width + 1
           && text.top >= -1 && text.bottom <= metrics.height + 1, `${label}: clipped ${JSON.stringify(text)}`);
-        const outside = text.right <= metrics.area.left || text.left >= metrics.area.right
-          || text.bottom <= metrics.area.top || text.top >= metrics.area.bottom;
-        const besideAxis = Math.abs((text.left + text.right) / 2 - metrics.originX) < 96
-          || Math.abs((text.top + text.bottom) / 2 - metrics.originY) < 30;
-        assert.ok(outside || besideAxis, `${label}: labels sit beside the axes: ${JSON.stringify(text)}`);
       }
       assert.ok(metrics.texts.some(item => item.text === 'σ' && Math.abs(item.rotation + Math.PI / 2) < 1e-6),
         `${label}: stress title is vertical`);
@@ -197,16 +319,6 @@ const {join} = require('node:path');
       }
       assert.ok(metrics.texts.some(item => item.text === '(MPa)' && !item.font.includes('italic')));
       assert.ok(metrics.texts.some(item => item.text === '(-)' && !item.font.includes('italic')));
-      if (process.env.PLOT_SCREENSHOT_DIR && width === 1440) {
-        mkdirSync(process.env.PLOT_SCREENSHOT_DIR, {recursive: true});
-        await evaluate(`document.querySelector('.plot-panel').scrollIntoView({block: 'start', behavior: 'instant'});
-          scrollBy({top: -88, behavior: 'instant'});
-          new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))`);
-        assert.ok(await evaluate(`(() => {const r = document.getElementById('mechanical-plot').getBoundingClientRect();
-          return r.top >= 0 && r.bottom <= innerHeight;})()`), `${label}: canvas is visible in the screenshot`);
-        const shot = await command('Page.captureScreenshot', {format: 'png'});
-        writeFileSync(join(process.env.PLOT_SCREENSHOT_DIR, `${label}.png`), Buffer.from(shot.data, 'base64'));
-      }
       return metrics;
     }
     async function hover(label, segment, fraction, expectedIndex, offset = 0) {
@@ -266,9 +378,12 @@ const {join} = require('node:path');
     await command('Page.addScriptToEvaluateOnNewDocument', {source: library});
     await command('Page.addScriptToEvaluateOnNewDocument', {source: `
       window.plotTexts = [];
+      window.plotExportTexts = [];
+      window.plotFilledPaths = [];
       const drawText = CanvasRenderingContext2D.prototype.fillText;
       CanvasRenderingContext2D.prototype.fillText = function(text, x, y, ...args) {
-        if (this.canvas.id === 'mechanical-plot') {
+        const exporting = window.capturePlotExport && this.canvas.width === 2160 && this.canvas.height === 1440;
+        if (this.canvas.id === 'mechanical-plot' || exporting) {
           const m = this.measureText(text);
           const matrix = this.getTransform();
           const corners = [[x - m.actualBoundingBoxLeft, y - m.actualBoundingBoxAscent],
@@ -277,11 +392,37 @@ const {join} = require('node:path');
             [x + m.actualBoundingBoxRight, y + m.actualBoundingBoxDescent]]
             .map(([px, py]) => ({x: matrix.a * px + matrix.c * py + matrix.e,
               y: matrix.b * px + matrix.d * py + matrix.f}));
-          window.plotTexts.push({text, font: this.font, rotation: Math.atan2(matrix.b, matrix.a),
+          const record = {text, font: this.font, rotation: Math.atan2(matrix.b, matrix.a),
+            scaleX: Math.hypot(matrix.a, matrix.b), scaleY: Math.hypot(matrix.c, matrix.d),
+            glyphHeight: (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) * Math.hypot(matrix.c, matrix.d),
             left: Math.min(...corners.map(point => point.x)), right: Math.max(...corners.map(point => point.x)),
-            top: Math.min(...corners.map(point => point.y)), bottom: Math.max(...corners.map(point => point.y))});
+            top: Math.min(...corners.map(point => point.y)), bottom: Math.max(...corners.map(point => point.y))};
+          (exporting ? window.plotExportTexts : window.plotTexts).push(record);
         }
         return drawText.call(this, text, x, y, ...args);
+      };
+      const beginPath = CanvasRenderingContext2D.prototype.beginPath;
+      CanvasRenderingContext2D.prototype.beginPath = function(...args) {
+        if (this.canvas.id === 'mechanical-plot') this.plotTestPath = [];
+        return beginPath.apply(this, args);
+      };
+      for (const method of ['moveTo', 'lineTo']) {
+        const original = CanvasRenderingContext2D.prototype[method];
+        CanvasRenderingContext2D.prototype[method] = function(x, y, ...args) {
+          if (this.canvas.id === 'mechanical-plot' && this.plotTestPath) {
+            const matrix = this.getTransform();
+            this.plotTestPath.push({x: matrix.a * x + matrix.c * y + matrix.e,
+              y: matrix.b * x + matrix.d * y + matrix.f});
+          }
+          return original.call(this, x, y, ...args);
+        };
+      }
+      const fill = CanvasRenderingContext2D.prototype.fill;
+      CanvasRenderingContext2D.prototype.fill = function(...args) {
+        if (this.canvas.id === 'mechanical-plot' && this.plotTestPath?.length === 3) {
+          window.plotFilledPaths.push(this.plotTestPath.slice());
+        }
+        return fill.apply(this, args);
       };`});
     await command('Network.setCookie', {name: process.env.PLOT_COOKIE_NAME, value: process.env.PLOT_SESSION,
       url: process.env.PLOT_BASE_URL, path: '/'});
@@ -345,7 +486,7 @@ const {join} = require('node:path');
     await evaluate('Chart.getChart("mechanical-plot").resize()');
     await until('canvas.width === 1440');
     await hover('PNG excludes the active sample marker', 0, .7, 1);
-    await evaluate('document.getElementById("download-plot-btn").click()');
+    await evaluate('window.capturePlotExport = true; window.plotExportTexts = []; document.getElementById("download-plot-btn").click(); window.capturePlotExport = false');
     await evaluate('document.getElementById("download-xy-csv-btn").click()');
     for (let attempt = 0; attempt < 100; attempt++) {
       if (readdirSync(profile).some(name => name.endsWith('.png')) && readdirSync(profile).some(name => name.endsWith('.csv'))) break;
@@ -357,6 +498,14 @@ const {join} = require('node:path');
     const png = readFileSync(join(profile, pngName));
     assert.equal(png.readUInt32BE(16), (720 + 48) * 3, 'PNG uses three pixels per CSS pixel with equal margins');
     assert.equal(png.readUInt32BE(20), (480 + 48) * 3);
+    const exportTexts = await evaluate('window.plotExportTexts');
+    assert.ok(exportTexts.length > 5, 'PNG redraws its labels on the full resolution canvas');
+    assert.ok(exportTexts.every(text => Math.abs(text.scaleX - 3) < 1e-6 && Math.abs(text.scaleY - 3) < 1e-6),
+      'PNG uses a genuine threefold text transform rather than scaling an existing bitmap');
+    assert.ok(exportTexts.every(text => text.left >= 0 && text.top >= 0 && text.right <= 2160 && text.bottom <= 1440),
+      'PNG text remains inside its drawing canvas before the equal margins are added');
+    assert.ok(exportTexts.some(text => text.text === 'σ') && exportTexts.some(text => text.text === 'ε'),
+      'PNG includes both mathematical axis titles');
     assert.equal(await evaluate('Chart.getChart("mechanical-plot").width'), 720, 'export preserves the interactive chart size');
     const exportedHoverEdge = await evaluate(`new Promise(resolve => {
       const image = new Image();
@@ -394,7 +543,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths, consistent canvas sizing, continuous sparse-line hover, enlarged sample markers, precise X/Y readouts, tiny values, a single point, reversals and hover clearing; two Cartesian axes, arrowheads, separate origin labels, no frame, asymmetric data ranges including zero, vertical stress title, uninterrupted curves, original samples, linked selectors, raw values, PNG/CSV downloads and empty data.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; measured Canvas text matches its layout without overlaps or clipping, titles have equal 16px gaps, arrow bases stay 24px beyond range endpoints, two-place ticks remain distinct, and mathematical glyph heights match. Curve hover, original samples, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

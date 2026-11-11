@@ -2309,43 +2309,42 @@ function buildPlotScale(values) {
       && (value === 0 || !besideEndpoint)) ticks.push(value);
   }
   ticks.sort((left, right) => left - right);
-  const labelMagnitude = Math.max(Math.abs(minimum - offset), Math.abs(maximum - offset));
-  const labelPrecision = Math.min(15, Math.max(6,
-    Math.floor(Math.log10(labelMagnitude)) - Math.floor(Math.log10(step)) + 2));
+  const tickFormat = step < .01 || Math.max(Math.abs(minimum), Math.abs(maximum)) >= 10000
+    ? "scientific" : "decimal";
 
   return {
     chartMin: minimum,
     chartMax: maximum,
     step,
     offset,
-    labelPrecision,
+    tickFormat,
     ticks,
   };
 }
 
-function formatPlotTickLabel(value, precision) {
-  value = Number(value.toPrecision(precision));
-  if (value === 0) return {type: "plain", text: "0"};
-  if (Math.abs(value) < 0.001 || Math.abs(value) >= 10000) {
-    const exponent = Math.floor(Math.log10(Math.abs(value)));
-    const mantissa = value / (10 ** exponent);
-    return {type: "scientific", mantissa: Number(mantissa.toPrecision(precision)).toString(),
-      exponent: exponent.toString()};
-  }
-  return {type: "plain", text: value.toString()};
-}
+const plotTickNumberOptions = {
+  useGrouping: false,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+  roundingMode: "halfExpand",
+};
+const plotTickDecimalFormatter = new Intl.NumberFormat("en-US", plotTickNumberOptions);
+const plotTickScientificFormatter = new Intl.NumberFormat("en-US", {
+  ...plotTickNumberOptions,
+  notation: "scientific",
+});
 
-function measurePlotTickLabel(ctx, value, precision) {
-  const label = formatPlotTickLabel(value, precision);
-  ctx.save();
-  ctx.font = "400 16px sans-serif";
-  let width = ctx.measureText(label.type === "plain" ? label.text : `${label.mantissa} × 10`).width;
-  if (label.type === "scientific") {
-    ctx.font = "400 11px sans-serif";
-    width += ctx.measureText(label.exponent).width + 1;
+function formatPlotTickLabel(value, mode = "auto") {
+  if (value === 0) return {type: "plain", text: "0"};
+  if (mode === "scientific" || Math.abs(value) < 0.01 || Math.abs(value) >= 10000) {
+    const parts = plotTickScientificFormatter.formatToParts(value);
+    const mantissa = parts.filter(part => ["minusSign", "integer", "decimal", "fraction"].includes(part.type))
+      .map(part => part.value).join("");
+    const exponent = parts.filter(part => ["exponentMinusSign", "exponentInteger"].includes(part.type))
+      .map(part => part.value).join("");
+    return {type: "scientific", mantissa, exponent};
   }
-  ctx.restore();
-  return width;
+  return {type: "plain", text: plotTickDecimalFormatter.format(value)};
 }
 
 function findCurveHoverIndex(points, position, radius = 16) {
@@ -2379,328 +2378,268 @@ function findCurveHoverIndex(points, position, radius = 16) {
   return nearestIndex;
 }
 
+function measurePlotText(ctx, runs) {
+  const measured = runs.map(run => {
+    ctx.font = run.font;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    const metrics = ctx.measureText(run.text);
+    return {...run, bounds: {
+      left: run.x - metrics.actualBoundingBoxLeft,
+      top: run.y - metrics.actualBoundingBoxAscent,
+      right: run.x + metrics.actualBoundingBoxRight,
+      bottom: run.y + metrics.actualBoundingBoxDescent,
+    }};
+  });
+  const bounds = {
+    left: Math.min(...measured.map(run => run.bounds.left)),
+    top: Math.min(...measured.map(run => run.bounds.top)),
+    right: Math.max(...measured.map(run => run.bounds.right)),
+    bottom: Math.max(...measured.map(run => run.bounds.bottom)),
+  };
+  return {runs: measured, bounds, width: bounds.right - bounds.left, height: bounds.bottom - bounds.top};
+}
+
+function plotTickText(ctx, value, mode) {
+  const label = formatPlotTickLabel(value, mode);
+  const font = "400 16px sans-serif";
+  const text = label.type === "plain" ? label.text : `${label.mantissa} × 10`;
+  const runs = [{text, font, x: 0, y: 0}];
+  if (label.type === "scientific") {
+    ctx.font = font;
+    runs.push({text: label.exponent, font: "400 11px sans-serif", x: ctx.measureText(text).width + 1, y: -7});
+  }
+  return measurePlotText(ctx, runs);
+}
+
+function plotTitleText(ctx, text) {
+  const match = String(text || "").trim().match(/^(.*?)\s*(\([^)]+\))?$/);
+  const notation = match?.[1].trim() || "";
+  const unit = match?.[2] || "";
+  const split = notation.indexOf("_");
+  const main = split < 0 ? notation : notation.slice(0, split);
+  const subscript = split < 0 ? "" : notation.slice(split + 1);
+  const runs = [];
+  let x = 0;
+  ctx.font = 'italic 400 18px "Times New Roman", serif';
+  const symbolHeight = Math.max(...["σ", "ε"].map(symbol => {
+    const metrics = ctx.measureText(symbol);
+    return metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+  }));
+  for (const run of getPlotTextRuns(main, 18)) {
+    ctx.font = run.font;
+    if (/^[σε]$/.test(run.text)) {
+      const metrics = ctx.measureText(run.text);
+      const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+      if (height > 0) run.font = run.font.replace("18px", `${18 * symbolHeight / height}px`);
+      ctx.font = run.font;
+    }
+    runs.push({...run, x, y: 0});
+    x += ctx.measureText(run.text).width;
+  }
+  if (subscript) {
+    const font = "400 13px sans-serif";
+    ctx.font = font;
+    runs.push({text: subscript, font, x: x + 1, y: 5});
+    x += ctx.measureText(subscript).width + 1;
+  }
+  if (unit) runs.push({text: unit, font: "400 18px sans-serif", x: x + 6, y: 0});
+  return measurePlotText(ctx, runs);
+}
+
+function placePlotText(group, left, top, rotation = 0) {
+  const width = rotation ? group.height : group.width;
+  const height = rotation ? group.width : group.height;
+  return {group, left, top, right: left + width, bottom: top + height, rotation};
+}
+
+function plotTextOverlaps(first, second, gap = 6) {
+  return first.left < second.right + gap && first.right > second.left - gap
+    && first.top < second.bottom + gap && first.bottom > second.top - gap;
+}
+
+function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
+  const pixelX = value => area.left + (value - xScale.min) / (xScale.max - xScale.min) * (area.right - area.left);
+  const pixelY = value => area.bottom - (value - yScale.min) / (yScale.max - yScale.min) * (area.bottom - area.top);
+  const axisX = pixelX(0), axisY = pixelY(0);
+  const xSide = axisY < (area.top + area.bottom) / 2 ? -1 : 1;
+  const ySide = axisX > (area.left + area.right) / 2 ? 1 : -1;
+  const ticks = [];
+  const tickGap = 13;
+  const titleGap = 16;
+  const arrowGap = 24, arrowLength = 8, arrowHalfWidth = 4;
+  const arrows = {
+    x: [{x: area.right + arrowGap + arrowLength, y: axisY},
+      {x: area.right + arrowGap, y: axisY - arrowHalfWidth},
+      {x: area.right + arrowGap, y: axisY + arrowHalfWidth}],
+    y: [{x: axisX, y: area.top - arrowGap - arrowLength},
+      {x: axisX - arrowHalfWidth, y: area.top - arrowGap},
+      {x: axisX + arrowHalfWidth, y: area.top - arrowGap}],
+  };
+  const arrowBoxes = Object.values(arrows).map(points => ({
+    left: Math.min(...points.map(point => point.x)),
+    right: Math.max(...points.map(point => point.x)),
+    top: Math.min(...points.map(point => point.y)),
+    bottom: Math.max(...points.map(point => point.y)),
+  }));
+
+  function makeTick(axis, value) {
+    const scale = axis === "x" ? xScale : yScale;
+    const group = plotTickText(ctx, value, scale.customTickFormat);
+    let left, top;
+    if (axis === "x") {
+      left = pixelX(value) - group.width / 2;
+      top = xSide < 0 ? axisY - tickGap - group.height : axisY + tickGap;
+      if (value === 0) left = ySide < 0 ? axisX + 12 : axisX - 12 - group.width;
+    } else {
+      left = ySide < 0 ? axisX - tickGap - group.width : axisX + tickGap;
+      top = pixelY(value) - group.height / 2;
+      if (value === 0) top = xSide < 0 ? axisY + 12 : axisY - 12 - group.height;
+    }
+    return {...placePlotText(group, left, top), axis, value,
+      tickX: axis === "x" ? pixelX(value) : axisX,
+      tickY: axis === "y" ? pixelY(value) : axisY};
+  }
+
+  ticks.push(makeTick("x", 0), makeTick("y", 0));
+  for (const axis of ["x", "y"]) {
+    const scale = axis === "x" ? xScale : yScale;
+    for (const value of [scale.min, scale.max]) {
+      if (value === 0) continue;
+      let tick = makeTick(axis, value);
+      for (let pass = 0; pass <= ticks.length + arrowBoxes.length; pass++) {
+        const conflicts = [...ticks, ...arrowBoxes].filter(other => plotTextOverlaps(tick, other));
+        if (!conflicts.length) break;
+        let left = tick.left, top = tick.top;
+        if (axis === "x") {
+          left = value > 0 ? Math.max(...conflicts.map(other => other.right)) + 6
+            : Math.min(...conflicts.map(other => other.left)) - 6 - tick.group.width;
+        } else {
+          top = value > 0 ? Math.min(...conflicts.map(other => other.top)) - 6 - tick.group.height
+            : Math.max(...conflicts.map(other => other.bottom)) + 6;
+        }
+        tick = {...tick, ...placePlotText(tick.group, left, top)};
+      }
+      ticks.push(tick);
+    }
+  }
+  for (const axis of ["x", "y"]) {
+    const scale = axis === "x" ? xScale : yScale;
+    for (const value of scale.customTickValues) {
+      if (value === 0 || value === scale.min || value === scale.max) continue;
+      const tick = makeTick(axis, value);
+      const text = tick.group.runs.map(run => run.text).join("");
+      const duplicate = ticks.some(other => other.axis === axis
+        && other.group.runs.map(run => run.text).join("") === text);
+      if (!duplicate && ![...ticks, ...arrowBoxes].some(other => plotTextOverlaps(tick, other))) ticks.push(tick);
+    }
+  }
+
+  const xTitle = plotTitleText(ctx, xScale.title.text);
+  const yTitle = plotTitleText(ctx, yScale.title.text);
+  const envelope = [...ticks, ...arrowBoxes, area];
+  const xTitleTop = xSide < 0
+    ? Math.min(...envelope.map(box => box.top)) - titleGap - xTitle.height
+    : Math.max(...envelope.map(box => box.bottom)) + titleGap;
+  const yTitleLeft = ySide < 0
+    ? Math.min(...envelope.map(box => box.left)) - titleGap - yTitle.height
+    : Math.max(...envelope.map(box => box.right)) + titleGap;
+  const titles = {
+    x: placePlotText(xTitle, (area.left + area.right - xTitle.width) / 2, xTitleTop),
+    y: placePlotText(yTitle, yTitleLeft, (area.top + area.bottom - yTitle.width) / 2, -Math.PI / 2),
+  };
+  return {ticks, titles, arrows, area, axes: {x: axisX, y: axisY}, xSide, ySide};
+}
+
+function drawPlotText(ctx, placed) {
+  const {group, left, top, rotation} = placed;
+  ctx.save();
+  if (rotation) {
+    ctx.translate(left - group.bounds.top, top + group.bounds.right);
+    ctx.rotate(rotation);
+  } else {
+    ctx.translate(left - group.bounds.left, top - group.bounds.top);
+  }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  for (const run of group.runs) {
+    ctx.font = run.font;
+    ctx.fillText(run.text, run.x, run.y);
+  }
+  ctx.restore();
+}
+
 const cornerAxisPlugin = {
   id: "cornerAxisPlugin",
+  beforeLayout(chart) {
+    const {ctx, width, height} = chart;
+    const {x, y} = chart.options.scales;
+    const padding = {top: 40, right: 40, bottom: 40, left: 40};
+    ctx.save();
+    for (let pass = 0; pass < 8; pass++) {
+      const area = {left: padding.left, top: padding.top, right: width - padding.right, bottom: height - padding.bottom};
+      const layout = buildMechanicalPlotLayout(ctx, area, x, y);
+      const boxes = [...layout.ticks, ...Object.values(layout.titles)];
+      const arrows = Object.values(layout.arrows).flat();
+      const overflow = {
+        left: Math.max(0, 8 - Math.min(...boxes.map(box => box.left), ...arrows.map(point => point.x))),
+        right: Math.max(0, Math.max(...boxes.map(box => box.right), ...arrows.map(point => point.x)) + 8 - width),
+        top: Math.max(0, 8 - Math.min(...boxes.map(box => box.top), ...arrows.map(point => point.y))),
+        bottom: Math.max(0, Math.max(...boxes.map(box => box.bottom), ...arrows.map(point => point.y)) + 8 - height),
+      };
+      if (Object.values(overflow).every(value => value < .01)) break;
+      for (const side of Object.keys(padding)) padding[side] += overflow[side];
+    }
+    ctx.restore();
+    chart.options.layout.padding = padding;
+  },
+  afterLayout(chart) {
+    chart.ctx.save();
+    chart.$mechanicalPlotLayout = buildMechanicalPlotLayout(chart.ctx, chart.chartArea,
+      chart.options.scales.x, chart.options.scales.y);
+    chart.ctx.restore();
+  },
   beforeDraw(chart) {
-    const {ctx, chartArea, scales} = chart;
-    if (!scales.x || !scales.y || !chartArea) return;
-    const axisX = scales.x.getPixelForValue(0);
-    const axisY = scales.y.getPixelForValue(0);
-    const arrowLength = 12;
+    const {ctx, $mechanicalPlotLayout: layout} = chart;
+    if (!layout) return;
+    const {area, axes, arrows} = layout;
     ctx.save();
     ctx.strokeStyle = "#111111";
     ctx.fillStyle = "#111111";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(chartArea.left, axisY);
-    ctx.lineTo(chartArea.right + arrowLength, axisY);
-    ctx.moveTo(axisX, chartArea.bottom);
-    ctx.lineTo(axisX, chartArea.top - arrowLength);
+    ctx.moveTo(area.left, axes.y);
+    ctx.lineTo(arrows.x[0].x, axes.y);
+    ctx.moveTo(axes.x, area.bottom);
+    ctx.lineTo(axes.x, arrows.y[0].y);
     ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(chartArea.right + arrowLength, axisY);
-    ctx.lineTo(chartArea.right + 4, axisY - 4);
-    ctx.lineTo(chartArea.right + 4, axisY + 4);
-    ctx.closePath();
-    ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(axisX, chartArea.top - arrowLength);
-    ctx.lineTo(axisX - 4, chartArea.top - 4);
-    ctx.lineTo(axisX + 4, chartArea.top - 4);
-    ctx.closePath();
-    ctx.fill();
+    for (const points of Object.values(arrows)) {
+      ctx.beginPath();
+      points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
+      ctx.closePath();
+      ctx.fill();
+    }
     ctx.restore();
   },
   beforeDatasetsDraw(chart) {
-    const { ctx, chartArea, scales } = chart;
-    const xScale = scales.x;
-    const yScale = scales.y;
-
-    if (!xScale || !yScale || !chartArea) {
-      return;
-    }
-
-    const axisX = xScale.getPixelForValue(0);
-    const axisY = yScale.getPixelForValue(0);
-    const xLabelSide = axisY < (chartArea.top + chartArea.bottom) / 2 ? -1 : 1;
-    const yLabelSide = axisX > (chartArea.left + chartArea.right) / 2 ? 1 : -1;
-    const yLabelX = yLabelSide < 0 ? chartArea.left : chartArea.right;
-    const axisColor = "#111111";
-    const labelColor = "#111111";
-    const tickLength = 5;
-    const xTickLabelOffset = 20;
-    const yTickLabelOffset = 10;
-    const tickLabelFontSize = 16;
-    const tickExponentFontSize = 11;
-
-    function drawTickLabel(x, y, value, align, precision) {
-      const label = formatPlotTickLabel(value, precision);
-
-      if (label.type === "plain") {
-        ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
-        ctx.textAlign = align;
-        ctx.fillText(label.text, x, y);
-        return;
-      }
-
-      const baseText = `${label.mantissa} × 10`;
-      ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
-
-      const baseWidth = ctx.measureText(baseText).width;
-      ctx.font = `400 ${tickExponentFontSize}px sans-serif`;
-      const exponentWidth = ctx.measureText(label.exponent).width;
-      const totalWidth = baseWidth + exponentWidth + 1;
-      let baseX = x;
-
-      if (align === "center") {
-        baseX = x - (totalWidth / 2);
-      } else if (align === "right") {
-        baseX = x - totalWidth;
-      }
-
-      ctx.textAlign = "left";
-      ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
-      ctx.fillText(baseText, baseX, y);
-
-      ctx.font = `400 ${tickExponentFontSize}px sans-serif`;
-      ctx.textAlign = "left";
-      ctx.fillText(label.exponent, baseX + baseWidth + 1, y - 7);
-    }
-
-    function drawTick(x1, y1, x2, y2) {
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-
-    function parseAxisTitle(text) {
-      const value = String(text || "").trim();
-      const match = value.match(/^(.*?)\s*(\([^)]+\))?$/);
-      const notation = match ? match[1].trim() : value;
-      const unit = match && match[2] ? match[2] : "";
-      const subscriptStart = notation.indexOf("_");
-
-      if (subscriptStart < 0) {
-        return {
-          main: notation,
-          subscript: "",
-          unit,
-        };
-      }
-
-      return {
-        main: notation.slice(0, subscriptStart),
-        subscript: notation.slice(subscriptStart + 1),
-        unit,
-      };
-    }
-
-    function measureAxisTitle(ctx, title) {
-      const mainWidth = getPlotTextRuns(title.main, 18).reduce((width, run) => {
-        ctx.font = run.font;
-        return width + ctx.measureText(run.text).width;
-      }, 0);
-
-      ctx.font = "400 13px sans-serif";
-      const subscriptWidth = title.subscript
-        ? ctx.measureText(title.subscript).width
-        : 0;
-
-      ctx.font = "400 18px sans-serif";
-      const unitWidth = title.unit ? ctx.measureText(title.unit).width : 0;
-      const unitGap = title.unit ? 6 : 0;
-
-      return mainWidth + subscriptWidth + unitGap + unitWidth;
-    }
-
-    function drawAxisTitle(ctx, text, x, y, align) {
-      const title = parseAxisTitle(text);
-
-      if (!title.main) {
-        return;
-      }
-
-      const titleWidth = measureAxisTitle(ctx, title);
-      let cursorX = x;
-
-      if (align === "center") {
-        cursorX -= titleWidth / 2;
-      } else if (align === "right") {
-        cursorX -= titleWidth;
-      }
-
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-      getPlotTextRuns(title.main, 18).forEach(run => {
-        ctx.font = run.font;
-        ctx.fillText(run.text, cursorX, y);
-        cursorX += ctx.measureText(run.text).width;
-      });
-
-      if (title.subscript) {
-        ctx.font = "400 13px sans-serif";
-        ctx.fillText(title.subscript, cursorX + 1, y + 5);
-        cursorX += ctx.measureText(title.subscript).width + 1;
-      }
-
-      if (title.unit) {
-        ctx.font = "400 18px sans-serif";
-        ctx.fillText(title.unit, cursorX + 6, y);
-      }
-    }
-
-    function drawXAxisTitle(ctx, text, chartArea) {
-      const titleX = (chartArea.left + chartArea.right) / 2;
-      const titleY = xLabelSide < 0 ? chartArea.top - 44 : chartArea.bottom + 54;
-
-      drawAxisTitle(ctx, text, titleX, titleY, "center");
-    }
-
-    function drawYAxisTitle(ctx, text, chartArea) {
-      const tickWidth = Math.max(0, ...buildAxisTickValues(yScale).map(value =>
-        measurePlotTickLabel(ctx, value - yScale.options.customOffset, yScale.options.customLabelPrecision)));
-      ctx.save();
-      ctx.translate(yLabelX + yLabelSide * (yTickLabelOffset + tickWidth + 18),
-        (chartArea.top + chartArea.bottom) / 2);
-      ctx.rotate(-Math.PI / 2);
-      drawAxisTitle(ctx, text, 0, 0, "center");
-      ctx.restore();
-    }
-
-    function buildAxisTickValues(scale) {
-      if (Array.isArray(scale.options.customTickValues)) {
-        return scale.options.customTickValues.map(value => Number(value));
-      }
-
-      const step = Number(scale.options.ticks.stepSize);
-
-      if (!Number.isFinite(step) || step <= 0) {
-        return scale.ticks.map(tick => Number(tick.value));
-      }
-
-      const values = [];
-      const start = Math.ceil(scale.min / step) * step;
-      const end = Math.floor(scale.max / step) * step;
-
-      for (let value = start; value <= end + (step / 2); value += step) {
-        values.push(Number(value.toPrecision(12)));
-      }
-
-      return values;
-    }
-
-    function spacedAxisTickValues(scale, horizontal) {
-      const values = buildAxisTickValues(scale);
-      const required = new Set([scale.min, scale.max, 0]);
-      const kept = values.filter(value => required.has(value));
-      const origin = scale.getPixelForValue(0);
-
-      function interval(value) {
-        let center = scale.getPixelForValue(value);
-        const half = horizontal
-          ? measurePlotTickLabel(ctx, value - scale.options.customOffset, scale.options.customLabelPrecision) / 2
-          : 12;
-        if (horizontal && value !== 0 && Math.abs(center - origin) < half + 24) {
-          center += Math.sign(value) * (half + 12);
-        } else if (!horizontal && value !== 0 && Math.abs(center - origin) < 36) {
-          center -= Math.sign(value) * 46;
-        }
-        return {start: center - half - 6, end: center + half + 6};
-      }
-
-      const occupied = kept.map(interval);
-      for (const value of values) {
-        if (required.has(value)) continue;
-        const candidate = interval(value);
-        if (occupied.some(other => candidate.start < other.end && candidate.end > other.start)) continue;
-        occupied.push(candidate);
-        kept.push(value);
-      }
-      return kept.sort((left, right) => left - right);
-    }
-
+    const {ctx, $mechanicalPlotLayout: layout} = chart;
+    if (!layout) return;
     ctx.save();
-    ctx.strokeStyle = axisColor;
-    ctx.fillStyle = labelColor;
-    ctx.textBaseline = "middle";
-
-    ctx.lineWidth = 1;
-    ctx.font = `400 ${tickLabelFontSize}px sans-serif`;
-    ctx.textAlign = "center";
-
-    spacedAxisTickValues(xScale, true).forEach(value => {
-      value = Number(value);
-
-      if (!Number.isFinite(value) || value === 0) {
-        return;
-      }
-
-      const x = xScale.getPixelForValue(value);
-
-      if (x < chartArea.left - 1 || x > chartArea.right + 1) {
-        return;
-      }
-
-      const labelWidth = measurePlotTickLabel(ctx, value - xScale.options.customOffset,
-        xScale.options.customLabelPrecision);
-      const nearOrigin = Math.abs(x - axisX) < labelWidth / 2 + 24;
-      const labelX = nearOrigin ? x + Math.sign(value) * 12 : x;
-      const align = nearOrigin ? (value < 0 ? "right" : "left") : "center";
-      drawTick(x, axisY, x, axisY + xLabelSide * tickLength);
-      drawTickLabel(
-        labelX,
-        axisY + xLabelSide * xTickLabelOffset,
-        value - xScale.options.customOffset,
-        align,
-        Number(xScale.options.customLabelPrecision || 4)
-      );
-    });
-
-    ctx.textAlign = yLabelSide < 0 ? "right" : "left";
-    spacedAxisTickValues(yScale, false).forEach(value => {
-      value = Number(value);
-
-      if (!Number.isFinite(value) || value === 0) {
-        return;
-      }
-
-      const y = yScale.getPixelForValue(value);
-
-      if (y < chartArea.top - 1 || y > chartArea.bottom + 1) {
-        return;
-      }
-
-      const nearOrigin = Math.abs(y - axisY) < 36;
-      drawTick(axisX, y, axisX + yLabelSide * tickLength, y);
-      drawTickLabel(
-        axisX + yLabelSide * yTickLabelOffset,
-        nearOrigin ? y - Math.sign(value) * 46 : y,
-        value - yScale.options.customOffset,
-        yLabelSide < 0 ? "right" : "left",
-        Number(yScale.options.customLabelPrecision || 4)
-      );
-    });
-
-    drawTickLabel(axisX - yLabelSide * 8, axisY + xLabelSide * xTickLabelOffset, 0, "center", 4);
-    drawTickLabel(axisX + yLabelSide * yTickLabelOffset, axisY - xLabelSide * 8, 0,
-      yLabelSide < 0 ? "right" : "left", 4);
-
-    ctx.font = "400 11px sans-serif";
-    ctx.textAlign = "left";
-    if (yScale.options.customOffset) {
-      const offset = yScale.options.customOffset;
-      ctx.fillText(`Offset ${offset > 0 ? "+" : ""}${offset}`, chartArea.left, chartArea.top - 16);
-    }
-    ctx.textAlign = "right";
-    if (xScale.options.customOffset) {
-      const offset = xScale.options.customOffset;
-      ctx.fillText(`Offset ${offset > 0 ? "+" : ""}${offset}`, chartArea.right, chartArea.bottom + 54);
-    }
+    ctx.strokeStyle = "#111111";
     ctx.fillStyle = "#111111";
-    drawXAxisTitle(ctx, xScale.options.title.text, chartArea);
-    drawYAxisTitle(ctx, yScale.options.title.text, chartArea);
-
+    ctx.lineWidth = 1;
+    for (const tick of layout.ticks) {
+      if (tick.value !== 0) {
+        ctx.beginPath();
+        ctx.moveTo(tick.tickX, tick.tickY);
+        ctx.lineTo(tick.tickX + (tick.axis === "y" ? layout.ySide * 5 : 0),
+          tick.tickY + (tick.axis === "x" ? layout.xSide * 5 : 0));
+        ctx.stroke();
+      }
+      drawPlotText(ctx, tick);
+    }
+    drawPlotText(ctx, layout.titles.x);
+    drawPlotText(ctx, layout.titles.y);
     ctx.restore();
   },
 };
@@ -2831,26 +2770,6 @@ function updateRawValues(xVariable, yVariable, pointCount) {
 
     const xScaleConfig = buildPlotScale(points.map(point => point.x));
     const yScaleConfig = buildPlotScale(points.map(point => point.y));
-    const plotContext = canvas.getContext("2d");
-    const xTickWidth = Math.max(0, ...xScaleConfig.ticks.map(value =>
-      measurePlotTickLabel(plotContext, value - xScaleConfig.offset, xScaleConfig.labelPrecision)));
-    const yTickWidth = Math.max(0, ...yScaleConfig.ticks.map(value =>
-      measurePlotTickLabel(plotContext, value - yScaleConfig.offset, yScaleConfig.labelPrecision)));
-    const xLabelsAbove = yScaleConfig.chartMax < -yScaleConfig.chartMin;
-    const yLabelsRight = -xScaleConfig.chartMin > xScaleConfig.chartMax;
-    const xSpan = xScaleConfig.chartMax - xScaleConfig.chartMin;
-    const nearMinimum = xScaleConfig.chartMin < 0 && -xScaleConfig.chartMin / xSpan < .15;
-    const nearMaximum = xScaleConfig.chartMax > 0 && xScaleConfig.chartMax / xSpan < .15;
-    const leftTickPadding = Math.max(24, xTickWidth * (nearMinimum ? 1 : .5) + 16);
-    const rightTickPadding = Math.max(24, xTickWidth * (nearMaximum ? 1 : .5) + 16);
-    const sidePadding = Math.max(84, yTickWidth + 64);
-    const plotLayoutPadding = {
-      top: xLabelsAbove ? 68 : 24,
-      right: yLabelsRight ? Math.max(sidePadding, rightTickPadding) : rightTickPadding,
-      bottom: xLabelsAbove ? 24 : 66,
-      left: yLabelsRight ? leftTickPadding : Math.max(sidePadding, leftTickPadding),
-    };
-
     if (chartInstance) {
       chartInstance.destroy();
     }
@@ -2913,7 +2832,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
           },
         },
         layout: {
-          padding: plotLayoutPadding,
+          padding: 40,
         },
         scales: {
           x: {
@@ -2922,7 +2841,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             max: xScaleConfig.chartMax,
             customTickValues: xScaleConfig.ticks,
             customTickStep: xScaleConfig.step,
-            customLabelPrecision: xScaleConfig.labelPrecision,
+            customTickFormat: xScaleConfig.tickFormat,
             customOffset: xScaleConfig.offset,
             border: {
               display: false,
@@ -2945,7 +2864,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             max: yScaleConfig.chartMax,
             customTickValues: yScaleConfig.ticks,
             customTickStep: yScaleConfig.step,
-            customLabelPrecision: yScaleConfig.labelPrecision,
+            customTickFormat: yScaleConfig.tickFormat,
             customOffset: yScaleConfig.offset,
             border: {
               display: false,

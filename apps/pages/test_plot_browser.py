@@ -82,6 +82,14 @@ class MechanicalPlotBrowserTests(StaticLiveServerTestCase):
              [2e8, 2e8 + .002, 2e8 + .001], "+", "+"),
             ("constant-x", [2, 2, 2], [10, 30, 20], "+", "+"),
             ("constant-y", [-3, -2, -1], [-2, -2, -2], "-", "-"),
+            ("long-decimal-upper", [0, .123456789], [0, 1234.567891234], "+", "+"),
+            ("half-up-ticks", [0, .005, .015, .025], [0, 1.005, 2.675, 3.005], "+", "+"),
+            ("negative-half-up", [-.025, -.015, -.005], [-3.005, -2.675, -1.005], "-", "-"),
+            ("scientific-bounds", [-.000123456789, .000987654321],
+             [-123456789, 987654321], "-+", "-+"),
+            ("scientific-positive", [0, 1.005e-8, 2.675e-8], [0, 1.005e9, 2.675e9], "+", "+"),
+            ("symmetric-scientific", [-.0012345, .0012345], [-1, 1], "-+", "-+"),
+            ("symmetric-negative-y", [-.0012345, .0012345], [-1, -.5], "-+", "-"),
         )
         for name, x_values, y_values, x_signs, y_signs in arrangements:
             obj = JSONData.objects.create(owner=viewer, data={

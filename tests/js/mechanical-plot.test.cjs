@@ -50,6 +50,62 @@ function visibleSigns(scale) {
   return [scale.chartMin < 0 ? '-' : '', scale.chartMax > 0 ? '+' : ''].join('');
 }
 
+function tickLabel(value, mode = 'auto') {
+  const label = vm.runInNewContext(`${scaling}\nformatPlotTickLabel(value, mode)`, {value, mode});
+  return JSON.parse(JSON.stringify(label));
+}
+
+test('ordinary tick labels keep two decimal places with half-up rounding', () => {
+  for (const [value, text] of [
+    [1, '1.00'], [0.01, '0.01'], [1.004, '1.00'], [1.005, '1.01'],
+    [2.675, '2.68'], [-1.005, '-1.01'], [-2.675, '-2.68'], [9.999, '10.00'],
+  ]) {
+    for (const mode of ['auto', 'decimal']) {
+      assert.deepEqual(tickLabel(value, mode), {type: 'plain', text});
+    }
+  }
+});
+
+test('tiny and large nonzero ticks use two-place scientific mantissas', () => {
+  for (const [value, mantissa, exponent] of [
+    [1e-16, '1.00', '-16'], [-1e-16, '-1.00', '-16'],
+    [1.005e-16, '1.01', '-16'], [-1.005e-16, '-1.01', '-16'],
+    [0.00999, '9.99', '-3'], [10000, '1.00', '4'],
+    [Number.MIN_VALUE, '5.00', '-324'], [Number.MAX_VALUE, '1.80', '308'],
+  ]) {
+    for (const mode of ['auto', 'decimal', 'scientific']) {
+      assert.deepEqual(tickLabel(value, mode), {type: 'scientific', mantissa, exponent});
+    }
+  }
+});
+
+test('scientific mode formats every nonzero tick consistently', () => {
+  for (const [value, mantissa, exponent] of [
+    [1, '1.00', '0'], [12.5, '1.25', '1'], [0.1, '1.00', '-1'],
+    [-2.675, '-2.68', '0'],
+  ]) {
+    assert.deepEqual(tickLabel(value, 'scientific'), {type: 'scientific', mantissa, exponent});
+  }
+});
+
+test('scientific rounding carries into the exponent at mantissa boundaries', () => {
+  for (const [value, mantissa, exponent] of [
+    [9.994, '9.99', '0'], [9.995, '1.00', '1'], [9.999, '1.00', '1'],
+    [-9.999, '-1.00', '1'], [9.999e-16, '1.00', '-15'],
+    [99999, '1.00', '5'],
+  ]) {
+    assert.deepEqual(tickLabel(value, 'scientific'), {type: 'scientific', mantissa, exponent});
+  }
+});
+
+test('both true zero signs remain plain origin labels in every mode', () => {
+  for (const value of [0, -0]) {
+    for (const mode of ['auto', 'decimal', 'scientific']) {
+      assert.deepEqual(tickLabel(value, mode), {type: 'plain', text: '0'});
+    }
+  }
+});
+
 test('the viewport shows only one quadrant or two adjacent quadrants when possible', () => {
   const cases = [
     [[1, 2], [3, 4], '+', '+'],
@@ -147,7 +203,7 @@ test('large nonzero samples retain an actual zero tick and distinguishable label
   const result = vm.runInNewContext(`${scaling}
     const scale = buildPlotScale([1e8, 1e8 + .001, 1e8 + .002]);
     ({minimum: scale.chartMin, maximum: scale.chartMax, offset: scale.offset, labels: scale.ticks.map(value =>
-      formatPlotTickLabel(value - scale.offset, scale.labelPrecision))})`);
+      formatPlotTickLabel(value - scale.offset, scale.tickFormat))})`);
   assert.equal(result.minimum, 0);
   assert.equal(result.maximum, 1e8 + .002);
   assert.equal(result.offset, 0);
