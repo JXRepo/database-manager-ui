@@ -1153,6 +1153,33 @@ details[open] > .detail-group-summary {
       font-size: 0.8rem;
     }
 
+    .plot-view-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin: 14px 0 6px;
+      color: #63788a;
+      font-size: 0.85rem;
+    }
+
+    .plot-sample-count {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .plot-sample-count input {
+      width: 88px;
+    }
+
+    .plot-view-error {
+      color: #a12622;
+      font-size: 0.85rem;
+      margin: 6px 0;
+    }
+
 
 
 
@@ -1862,7 +1889,7 @@ details[open] > .detail-group-summary {
 
 
             <div class="plot-field plot-button-field">
-              <button id="download-plot-btn" type="button" class="btn btn-primary">
+              <button id="download-plot-btn" type="button" class="btn btn-primary" title="Download the current plot view">
                 Download PNG
               </button>
             </div>
@@ -1871,8 +1898,9 @@ details[open] > .detail-group-summary {
         </div>
 
         <div class="csv-export-actions">
-          <button type="button" id="download-xy-csv-btn" class="btn btn-outline-primary btn-sm">
-            Download X/Y CSV
+          <button type="button" id="download-xy-csv-btn" class="btn btn-outline-primary btn-sm"
+                  title="Download all samples for the selected variables, regardless of the plot view">
+            Download full X/Y CSV
           </button>
           <a href="{% url 'mechanical_csv_export' data_object.id %}" class="btn btn-outline-primary btn-sm" id="download-all-csv">
             Download All CSV
@@ -1897,6 +1925,21 @@ details[open] > .detail-group-summary {
             <button type="submit" class="btn btn-primary btn-sm" id="download-selected-csv">Download Selected CSV</button>
           </form>
         </details>
+
+        <div class="plot-view-controls">
+          <span id="plot-view-label">View</span>
+          <div class="btn-group btn-group-sm" role="group" aria-labelledby="plot-view-label">
+            <button type="button" id="plot-full-view" class="btn btn-outline-primary active" aria-pressed="true">Full curve</button>
+            <button type="button" id="plot-initial-view" class="btn btn-outline-primary" aria-pressed="false">Initial samples</button>
+          </div>
+          <span id="plot-initial-controls" hidden>
+            <label for="plot-initial-count" class="plot-sample-count">Samples
+              <input type="number" id="plot-initial-count" class="form-control form-control-sm"
+                     min="1" step="1" value="50" aria-describedby="plot-view-error plot-status">
+            </label>
+          </span>
+        </div>
+        <p id="plot-view-error" class="plot-view-error" role="alert" hidden></p>
 
         <div class="plot-canvas-wrap">
           <div class="plot-canvas-box">
@@ -2070,6 +2113,11 @@ details[open] > .detail-group-summary {
   }
   const plotStatus = document.getElementById("plot-status");
   const canvas = document.getElementById("mechanical-plot");
+  const fullPlotButton = document.getElementById("plot-full-view");
+  const initialPlotButton = document.getElementById("plot-initial-view");
+  const initialPlotControls = document.getElementById("plot-initial-controls");
+  const initialPlotCountInput = document.getElementById("plot-initial-count");
+  const plotViewError = document.getElementById("plot-view-error");
   const xRawSummary = document.getElementById("x-raw-summary");
     const yRawSummary = document.getElementById("y-raw-summary");
     const xRawMeta = document.getElementById("x-raw-meta");
@@ -2078,6 +2126,40 @@ details[open] > .detail-group-summary {
     const yRawPre = document.getElementById("y-raw-pre");
 
   let chartInstance = null;
+  let initialSamplesOnly = false;
+  let initialSampleCount = 50;
+
+  function clearPlotViewError() {
+    plotViewError.textContent = "";
+    plotViewError.hidden = true;
+    initialPlotCountInput.removeAttribute("aria-invalid");
+    downloadPlotButton.disabled = false;
+  }
+
+  function resetPlotView() {
+    initialSamplesOnly = false;
+    initialSampleCount = 50;
+    clearPlotViewError();
+  }
+
+  function applyInitialSampleCount() {
+    const xVariable = getVariableByKey(xSelect.value);
+    const yVariable = getVariableByKey(ySelect.value);
+    if (!xVariable || !yVariable) return;
+    const pointCount = Math.min(xVariable.values.length, yVariable.values.length);
+    const entered = initialPlotCountInput.value.trim();
+    const count = Number(entered);
+    if (!entered || !Number.isSafeInteger(count) || count < 1 || count > pointCount) {
+      initialPlotCountInput.setAttribute("aria-invalid", "true");
+      plotViewError.textContent = `Enter a whole number from 1 to ${pointCount}. The previous view is unchanged.`;
+      plotViewError.hidden = false;
+      downloadPlotButton.disabled = true;
+      return;
+    }
+    initialSampleCount = count;
+    clearPlotViewError();
+    renderPlot();
+  }
 
   function findDefaultKey(prefix) {
     const item = plotVariables.find(variable => variable.short_label.startsWith(prefix));
@@ -2668,7 +2750,7 @@ const curveHoverPlugin = {
 };
 
 function downloadCurrentPlot() {
-  if (!chartInstance) {
+  if (!chartInstance || downloadPlotButton.disabled) {
     return;
   }
 
@@ -2680,8 +2762,10 @@ function downloadCurrentPlot() {
   }
 
   const link = document.createElement("a");
+  const sampleSuffix = initialSamplesOnly
+    ? `_samples-0-${chartInstance.data.datasets[0].data.length - 1}` : "";
   const fileName =
-    `${sanitizeFileName(yVariable.symbol_label || yVariable.short_label)}_vs_${sanitizeFileName(xVariable.symbol_label || xVariable.short_label)}.png`;
+    `${sanitizeFileName(yVariable.symbol_label || yVariable.short_label)}_vs_${sanitizeFileName(xVariable.symbol_label || xVariable.short_label)}${sampleSuffix}.png`;
   const resolution = 3;
   const exportPadding = 24 * resolution;
   const sourceCanvas = document.createElement("canvas");
@@ -2754,14 +2838,23 @@ function updateRawValues(xVariable, yVariable, pointCount) {
 
 
     const pointCount = Math.min(xVariable.values.length, yVariable.values.length);
+    const initialCount = Math.min(initialSampleCount, pointCount);
+    initialPlotCountInput.max = String(pointCount);
+    initialPlotCountInput.value = String(initialCount);
+    initialPlotControls.hidden = !initialSamplesOnly;
+    fullPlotButton.classList.toggle("active", !initialSamplesOnly);
+    initialPlotButton.classList.toggle("active", initialSamplesOnly);
+    fullPlotButton.setAttribute("aria-pressed", String(!initialSamplesOnly));
+    initialPlotButton.setAttribute("aria-pressed", String(initialSamplesOnly));
 
     if (pointCount === 0) {
       plotStatus.textContent = "Selected variables do not contain plot data";
       return;
     }
 
+    const visibleCount = initialSamplesOnly ? initialCount : pointCount;
     const points = [];
-    for (let i = 0; i < pointCount; i += 1) {
+    for (let i = 0; i < visibleCount; i += 1) {
       points.push({
         x: Number(xVariable.values[i]),
         y: Number(yVariable.values[i]),
@@ -2801,6 +2894,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,
         interaction: {
           mode: "mechanicalCurve",
         },
@@ -2889,7 +2983,9 @@ function updateRawValues(xVariable, yVariable, pointCount) {
 
 updateRawValues(xVariable, yVariable, pointCount);
 
-plotStatus.textContent = `${pointCount} points plotted.`;
+plotStatus.textContent = initialSamplesOnly
+  ? `${visibleCount} of ${pointCount} points plotted (sample indices 0–${visibleCount - 1}).`
+  : `${pointCount} points plotted.`;
   }
 
 
@@ -2911,11 +3007,28 @@ plotStatus.textContent = `${pointCount} points plotted.`;
 
       xSelect.addEventListener("change", function () {
         syncYVariableToX();
+        resetPlotView();
         renderPlot();
       });
       ySelect.addEventListener("change", function () {
         syncXVariableToY();
+        resetPlotView();
         renderPlot();
+      });
+
+      for (const [button, initial] of [[fullPlotButton, false], [initialPlotButton, true]]) {
+        button.addEventListener("click", () => {
+          initialSamplesOnly = initial;
+          clearPlotViewError();
+          renderPlot();
+        });
+      }
+      initialPlotCountInput.addEventListener("change", applyInitialSampleCount);
+      initialPlotCountInput.addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          applyInitialSampleCount();
+        }
       });
 
       if (downloadPlotButton) {

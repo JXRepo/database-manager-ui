@@ -686,6 +686,21 @@ is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
 all exports.
 
+**Full curve** is the default view. **Initial samples** rescales the first 50
+paired samples (or all samples when fewer are available), so a short initial
+response can be inspected. The sample count can be changed to any integer from
+1 through the paired X/Y length; press Enter or leave the field to apply it.
+The status shows the visible count and original zero-based sample indices.
+Invalid counts leave the previous view unchanged and disable PNG until the
+count is corrected or a view button is used. Changing either variable restores
+the full view and default count. Views redraw immediately without animating
+the curve into place. Both views retain the true origin and original
+sample values; no initial point is invented. This is a display selection, not
+automatic identification of an elastic region, yield point or Young's modulus.
+PNG exports the current view, with a sample-interval suffix for initial views;
+**Download full X/Y CSV** continues to export every sample of both selected
+variables. Raw-value panels retain their original behavior.
+
 Moving within 16 pixels of a detail curve highlights the nearest recorded
 sample on that segment with a larger blue dot and white border. The tooltip
 shows its zero-based sample index and exact X/Y numbers with variable names and
