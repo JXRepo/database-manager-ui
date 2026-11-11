@@ -2297,7 +2297,7 @@ function buildPlotScale(values) {
 
   // Include the true origin without making the signed ranges symmetric.
   const span = maximum - minimum;
-  const rawStep = span / 4;
+  const rawStep = span / 7;
   const magnitude = 10 ** Math.floor(Math.log10(rawStep));
   const multiple = [1, 2, 2.5, 5, 10].find(value => value >= rawStep / magnitude) || 10;
   const step = multiple * magnitude;

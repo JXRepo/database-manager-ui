@@ -725,6 +725,8 @@ positive range. Small signed values retain their actual signs and scale.
 Tick labels sit beside the actual axes, on the side closest to the plotting
 edge; range endpoints are labelled even when they do not fall on a regular tick.
 Nearby regular ticks are omitted to leave room for the endpoint labels.
+Regular steps target seven intervals before rounding to readable values;
+measured label bounds suppress collisions when longer numbers need more space.
 Axes and numbers are black, with 16px tick labels. Nonzero tick labels use two
 decimal places with half-up rounding; small or large scales use scientific
 notation with two decimal places in the mantissa. The two origin labels remain

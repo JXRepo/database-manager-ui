@@ -333,6 +333,12 @@ const {join} = require('node:path');
       assert.equal(metrics.overflow, false, `${label}: desktop width`);
       assert.ok(metrics.texts.length > 5, `${label}: visible ticks and titles`);
       verifyTextLayout(metrics, label);
+      if (label === 'long-decimal-upper' || label === 'sample-33') {
+        for (const axis of ['x', 'y']) {
+          const count = metrics.tickLabels.filter(tick => tick.axis === axis).length;
+          assert.ok(count >= 6, `${label}: ${axis} has at least six readable ticks, got ${count}`);
+        }
+      }
       const zeros = metrics.texts.filter(text => text.text === '0');
       assert.equal(zeros.length, 2, `${label}: separate zero labels for X and Y`);
       assert.ok(zeros.every(text => Math.abs((text.left + text.right) / 2 - metrics.originX) < 25
