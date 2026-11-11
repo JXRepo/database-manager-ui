@@ -102,21 +102,6 @@ class MechanicalPlotBrowserTests(StaticLiveServerTestCase):
             cases.append({"name": name, "path": reverse("json_data_detail", args=[obj.pk]),
                           "x": x_values, "y": y_values, "xSigns": x_signs, "ySigns": y_signs})
         empty = JSONData.objects.create(owner=viewer, data={"title": "No curves " * 60})
-        initial_x = []
-        initial_y = []
-        for index in range(250):
-            if index < 50:
-                initial_x.append(index * .000001)
-                initial_y.append(index * 1.25)
-            else:
-                initial_x.append(.000049 + (index - 49) * .002)
-                initial_y.append(61.25 + (index - 49) * .9)
-        initial = JSONData.objects.create(owner=viewer, data={
-            "identifier": "plot-initial-samples", "title": "Initial samples with a longer complete curve",
-            "stress": {"stress_33": initial_y, "stress_11": [0, 10, 20]},
-            "total_strain": {"strain_33": initial_x, "strain_11": [0, .1, .2]},
-            "units": {"Stress": "MPa", "Strain": 1},
-        })
         example = settings.BASE_DIR / "example_json_files/a46fde6c.json"
         sample_path = ""
         if example.is_file():
@@ -127,7 +112,6 @@ class MechanicalPlotBrowserTests(StaticLiveServerTestCase):
                            PLOT_SESSION=self.client.cookies[settings.SESSION_COOKIE_NAME].value,
                            PLOT_COOKIE_NAME=settings.SESSION_COOKIE_NAME, PLOT_CASES=json.dumps(cases),
                            PLOT_EMPTY_PATH=reverse("json_data_detail", args=[empty.pk]),
-                           PLOT_INITIAL_PATH=reverse("json_data_detail", args=[initial.pk]),
                            PLOT_SAMPLE_PATH=sample_path)
         result = subprocess.run(
             [shutil.which("node"), str(settings.BASE_DIR / "tests/browser/mechanical-plot.cjs")],

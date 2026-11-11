@@ -371,129 +371,6 @@ const {join} = require('node:path');
       await until(`(() => {const chart = Chart.getChart('mechanical-plot');
         return chart.getActiveElements().length === 0 && chart.tooltip.opacity === 0;})()`);
     }
-    async function plotViewState() {
-      return evaluate(`(() => {
-        const chart = Chart.getChart('mechanical-plot');
-        return {data: chart.data.datasets[0].data,
-          bounds: {xMin: chart.scales.x.min, xMax: chart.scales.x.max, yMin: chart.scales.y.min, yMax: chart.scales.y.max},
-          source: JSON.stringify(plotVariables), rawX: document.getElementById('x-raw-pre').textContent,
-          rawY: document.getElementById('y-raw-pre').textContent};
-      })()`);
-    }
-    async function changeInitialCount(value, enter = false) {
-      await evaluate(`(() => {const input = document.getElementById('plot-initial-count');
-        input.value = ${JSON.stringify(String(value))};
-        ${enter ? 'input.focus();' : "input.dispatchEvent(new Event('change', {bubbles: true}));"}})()`);
-      if (enter) {
-        await command('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
-        await command('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
-      }
-    }
-    async function downloadFile(buttonId, extension) {
-      const previous = new Set(readdirSync(profile));
-      await evaluate(`document.getElementById(${JSON.stringify(buttonId)}).click()`);
-      for (let attempt = 0; attempt < 100; attempt++) {
-        const name = readdirSync(profile).find(name => !previous.has(name) && name.endsWith(extension));
-        if (name) {
-          const contents = readFileSync(join(profile, name));
-          rmSync(join(profile, name));
-          return {name, contents};
-        }
-        await new Promise(resolve => setTimeout(resolve, 50));
-      }
-      throw new Error(`No ${extension} download from ${buttonId}`);
-    }
-    async function verifyInitialSamples(path, label, localSample = false) {
-      await navigate(path);
-      await select('plot-x-select', 'total_strain.strain_33');
-      const full = await plotViewState();
-      assert.equal(full.data.length, 250, `${label}: complete paired curve has 250 samples`);
-      assert.equal(await evaluate('document.getElementById("plot-full-view").getAttribute("aria-pressed")'), 'true');
-      assert.equal(await evaluate('document.getElementById("plot-initial-view").getAttribute("aria-pressed")'), 'false');
-      assert.equal(await evaluate('document.getElementById("plot-initial-count").value'), '50');
-      assert.equal(await evaluate('document.getElementById("plot-initial-count").min'), '1');
-      assert.equal(await evaluate('document.getElementById("plot-initial-count").max'), '250');
-
-      async function checkCount(count) {
-        const state = await plotViewState();
-        assert.deepEqual(state.data, full.data.slice(0, count), `${label}: the view contains unchanged original samples 0 through ${count - 1}`);
-        assert.equal(state.source, full.source, `${label}: viewing never mutates source arrays`);
-        assert.equal(state.rawX, full.rawX, `${label}: X raw values stay complete`);
-        assert.equal(state.rawY, full.rawY, `${label}: Y raw values stay complete`);
-        assert.equal(await evaluate('document.getElementById("plot-status").textContent'),
-          `${count} of 250 points plotted (sample indices 0–${count - 1}).`);
-        assert.equal(await evaluate('document.getElementById("plot-full-view").getAttribute("aria-pressed")'), 'false');
-        assert.equal(await evaluate('document.getElementById("plot-initial-view").getAttribute("aria-pressed")'), 'true');
-        return state;
-      }
-
-      await evaluate('document.getElementById("plot-initial-view").click()');
-      const first50 = await checkCount(50);
-      for (const axis of ['x', 'y']) {
-        assert.ok(first50.bounds[axis + 'Max'] - first50.bounds[axis + 'Min']
-          < full.bounds[axis + 'Max'] - full.bounds[axis + 'Min'], `${label}: the first 50 samples are enlarged on ${axis}`);
-      }
-      await layout(`${label}-initial-50`, 1440);
-      await changeInitialCount(25);
-      const first25 = await checkCount(25);
-      await layout(`${label}-initial-25`, 1440);
-      await hover(`${label}: original sample index in the initial view`, 10, .7, 11);
-      await clearHover();
-
-      for (const invalid of ['1.5', '0', '', '251']) {
-        await changeInitialCount(invalid);
-        assert.deepEqual(await plotViewState(), first25, `${label}: invalid count ${JSON.stringify(invalid)} preserves the last valid view`);
-        assert.equal(await evaluate('document.getElementById("plot-initial-count").getAttribute("aria-invalid")'), 'true');
-        assert.ok(await evaluate('document.getElementById("plot-view-error").textContent.trim().length > 0'));
-        assert.equal(await evaluate('document.getElementById("download-plot-btn").disabled'), true,
-          `${label}: PNG is disabled until the displayed range agrees with valid controls`);
-      }
-      await changeInitialCount(50, true);
-      await checkCount(50);
-      assert.notEqual(await evaluate('document.getElementById("plot-initial-count").getAttribute("aria-invalid")'), 'true');
-      assert.equal(await evaluate('document.getElementById("plot-view-error").textContent.trim()'), '');
-      assert.equal(await evaluate('document.getElementById("download-plot-btn").disabled'), false);
-      await changeInitialCount(1);
-      await checkCount(1);
-      await changeInitialCount(25, true);
-      const exportedView = await checkCount(25);
-      await evaluate('window.capturePlotExport = true; window.plotExportTexts = []; window.plotExportSnapshot = null');
-      const png = await downloadFile('download-plot-btn', '.png');
-      await evaluate('window.capturePlotExport = false');
-      assert.match(png.name, /_samples-0-24(?: \(\d+\))?\.png$/, `${label}: PNG identifies its visible sample range`);
-      assert.equal(png.contents.readUInt32BE(16), 2304);
-      assert.equal(png.contents.readUInt32BE(20), 1584);
-      const exported = await evaluate('window.plotExportSnapshot');
-      assert.deepEqual(exported, {data: exportedView.data, bounds: exportedView.bounds},
-        `${label}: PNG redraws the current 25 samples with their enlarged ranges`);
-      if (process.env.PLOT_SCREENSHOT_DIR) {
-        writeFileSync(join(process.env.PLOT_SCREENSHOT_DIR, `${label}-initial-25-download.png`), png.contents);
-      }
-      const csv = await downloadFile('download-xy-csv-btn', '.csv');
-      const rows = csv.contents.toString('utf8').trim().split(/\r?\n/);
-      assert.equal(rows.length, 251, `${label}: CSV retains all 250 samples plus its header`);
-      assert.match(rows[0], /total_strain.strain_33/);
-      assert.match(rows[0], /stress.stress_33/);
-      rows.slice(1).forEach((row, index) => {
-        const fields = row.split(',').map(Number);
-        assert.deepEqual(fields, [index, full.data[index].x, full.data[index].y], `${label}: CSV sample ${index} retains its original values`);
-      });
-
-      await evaluate('document.getElementById("plot-full-view").click()');
-      assert.deepEqual(await plotViewState(), full, `${label}: Full curve restores every original point and its ranges`);
-      await evaluate('document.getElementById("plot-initial-view").click()');
-      await changeInitialCount(25);
-      await select('plot-x-select', localSample ? 'total_strain.strain_23' : 'total_strain.strain_11');
-      const nextCount = localSample ? 242 : 3;
-      assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), nextCount);
-      assert.equal(await evaluate('document.getElementById("plot-full-view").getAttribute("aria-pressed")'), 'true');
-      assert.equal(await evaluate('document.getElementById("plot-initial-count").value'), String(Math.min(50, nextCount)));
-      await evaluate('document.getElementById("plot-initial-view").click()');
-      await select('plot-y-select', 'stress.stress_33');
-      assert.deepEqual((await plotViewState()).data, full.data, `${label}: changing Y also restores Full curve`);
-      assert.equal(await evaluate('document.getElementById("plot-full-view").getAttribute("aria-pressed")'), 'true');
-      assert.equal(await evaluate('document.getElementById("plot-initial-count").value'), '50');
-    }
     await command('Page.enable');
     await command('Runtime.enable');
     await command('Network.enable');
@@ -521,16 +398,6 @@ const {join} = require('node:path');
             left: Math.min(...corners.map(point => point.x)), right: Math.max(...corners.map(point => point.x)),
             top: Math.min(...corners.map(point => point.y)), bottom: Math.max(...corners.map(point => point.y))};
           (exporting ? window.plotExportTexts : window.plotTexts).push(record);
-          if (exporting) {
-            const chart = Chart.getChart(this.canvas);
-            if (chart?.scales.x && chart.scales.y) {
-              window.plotExportSnapshot = {
-                data: chart.data.datasets[0].data.map(point => ({x: point.x, y: point.y})),
-                bounds: {xMin: chart.scales.x.min, xMax: chart.scales.x.max,
-                  yMin: chart.scales.y.min, yMax: chart.scales.y.max},
-              };
-            }
-          }
         }
         return drawText.call(this, text, x, y, ...args);
       };
@@ -561,11 +428,10 @@ const {join} = require('node:path');
       url: process.env.PLOT_BASE_URL, path: '/'});
     await send('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: profile});
     const cases = JSON.parse(process.env.PLOT_CASES);
-    await navigate(cases[0].path);
-    assert.ok(await evaluate('document.getElementById("plot-full-view") && document.getElementById("plot-initial-view") && document.getElementById("plot-initial-count") && document.getElementById("plot-view-error")'),
-      'The plot provides Full curve and Initial samples controls with a sample count and validation message');
     for (const item of cases) {
       await navigate(item.path);
+      assert.equal(await evaluate('document.querySelector("#plot-full-view, #plot-initial-view, #plot-initial-count")'), null,
+        'The detail page shows the complete curve without sample-range controls');
       await select('plot-x-select', 'total_strain.strain_11');
       for (const width of [1280, 1440, 1920]) await layout(item.name, width, item);
     }
@@ -631,7 +497,6 @@ const {join} = require('node:path');
     const pngName = readdirSync(profile).find(name => name.endsWith('.png'));
     const csvName = readdirSync(profile).find(name => name.endsWith('.csv'));
     assert.ok(pngName && csvName, 'PNG and selected X/Y CSV both download');
-    assert.doesNotMatch(pngName, /_samples-/, 'Full curve keeps its original PNG filename');
     const png = readFileSync(join(profile, pngName));
     assert.equal(png.readUInt32BE(16), (720 + 48) * 3, 'PNG uses three pixels per CSS pixel with equal margins');
     assert.equal(png.readUInt32BE(20), (480 + 48) * 3);
@@ -665,7 +530,6 @@ const {join} = require('node:path');
     assert.match(csv, /stress.stress_11/);
     assert.match(csv, /1,0.01,40/);
     if (process.env.PLOT_SCREENSHOT_DIR) writeFileSync(join(process.env.PLOT_SCREENSHOT_DIR, 'download.png'), png);
-    await verifyInitialSamples(process.env.PLOT_INITIAL_PATH, 'synthetic');
     if (process.env.PLOT_SAMPLE_PATH) {
       await navigate(process.env.PLOT_SAMPLE_PATH);
       for (const component of ['33', '22', '13', '23']) {
@@ -673,7 +537,6 @@ const {join} = require('node:path');
         await layout(`sample-${component}`, 1440);
       }
       assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), 242);
-      await verifyInitialSamples(process.env.PLOT_SAMPLE_PATH, 'sample-33', true);
     }
     await navigate(process.env.PLOT_EMPTY_PATH, false);
     assert.match(await evaluate('document.querySelector(".plot-empty").textContent'), /No plot-ready mechanical variables/);
@@ -682,7 +545,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; measured Canvas text matches its layout without overlaps or clipping, titles have equal 16px gaps, arrow bases stay 24px beyond range endpoints, two-place ticks remain distinct, and mathematical glyph heights match. Initial views preserve the first 50/25 samples, magnify their true ranges, validate counts, restore the full curve, export the current PNG and keep all 250 CSV samples. Curve hover, original samples, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; measured Canvas text matches its layout without overlaps or clipping, titles have equal 16px gaps, arrow bases stay 24px beyond range endpoints, two-place ticks remain distinct, and mathematical glyph heights match. Curve hover, original samples, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

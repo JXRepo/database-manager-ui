@@ -46,10 +46,11 @@ approximately `131.034 GPa`, with a very small supplied plastic component.
 
 The entire component 33 curve reaches strain `−0.133546447586274`. Measured
 from the true origin, the first 25 samples occupy about `0.1025%` of that full
-horizontal range, less than one pixel even across a 720-pixel canvas. A view of
-the first 50 samples has a strain bound of `−0.001019646479252`, so the same
-initial samples occupy approximately `13.42%` of its horizontal range. These
-are range ratios, not a measurement of the final rendered plot width.
+horizontal range, less than one pixel even across a 720-pixel canvas. For a
+separate diagnostic comparison, the first 50 samples have a strain bound of
+`−0.001019646479252`, so the same initial samples occupy approximately `13.42%`
+of that restricted range. These are range ratios, not a measurement of the
+final rendered plot width or a requirement for webpage magnification.
 
 ## Departure from the initial line
 
@@ -93,21 +94,30 @@ Young's modulus of this polycrystal. This diagnosis does not reconstruct
 elastic strain by assuming that the stored total and plastic strain arrays
 can be subtracted in the finite-strain regime.
 
-## Product decision
+## Withdrawn webpage feature
 
-Keep `Full curve` as the default. The optional `Initial samples` view displays
-the first `min(50, paired sample count)` recorded pairs. Its count is editable,
-and the status identifies the displayed count and original sample indices.
-The default 50 is a viewing convenience, not an estimated elastic boundary.
+Commit `279c0e9` introduced an optional `Initial samples` view with an editable
+count, initially `min(50, paired sample count)`. It also added PNG filenames
+identifying the displayed sample interval. The user subsequently chose not to
+have magnification on the webpage, so this feature and its implementation plan
+are withdrawn.
 
-The view changes only which original samples are displayed and the resulting
-axis ranges. It does not fit a line in the UI, report E, detect a yield point,
-infer an elastic limit, add an origin sample or change sample values. PNG
-exports the current view and identifies an initial sample interval in the
-filename. CSV retains all samples in the selected columns, including longer
-column tails, irrespective of the displayed view.
+The current product decision is to show the complete paired curve only, without
+an initial sample count or local zoom controls. Keep the original samples,
+axis typography, precise hover values, complete PNG plot and full CSV columns.
+Curve redraws remain free of animation. There is no automatic fit, E estimate,
+yield point or elastic limit in the UI.
 
-## Verification
+A magnified diagnostic figure, if shared with Ronak, would serve only to show
+that the initial near-linear response exists in the supplied data and is
+compressed by the full plot range. It does not establish Young's modulus and
+does not represent a request for a webpage feature. The numerical investigation
+above remains valid independently of the withdrawn view controls.
+
+## Historical verification of the withdrawn feature
+
+The following results were recorded for the implementation before its removal.
+They describe that earlier state, not verification of the current removal.
 
 - Mechanical plot JavaScript checks: 19 passed; complete JavaScript suite:
   144 passed, zero skipped.
@@ -115,21 +125,33 @@ column tails, irrespective of the displayed view.
   `apps.pages.test_plot_schema`, `apps.pages.test_mechanical_csv` and
   `apps.dyn_api.test_metadata_compat`: 32 passed.
 - `apps.pages.test_plot_browser` passed with Chromium and the cached Chart.js
-  bundle. It retains 28 layout cases at 1280, 1440 and 1920 desktop widths.
-  New checks use an independent 250-point fixture and the supplied component 33.
-  They verify original 50/25-point prefixes, actual axis ranges, index 11 hover,
+  bundle. It retained 28 layout cases at 1280, 1440 and 1920 desktop widths.
+  The added checks used an independent 250-point fixture and the supplied component 33.
+  They verified original 50/25-point prefixes, actual axis ranges, index 11 hover,
   unchanged source/raw data, invalid counts, Enter, one-point views, full-view
   restoration and variable changes with different paired lengths.
-- The actual exported PNG contains the current 25 points and matching ranges,
-  at 2304 × 1584 pixels. CSV is compared row by row against all 250 original
-  samples, even while the plot displays 25 points.
+- The actual exported PNG contained the selected 25 points and matching ranges,
+  at 2304 × 1584 pixels. CSV was compared row by row against all 250 original
+  samples, even while the plot displayed 25 points.
 - Initial 50/25-point desktop screenshots and the actual 25-point PNG were
   visually inspected. An independent reviewer found no outstanding issue.
 
-The browser check exposed a misleading intermediate curve during Chart.js's
-default draw animation after a view change. Mechanical curves now redraw
-without animation. The final browser run passed with the original axis,
-typography, hover and export checks retained.
+That browser check exposed a misleading intermediate curve during Chart.js's
+default draw animation after a view change. The earlier implementation disabled
+curve animation, and that behavior is retained in the current product decision.
+The earlier final browser run passed with the original axis, typography, hover
+and export checks retained.
 
-These results describe local verification. A successful push does not confirm
-that Render has finished deployment.
+## Removal verification
+
+- `node --test tests/js/mechanical-plot.test.cjs`: 19 passed.
+- With `DEBUG=True`, `.venv/bin/python manage.py test` for
+  `apps.pages.test_plot_schema`, `apps.pages.test_mechanical_csv` and
+  `apps.pages.test_plot_browser`: 16 passed.
+- Chromium checks retained all 28 layout cases at desktop widths 1280, 1440
+  and 1920, and asserted that the initial sample controls are absent.
+- The supplied component 33 screenshot and the complete-curve PNG export were
+  visually reviewed after removal.
+
+These results cover the local removal. A successful push does not confirm that
+Render has finished deployment.
