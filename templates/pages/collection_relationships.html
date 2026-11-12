@@ -11,6 +11,7 @@
     <summary id="manual-relationship-editor-heading">{% if manual_editor.selected %}Edit relationship{% else %}Add relationship{% endif %}</summary>
     <form method="post" action="{{ manual_editor.save_url }}" id="manual-relationship-form">
       {% csrf_token %}
+      {% if study_return_params and graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
       <input type="hidden" name="relationship_id" value="{{ manual_editor.form.relationship_id.value|default_if_none:'' }}">
       <input type="hidden" name="revision" value="{{ manual_editor.form.revision.value|default_if_none:'' }}">
       {{ manual_editor.form.non_field_errors }}{{ manual_editor.form.relationship_id.errors }}{{ manual_editor.form.revision.errors }}
@@ -25,13 +26,14 @@
           {% for member in manual_editor.members %}{% with member_id=member.pk|stringformat:'s' target_id=manual_editor.form.target.value|stringformat:'s' %}<option value="{{ member.pk }}"{% if member_id == target_id %} selected{% endif %}>{{ member.title }}{% if member.identifier %} · {{ member.identifier }}{% endif %}</option>{% endwith %}{% endfor %}
         </select>{{ manual_editor.form.target.errors }}</div>
       </div>
-      <div class="manual-relationship-actions"><button type="submit" id="manual-relationship-save" class="btn btn-primary btn-sm">Save relationship</button><button type="button" id="manual-relationship-cancel" class="btn btn-outline-secondary btn-sm" hidden>Cancel</button><a href="{{ workspace_url }}?links=members#manual-relationships" class="manual-native-new">Start a new relationship</a></div>
+      <div class="manual-relationship-actions"><button type="submit" id="manual-relationship-save" class="btn btn-primary btn-sm">Save relationship</button><button type="button" id="manual-relationship-cancel" class="btn btn-outline-secondary btn-sm" hidden>Cancel</button><a href="{{ manual_editor.members_url }}#manual-relationships" class="manual-native-new">Start a new relationship</a></div>
     </form>
     <details id="manual-relationship-delete-confirm"{% if not manual_editor.selected %} hidden{% endif %}>
       <summary>Delete relationship</summary>
       <p>This removes only this manual connection from the collection.</p>
       <form method="post" action="{{ manual_editor.selected.delete_url }}" id="manual-relationship-delete-form">
         {% csrf_token %}<input type="hidden" name="revision" value="{% if manual_editor.form.is_bound %}{{ manual_editor.form.revision.value|default_if_none:'' }}{% else %}{{ manual_editor.selected.revision }}{% endif %}">
+        {% if study_return_params and graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
         <button type="submit" class="btn btn-outline-danger btn-sm" id="manual-relationship-delete">Delete this relationship</button>
       </form>
     </details>

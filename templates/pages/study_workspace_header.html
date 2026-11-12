@@ -1,0 +1,56 @@
+<section class="study-workspace{% if not object_total %} is-browser-collapsed{% endif %}" id="study-workspace" data-panel="{{ study_workspace.panel }}" data-selection-count="{{ study_comparison.objects|length }}">
+  <div class="study-mode-bar">
+    <nav class="study-modes" aria-label="Study workspace">
+      <a href="{{ study_workspace.explore_url }}" id="study-explore-link"{% if study_workspace.panel == 'explore' %} aria-current="page"{% endif %}>Explore relationships</a>
+      <a href="{{ study_workspace.compare_url }}" id="study-compare-link"{% if study_workspace.panel == 'compare' %} aria-current="page"{% endif %}>Compare records{% if study_comparison.objects %}<span>{{ study_comparison.objects|length }}</span>{% endif %}</a>
+    </nav>
+    {% if object_total %}<button type="button" id="study-browser-toggle" class="study-browser-toggle" aria-controls="study-member-browser" aria-expanded="true" hidden>Browse data objects</button>{% endif %}
+  </div>
+  {% if study_comparison.objects or object_total and study_workspace.panel == 'compare' or not object_total and study_workspace.panel == 'explore' %}
+  <div class="study-selection-tray" id="study-selection-tray" aria-label="Selected comparison records">
+    {% if study_comparison.objects %}
+    <div class="study-selection-heading"><span>{{ study_comparison.objects|length }} of 4 records selected</span><a href="{{ study_workspace.clear_url }}" id="study-clear-selection">Clear selection</a></div>
+    <div class="study-pinned-records" style="--study-columns:{{ study_comparison.objects|length }}">
+      {% for item in study_comparison.objects %}
+      <article class="study-pinned-record{% if forloop.first %} is-reference{% endif %}" data-study-pin="{{ item.pk }}" data-reference="{{ forloop.first|yesno:'true,false' }}">
+        <div class="study-pin-heading">{% if forloop.first %}<span class="study-reference-label">Reference record</span>{% else %}<a href="{{ item.reference_url }}" data-study-reference="{{ item.pk }}">Use as reference</a>{% endif %}<a href="{{ item.remove_url }}" data-study-remove="{{ item.pk }}" aria-label="Remove {{ item.title }} from comparison" title="Remove from comparison">×</a></div>
+        <a class="study-pin-title" href="{{ item.detail_url }}" title="{{ item.title }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a>
+        {% if item.identifier %}<span class="study-pin-identifier" title="{{ item.identifier }}">{{ item.identifier }}</span>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+    {% elif object_total %}
+    <div class="study-selection-empty"><div><strong>What changed between your simulations?</strong><p>Choose 2–4 records to inspect their reported materials, models and loading settings together.</p></div><a href="#study-member-search" class="study-browse-link">Choose records</a></div>
+    {% else %}
+    <div class="study-selection-empty"><div><strong>Build your research collection</strong><p>Add accessible data objects to explore their connections and compare recorded settings.</p></div>{% if graph_continue_search_url %}<div class="study-empty-actions"><a href="{{ graph_continue_search_url }}">Select data from Search</a><a href="{{ graph_continue_my_data_url }}">Select from My Data</a></div>{% endif %}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+  <div class="study-layout">
+    {% if object_total %}
+    <aside class="study-member-browser" id="study-member-browser" aria-labelledby="study-member-heading">
+      <div class="study-browser-heading"><h2 id="study-member-heading">Data objects</h2><span>{{ study_workspace.browser_page.paginator.count }}</span></div>
+      <form method="get" action="{{ workspace_url }}" id="study-member-search" class="study-member-search">
+        {% for field in study_workspace.search_hidden_fields %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
+        <label class="visually-hidden" for="study-member-query">Find data objects in this collection</label>
+        <div><input type="search" id="study-member-query" name="member_q" value="{{ study_workspace.browser_query }}" placeholder="Find records in this collection"><button type="submit" title="Find matching records">Find</button></div>
+        {% if study_workspace.browser_query %}<a href="{{ study_workspace.browser_clear_url }}" id="study-member-clear">Clear search</a>{% endif %}
+      </form>
+      <p class="study-browser-guidance">Pin records from any page. Your first selection is the reference.</p>
+      {% if study_comparison.objects|length >= 4 %}<p class="study-selection-limit">Four records selected. Remove one to add another.</p>{% endif %}
+      {% if study_workspace.browser_rows %}
+      <ul class="study-member-list">
+        {% for item in study_workspace.browser_rows %}
+        <li data-study-member="{{ item.pk }}"{% if item.selected %} class="is-pinned"{% endif %}>
+          <a href="{{ item.show_url }}" class="study-member-title" title="{{ item.title }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a>
+          {% if item.identifier %}<span class="study-member-identifier" title="{{ item.identifier }}">{{ item.identifier }}</span>{% endif %}
+          {% if item.phase or item.software %}<p class="study-member-description">{% if item.phase %}<span title="{{ item.phase }}">{{ item.phase }}</span>{% endif %}{% if item.software %}<span title="{{ item.software }}">{{ item.software }}</span>{% endif %}</p>{% endif %}
+          <div class="study-member-actions">{% if item.selected %}<span class="study-member-pinned">Pinned</span>{% elif item.pin_url %}<a href="{{ item.pin_url }}" data-study-add="{{ item.pk }}" class="study-pin-action" aria-label="Pin {{ item.title }} for comparison">Pin for comparison</a>{% else %}<span class="study-member-limit">Selection full</span>{% endif %}<a href="{{ item.show_url }}" class="study-member-show">Show</a></div>
+        </li>
+        {% endfor %}
+      </ul>
+      <nav class="study-member-pagination" aria-label="Study member pages">{% if study_workspace.previous_url %}<a href="{{ study_workspace.previous_url }}" id="study-member-previous">Previous</a>{% endif %}<span>{{ study_workspace.browser_page.number }} / {{ study_workspace.browser_page.paginator.num_pages }}</span>{% if study_workspace.next_url %}<a href="{{ study_workspace.next_url }}" id="study-member-next">Next</a>{% endif %}</nav>
+      {% else %}<p class="study-browser-empty">{% if study_workspace.browser_query %}No records match these words. Try fewer words or clear the search.{% else %}Add accessible data objects to begin a comparison.{% endif %}</p>{% endif %}
+    </aside>
+    {% endif %}
+    <div class="study-main">

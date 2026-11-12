@@ -295,6 +295,17 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
             ))
         graph_options = {"manual_relationships": manual_rows} if manual_rows else {}
         context.update(_graph_context(objects, title=title, base_url=url, params=params, **graph_options))
+        if "manual_member_summaries" in context:
+            from .study_workspace import build_study_workspace_context
+
+            context.update(build_study_workspace_context(
+                objects, context, params, base_url=url, collection=collection, selection_token=token,
+            ))
+            if context["study_workspace"]["error"] and status < 400:
+                status = 400
+            preparation = context["study_comparison"].get("preparation")
+            if preparation and status < 400:
+                status = 503 if preparation["requires_admin"] else 202
         if collection is not None and "manual_member_summaries" in context:
             from .collection_relationship_context import relationship_editor_context
 
@@ -507,18 +518,31 @@ def collection_save(request, token):
     HttpResponse
         Saved collection or the existing workspace with validation errors.
     """
+    from urllib.parse import urlencode
+
+    from .collection_navigation import read_mutation_navigation
+
     ids = _selection_ids(request, token)
     form = _collection_form(request.POST)
+    try:
+        navigation = read_mutation_navigation(request, selection_token=token)
+    except ValueError as exc:
+        return _workspace_response(request, token=token, form=form, error=str(exc), status=400,
+                                   navigation_params={})
+    return_params = navigation["params"] if navigation is not None else None
     if not form.is_valid():
-        return _workspace_response(request, token=token, form=form, status=400)
+        return _workspace_response(request, token=token, form=form, status=400, navigation_params=return_params)
     try:
         with transaction.atomic():
             _validate_access(request.user, ids, lock=True)
             collection = ResearchCollection.objects.create(owner=request.user, **form.cleaned_data)
             collection.members.add(*ids)
     except ValueError as exc:
-        return _workspace_response(request, token=token, form=form, error=str(exc), status=400)
+        return _workspace_response(request, token=token, form=form, error=str(exc), status=400,
+                                   navigation_params=return_params)
     messages.success(request, "Research collection saved. Only you can access this collection.")
+    if return_params:
+        return redirect(reverse("collection_detail", args=[collection.pk]) + "?" + urlencode(return_params))
     return redirect("collection_detail", pk=collection.pk)
 
 

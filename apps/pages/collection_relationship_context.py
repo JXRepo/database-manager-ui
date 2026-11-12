@@ -36,13 +36,14 @@ def relationship_editor_context(collection, context, params, form=None):
     by_id = {row["pk"]: row for row in members}
     base_url = reverse("collection_detail", args=[collection.pk])
     presentation = context["graph_view_mode"]
+    study_state = context.get("study_return_params", {})
     rows = []
     for relation in context["manual_relationship_rows"]:
         row = dict(relation)
         row.update(
             source_title=by_id[row["source_id"]]["title"],
             target_title=by_id[row["target_id"]]["title"],
-            edit_url=base_url + "?" + urlencode({"links": "members", "edge": row["id"], "view": presentation}),
+            edit_url=base_url + "?" + urlencode({**study_state, "panel": "explore", "links": "members", "edge": row["id"], "view": presentation}),
             delete_url=reverse("collection_relationship_delete", args=[collection.pk, row["id"]]),
         )
         rows.append(row)
@@ -70,7 +71,7 @@ def relationship_editor_context(collection, context, params, form=None):
     else:
         form.fields["source"].widget.choices = [("", "Choose a data object"), *choices]
         form.fields["target"].widget.choices = [("", "Choose a data object"), *choices]
-    arguments = {}
+    arguments = dict(study_state)
     for key in ("links", "group", "page", "groups_page", "edge", "view"):
         value = _argument(params, key)
         if value:
@@ -90,6 +91,6 @@ def relationship_editor_context(collection, context, params, form=None):
         "visible_total": context["manual_visible_total"],
         "selected": selected, "form": form,
         "editable_rows": [row for row in rows if row["id"] in editable_ids],
-        "members_url": base_url + "?" + urlencode({"links": "members", "view": presentation}),
+        "members_url": base_url + "?" + urlencode({**study_state, "panel": "explore", "links": "members", "view": presentation}),
         "reload_url": selected["edit_url"] if selected else base_url + "?links=members",
     }

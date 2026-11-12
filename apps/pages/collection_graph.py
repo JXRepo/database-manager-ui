@@ -13,6 +13,7 @@ from django.db.models.functions import Cast
 from django.urls import reverse
 
 from .collection_summary import build_collection_summary
+from .study_comparison import SUMMARY_VERSION, outdated_summary_query
 
 
 PAGE_SIZE = 25
@@ -64,7 +65,7 @@ class CollectionSummaryPending(Exception):
         super().__init__("Collection summaries are still being prepared.")
 
 
-def collection_summaries(accessible_queryset, *, prepare_all=False):
+def collection_summaries(accessible_queryset, *, prepare_all=False, require_comparison=False):
     """
     Read cached labels and prepare missing summaries one accessible row at a time
 
@@ -74,6 +75,8 @@ def collection_summaries(accessible_queryset, *, prepare_all=False):
         Records already restricted to the viewer and current collection.
     prepare_all : bool, optional
         Allow operator commands to prepare their bounded batch without web limits.
+    require_comparison : bool, optional
+        Upgrade only the selected records when their comparison projection is outdated.
 
     Yields
     ------
@@ -91,6 +94,22 @@ def collection_summaries(accessible_queryset, *, prepare_all=False):
     pending = False
     operator_rows = set()
     objects = accessible_queryset.only("pk", "collection_summary", "size_bytes").order_by("-uploaded_at", "-pk")
+
+    def needs_preparation(summary):
+        """
+        Keep legacy discovery summaries usable until comparison explicitly needs them
+
+        Parameters
+        ----------
+        summary : dict or None
+            Stored scalar metadata projection.
+
+        Returns
+        -------
+        bool
+            Whether this caller requires a new projection.
+        """
+        return summary is None or (require_comparison and summary.get("summary_version") != SUMMARY_VERSION)
 
     def within_budget(size_bytes):
         """
@@ -114,7 +133,7 @@ def collection_summaries(accessible_queryset, *, prepare_all=False):
 
     for obj in objects.iterator(chunk_size=100):
         summary = obj.collection_summary
-        if summary is None:
+        if needs_preparation(summary):
             if not prepare_all and (obj.size_bytes <= 0 or obj.size_bytes > MAX_REQUEST_SUMMARY_BYTES):
                 operator_rows.add(obj.pk)
             if not within_budget(obj.size_bytes):
@@ -133,7 +152,7 @@ def collection_summaries(accessible_queryset, *, prepare_all=False):
                     pending = True
                     continue
                 summary = current.collection_summary
-                if summary is None:
+                if needs_preparation(summary):
                     if not within_budget(current.size_bytes):
                         if current.size_bytes <= 0 or current.size_bytes > MAX_REQUEST_SUMMARY_BYTES:
                             operator_rows.add(current.pk)
@@ -164,11 +183,14 @@ def collection_summaries(accessible_queryset, *, prepare_all=False):
                     prepared_bytes += raw_bytes
             del current
         detail_url = reverse("json_data_detail", args=[obj.pk])
-        yield {**summary, "pk": obj.pk, "detail_url": detail_url, "graph_url": detail_url + "?tab=graph"}
+        displayed = summary if require_comparison else {key: value for key, value in summary.items()
+                                                        if key != "comparison"}
+        yield {**displayed, "pk": obj.pk, "detail_url": detail_url, "graph_url": detail_url + "?tab=graph"}
     if pending and not prepare_all:
+        missing = outdated_summary_query() if require_comparison else Q(collection_summary__isnull=True)
         counts = accessible_queryset.aggregate(
-            total=Count("pk"), ready=Count("pk", filter=Q(collection_summary__isnull=False)),
-            blocked=Count("pk", filter=Q(collection_summary__isnull=True) & (
+            total=Count("pk"), ready=Count("pk", filter=~missing),
+            blocked=Count("pk", filter=missing & (
                 Q(size_bytes__lte=0) | Q(size_bytes__gt=MAX_REQUEST_SUMMARY_BYTES)
                 | Q(pk__in=operator_rows)
             )),
@@ -367,6 +389,15 @@ def build_collection_context(accessible_queryset, *, title, base_url, params, ma
     view = "detailed" if _argument(params, "view", "compact") == "detailed" else "compact"
     summaries = list(collection_summaries(accessible_queryset))
     member_ids = {row["pk"] for row in summaries}
+    from .study_workspace import study_parameters
+
+    try:
+        study_state = study_parameters(params)
+    except ValueError:
+        study_state = {}
+    focus_ids = [int(value) for value in study_state.get("compare", "").split(",") if value]
+    if len(focus_ids) < 2 or not set(focus_ids).issubset(member_ids):
+        focus_ids = []
     manual_relationships = [row for row in manual_relationships
                             if row["source_id"] in member_ids and row["target_id"] in member_ids]
     edge_id = _argument(params, "edge")
@@ -378,7 +409,9 @@ def build_collection_context(accessible_queryset, *, title, base_url, params, ma
         if selected_edge is None:
             raise ValueError("This manual relationship is unavailable. Return to the collection overview.")
         mode, selected_key = "members", ""
-    if not selected_edge and "links" not in params and "group" not in params:
+    elif focus_ids:
+        mode, selected_key = "members", ""
+    if not selected_edge and not focus_ids and "links" not in params and "group" not in params:
         reference_keys = {
             identity
             for row in summaries
@@ -391,7 +424,7 @@ def build_collection_context(accessible_queryset, *, title, base_url, params, ma
         )
         if no_references or crowded_small_collection:
             mode = "members"
-    arguments = {"links": mode}
+    arguments = {"links": mode, **study_state}
     if selected_edge:
         arguments["edge"] = edge_id
     if selected_key:
@@ -453,6 +486,8 @@ def build_collection_context(accessible_queryset, *, title, base_url, params, ma
             details=[{"label": "Accessible objects", "value": str(len(summaries))}],
             source_url=url(group=None, edge=None), source_label="View collection overview",
         )
+        if focus_ids and not selected_edge:
+            root["details"].append({"label": "Selected records", "value": str(len(focus_ids))})
         nodes = [root]
         connections = []
         visible_groups = [selected] if selected else group_page.object_list
@@ -469,7 +504,11 @@ def build_collection_context(accessible_queryset, *, title, base_url, params, ma
             ))
             connections.append({"source": root["id"], "target": nodes[-1]["id"], "relation": relation})
         if mode == "members" or selected or auto_expanded:
-            for row in object_rows:
+            graph_rows = object_rows
+            if focus_ids and not selected_edge:
+                by_pk = {row["pk"]: row for row in summaries}
+                graph_rows = [by_pk[pk] for pk in focus_ids]
+            for row in graph_rows:
                 parents = [group for group in visible_groups if group["key"] in row["group_keys"]]
                 parent_id = "collection-group-" + parents[0]["key"] if parents else root["id"]
                 relation = "Contains object" if mode == "members" else "Includes object" if row["group_keys"] == {"missing"} else "Declared by" if mode == "relations" else "Reported by"

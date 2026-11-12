@@ -16,7 +16,8 @@ CONTEXT_ERROR = (
     "This collection or selection link is no longer available. "
     "Open Graph and choose the collection or selection again."
 )
-RETURN_PARAMETERS = {"links", "group", "page", "groups_page", "view", "edge", "relationships_page"}
+RETURN_PARAMETERS = {"links", "group", "page", "groups_page", "view", "edge", "relationships_page",
+                     "compare", "panel", "member_q", "members_page", "differences"}
 
 
 def _return_parameters(values):
@@ -61,6 +62,13 @@ def _return_parameters(values):
         params[key] = value
     if params.get("links") == "members" and "group" in params:
         raise ValueError(CONTEXT_ERROR)
+    if any(key in params for key in ("compare", "panel", "member_q", "members_page", "differences")):
+        from .study_workspace import study_parameters
+
+        try:
+            study_parameters(params)
+        except ValueError:
+            raise ValueError(CONTEXT_ERROR) from None
     return params
 
 
@@ -186,6 +194,44 @@ def navigation_fields(navigation):
     }
 
 
+def read_mutation_navigation(request, *, collection=None, selection_token=""):
+    """
+    Accept optional signed POST state only for the exact workspace being changed
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated mutation request with optional graph_context form field.
+    collection : ResearchCollection or None, optional
+        Already owned collection whose mutation is requested.
+    selection_token : str, optional
+        Session selection being saved when no collection is supplied.
+
+    Returns
+    -------
+    dict or None
+        Validated navigation state, or no state for legacy native submissions.
+
+    Raises
+    ------
+    ValueError
+        Navigation is ambiguous, unsigned, repeated or names a different workspace.
+    """
+    if any(key in request.GET for key in RETURN_PARAMETERS | {"graph_context"}):
+        raise ValueError(CONTEXT_ERROR)
+    if any(key in request.POST for key in RETURN_PARAMETERS):
+        raise ValueError(CONTEXT_ERROR)
+    navigation = read_navigation(request, data=request.POST)
+    if navigation is None:
+        return None
+    if collection is not None:
+        if navigation["kind"] != "collection" or navigation["collection"].pk != collection.pk:
+            raise ValueError(CONTEXT_ERROR)
+    elif navigation["kind"] != "selection" or navigation["selection_token"] != selection_token:
+        raise ValueError(CONTEXT_ERROR)
+    return navigation
+
+
 def navigation_context(request):
     """
     Show optional return navigation without denying access to an accessible object
@@ -237,6 +283,7 @@ def workspace_navigation(request, context, *, collection=None, selection_token="
         params["edge"] = str(context["manual_selected"]["id"])
     if context.get("manual_editor") and context["manual_editor"]["page"].number > 1:
         params["relationships_page"] = str(context["manual_editor"]["page"].number)
+    params.update(context.get("study_return_params", {}))
     params = _return_parameters(params)
     payload = {
         "user": request.user.pk, "kind": "collection" if collection is not None else "selection",
@@ -254,9 +301,14 @@ def workspace_navigation(request, context, *, collection=None, selection_token="
         fields[f"graph_context_{view}"] = signing.dumps(
             {**payload, "params": {**params, "view": view}}, salt=CONTEXT_SALT,
         )
-    for row in context.get("object_rows", []):
+    source_rows = [*context.get("object_rows", []), *context.get("study_comparison", {}).get("objects", [])]
+    for row in source_rows:
         row["detail_url"] = with_graph_context(row["detail_url"], token)
         row["graph_url"] = with_graph_context(row["graph_url"], token)
+        row["metadata_url"] = row["detail_url"] + "#data-metadata"
+        row["curves_url"] = row["detail_url"] + "#data-curves"
+    for row in context.get("study_workspace", {}).get("browser_rows", []):
+        row["show_url"] = with_graph_context(row["show_url"], token)
     for node in (context.get("relationship_graph") or {}).get("nodes", []):
         if node.get("id", "").startswith("collection-object-"):
             for key in ("source_url", "graph_url"):

@@ -99,7 +99,9 @@ class CollectionSummaryTests(TestCase):
         self.assertNotIn("stress", summary)
         self.assertNotIn("total_strain", summary)
         self.assertNotIn("extra", summary)
-        self.assertTrue(all(isinstance(value, str) for key, value in summary.items() if key != "groups"))
+        self.assertTrue(all(isinstance(value, str) for key, value in summary.items()
+                            if key not in {"groups", "summary_version", "comparison"}))
+        self.assertEqual(summary["summary_version"], 2)
         self.record.refresh_from_db()
         self.assertEqual(self.record.data, original)
         self.assertEqual(self.record.collection_summary, summary)
@@ -267,7 +269,7 @@ class CollectionSummaryTests(TestCase):
         batch_sizes = []
         inserted = []
 
-        def prepare_batch(queryset, *, prepare_all=False):
+        def prepare_batch(queryset, *, prepare_all=False, require_comparison=False):
             """
             Observe real batches while introducing a new record after the first
 
@@ -277,6 +279,8 @@ class CollectionSummaryTests(TestCase):
                 Current batch selected by the management command.
             prepare_all : bool, optional
                 Whether operator preparation bypasses the web request allowance.
+            require_comparison : bool, optional
+                Whether outdated comparison projections are also prepared.
 
             Returns
             -------
@@ -284,7 +288,8 @@ class CollectionSummaryTests(TestCase):
                 Summaries prepared by the actual implementation.
             """
             batch_sizes.append(queryset.count())
-            summaries = list(collection_summaries(queryset, prepare_all=prepare_all))
+            summaries = list(collection_summaries(queryset, prepare_all=prepare_all,
+                                                require_comparison=require_comparison))
             if len(batch_sizes) == 1:
                 obj = JSONData.objects.create(owner=self.owner, data={"title": "Inserted after command start"})
                 JSONData.objects.filter(pk=obj.pk).update(collection_summary=None)

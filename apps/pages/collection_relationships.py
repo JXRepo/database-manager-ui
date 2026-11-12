@@ -2,6 +2,8 @@
 Save private user supplied relationships without modifying uploaded metadata
 """
 
+from urllib.parse import urlencode
+
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -12,6 +14,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from .collection_graph import CollectionSummaryPending, collection_summaries
+from .collection_navigation import read_mutation_navigation
 from .models import CollectionRelationship
 from .research_collections import _owned_collection, _validate_access, _workspace_response, accessible_objects
 
@@ -147,7 +150,7 @@ def _wants_json(request):
                for value in request.headers.get("Accept", "").split(","))
 
 
-def _failure(request, collection, form, error, status=400):
+def _failure(request, collection, form, error, status=400, *, navigation_params=None):
     """
     Preserve submitted values while reporting a rejected mutation
 
@@ -163,6 +166,8 @@ def _failure(request, collection, form, error, status=400):
         Actionable failure description without inaccessible metadata.
     status : int, optional
         Validation or conflict response status.
+    navigation_params : dict or None, optional
+        Validated workspace state to retain beside the bound form.
 
     Returns
     -------
@@ -171,7 +176,12 @@ def _failure(request, collection, form, error, status=400):
     """
     if _wants_json(request):
         return JsonResponse({"ok": False, "error": error, "errors": dict(form.errors)}, status=status)
-    return _workspace_response(request, collection=collection, relationship_form=form, error=error, status=status)
+    if navigation_params is not None:
+        navigation_params = {**navigation_params, "links": "members", "panel": "explore"}
+        navigation_params.pop("group", None)
+        navigation_params.pop("edge", None)
+    return _workspace_response(request, collection=collection, relationship_form=form, error=error, status=status,
+                               navigation_params=navigation_params)
 
 
 def _validate_members(user, collection, ids):
@@ -240,11 +250,16 @@ def collection_relationship_save(request, pk):
     """
     collection = _owned_collection(request, pk)
     form = RelationshipForm(request.POST)
+    try:
+        navigation = read_mutation_navigation(request, collection=collection)
+    except ValueError as exc:
+        return _failure(request, collection, form, str(exc), navigation_params={})
+    return_params = None if navigation is None else {**navigation["params"], "panel": "explore"}
     if any(name in request.GET for name in form.fields):
         form.is_valid()
         form.add_error(None, "Submit relationship fields in the form only.")
     if not form.is_valid():
-        return _failure(request, collection, form, "Check the relationship fields below.")
+        return _failure(request, collection, form, "Check the relationship fields below.", navigation_params=return_params)
     fields = form.cleaned_data
     conflict = False
     try:
@@ -283,8 +298,13 @@ def collection_relationship_save(request, pk):
             relationship.save()
             collection.save(update_fields=["updated_at"])
     except ValueError as exc:
-        return _failure(request, collection, form, str(exc), status=409 if conflict else 400)
+        return _failure(request, collection, form, str(exc), status=409 if conflict else 400,
+                        navigation_params=return_params)
     url = reverse("collection_detail", args=[collection.pk]) + f"?links=members&edge={relationship.pk}"
+    if return_params is not None:
+        return_params.update(links="members", edge=str(relationship.pk))
+        return_params.pop("group", None)
+        url = reverse("collection_detail", args=[collection.pk]) + "?" + urlencode(return_params)
     if _wants_json(request):
         return JsonResponse({"ok": True, "redirect_url": url, "relationship": _saved_fields(relationship)})
     messages.success(request, "Relationship saved in this collection. Original data objects are unchanged.")
@@ -313,13 +333,18 @@ def collection_relationship_delete(request, pk, relationship_pk):
     """
     collection = _owned_collection(request, pk)
     form = RelationshipForm(request.POST)
+    try:
+        navigation = read_mutation_navigation(request, collection=collection)
+    except ValueError as exc:
+        return _failure(request, collection, form, str(exc), navigation_params={})
+    return_params = None if navigation is None else {**navigation["params"], "panel": "explore"}
     revisions = request.POST.getlist("revision")
     try:
         if len(revisions) != 1 or "revision" in request.GET:
             raise forms.ValidationError("Submit the relationship revision once.")
         revision = _positive_id(revisions[0])
     except forms.ValidationError as exc:
-        return _failure(request, collection, form, str(exc.messages[0]))
+        return _failure(request, collection, form, str(exc.messages[0]), navigation_params=return_params)
     conflict = False
     try:
         with transaction.atomic():
@@ -339,8 +364,14 @@ def collection_relationship_delete(request, pk, relationship_pk):
             relationship.delete()
             collection.save(update_fields=["updated_at"])
     except ValueError as exc:
-        return _failure(request, collection, form, str(exc), status=409 if conflict else 400)
+        return _failure(request, collection, form, str(exc), status=409 if conflict else 400,
+                        navigation_params=return_params)
     url = reverse("collection_detail", args=[collection.pk]) + "?links=members#manual-relationships"
+    if return_params is not None:
+        return_params.update(links="members")
+        return_params.pop("group", None)
+        return_params.pop("edge", None)
+        url = reverse("collection_detail", args=[collection.pk]) + "?" + urlencode(return_params) + "#manual-relationships"
     if _wants_json(request):
         return JsonResponse({"ok": True, "redirect_url": url})
     messages.success(request, "Relationship deleted. Original data objects are unchanged.")

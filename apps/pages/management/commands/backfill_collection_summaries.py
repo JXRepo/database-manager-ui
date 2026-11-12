@@ -6,14 +6,15 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.pages.collection_graph import collection_summaries
 from apps.pages.models import JSONData
+from apps.pages.study_comparison import outdated_summary_query
 
 
 class Command(BaseCommand):
     """
-    Build missing summaries without rewriting original JSON or existing summaries
+    Upgrade missing or outdated summaries without rewriting original JSON
     """
 
-    help = "Prepare missing collection summaries in a bounded, restartable batch."
+    help = "Prepare missing or outdated collection summaries in a bounded, restartable batch."
 
     def add_arguments(self, parser):
         """
@@ -50,13 +51,15 @@ class Command(BaseCommand):
         prepared = 0
         while last_pk < upper_pk:
             ids = list(objects.filter(
-                pk__gt=last_pk, pk__lte=upper_pk, collection_summary__isnull=True,
+                outdated_summary_query(), pk__gt=last_pk, pk__lte=upper_pk,
             ).order_by("pk").values_list("pk", flat=True)[:batch_size])
             if not ids:
                 break
-            prepared += sum(1 for _ in collection_summaries(objects.filter(pk__in=ids), prepare_all=True))
+            prepared += sum(1 for _ in collection_summaries(
+                objects.filter(pk__in=ids), prepare_all=True, require_comparison=True,
+            ))
             last_pk = ids[-1]
             if not options["all"]:
                 break
-        remaining = objects.filter(collection_summary__isnull=True).count()
+        remaining = objects.filter(outdated_summary_query()).count()
         self.stdout.write(f"Prepared {prepared} summaries. {remaining} records still need summaries.")

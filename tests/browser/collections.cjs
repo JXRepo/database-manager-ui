@@ -408,6 +408,7 @@ const {join} = require('node:path');
           closed: !document.querySelector('#collection-save-panel').open,
           firstScreen: canvas.top >= 0 && canvas.top + Math.min(canvas.height, 260) <= innerHeight};
       })()`);
+      await screenshot(`selected-two-objects-${width}`);
       assert.deepEqual(new Set(smallGraph.records), new Set([`collection-object-${cases.first}`, `collection-object-${cases.public}`]));
       assert.equal(smallGraph.records.length, 2, 'Each selected object appears exactly once before drilling into groups');
       assert.equal(smallGraph.references, 1, 'DOI spelling variants share one declared reference');
@@ -415,7 +416,6 @@ const {join} = require('node:path');
       assert.equal(smallGraph.closed, true, 'Saving remains available without pushing the graph down');
       assert.equal(smallGraph.firstScreen, true, `The graph is visible on the first desktop screen at ${width}px`);
       assert.equal(smallGraph.cardsVisible, true, `Both object cards fit the initial viewport at ${width}px`);
-      await screenshot(`selected-two-objects-${width}`);
     }
     await command('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
     await follow('#collection-select-more');

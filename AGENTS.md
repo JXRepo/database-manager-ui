@@ -231,6 +231,18 @@ Current priority:
 - Keep classification counts and distribution units visible, with denominators in hover details; preserve empty states, long labels, expandable categories, keyboard operation and ordinary GET navigation without JavaScript
 - Verify desktop layout and drillthrough with `DEBUG=True ... manage.py test apps.charts`; the browser test needs Chromium and Node with global WebSocket and must not be skipped
 
+## Study workspace rules
+
+- Collections and temporary selections support Explore and Compare with up to four ordered accessible member IDs; the first is the explicit reference
+- Preserve comparison pins across member searches/pages, source-detail return links, manual relationship saves/deletes and temporary collection saves; validate signed navigation before mutations
+- Reject invalid, repeated, inaccessible or nonmember comparison IDs as a whole selection; never silently drop an object or reveal inaccessible titles
+- Compare recorded settings only, retaining phase/loading order, numeric precision and explicit units; do not infer physical comparability, align phases by name, overlay curves or infer causal relationships
+- Distinguish matching, differing and incomplete rows; missing, ambiguous or truncated values must never produce a complete equality fingerprint, and Differences & gaps retains incomplete rows
+- Use version 2 collection summaries with a bounded comparison projection: eight entries per field, 240 characters per displayed value and 32 KiB total; keep raw arrays out of retained summaries
+- Ordinary graphs may read legacy summaries; comparison preparation upgrades selected records only within existing request budgets, while deployment backfill upgrades outdated versions in bounded batches
+- Show schema locators as Recognized fields, with links to complete source metadata/curves; comparison CSV is a bounded snapshot with formula protection, separate from unchanged original JSON exports
+- Verify the study workspace and existing collection/manual relationship flows in real Chromium at desktop widths, including native forms, long content, empty collections and four-record tables
+
 ## Search rules
 
 - Keep search practical and understandable

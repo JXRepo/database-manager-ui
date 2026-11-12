@@ -5,9 +5,10 @@
 <link rel="stylesheet" href="{% static 'assets/css/detail-relationships.css' %}">
 <link rel="stylesheet" href="{% static 'assets/css/research-collections.css' %}">
 <link rel="stylesheet" href="{% static 'assets/css/collection-relationships.css' %}">
+<link rel="stylesheet" href="{% static 'assets/css/study-workspace.css' %}">
 {% endblock extrastyle %}
 {% block content %}
-<main class="pc-container graph-page collection-page">
+<main class="pc-container graph-page collection-page study-page">
   <div class="pc-content">
     <div class="page-header"><div class="page-block">
       <div class="page-header-title"><h1 class="h5 m-b-10">Graph</h1></div>
@@ -19,7 +20,7 @@
     {% if graph_navigation_error %}<div class="alert alert-warning" role="alert">{{ graph_navigation_error }} <a href="{% url 'search' %}">Start a new selection</a></div>{% endif %}
     <section class="collection-intro" aria-labelledby="collection-title">
       <div class="collection-title-block">
-        <span class="collection-overline">{% if collection %}Research collection · Only you{% else %}Unsaved selection{% endif %}</span>
+        <span class="collection-overline">{% if collection %}Private research collection{% else %}Unsaved selection{% endif %}</span>
         <h2 id="collection-title">{{ workspace_title }}</h2>
         {% if collection.description %}<p class="collection-description">{{ collection.description }}</p>{% endif %}
         {% if not graph_error %}<p class="collection-total">{{ object_total }} accessible data object{{ object_total|pluralize }}</p>{% endif %}
@@ -42,6 +43,7 @@
       <div class="collection-save-options">
         <form method="post" action="{% url 'collection_save' selection_token %}" id="collection-save-form" class="collection-edit-form">
           {% csrf_token %}
+          {% if study_return_params and graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
           {{ collection_form.non_field_errors }}
           <div><label for="{{ collection_form.title.id_for_label }}">Collection name</label>{{ collection_form.title }}{{ collection_form.title.errors }}</div>
           <details class="collection-optional-description"{% if collection_form.description.errors %} open{% endif %}><summary>Add a description</summary><label class="visually-hidden" for="{{ collection_form.description.id_for_label }}">Description</label>{{ collection_form.description }}{{ collection_form.description.errors }}</details>
@@ -85,7 +87,13 @@
     </section>
     {% endif %}
 
+    {% if study_workspace and not summary_preparation %}{% include "pages/study_workspace_header.html" %}{% endif %}
+    {% if study_workspace.panel == 'compare' and not summary_preparation %}
+      {% include "pages/study_comparison.html" %}
+    {% else %}
+    {% if study_comparison.error %}<div class="study-comparison-error" id="study-comparison-error" role="alert"><strong>This comparison cannot be opened.</strong><p>{{ study_comparison.error }}</p><a href="{{ study_workspace.clear_url }}">Clear the selection and choose records again</a></div>{% endif %}
     {% if object_total and not summary_preparation %}
+    {% if study_comparison.ids|length < 2 %}
     <section class="collection-explore" aria-label="Explore collection relationships">
       <nav class="collection-dimensions" aria-label="Relationship view">{% for option in links_options %}<a href="{{ option.url }}"{% if option.active %} aria-current="page"{% endif %}>{{ option.label }}</a>{% endfor %}</nav>
       <p class="collection-explanation">{{ links_description }}</p>
@@ -97,11 +105,15 @@
       </details>
       {% endif %}
     </section>
-    {% if manual_selected %}<p class="manual-relationship-focus-note">Manual: <strong>{{ manual_selected.label }}</strong> · Showing this connection and its two data objects. <a href="{{ manual_editor.members_url }}">Show collection members</a></p>{% endif %}
+    {% endif %}
+    {% if study_workspace.focus_count >= 2 and not manual_selected %}<p class="study-map-caption">Map of {{ study_workspace.focus_count }} selected records. <a href="{{ study_workspace.compare_url }}">Inspect their recorded differences</a> <a href="{{ study_workspace.clear_url }}">Show the whole collection</a></p>{% endif %}
+    {% if manual_selected %}<p class="manual-relationship-focus-note">Manual: <strong>{{ manual_selected.label }}</strong> · Showing this connection and its two data objects. <a href="{{ manual_editor.members_url }}">{% if study_comparison.objects|length >= 2 %}Return to selected records{% else %}Show collection members{% endif %}</a></p>{% endif %}
     {% if relationship_graph %}{% include "pages/detail_relationships.html" with graph_json_url=export_url %}{% endif %}
     {% endif %}
 
     {% if manual_editor %}{% include "pages/collection_relationships.html" %}{% elif selection_token and not summary_preparation and not graph_error %}<p class="collection-manual-save-note"><a href="#collection-save-panel" id="collection-save-for-relationships">Save this selection as a collection</a> to add and edit manual relationships.</p>{% endif %}
+    {% endif %}
+    {% if study_workspace and not summary_preparation %}</div></div></section>{% endif %}
 
     {% if not graph_error and not summary_preparation %}
     <section class="collection-card collection-objects" aria-labelledby="collection-objects-heading">
@@ -129,4 +141,5 @@
 </main>
 <script src="{% static 'assets/js/research-collections.js' %}" defer></script>
 <script src="{% static 'assets/js/collection-relationships.js' %}" defer></script>
+<script src="{% static 'assets/js/study-workspace.js' %}" defer></script>
 {% endblock content %}

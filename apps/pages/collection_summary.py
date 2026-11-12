@@ -7,6 +7,7 @@ import re
 from urllib.parse import unquote, urlsplit
 
 from apps.dyn_api.metadata_compat import field_name, field_value, metadata_view
+from .study_comparison import SUMMARY_VERSION, build_study_projection
 
 
 DOI = re.compile(r"10\.\d{4,9}/\S+\Z", re.IGNORECASE)
@@ -153,6 +154,7 @@ def build_collection_summary(raw_data):
     """
     conflicts = []
     data = metadata_view(raw_data, conflicts=conflicts)
+    comparison = build_study_projection(data, conflicts, original=raw_data)
     for first, second in conflicts:
         for field in ("identifier", "relation", "phase", "mechanical_BC"):
             if field_name(first) == field_name(field) or field_name(second) == field_name(field):
@@ -178,6 +180,7 @@ def build_collection_summary(raw_data):
     identifier = "; ".join(_names(data.get("identifier")))
     title = "; ".join(_names(data.get("title"))) or identifier or "Untitled data object"
     return {
+        "summary_version": SUMMARY_VERSION, "comparison": comparison,
         "title": title, "identifier": identifier,
         "software": "; ".join(software),
         "software_version": _version_text(data.get("software_version")),

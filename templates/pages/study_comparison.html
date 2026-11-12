@@ -1,0 +1,49 @@
+<section class="study-comparison" id="study-comparison" aria-labelledby="study-comparison-heading">
+  <header class="study-comparison-heading">
+    <div><h2 id="study-comparison-heading">Recorded setup, side by side</h2><p>Inspect what each record reports. Matching entries do not establish scientific comparability.</p></div>
+    {% if study_comparison.ready %}<a href="{{ study_comparison.csv_url }}" id="study-comparison-export" class="study-export-link">Download comparison (CSV)</a>{% endif %}
+  </header>
+  {% if study_comparison.error %}
+  <div class="study-comparison-error" id="study-comparison-error" role="alert"><strong>This comparison cannot be opened.</strong><p>{{ study_comparison.error }}</p><a href="{{ study_workspace.clear_url }}">Clear the selection and choose records again</a></div>
+  {% elif study_comparison.preparation %}
+  <section class="study-comparison-preparation" id="study-comparison-preparation" data-ready="{{ study_comparison.preparation.ready_count }}" data-total="{{ study_comparison.preparation.total_count }}" data-requires-admin="{{ study_comparison.preparation.requires_admin|yesno:'true,false' }}">
+    <h3>Preparing the selected records</h3><p role="status">{{ study_comparison.preparation.ready_count }} of {{ study_comparison.preparation.total_count }} selected records ready</p>
+    <p>{% if study_comparison.preparation.requires_admin %}An administrator needs to prepare metadata for one or more selected records.{% else %}Continue to prepare the remaining selected records. The complete comparison will appear when they are ready.{% endif %}</p>
+    <a href="{{ study_comparison.retry_url|default:request.get_full_path }}" id="study-comparison-continue">{% if study_comparison.preparation.requires_admin %}Check again{% else %}Continue preparing{% endif %}</a>
+  </section>
+  {% elif study_comparison.ready %}
+  <div class="study-comparison-controls">
+    <div class="study-field-filter" role="group" aria-label="Comparison fields"><a href="{{ study_comparison.all_fields_url }}" id="study-all-fields-link"{% if not study_comparison.differences %} aria-current="true"{% endif %}>All fields</a><a href="{{ study_comparison.differences_url }}" id="study-differences-link"{% if study_comparison.differences %} aria-current="true"{% endif %}>Differences &amp; gaps</a></div>
+    <p class="study-comparison-counts"><span class="study-count-different">{{ study_comparison.counts.different }} differing</span><span>{{ study_comparison.counts.same }} matching</span><span>{{ study_comparison.counts.incomplete }} incomplete</span></p>
+  </div>
+  {% if study_comparison.objects|length > 2 %}<div class="study-column-navigation" id="study-column-navigation"><span>Scroll across to see all {{ study_comparison.objects|length }} records.</span><div><button type="button" id="study-columns-left" aria-label="Scroll comparison left" hidden>←</button><button type="button" id="study-columns-right" aria-label="Scroll comparison right" hidden>→</button></div></div>{% endif %}
+  <div class="study-comparison-scroll" tabindex="0" aria-label="Recorded metadata comparison">
+    <table class="study-comparison-table" id="study-comparison-table" style="--study-columns:{{ study_comparison.objects|length }}">
+      <thead><tr><th scope="col">Recorded field</th>{% for item in study_comparison.objects %}<th scope="col"{% if forloop.first %} class="is-reference"{% endif %}><span class="study-column-kind">{% if forloop.first %}Reference{% else %}Selected record{% endif %}</span><a href="{{ item.detail_url }}" title="{{ item.title }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a><div class="study-column-links"><a href="{{ item.detail_url }}#data-metadata">Metadata</a><a href="{{ item.detail_url }}#data-curves">Curves</a></div></th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for row in study_comparison.rows %}
+        {% if not study_comparison.differences or row.status != 'same' %}
+        {% ifchanged row.group %}<tr class="study-comparison-group"><th scope="rowgroup" colspan="{{ study_comparison.objects|length|add:'1' }}">{{ row.group }}</th></tr>{% endifchanged %}
+        <tr data-field="{{ row.key }}" data-state="{{ row.status }}">
+          <th scope="row"><span>{{ row.label }}</span><span class="study-row-state">{% if row.status == 'same' %}Same recorded values{% elif row.status == 'different' %}Different recorded values{% else %}Incomplete information{% endif %}</span></th>
+          {% for cell in row.cells %}
+          <td data-state="{{ cell.state }}" data-reference-match="{{ cell.matches_reference|yesno:'true,false,unknown' }}"{% if forloop.first %} class="is-reference"{% endif %}>
+            <div class="study-cell-content">
+              {% if cell.entries %}<ul class="study-cell-values">{% for entry in cell.entries %}<li>{% if entry.context %}<span class="study-entry-context">{{ entry.context }}</span>{% endif %}<span class="study-entry-value">{{ entry.value }}</span></li>{% endfor %}</ul>{% endif %}
+              {% if cell.state == 'not_supplied' and not cell.entries %}<span class="study-cell-state">Not supplied</span>{% elif cell.state == 'ambiguous' %}<span class="study-cell-state">Ambiguous metadata</span>{% elif cell.state == 'truncated' %}<span class="study-cell-state">Partial summary</span>{% endif %}
+              {% if cell.entries %}<details class="study-cell-sources"><summary>Recognized fields</summary><ul>{% for entry in cell.entries %}<li>{{ entry.path }}</li>{% endfor %}</ul></details>{% endif %}
+            </div>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if study_comparison.differences and not study_comparison.counts.different and not study_comparison.counts.incomplete %}<p class="study-comparison-footnote">No differing or incomplete fields in this comparison. <a href="{{ study_comparison.all_fields_url }}">Show all recorded fields</a>.</p>{% endif %}
+  <p class="study-comparison-footnote">Phase and loading entries retain their recorded order. Missing, ambiguous or partial values are kept visible; full metadata and curves remain on each record’s detail page.</p>
+  {% else %}
+  <div class="study-comparison-empty"><div class="study-empty-columns" aria-hidden="true"><span></span><span></span></div>{% if object_total %}<h3>{% if study_comparison.objects %}Choose another record to compare{% else %}Bring a few simulations into focus{% endif %}</h3><p>Select 2–4 data objects from the browser. Their materials, models, loading settings and available outputs will appear together.</p><a href="#study-member-search" class="study-browse-link">Browse data objects</a>{% else %}<h3>Add the simulations you want to study</h3><p>Choose accessible records from Search or your own uploads. You can then inspect their recorded setup side by side.</p>{% if graph_continue_search_url %}<div class="study-empty-actions"><a href="{{ graph_continue_search_url }}">Select data from Search</a><a href="{{ graph_continue_my_data_url }}">Select from My Data</a></div>{% endif %}{% endif %}</div>
+  {% endif %}
+</section>

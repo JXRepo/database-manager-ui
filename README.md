@@ -565,6 +565,31 @@ keep the same selection URL. Filters and Clear retain this destination. The
 **Save or add selection** disclosure keeps optional saving controls compact;
 saving records collection membership, not an exported research package.
 
+Each workspace has **Explore relationships** and **Compare records**. Browse or
+search accessible members and select up to four records across pages. The first
+record is the reference; **Use as reference** changes its position. Compare shows
+16 recorded metadata fields, grouped by topic, including phases, model names, discretization,
+temperature, loading conditions and mechanical output availability. **Differences
+& gaps** hides matching rows while retaining missing, ambiguous and partial values.
+The member browser can collapse to leave more room for the comparison.
+
+Comparison means recorded values, not scientific equivalence. Phase and loading
+entries retain their order; explicit units and original numeric text remain
+distinct. Each field shows up to eight entries of 240 characters, within a 32-KiB
+projection. Incomplete or shortened summaries are never classified as complete
+matches. **Recognized fields** shows schema locators; **Metadata** and **Curves**
+open the source record with a return link to the same comparison. Curve arrays
+remain on the detail page and are not overlaid or compared automatically.
+
+Selecting two to four records focuses Explore on those objects and their existing
+manual relationships. Clear the selection to return to whole-collection browsing.
+Comparison selection, reference order and browser scope survive detail navigation
+and relationship editing. Saving a temporary selection retains its comparison.
+**Download comparison (CSV)** exports the displayed metadata snapshot and states,
+with spreadsheet formula protection. Original JSON exports are unchanged. A
+revoked or nonmember comparison object rejects the whole comparison rather than
+silently dropping a selected record.
+
 Collection views distinguish **Declared relations**, **Software names**,
 **Phase names** and **Collection members**. Declared relations come only from
 supplied top-level `relation` strings, with explicit DOI spelling variants
@@ -586,7 +611,10 @@ Collection graphs read internal scalar metadata summaries instead of repeatedly
 loading mechanical arrays. Uploads and data saves prepare these summaries; raw
 data updates invalidate them. Deployment prepares existing records with
 `backfill_collection_summaries --all`, using a fixed starting range and batches of
-100. The command can be interrupted and rerun without changing original JSON.
+100. The command upgrades missing and outdated summaries to version 2, including
+the bounded comparison projection. Ordinary graphs can still use legacy summaries;
+comparison requests prepare only their selected outdated records. The command can
+be interrupted and rerun without changing original JSON.
 
 If old summaries are still missing, the page prepares a bounded batch and shows
 actual progress until the complete graph is available. Each web request checks at
@@ -658,7 +686,8 @@ software, phases, constitutive models, loading conditions and available
 mechanical outputs, with node details beside the canvas.
 Object links from a collection retain a **Back to ...** link across Details,
 the Graph tab, the standalone workspace and copied node links. It restores the
-collection's grouping, group page, object page and Compact/Detailed presentation.
+collection's grouping, group page, object page, Compact/Detailed presentation,
+comparison selection/reference order and member-browser scope.
 The signed navigation context is user-bound and rechecks ownership and current
 access; an unavailable context does not reveal a private collection title or
 block an otherwise accessible object's detail page.
