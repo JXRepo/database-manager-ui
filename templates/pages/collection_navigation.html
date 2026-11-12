@@ -1,0 +1,12 @@
+{% if graph_navigation_error %}
+<div class="alert alert-warning" role="alert">{{ graph_navigation_error }}</div>
+{% elif graph_return_url %}
+{% if graph_selecting %}
+<div class="alert alert-light border d-flex flex-wrap align-items-center justify-content-between gap-2" id="graph-selection-target">
+  <span style="overflow-wrap:anywhere;min-width:0"><strong>{{ graph_add_label }}</strong><br><span class="small text-muted">Select objects below, then choose Add selected objects.</span></span>
+  <a href="{{ graph_return_url }}" id="graph-return-context" style="overflow-wrap:anywhere">{{ graph_return_label }}</a>
+</div>
+{% else %}
+<p class="mb-3"><a href="{{ graph_return_url }}" id="graph-return-context" style="overflow-wrap:anywhere">{{ graph_return_label }}</a></p>
+{% endif %}
+{% endif %}

@@ -67,12 +67,17 @@ class CollectionGraphTests(TestCase):
         """
         Combine explicit DOI spellings without inventing relationships between records
         """
-        self.record({"title": "Run A", "relation": ["10.1234/Example", "https://doi.org/10.1234/example", "doi:10.1234/EXAMPLE"]})
-        self.record({"title": "Run B", "relation": "https://dx.doi.org/10.1234/Example"})
+        first = self.record({"title": "Run A", "relation": ["10.1234/Example", "https://doi.org/10.1234/example", "doi:10.1234/EXAMPLE"]})
+        second = self.record({"title": "Run B", "relation": "https://dx.doi.org/10.1234/Example"})
         context = self.context()
         self.assertEqual(context["object_total"], 2)
         self.assertEqual(len(context["group_options"]), 1)
         self.assertEqual(context["group_options"][0]["count"], 2)
+        self.assertTrue(context["auto_expanded"])
+        graph = context["relationship_graph"]
+        self.assertEqual({node["object_pk"] for node in graph["nodes"] if node["kind"] == "record"}, {first.pk, second.pk})
+        self.assertEqual(len(graph["nodes"]), 4)
+        self.assertEqual(len(graph["edges"]), 3)
         group = context["group_options"][0]
         selected = self.context("group=" + group["key"])
         self.assertEqual(selected["matching_object_count"], 2)
@@ -80,6 +85,71 @@ class CollectionGraphTests(TestCase):
         self.assertEqual(len(edges), 3)
         self.assertTrue(all("Declared by" in edge["label"] for edge in edges[1:]))
         self.assertNotIn("derived", str(edges).casefold())
+
+    def test_shared_groups_connect_each_member_without_duplicating_object_nodes(self):
+        """
+        Keep one object identity and every supplied membership in small overviews
+        """
+        first = self.record({
+            "title": "Run A", "relation": ["10.1234/common", "10.1234/first"],
+            "software": ["Abaqus", "DAMASK"],
+            "phase": [{"phase_name": "Copper"}, {"phase_name": "Steel"}],
+        })
+        second = self.record({
+            "title": "Run B", "relation": "10.1234/common", "software": "DAMASK",
+            "phase": [{"phase_name": "Steel"}],
+        })
+        original = deepcopy(first.data)
+        for mode in ("relations", "software", "phase"):
+            with self.subTest(mode=mode):
+                context = self.context("links=" + mode)
+                graph = context["relationship_graph"]
+                members = [node for node in graph["nodes"] if node["kind"] == "record"]
+                self.assertTrue(context["auto_expanded"])
+                self.assertEqual(len(graph["nodes"]), 5)
+                self.assertEqual(len(graph["edges"]), 5)
+                self.assertEqual({node["object_pk"] for node in members}, {first.pk, second.pk})
+                group_labels = {node["id"]: node["label"] for node in graph["nodes"]}
+                for node in members:
+                    expected = 2 if node["object_pk"] == first.pk else 1
+                    incoming = [edge for edge in graph["edges"] if edge["target"] == node["id"]]
+                    self.assertEqual(len(incoming), expected)
+                    self.assertEqual(len({edge["source"] for edge in incoming}), expected)
+                    self.assertEqual(len(node["connections"]), expected)
+                    self.assertTrue(all(connection["direction"] == "Incoming" for connection in node["connections"]))
+                    if node["object_pk"] == second.pk:
+                        shared = {"relations": "10.1234/common", "software": "DAMASK", "phase": "Steel"}[mode]
+                        self.assertEqual({group_labels[edge["source"]] for edge in incoming}, {shared})
+                for layout in graph["layouts"].values():
+                    self.assertEqual(len(layout["positions"]), 5)
+                    self.assertEqual(len(layout["paths"]), 5)
+        first.refresh_from_db()
+        self.assertEqual(first.data, original)
+
+    def test_missing_relations_default_to_members_but_explicit_scope_is_retained(self):
+        """
+        Open actual records immediately without overriding a requested relationship view
+        """
+        first = self.record({"title": "Run A", "software": "DAMASK"})
+        second = self.record({"title": "Run B"})
+        context = self.context("view=detailed")
+        self.assertEqual(context["links_mode"], "members")
+        self.assertEqual(context["graph_view_mode"], "detailed")
+        self.assertFalse(context["auto_expanded"])
+        self.assertEqual(context["group_options"], [])
+        self.assertEqual({node["object_pk"] for node in context["relationship_graph"]["nodes"] if node["kind"] == "record"}, {first.pk, second.pk})
+        for query in ("links=relations", "group=missing", "group="):
+            with self.subTest(query=query):
+                explicit = self.context(query)
+                self.assertEqual(explicit["links_mode"], "relations")
+                self.assertEqual(explicit["group_options"][0]["key"], "missing")
+                self.assertEqual(explicit["matching_object_count"], 2)
+                self.assertEqual(len(explicit["relationship_graph"]["nodes"]), 4)
+        software = self.context("links=software")
+        missing = next(group for group in software["group_options"] if group["key"] == "missing")
+        selected = self.context("links=software&group=" + missing["key"])
+        self.assertEqual([row["pk"] for row in selected["object_rows"]], [second.pk])
+        self.assertFalse(selected["auto_expanded"])
 
     def test_arbitrary_relations_keep_case_sensitive_identity(self):
         """
@@ -123,7 +193,7 @@ class CollectionGraphTests(TestCase):
         """
         self.record({"relation": [{"@id": "https://example.org/hidden"}, 123],
                      "custom": {"relation": "10.1234/hidden"}, "software": "10.1234/not-a-reference"})
-        context = self.context()
+        context = self.context("links=relations")
         self.assertEqual([(group["key"], group["count"]) for group in context["group_options"]], [("missing", 1)])
         self.assertNotIn("https://example.org/hidden", str(context["relationship_graph"]))
         self.assertNotIn("10.1234/hidden", str(context["relationship_graph"]))
@@ -246,6 +316,7 @@ class CollectionGraphTests(TestCase):
         overview = self.context()
         self.assertEqual(overview["object_total"], 101)
         self.assertEqual(len(overview["relationship_graph"]["nodes"]), 2)
+        self.assertFalse(overview["auto_expanded"])
         self.assertEqual(len(overview["object_rows"]), 25)
         key = overview["group_options"][0]["key"]
         selected = self.context("group=" + key + "&page=5&view=detailed")
@@ -262,16 +333,44 @@ class CollectionGraphTests(TestCase):
         Bound overview nodes and preserve group identity across record ordering
         """
         self.record({"relation": [f"10.1234/reference-{index}" for index in range(61)]})
-        first = self.context()
-        second = self.context("groups_page=2&view=detailed")
+        default = self.context()
+        self.assertEqual(default["links_mode"], "members")
+        self.assertEqual(len(default["relationship_graph"]["nodes"]), 2)
+        first = self.context("links=relations")
+        second = self.context("links=relations&groups_page=2&view=detailed")
+        self.assertFalse(first["auto_expanded"])
         self.assertEqual(len(first["relationship_graph"]["nodes"]), 26)
         self.assertEqual(len(second["relationship_graph"]["nodes"]), 26)
         self.assertEqual(second["group_page"].paginator.count, 61)
         self.assertTrue(second["next_groups_url"])
         before = {group["label"]: group["key"] for group in first["group_options"]}
         self.record({"relation": "10.1234/reference-0"})
-        after = {group["label"]: group["key"] for group in self.context()["group_options"]}
+        after = {group["label"]: group["key"] for group in self.context("links=relations")["group_options"]}
         self.assertEqual(before["10.1234/reference-0"], after["10.1234/reference-0"])
+
+    def test_overview_expansion_obeys_object_and_node_limits(self):
+        """
+        Expand at both limits and keep larger explicit overviews bounded
+        """
+        records = [
+            self.record({"relation": [f"10.1234/reference-{index}", f"10.1234/reference-{index + 8}"]})
+            for index in range(8)
+        ]
+        context = self.context()
+        self.assertTrue(context["auto_expanded"])
+        self.assertEqual(len(context["relationship_graph"]["nodes"]), 25)
+        records[0].data["relation"].append("10.1234/extra")
+        records[0].save(update_fields=["data"])
+        context = self.context()
+        self.assertEqual(context["links_mode"], "members")
+        explicit = self.context("links=relations")
+        self.assertFalse(explicit["auto_expanded"])
+        self.assertEqual(len(explicit["relationship_graph"]["nodes"]), 18)
+        self.record({"relation": "10.1234/reference-0"})
+        larger = self.context()
+        self.assertEqual(larger["links_mode"], "relations")
+        self.assertFalse(larger["auto_expanded"])
+        self.assertEqual(larger["object_total"], 9)
 
     def test_paging_one_list_preserves_the_other_list_and_resets_on_group_change(self):
         """
@@ -326,7 +425,7 @@ class CollectionGraphTests(TestCase):
         self.assertIn(f'href="/data-list/{obj.pk}/"', rendered)
         self.assertIn(f'href="/data-list/{obj.pk}/?tab=graph"', rendered)
         self.assertIn("View object graph", rendered)
-        self.assertIn("Current view as SVG", rendered)
+        self.assertIn("Current graph page (SVG)", rendered)
         self.assertNotIn("Original JSON", rendered)
 
     def test_compact_and_detailed_geometry_keeps_cards_separate(self):

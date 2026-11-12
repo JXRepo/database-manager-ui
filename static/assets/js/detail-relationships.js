@@ -120,6 +120,18 @@
     else url.searchParams.delete('view');
   };
   const updateNavigation = () => {
+    if (graph.dataset.collection) {
+      const token = view === 'detailed' ? graph.dataset.contextDetailed : graph.dataset.contextCompact;
+      if (token && token !== graph.dataset.context) {
+        for (const link of document.querySelectorAll('a[href*="graph_context="]')) {
+          const url = new URL(link.getAttribute('href'), location.href);
+          if (url.searchParams.get('graph_context') !== graph.dataset.context) continue;
+          url.searchParams.set('graph_context', token);
+          link.setAttribute('href', url.pathname + url.search + url.hash);
+        }
+        graph.dataset.context = token;
+      }
+    }
     for (const link of document.querySelectorAll('[data-graph-url]')) {
       const url = new URL(link.href);
       setURLView(url, view);
@@ -303,6 +315,7 @@
     if (graph.dataset.object) {
       url.search = new URLSearchParams(url.searchParams.get('tab') === 'graph'
         ? {tab: 'graph'} : {object: graph.dataset.object}).toString();
+      if (graph.dataset.context) url.searchParams.set('graph_context', graph.dataset.context);
     }
     setURLView(url, view);
     url.hash = selected.getAttribute('href');
@@ -429,12 +442,12 @@
   graph.querySelector('#graph-save-svg').addEventListener('click', () => {
     download(exportSVG(), 'svg');
     graph.querySelector('.graph-download').open = false;
-    announce(`${graph.dataset.collection ? 'Current graph view' : 'Complete graph'} downloaded as SVG. Full node names are included in the SVG titles.`);
+    announce(`${graph.dataset.collection ? 'Current graph page' : 'Complete graph'} downloaded as SVG. Full node names are included in the SVG titles.`);
   });
   graph.querySelector('#graph-save-png').addEventListener('click', async event => {
     const button = event.currentTarget;
     button.disabled = true;
-    announce('Preparing the complete graph image…');
+    announce(graph.dataset.collection ? 'Preparing the current graph page image…' : 'Preparing the complete graph image…');
     const exportWidth = width;
     const exportHeight = height;
     const exportView = view;
@@ -456,9 +469,11 @@
       if (!blob) throw new Error('Empty image');
       download(blob, 'png', exportView);
       graph.querySelector('.graph-download').open = false;
-      announce(`${graph.dataset.collection ? 'Current graph view' : 'Complete graph'} downloaded as PNG (${canvas.width} × ${canvas.height}). SVG retains vector detail at any size.`);
+      announce(`${graph.dataset.collection ? 'Current graph page' : 'Complete graph'} downloaded as PNG (${canvas.width} × ${canvas.height}). SVG retains vector detail at any size.`);
     } catch {
-      announce('PNG could not be created. Download SVG to save the complete graph.');
+      announce(graph.dataset.collection
+        ? 'PNG could not be created. Download SVG to save the current graph page.'
+        : 'PNG could not be created. Download SVG to save the complete graph.');
     } finally {
       if (url) URL.revokeObjectURL(url);
       button.disabled = false;
@@ -483,7 +498,7 @@
   select(nodeFromHash() || nodes[0], {bookmark: false, move: false});
   search();
   fit();
-  if (nodeFromHash() || zoom < (view === 'detailed' ? 1 : .75)) centerSelected();
+  if (nodeFromHash() || (!graph.dataset.fitOverview && zoom < (view === 'detailed' ? 1 : .75))) centerSelected();
   let lastSize = '';
   new ResizeObserver(() => {
     const size = `${viewport.clientWidth},${viewport.clientHeight}`;

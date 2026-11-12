@@ -1512,6 +1512,7 @@ details[open] > .detail-group-summary {
     </div>
 
 
+    {% include "pages/collection_navigation.html" %}
     <div class="card detail-page-card">
       <div class="card-header">
         <div class="d-flex align-items-start justify-content-between gap-3">
@@ -1527,11 +1528,11 @@ details[open] > .detail-group-summary {
           <div class="text-muted small mt-1">Identifier: {{ metadata.identifier }}</div>
         {% endif %}
         </div>
-        <a href="{% url 'graph' %}?object={{ data_object.pk }}{% if relationship_graph.view == 'detailed' %}&amp;view=detailed{% endif %}" class="btn btn-outline-primary btn-sm flex-shrink-0" id="detail-open-graph">Open in Graph workspace</a>
+        <a href="{{ graph_standalone_url }}" class="btn btn-outline-primary btn-sm flex-shrink-0" id="detail-open-graph">Open in Graph workspace</a>
         </div>
         <nav class="nav nav-tabs mt-3" aria-label="Data object views">
-          <a href="{% url 'json_data_detail' data_object.pk %}" class="nav-link{% if detail_tab != 'graph' %} active{% endif %}"{% if detail_tab != 'graph' %} aria-current="page"{% endif %}>Details</a>
-          <a href="{% url 'json_data_detail' data_object.pk %}?tab=graph" class="nav-link{% if detail_tab == 'graph' %} active{% endif %}"{% if detail_tab == 'graph' %} aria-current="page"{% endif %}>Graph</a>
+          <a href="{{ graph_detail_url }}" class="nav-link{% if detail_tab != 'graph' %} active{% endif %}"{% if detail_tab != 'graph' %} aria-current="page"{% endif %}>Details</a>
+          <a href="{{ graph_detail_graph_url }}" class="nav-link{% if detail_tab == 'graph' %} active{% endif %}"{% if detail_tab == 'graph' %} aria-current="page"{% endif %}>Graph</a>
         </nav>
       </div>
 
@@ -2006,8 +2007,8 @@ details[open] > .detail-group-summary {
 
 {% endif %}
         <div class="detail-actions">
-          <a href="{% url detail_back_url_name %}" class="btn btn-outline-secondary btn-sm">
-            {{ detail_back_label }}
+          <a href="{% if graph_return_url %}{{ graph_return_url }}{% else %}{% url detail_back_url_name %}{% endif %}" class="btn btn-outline-secondary btn-sm">
+            {{ graph_return_label|default:detail_back_label }}
           </a>
 
           <a href="{% url 'json_data_export' data_object.id %}" class="btn btn-outline-primary btn-sm">

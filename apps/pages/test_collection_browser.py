@@ -84,6 +84,8 @@ class CollectionBrowserTests(StaticLiveServerTestCase):
             description=long_name,
         )
         reference.members.add(*reference_ids)
+        unlinked = ResearchCollection.objects.create(owner=viewer, title="Metadata only study")
+        unlinked.members.add(shared, record)
         empty = ResearchCollection.objects.create(owner=viewer, title="Empty research collection")
         forbidden = ResearchCollection.objects.create(owner=other, title="SECRET private collection")
         record_count = JSONData.objects.count()
@@ -91,10 +93,12 @@ class CollectionBrowserTests(StaticLiveServerTestCase):
             "home": reverse("collection_index"), "search": reverse("search"),
             "myData": reverse("json_data_list"),
             "reference": reverse("collection_detail", args=[reference.pk]),
+            "unlinked": reverse("collection_detail", args=[unlinked.pk]),
             "empty": reverse("collection_detail", args=[empty.pk]),
             "forbidden": reverse("collection_detail", args=[forbidden.pk]),
             "first": first.pk, "second": second.pk, "public": public.pk,
             "shared": shared.pk, "hidden": hidden.pk,
+            "ownedExtra": record.pk,
             "detail": reverse("json_data_detail", args=[first.pk]),
         }
         self.client.force_login(viewer)
@@ -106,7 +110,7 @@ class CollectionBrowserTests(StaticLiveServerTestCase):
         )
         result = subprocess.run(
             [shutil.which("node"), str(settings.BASE_DIR / "tests/browser/collections.cjs")],
-            env=environment, capture_output=True, text=True, timeout=180, check=False,
+            env=environment, capture_output=True, text=True, timeout=240, check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(JSONData.objects.count(), record_count)

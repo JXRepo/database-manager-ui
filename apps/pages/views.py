@@ -33,6 +33,7 @@ from numbers import Number
 from .rate_limits import consume_rate_limit, get_client_identifier
 from .session_policy import apply_login_session_policy
 from .my_data_filters import filter_my_data_objects
+from .collection_navigation import navigation_context, with_graph_context
 from .assistant import help_reply, read_context, sign_context
 from .detail_metadata import VISUALIZED_DETAIL_FIELDS, ordered_metadata_items
 from .mechanical_csv import write_mechanical_csv
@@ -2332,6 +2333,7 @@ def json_data_list_view(request):
         "show_delete": True,
         "show_bulk_export": True,
     }
+    context.update(navigation_context(request))
     return render(request, "pages/data_list.html", context)
 
 
@@ -2706,6 +2708,7 @@ def search_view(request):
         "search_errors": search_errors,
         "max_conditions": MAX_CONDITIONS,
     }
+    context.update(navigation_context(request))
     return render(request, "pages/search.html", context)
 
 
@@ -4480,14 +4483,29 @@ def json_data_detail_view(request, pk):
         "detail_back_label": detail_back_label,
         "detail_breadcrumb_label": detail_breadcrumb_label,
     }
+    context.update(navigation_context(request))
+    detail_url = reverse("json_data_detail", args=[obj.pk])
+    view = "detailed" if request.GET.getlist("view") == ["detailed"] else "compact"
+    view_suffix = "&view=detailed" if view == "detailed" else ""
+    context["graph_detail_url"] = with_graph_context(
+        detail_url + ("?view=detailed" if view == "detailed" else ""), context["graph_context"],
+    )
+    context["graph_detail_graph_url"] = with_graph_context(
+        detail_url + "?tab=graph" + view_suffix, context["graph_context"],
+    )
+    context["graph_standalone_url"] = with_graph_context(
+        reverse("graph") + f"?object={obj.pk}" + view_suffix, context["graph_context"],
+    )
     if context["detail_tab"] == "graph":
         from .detail_relationships import build_relationship_graph
 
-        view = "detailed" if request.GET.getlist("view") == ["detailed"] else "compact"
         graph = build_relationship_graph(metadata, plot_variables, view=view)
         graph["has_loading_details"] = any(item["is_defined"] for item in mechanical_bc_items)
         context["relationship_graph"] = graph
-        detail_url = reverse("json_data_detail", args=[obj.pk])
-        context["graph_compact_url"] = f"{detail_url}?tab=graph&view=compact"
-        context["graph_detailed_url"] = f"{detail_url}?tab=graph&view=detailed"
+        context["graph_compact_url"] = with_graph_context(
+            f"{detail_url}?tab=graph&view=compact", context["graph_context"],
+        )
+        context["graph_detailed_url"] = with_graph_context(
+            f"{detail_url}?tab=graph&view=detailed", context["graph_context"],
+        )
     return render(request, "pages/data_detail.html", context)

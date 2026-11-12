@@ -691,10 +691,12 @@
       </div>
     {% endfor %}
 
+    {% include "pages/collection_navigation.html" with graph_selecting=True %}
     <div class="card search-bar-card">
       <div class="card-body py-4">
         <div class="search-hero-wrap">
           <form method="get" id="advancedSearchForm">
+            {% if graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
 
 
             <div class="search-main-row">
@@ -724,7 +726,7 @@
                     <span>Advanced Search</span>
                   </button>
 
-                  <a href="{% url 'search' %}{% if advanced_open %}?advanced=1{% endif %}" class="clear-btn text-decoration-none" data-clear-search>
+                  <a href="{% url 'search' %}{% if advanced_open %}?advanced=1{% if graph_context %}&amp;graph_context={{ graph_context|urlencode }}{% endif %}{% elif graph_context %}?graph_context={{ graph_context|urlencode }}{% endif %}" class="clear-btn text-decoration-none" data-clear-search>
                     Clear
                   </a>
                 </div>
@@ -870,7 +872,7 @@
               </section>
 
               <div class="advanced-search-actions">
-                <a href="{% url 'search' %}{% if advanced_open %}?advanced=1{% endif %}" class="clear-btn text-decoration-none" data-clear-search>Clear</a>
+                <a href="{% url 'search' %}{% if advanced_open %}?advanced=1{% if graph_context %}&amp;graph_context={{ graph_context|urlencode }}{% endif %}{% elif graph_context %}?graph_context={{ graph_context|urlencode }}{% endif %}" class="clear-btn text-decoration-none" data-clear-search>Clear</a>
                 <button type="submit" class="btn btn-primary search-main-submit">Search</button>
               </div>
 
@@ -944,6 +946,7 @@
       {% if data_objects %}
       <form method="post" action="{% url 'export_selected_search_results' %}" id="searchSelectionForm">
         {% csrf_token %}
+        {% if graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
 
         <div class="result-selection-toolbar">
           <div class="selection-left">
@@ -956,8 +959,8 @@
 
           <div class="d-flex flex-wrap gap-2 justify-content-end">
             <button type="submit" formaction="{% url 'graph_selection_create' %}"
-              class="btn btn-outline-primary btn-sm" id="graphSelectedButton">
-              Open selection in Graph
+              class="btn btn-outline-primary btn-sm" id="graphSelectedButton"{% if graph_navigation_error %} disabled data-context-invalid="true"{% endif %}>
+              {% if graph_context %}Add selected objects{% else %}Open selection in Graph{% endif %}
             </button>
             <button type="submit" class="btn btn-primary btn-sm" id="exportSelectedButton" disabled>
               Export Selected Data Objects as JSON
@@ -1142,7 +1145,7 @@
         exportSelectedButton.disabled = selectedCount === 0;
       }
       if (graphSelectedButton) {
-        graphSelectedButton.disabled = selectedCount === 0;
+        graphSelectedButton.disabled = selectedCount === 0 || graphSelectedButton.dataset.contextInvalid === 'true';
       }
       if (exportSelectedCSVButton) {
         exportSelectedCSVButton.disabled = selectedCount === 0;

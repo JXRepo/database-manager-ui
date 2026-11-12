@@ -397,6 +397,7 @@
       {% endfor %}
     {% endif %}
 
+    {% include "pages/collection_navigation.html" with graph_selecting=True %}
     <div class="card">
       <div class="card-header">
         <h5>{{ card_title|default:"My Uploaded Data Objects" }}</h5>
@@ -404,6 +405,7 @@
       <div class="card-body">
         {% if my_data_filters %}
           <form method="get" action="{% url 'json_data_list' %}" id="myDataFilterForm" aria-label="Filter My Data">
+            {% if graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
             <div class="my-data-filter-grid">
               {% for field in my_data_filters %}
                 <div>
@@ -421,7 +423,7 @@
               <p class="text-muted small mb-0" id="myDataResultCount" role="status">{{ result_count }} of {{ total_count }} data object{{ total_count|pluralize }}</p>
               <div class="d-flex align-items-center gap-2">
                 <noscript><button type="submit" class="btn btn-primary btn-sm">Filter</button></noscript>
-                <a href="{% url 'json_data_list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                <a href="{% url 'json_data_list' %}{% if graph_context %}?graph_context={{ graph_context|urlencode }}{% endif %}" class="btn btn-outline-secondary btn-sm">Clear</a>
               </div>
             </div>
           </form>
@@ -430,6 +432,7 @@
           {% if show_bulk_export %}
             <form method="post" action="{% url 'export_selected_my_data_objects' %}" id="myDataBulkActionForm">
               {% csrf_token %}
+              {% if graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
             </form>
 
             <div class="data-list-selection-toolbar">
@@ -444,8 +447,8 @@
               <div class="selection-actions">
                 <button type="submit" form="myDataBulkActionForm"
                   formaction="{% url 'graph_selection_create' %}"
-                  class="btn btn-outline-primary btn-sm" id="graphMyDataButton">
-                  Open selection in Graph
+                  class="btn btn-outline-primary btn-sm" id="graphMyDataButton"{% if graph_navigation_error %} disabled data-context-invalid="true"{% endif %}>
+                  {% if graph_context %}Add selected objects{% else %}Open selection in Graph{% endif %}
                 </button>
                 <button
                   type="submit"
@@ -652,7 +655,7 @@
         bulkExportMyDataButton.disabled = selectedCount === 0;
       }
       if (graphMyDataButton) {
-        graphMyDataButton.disabled = selectedCount === 0;
+        graphMyDataButton.disabled = selectedCount === 0 || graphMyDataButton.dataset.contextInvalid === 'true';
       }
       if (bulkExportMyDataCSVButton) {
         bulkExportMyDataCSVButton.disabled = selectedCount === 0;

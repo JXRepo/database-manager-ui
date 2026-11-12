@@ -551,6 +551,14 @@ Collections are private to their owner; their membership never grants access to
 the underlying data. The session retains eight temporary selections, with at
 most 500 objects per selection; saved collections hold at most 1,000 objects.
 
+**Select more data** opens Search with the current collection or selection as
+the destination; **Select from My Data** does the same for owned uploads.
+**Add selected objects** adds directly to that destination, deduplicates members
+and returns to the original group, page and presentation. Temporary selections
+keep the same session entry. Filters and Clear retain this destination. The
+**Save or add selection** disclosure keeps optional saving controls compact;
+saving records collection membership, not an exported research package.
+
 Collection views distinguish **Declared relations**, **Software names**,
 **Phase names** and **Collection members**. Declared relations come only from
 supplied top-level `relation` strings, with explicit DOI spelling variants
@@ -561,6 +569,12 @@ metadata has its own group. Selecting a group reveals its objects; group and
 object lists each use 25-entry pages. A compact table shows supplied identifiers,
 phase names, software versions and loading types and modes. Graphs retain small
 metadata summaries, not raw mechanical arrays.
+
+Overviews with at most eight accessible objects automatically show their object
+nodes when the complete graph fits within 25 nodes. An object shared by several
+groups appears once with all its group connections. Without supplied references,
+the default view shows collection members; explicit grouping choices are retained.
+Large collections continue to use bounded group and member pages.
 
 Use **Edit collection** to change its description, and the member table to
 remove selected objects from the displayed page. **Delete collection** removes
@@ -584,6 +598,12 @@ Individual objects have a **Graph** tab on their detail page. Existing
 `/graph/?choose=1` opens its chooser. This graph shows supplied creators,
 software, phases, constitutive models, loading conditions and available
 mechanical outputs, with node details beside the canvas.
+Object links from a collection retain a **Back to ...** link across Details,
+the Graph tab, the standalone workspace and copied node links. It restores the
+collection's grouping, group page, object page and Compact/Detailed presentation.
+The signed navigation context is user-bound and rechecks ownership and current
+access; an unavailable context does not reveal a private collection title or
+block an otherwise accessible object's detail page.
 The object chooser combines title or identifier search with a bounded list of 25
 objects per page. Click a record row to open its graph directly. **Change data**
 opens the same list above the current graph, and **Close chooser** returns to the

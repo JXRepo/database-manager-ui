@@ -14,6 +14,8 @@ from apps.dyn_api.metadata_compat import field_name, field_value, metadata_view
 
 
 PAGE_SIZE = 25
+SMALL_COLLECTION_LIMIT = 8
+MAX_EXPANDED_NODES = 25
 LINK_MODES = {
     "relations": (
         "Declared relations", "No declared relation",
@@ -274,7 +276,7 @@ def _node(node_id, kind, category, label, *, parent="", relation="", details=(),
     }
 
 
-def _layout(nodes, view):
+def _layout(nodes, view, connections):
     """
     Arrange a bounded collection, optional group and one page of member cards
 
@@ -284,6 +286,8 @@ def _layout(nodes, view):
         Collection graph nodes with at most three levels.
     view : str
         Compact or detailed card presentation.
+    connections : list of dict
+        Actual source, target and relation edges, including shared group membership.
 
     Returns
     -------
@@ -314,9 +318,9 @@ def _layout(nodes, view):
                 positions[node["id"]] = {"x": 20 + depth * 296, "y": y, "height": heights[node["id"]]}
                 y += heights[node["id"]] + 24
         paths = []
-        for node in nodes[1:]:
-            parent = positions[node["parent"]]
-            target = positions[node["id"]]
+        for connection in connections:
+            parent = positions[connection["source"]]
+            target = positions[connection["target"]]
             start_x = parent["x"] + 232
             start_y = parent["y"] + parent["height"] // 2
             end_x, end_y = target["x"], target["y"] + 14
@@ -333,16 +337,17 @@ def _layout(nodes, view):
         node.update(layout["positions"][node["id"]])
         category = categories.setdefault(node["kind"], {"kind": node["kind"], "label": node["category"], "count": 0})
         category["count"] += 1
-        if not node["parent"]:
-            continue
-        parent = by_id[node["parent"]]
+    for connection in connections:
+        parent = by_id[connection["source"]]
+        node = by_id[connection["target"]]
+        relation = connection["relation"]
         edges.append({
             "source": parent["id"], "target": node["id"],
-            "label": f'{parent["label"]} → {node["relation"]} → {node["label"]}',
+            "label": f'{parent["label"]} → {relation} → {node["label"]}',
             "path": layout["paths"][len(edges)],
         })
-        parent["connections"].append({"id": node["id"], "label": node["label"], "relation": node["relation"], "direction": "Outgoing"})
-        node["connections"].append({"id": parent["id"], "label": parent["label"], "relation": node["relation"], "direction": "Incoming"})
+        parent["connections"].append({"id": node["id"], "label": node["label"], "relation": relation, "direction": "Outgoing"})
+        node["connections"].append({"id": parent["id"], "label": parent["label"], "relation": relation, "direction": "Incoming"})
     return {
         "nodes": nodes, "edges": edges, "node_width": 232, "count": len(edges),
         "width": layout["width"], "height": layout["height"], "view": view,
@@ -383,6 +388,23 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
     if mode not in LINK_MODES or (mode == "members" and selected_key):
         raise ValueError("Choose a valid relationship view and group.")
     view = "detailed" if _argument(params, "view", "compact") == "detailed" else "compact"
+    summaries = [
+        _object_summary(obj)
+        for obj in accessible_queryset.only("pk", "data").order_by("-uploaded_at", "-pk").iterator(chunk_size=1)
+    ]
+    if "links" not in params and "group" not in params:
+        reference_keys = {
+            identity
+            for row in summaries
+            for identity in row["groups"]["relations"] or [None]
+        }
+        no_references = not reference_keys or reference_keys == {None}
+        crowded_small_collection = (
+            len(summaries) <= SMALL_COLLECTION_LIMIT
+            and 1 + len(summaries) + len(reference_keys) > MAX_EXPANDED_NODES
+        )
+        if no_references or crowded_small_collection:
+            mode = "members"
     arguments = {"links": mode}
     if selected_key:
         arguments["group"] = selected_key
@@ -407,11 +429,8 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
         values = {key: value for key, value in values.items() if value is not None and value != ""}
         return base_url + "?" + urlencode(values)
 
-    summaries = []
     groups = {}
-    for obj in accessible_queryset.only("pk", "data").order_by("-uploaded_at", "-pk").iterator(chunk_size=1):
-        row = _object_summary(obj)
-        summaries.append(row)
+    for row in summaries:
         labels = row.pop("groups").get(mode, {})
         row["group_keys"] = set()
         if mode == "members":
@@ -429,6 +448,11 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
     matches = [row for row in summaries if not selected_key or selected_key in row["group_keys"]]
     object_page = Paginator(matches, PAGE_SIZE).get_page(params.get("page"))
     object_rows = list(object_page.object_list)
+    auto_expanded = bool(
+        summaries and mode != "members" and not selected
+        and len(summaries) <= SMALL_COLLECTION_LIMIT
+        and 1 + len(summaries) + len(groups) <= MAX_EXPANDED_NODES
+    )
     graph = None
     if summaries:
         root = _node(
@@ -437,6 +461,7 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
             source_url=url(group=None), source_label="View collection overview",
         )
         nodes = [root]
+        connections = []
         visible_groups = [selected] if selected else group_page.object_list
         for group in visible_groups:
             missing = group["key"] == "missing"
@@ -449,24 +474,29 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
                 details=[{"label": "Data objects", "value": str(group["count"])}, {"label": "Meaning", "value": LINK_MODES[mode][2]}],
                 source_url=group["url"], source_label=f"View {group['count']} object{'s' if group['count'] != 1 else ''}",
             ))
-        if mode == "members" or selected:
-            parent = nodes[-1] if selected else root
-            relation = "Contains object" if mode == "members" else "Includes object" if selected_key == "missing" else "Declared by" if mode == "relations" else "Reported by"
+            connections.append({"source": root["id"], "target": nodes[-1]["id"], "relation": relation})
+        if mode == "members" or selected or auto_expanded:
             for row in object_rows:
+                parents = [group for group in visible_groups if group["key"] in row["group_keys"]]
+                parent_id = "collection-group-" + parents[0]["key"] if parents else root["id"]
+                relation = "Contains object" if mode == "members" else "Includes object" if row["group_keys"] == {"missing"} else "Declared by" if mode == "relations" else "Reported by"
                 details = []
                 for field, label in (("identifier", "Identifier"), ("software", "Software"), ("software_version", "Recorded versions"), ("phase", "Phase names"), ("loading", "Loading"), ("creator", "Creator"), ("relations", "Declared relations")):
                     if row[field]:
                         details.append({"label": label, "value": row[field]})
                 node = _node(
                     f"collection-object-{row['pk']}", "record", "Data object", row["title"],
-                    parent=parent["id"], relation=relation, details=details,
+                    parent=parent_id, relation=relation, details=details,
                     source_url=row["detail_url"], source_label="View data details",
                 )
+                node["object_pk"] = row["pk"]
                 node["graph_url"] = row["graph_url"]
                 nodes.append(node)
-        graph = _layout(nodes, view)
+                for source in ["collection-group-" + group["key"] for group in parents] or [root["id"]]:
+                    connections.append({"source": source, "target": node["id"], "relation": relation})
+        graph = _layout(nodes, view, connections)
     context = {
-        "relationship_graph": graph, "links_mode": mode,
+        "relationship_graph": graph, "links_mode": mode, "auto_expanded": auto_expanded,
         "links_description": LINK_MODES[mode][2], "links_options": [],
         "group_options": list(group_page.object_list), "group_page": group_page,
         "selected_group": selected, "object_rows": object_rows, "object_page": object_page,

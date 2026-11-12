@@ -25,6 +25,8 @@
     clearLinks.forEach(link => {
       const url = new URL(link.href);
       url.search = expanded ? 'advanced=1' : '';
+      const graphContext = form.querySelector('[name="graph_context"]');
+      if (graphContext?.value) url.searchParams.set('graph_context', graphContext.value);
       url.hash = '';
       link.href = url.href;
     });

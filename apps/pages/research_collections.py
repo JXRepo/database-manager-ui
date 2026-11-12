@@ -18,6 +18,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import JSONData, ResearchCollection
+from .collection_navigation import CONTEXT_ERROR, navigation_fields, read_navigation, workspace_navigation
 
 
 MAX_SELECTION_OBJECTS = 500
@@ -237,7 +238,8 @@ def _graph_context(objects, *, title, base_url, params):
     return build_collection_context(objects, title=title, base_url=base_url, params=params)
 
 
-def _workspace_response(request, *, collection=None, token="", form=None, error="", status=200):
+def _workspace_response(request, *, collection=None, token="", form=None, error="", status=200,
+                        navigation_params=None):
     """
     Render a selection or collection using only currently accessible members
 
@@ -255,6 +257,8 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
         Failed action description.
     status : int, optional
         HTTP response status.
+    navigation_params : dict or None, optional
+        Verified original workspace scope when a continuation action fails.
 
     Returns
     -------
@@ -281,12 +285,75 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
         "selection_error": error, "action_error": error,
     }
     try:
-        context.update(_graph_context(objects, title=title, base_url=url, params=request.GET))
+        params = request.GET if navigation_params is None else navigation_params
+        context.update(_graph_context(objects, title=title, base_url=url, params=params))
+        if "relationship_graph" in context:
+            context.update(workspace_navigation(request, context, collection=collection,
+                                                selection_token=token))
     except ValueError as exc:
         context.update(selection_error=str(exc), action_error=str(exc), graph_error=True,
                        object_rows=[], object_total=0)
         status = 400
     return render(request, "pages/collection_graph.html", context, status=status)
+
+
+def _extend_selection(request, navigation, ids):
+    """
+    Add the whole submitted selection to its original workspace atomically
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Authenticated continuation POST.
+    navigation : dict
+        Validated original collection or session selection.
+    ids : list of int
+        Bounded submitted IDs, whose access is checked during the change.
+
+    Returns
+    -------
+    HttpResponse
+        Redirect to the original group, page and presentation.
+
+    Raises
+    ------
+    ValueError
+        Any object is unavailable or the complete union exceeds capacity.
+    """
+    if navigation["kind"] == "collection":
+        with transaction.atomic():
+            collection = _owned_collection(request, navigation["collection"].pk, lock=True)
+            _validate_access(request.user, ids, lock=True)
+            existing = set(collection.members.values_list("pk", flat=True))
+            if len(existing.union(ids)) > MAX_COLLECTION_OBJECTS:
+                raise ValueError(
+                    f"A research collection can contain up to {MAX_COLLECTION_OBJECTS} data objects. "
+                    "Remove some members, or use Edit collection to clear unavailable members, then try again."
+                )
+            added = set(ids) - existing
+            if added:
+                collection.members.add(*added)
+                collection.save(update_fields=["updated_at"])
+            navigation["collection"] = collection
+        message = ("Selected objects added to the collection." if added
+                   else "The selected objects are already in this collection.")
+    else:
+        token = navigation["selection_token"]
+        existing = _selection_ids(request, token)
+        combined = list(dict.fromkeys([*existing, *ids]))
+        if len(combined) > MAX_SELECTION_OBJECTS:
+            raise ValueError(
+                f"A temporary selection can contain up to {MAX_SELECTION_OBJECTS} data objects. "
+                "Save this selection as a research collection to add more objects."
+            )
+        _validate_access(request.user, combined)
+        selections = dict(request.session.get(SELECTION_SESSION_KEY, {}))
+        selections[token] = {"owner": request.user.pk, "objects": combined}
+        request.session[SELECTION_SESSION_KEY] = selections
+        message = ("Selected objects added to this selection." if len(combined) > len(existing)
+                   else "The selected objects are already in this selection.")
+    messages.success(request, message)
+    return redirect(navigation_fields(navigation)["graph_return_url"])
 
 
 def _collection_form(data):
@@ -334,22 +401,34 @@ def collection_index(request):
 @require_POST
 def selection_create(request):
     """
-    Open a validated selection without creating a saved collection
+    Open a validated selection or extend the original collection workspace
 
     Parameters
     ----------
     request : HttpRequest
-        POST containing selected_objects from Search or My Data.
+        POST containing selected_objects and optional signed graph_context.
 
     Returns
     -------
     HttpResponse
         Redirect to a temporary workspace or an actionable selection error.
     """
+    navigation = None
     try:
+        if "graph_context" in request.GET:
+            raise ValueError(CONTEXT_ERROR)
+        navigation = read_navigation(request, data=request.POST)
         ids = _parse_ids(request.POST.getlist("selected_objects"))
+        if navigation is not None:
+            return _extend_selection(request, navigation, ids)
         _validate_access(request.user, ids)
     except ValueError as exc:
+        if navigation is not None:
+            return _workspace_response(
+                request, collection=navigation.get("collection"),
+                token=navigation.get("selection_token", ""), navigation_params=navigation["params"],
+                error=str(exc), status=400,
+            )
         return _index_response(request, error=str(exc), status=400)
     selections = request.session.get(SELECTION_SESSION_KEY, {})
     while len(selections) >= MAX_TEMPORARY_SELECTIONS:

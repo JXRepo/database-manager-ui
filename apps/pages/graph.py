@@ -14,6 +14,7 @@ from django.views.decorators.http import require_GET
 from apps.dyn_api.metadata_compat import field_value, metadata_view
 
 from .advanced_search import matches_whole_words
+from .collection_navigation import navigation_context, with_graph_context
 from .detail_relationships import build_relationship_graph
 from .models import JSONData
 from .views import _assistant_text, _build_mechanical_bc_items, _extract_plot_variables, _split_keyword_terms
@@ -141,12 +142,24 @@ def graph_view(request):
         "choose_object": choose, "object_query": query, "object_options": [],
         "graph_view_mode": view,
     }
+    context.update(navigation_context(request))
     if obj is not None:
+        detail_url = reverse("json_data_detail", args=[obj.pk])
+        view_suffix = "&view=detailed" if view == "detailed" else ""
+        context["graph_detail_url"] = with_graph_context(detail_url, context["graph_context"])
+        context["graph_detail_graph_url"] = with_graph_context(
+            detail_url + "?tab=graph" + view_suffix, context["graph_context"],
+        )
+        context["graph_standalone_url"] = with_graph_context(
+            reverse("graph") + f"?object={obj.pk}" + view_suffix, context["graph_context"],
+        )
         params = request.GET.copy()
         params["object"] = obj.pk
         for mode in ("compact", "detailed"):
             params["view"] = mode
-            context[f"graph_{mode}_url"] = reverse("graph") + "?" + params.urlencode()
+            context[f"graph_{mode}_url"] = with_graph_context(
+                reverse("graph") + "?" + params.urlencode(), context["graph_context"],
+            )
     if choose:
         page, options = _object_choices(accessible, query, request.GET.get("page"))
         params = {"choose": "1", "q": query}
@@ -154,6 +167,16 @@ def graph_view(request):
             params["view"] = view
         if obj is not None:
             params["object"] = obj.pk
+        if context["graph_context"]:
+            params["graph_context"] = context["graph_context"]
+        for option in options:
+            option_params = {"object": option["pk"]}
+            if view == "detailed":
+                option_params["view"] = view
+            option["graph_url"] = with_graph_context(
+                reverse("graph") + "?" + urlencode(option_params),
+                context["graph_context"],
+            )
         context.update(object_options=options, option_page=page)
         if page.has_previous():
             context["previous_objects_url"] = reverse("graph") + "?" + urlencode(

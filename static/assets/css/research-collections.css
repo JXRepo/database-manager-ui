@@ -1,7 +1,7 @@
 .collection-page .collection-intro {display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:18px;}
 .collection-page .collection-intro h2 {font-size:21px;margin:0 0 7px;overflow-wrap:anywhere;}
 .collection-page .collection-intro p {margin:0;color:#64748b;max-width:760px;}
-.collection-page .collection-actions {display:flex;gap:10px;align-items:center;flex-wrap:wrap;flex-shrink:0;}
+.collection-page .collection-actions {display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;max-width:580px;}
 .collection-page .collection-title-block {min-width:0;}
 .collection-page .collection-overline {display:block;color:#64748b;font-size:12px;margin-bottom:6px;}
 .collection-page .collection-description {white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto;}
@@ -28,6 +28,9 @@
 .collection-page .collection-empty p {margin:0;}
 .collection-page .collection-single-link {font-size:13px;color:#64748b;}
 .collection-page .collection-save-options {display:flex;gap:28px;align-items:flex-start;}
+.collection-page .collection-save-panel {padding:12px 20px;}
+.collection-page .collection-save-panel>summary {font-weight:500;color:#1e40af;cursor:pointer;}
+.collection-page .collection-save-note {font-size:12px;color:#64748b;margin:12px 0;}
 .collection-page .collection-edit-form {flex:1;max-width:620px;display:grid;gap:10px;}
 .collection-page .collection-edit-form label,.collection-page .collection-add-form label {display:block;font-size:13px;margin-bottom:5px;}
 .collection-page .collection-edit-form input,.collection-page .collection-edit-form textarea {display:block;width:100%;border:1px solid #b8c8db;border-radius:4px;padding:7px 10px;}

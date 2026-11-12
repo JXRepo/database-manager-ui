@@ -20,6 +20,7 @@
       </div>
     </div>
 
+    {% include "pages/collection_navigation.html" %}
     {% if selection_error %}
       <div class="alert alert-warning" role="alert">{{ selection_error }} <a href="{% url 'graph' %}?choose=1">Choose data</a></div>
     {% endif %}
@@ -33,11 +34,11 @@
       </div>
         <div class="graph-object-actions">
           {% if choose_object %}
-          <a class="btn btn-outline-primary btn-sm" href="{% url 'graph' %}?object={{ data_object.pk }}{% if graph_view_mode == 'detailed' %}&amp;view=detailed{% endif %}" data-graph-url data-keep-node id="graph-close-picker">Close chooser</a>
+          <a class="btn btn-outline-primary btn-sm" href="{{ graph_standalone_url }}" data-graph-url data-keep-node id="graph-close-picker">Close chooser</a>
           {% else %}
-          <a class="btn btn-outline-primary btn-sm" href="{% url 'graph' %}?object={{ data_object.pk }}&amp;choose=1{% if graph_view_mode == 'detailed' %}&amp;view=detailed{% endif %}" data-graph-url data-keep-node id="graph-change-data">Change data</a>
+          <a class="btn btn-outline-primary btn-sm" href="{{ graph_standalone_url }}&amp;choose=1" data-graph-url data-keep-node id="graph-change-data">Change data</a>
           {% endif %}
-          <a class="btn btn-outline-secondary btn-sm" href="{% url 'json_data_detail' data_object.pk %}" id="graph-view-details">View data details</a>
+          <a class="btn btn-outline-secondary btn-sm" href="{{ graph_detail_url }}" id="graph-view-details">View data details</a>
         </div>
     </section>
     {% endif %}
@@ -50,17 +51,18 @@
         </div>
         <form class="graph-find-form" method="get" action="{% url 'graph' %}">
           <input type="hidden" name="choose" value="1">
+          {% if graph_context %}<input type="hidden" name="graph_context" value="{{ graph_context }}">{% endif %}
           {% if data_object %}<input type="hidden" name="object" value="{{ data_object.pk }}">{% endif %}
           <input type="hidden" name="view" value="{{ graph_view_mode }}">
           <label for="graph-query" class="visually-hidden">Find data by title or identifier</label>
           <input class="form-control form-control-sm" type="search" id="graph-query" name="q" value="{{ object_query }}" placeholder="Search title or identifier words">
           <button type="submit" class="btn btn-outline-primary btn-sm">Search</button>
-          {% if object_query %}<a href="{% url 'graph' %}?choose=1{% if data_object %}&amp;object={{ data_object.pk }}{% endif %}{% if graph_view_mode == 'detailed' %}&amp;view=detailed{% endif %}" class="graph-clear" data-graph-url data-keep-node>Clear</a>{% endif %}
+          {% if object_query %}<a href="{% url 'graph' %}?choose=1{% if data_object %}&amp;object={{ data_object.pk }}{% endif %}{% if graph_view_mode == 'detailed' %}&amp;view=detailed{% endif %}{% if graph_context %}&amp;graph_context={{ graph_context|urlencode }}{% endif %}" class="graph-clear" data-graph-url data-keep-node>Clear</a>{% endif %}
         </form>
         {% if object_options %}
           <ul class="graph-object-list" aria-label="Available data objects">
             {% for option in object_options %}
-            <li><a class="graph-object-option{% if option.pk == data_object.pk %} is-current{% endif %}" href="{% url 'graph' %}?object={{ option.pk }}{% if graph_view_mode == 'detailed' %}&amp;view=detailed{% endif %}" data-graph-url{% if option.pk == data_object.pk %} aria-current="true" data-keep-node{% endif %}>
+            <li><a class="graph-object-option{% if option.pk == data_object.pk %} is-current{% endif %}" href="{{ option.graph_url }}" data-graph-url{% if option.pk == data_object.pk %} aria-current="true" data-keep-node{% endif %}>
               <span class="graph-option-description">
                 <strong title="{{ option.title|default:option.identifier }}">{{ option.title|default:option.identifier|default:"Untitled data object" }}</strong>
                 {% if option.identifier and option.title %}<span>{{ option.identifier }}</span>{% endif %}

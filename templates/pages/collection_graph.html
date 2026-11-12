@@ -15,6 +15,7 @@
     {% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}" role="status">{{ message }}</div>{% endfor %}
     {% if selection_error %}<div class="alert alert-warning" role="alert">{{ selection_error }}{% if graph_error %} <a href="{{ workspace_url }}" id="collection-reset-view">Return to overview</a>{% endif %}</div>{% endif %}
     {% if action_error and not selection_error %}<div class="alert alert-warning" role="alert">{{ action_error }}</div>{% endif %}
+    {% if graph_navigation_error %}<div class="alert alert-warning" role="alert">{{ graph_navigation_error }} <a href="{% url 'search' %}">Start a new selection</a></div>{% endif %}
     <section class="collection-intro" aria-labelledby="collection-title">
       <div class="collection-title-block">
         <span class="collection-overline">{% if collection %}Research collection · Only you{% else %}Unsaved selection{% endif %}</span>
@@ -23,15 +24,19 @@
         {% if not graph_error %}<p class="collection-total">{{ object_total }} accessible data object{{ object_total|pluralize }}</p>{% endif %}
       </div>
       <div class="collection-actions">
-        <a class="btn btn-outline-primary btn-sm" href="{% url 'search' %}">Select more data</a>
-        {% if object_total %}<a class="btn btn-outline-secondary btn-sm" href="{{ export_url }}" id="collection-export">{% if collection %}Collection{% else %}Selection{% endif %} JSON</a>{% endif %}
+        {% if graph_continue_search_url %}
+        <a class="btn btn-outline-primary btn-sm" href="{{ graph_continue_search_url }}" id="collection-select-more">Select more data</a>
+        <a href="{{ graph_continue_my_data_url }}" id="collection-select-more-owned">Select from My Data</a>
+        {% endif %}
+        {% if object_total %}<a class="btn btn-outline-secondary btn-sm" href="{{ export_url }}" id="collection-export" title="Download all accessible members as original JSON, including objects on other pages">All accessible objects (JSON)</a>{% endif %}
         <a href="{% url 'collection_index' %}">My collections</a>
       </div>
     </section>
 
     {% if not collection and selection_token %}
-    <section class="collection-card collection-save-panel" aria-labelledby="save-selection-heading">
-      <div class="collection-section-heading"><h2 id="save-selection-heading">Keep this selection</h2><span class="text-muted">Collections are private to you. Data permissions stay the same.</span></div>
+    <details class="collection-card collection-save-panel" id="collection-save-panel"{% if collection_form.errors or action_error %} open{% endif %}>
+      <summary>Save or add selection</summary>
+      <p class="collection-save-note">Save these objects as a named collection, or add them to an existing one. Collections are private to you and store membership; data permissions stay the same.</p>
       <div class="collection-save-options">
         <form method="post" action="{% url 'collection_save' selection_token %}" id="collection-save-form" class="collection-edit-form">
           {% csrf_token %}
@@ -49,7 +54,7 @@
         </form>
         {% endif %}
       </div>
-    </section>
+    </details>
     {% elif collection %}
     <details class="collection-card collection-manage"{% if collection_form.errors %} open{% endif %}>
       <summary>Edit collection</summary>
@@ -97,7 +102,7 @@
       {% if collection %}</form>{% endif %}
       <nav class="collection-pagination" aria-label="Object pages"><span>{{ object_page.start_index }}–{{ object_page.end_index }} of {{ matching_object_count }} objects</span>{% if previous_objects_url %}<a href="{{ previous_objects_url }}">Previous</a>{% endif %}<span>Page {{ object_page.number }} of {{ object_page.paginator.num_pages }}</span>{% if next_objects_url %}<a href="{{ next_objects_url }}">Next</a>{% endif %}</nav>
       {% else %}
-      <div class="collection-empty"><h3>No accessible data objects</h3><p>Select objects from <a href="{% url 'search' %}">Search</a> or <a href="{% url 'json_data_list' %}">My Data</a> and add them to a collection.</p></div>
+      <div class="collection-empty"><h3>No accessible data objects</h3>{% if graph_continue_search_url %}<p>Select objects from <a href="{{ graph_continue_search_url }}">Search</a> or <a href="{{ graph_continue_my_data_url }}">My Data</a> to add them here.</p>{% endif %}</div>
       {% endif %}
     </section>
     {% endif %}

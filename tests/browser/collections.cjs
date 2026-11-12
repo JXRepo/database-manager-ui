@@ -10,7 +10,7 @@ const {join} = require('node:path');
     ? readFileSync(process.env.CHARTJS_TEST_BUNDLE, 'utf8')
     : await (await fetch('https://cdn.jsdelivr.net/npm/chart.js', {signal: AbortSignal.timeout(30000)})).text();
   const profile = mkdtempSync(join(tmpdir(), 'collection-browser-'));
-  const artifacts = process.env.COLLECTION_ARTIFACT_DIR || join(tmpdir(), 'research-collections-qa');
+  const artifacts = process.env.COLLECTION_ARTIFACT_DIR || join(tmpdir(), 'research-collections-navigation-qa');
   mkdirSync(artifacts, {recursive: true});
   const browser = spawn(process.env.CHROMIUM_BIN || '/usr/bin/chromium', [
     '--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
@@ -85,7 +85,10 @@ const {join} = require('node:path');
       await new Promise(resolve => setTimeout(resolve, 40));
       const point = await evaluate(`(() => {
         const element = document.querySelector(${JSON.stringify(selector)});
-        const box = element.getBoundingClientRect();
+        const box = [...element.getClientRects()].find(rect => {
+          const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+          return rect.width && rect.height && element.contains(target);
+        }) || element.getBoundingClientRect();
         const x = box.left + box.width / 2;
         const y = box.top + box.height / 2;
         const target = document.elementFromPoint(x, y);
@@ -105,6 +108,39 @@ const {join} = require('node:path');
         element.dispatchEvent(new Event('input', {bubbles: true}));
         element.dispatchEvent(new Event('change', {bubbles: true}));
       })()`);
+    }
+    async function follow(selector) {
+      const href = await evaluate(`document.querySelector(${JSON.stringify(selector)}).href`);
+      await click(selector);
+      await until(`location.href === ${JSON.stringify(href)} && document.readyState === 'complete'`);
+    }
+    async function returnState(expectedPath) {
+      const href = await evaluate(`document.querySelector('#graph-return-context').href`);
+      const actual = new URL(href);
+      const expected = new URL(expectedPath, process.env.COLLECTION_BASE_URL);
+      assert.equal(actual.pathname, expected.pathname);
+      const defaults = {links: 'relations', page: '1', groups_page: '1', view: 'compact'};
+      for (const name of ['links', 'group', 'page', 'groups_page', 'view']) {
+        assert.equal(actual.searchParams.get(name) || defaults[name], expected.searchParams.get(name) || defaults[name], `Return state: ${name}`);
+      }
+    }
+    async function selectionContext(expectedPath) {
+      const state = await evaluate(`({
+        token: new URL(location.href).searchParams.get('graph_context'),
+        fields: [...document.querySelectorAll('input[name="graph_context"]')].map(field => field.value),
+        forms: [...document.querySelectorAll('#advancedSearchForm, #searchSelectionForm, #myDataFilterForm, #myDataBulkActionForm')]
+          .map(form => ({id: form.id, token: form.querySelector('input[name="graph_context"]')?.value})),
+        target: document.querySelector('#graph-selection-target')?.textContent,
+      })`);
+      assert.ok(state.token, 'Selection pages retain their target in the URL');
+      assert.ok(state.target, 'Selection target is visible');
+      assert.ok(state.fields.length > 0, 'Native navigation retains the target');
+      assert.ok(state.fields.every(value => value === state.token));
+      for (const form of state.forms) {
+        assert.equal(form.token, state.token, `${form.id} retains the target`);
+      }
+      await returnState(expectedPath);
+      return state.token;
     }
     async function screenshot(name) {
       await evaluate('window.scrollTo(0, 0)');
@@ -180,6 +216,11 @@ const {join} = require('node:path');
     console.log('Desktop layout passed at 1280, 1440 and 1920 pixels, including 100 accessible objects and empty collections.');
 
     await command('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
+    await navigate(cases.unlinked);
+    assert.equal(await evaluate(`new URL(document.querySelector('.collection-dimensions [aria-current="page"]').href).searchParams.get('links')`), 'members');
+    assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-record').length`), 2);
+    assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-reference').length`), 0);
+    await screenshot('metadata-only-members');
     await navigate(cases.reference);
     await click('.collection-group-list > summary');
     assert.equal(await evaluate(`document.querySelectorAll('.collection-group-list li').length`), 25);
@@ -201,8 +242,42 @@ const {join} = require('node:path');
     assert.equal(await evaluate(`new URL(location.href).searchParams.get('group')`), new URL(groupPath, process.env.COLLECTION_BASE_URL).searchParams.get('group'));
     await click('[data-graph-view="detailed"]');
     assert.ok(await evaluate(`document.querySelector('.relationship-preview').getBoundingClientRect().height > 0`));
+    await until(`new URL(location.href).searchParams.get('view') === 'detailed'`);
+    assert.deepEqual(exceptions, [], 'Switching presentation must retain working navigation');
+    const returnPath = await evaluate('location.pathname + location.search');
+    await follow('.collection-object-graph');
+    await returnState(returnPath);
+    const objectPath = await evaluate('location.pathname');
+    await follow('nav[aria-label="Data object views"] a:first-child');
+    assert.equal(await evaluate(`!!document.querySelector('#data-metadata')`), true);
+    await returnState(returnPath);
+    await follow('nav[aria-label="Data object views"] a:last-child');
+    assert.equal(await evaluate(`!!document.querySelector('#detail-relationships')`), true);
+    await returnState(returnPath);
+    await follow('#detail-open-graph');
+    assert.notEqual(await evaluate('location.pathname'), objectPath);
+    await returnState(returnPath);
+    await click('.relationship-node-software');
+    await evaluate(`Object.defineProperty(navigator, 'clipboard', {configurable: true,
+      value: {writeText: async value => {window.copiedCollectionLink = value;}}})`);
+    await click('#graph-copy-link');
+    await until(`typeof window.copiedCollectionLink === 'string'`);
+    const standaloneCopy = new URL(await evaluate('window.copiedCollectionLink'));
+    assert.ok(standaloneCopy.searchParams.get('graph_context'));
+    assert.equal(standaloneCopy.hash, '#relationship-software-info');
+    await navigate(standaloneCopy.pathname + standaloneCopy.search + standaloneCopy.hash);
+    await returnState(returnPath);
+    assert.equal(await evaluate(`document.querySelector('.relationship-node[aria-current="true"]').dataset.node`), 'relationship-software');
+    await follow('#graph-return-context');
+    assert.equal(await evaluate('location.pathname'), cases.reference);
+    assert.equal(await evaluate(`new URL(location.href).searchParams.get('group')`), new URL(returnPath, process.env.COLLECTION_BASE_URL).searchParams.get('group'));
+    assert.equal(await evaluate(`document.querySelector('#detail-relationships').dataset.view`), 'detailed');
+    assert.match(await evaluate(`document.querySelector('.collection-pagination[aria-label="Object pages"]').textContent`), /Page 2 of 2/);
     await screenshot('group-page-detailed');
+    assert.equal(await evaluate(`document.querySelector('#collection-export').textContent.trim()`), 'All accessible objects (JSON)');
     await click('.graph-download summary');
+    assert.equal(await evaluate(`document.querySelector('#graph-save-svg').textContent.trim()`), 'Current graph page (SVG)');
+    assert.equal(await evaluate(`document.querySelector('#graph-save-png').textContent.trim()`), 'Current graph page (PNG)');
     await click('#graph-save-svg');
     const svg = (await download('collection-relationships-detailed.svg')).toString();
     assert.ok(svg.includes('Research collection'));
@@ -223,7 +298,7 @@ const {join} = require('node:path');
     assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-record').length`), 25);
     const forbiddenStatus = await evaluate(`fetch(${JSON.stringify(cases.forbidden)}).then(response => response.status)`);
     assert.equal(forbiddenStatus, 404);
-    console.log('Group and member pagination, missing metadata, exact access counts, original JSON and actual SVG/PNG downloads passed.');
+    console.log('Group/page/view return through Details, Graph, standalone and copied links; bounded exports and access checks passed.');
 
     await navigate(cases.search + '?keyword=workflow');
     assert.equal(await evaluate(`document.querySelector('#graphSelectedButton').disabled`), true);
@@ -234,16 +309,67 @@ const {join} = require('node:path');
     assert.equal(await evaluate(`document.querySelector('#selectedResultCount').textContent`), '2 selected');
     await click('#graphSelectedButton');
     await until(`location.pathname.includes('/graph/selection/') && !!document.querySelector('#collection-save-form') && document.readyState === 'complete'`);
+    const temporaryPath = await evaluate('location.pathname');
     assert.equal(await evaluate(`document.querySelector('.collection-total').textContent`), '2 accessible data objects');
-    await screenshot('selected-two-objects');
+    for (const width of [1280, 1440, 1920]) {
+      await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
+      await navigate(temporaryPath);
+      await layout(`small-collection-${width}`);
+      const smallGraph = await evaluate(`(() => {
+        const canvas = document.querySelector('.graph-canvas').getBoundingClientRect();
+        const records = [...document.querySelectorAll('.relationship-node-record')].map(node => node.dataset.node);
+        const reference = document.querySelector('.relationship-node-reference')?.dataset.node;
+        const edges = [...document.querySelectorAll('.relationship-edge')].map(edge => [edge.dataset.source, edge.dataset.target]);
+        return {records, references: document.querySelectorAll('.relationship-node-reference').length,
+          connected: records.every(record => edges.some(edge => edge.includes(record) && edge.includes(reference))),
+          cardsVisible: [...document.querySelectorAll('.relationship-node-record')].every(node => {
+            const box = node.getBoundingClientRect();
+            return box.left >= canvas.left - 1 && box.right <= canvas.right + 1
+              && box.top >= canvas.top && box.bottom <= innerHeight;
+          }),
+          closed: !document.querySelector('#collection-save-panel').open,
+          firstScreen: canvas.top >= 0 && canvas.top + Math.min(canvas.height, 260) <= innerHeight};
+      })()`);
+      assert.deepEqual(new Set(smallGraph.records), new Set([`collection-object-${cases.first}`, `collection-object-${cases.public}`]));
+      assert.equal(smallGraph.records.length, 2, 'Each selected object appears exactly once before drilling into groups');
+      assert.equal(smallGraph.references, 1, 'DOI spelling variants share one declared reference');
+      assert.equal(smallGraph.connected, true, 'Both objects connect to their declared reference');
+      assert.equal(smallGraph.closed, true, 'Saving remains available without pushing the graph down');
+      assert.equal(smallGraph.firstScreen, true, `The graph is visible on the first desktop screen at ${width}px`);
+      assert.equal(smallGraph.cardsVisible, true, `Both object cards fit the initial viewport at ${width}px`);
+      await screenshot(`selected-two-objects-${width}`);
+    }
+    await command('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
+    await follow('#collection-select-more');
+    const temporaryContext = await selectionContext(temporaryPath);
+    await fill('#id_keyword', 'workflow');
+    await click('#advancedSearchForm .search-main-row button[type="submit"]');
+    await until(`new URL(location.href).searchParams.get('keyword') === 'workflow' && document.readyState === 'complete'`);
+    assert.equal(await selectionContext(temporaryPath), temporaryContext);
+    await follow('.search-secondary-row [data-clear-search]');
+    assert.equal(await evaluate(`new URL(location.href).searchParams.has('keyword')`), false);
+    assert.equal(await selectionContext(temporaryPath), temporaryContext);
+    await click('.advanced-toggle-btn');
+    await until(`document.querySelector('#advancedSearchPanel').classList.contains('show')`);
+    await follow('.advanced-search-actions [data-clear-search]');
+    assert.equal(await evaluate(`document.querySelector('#advancedSearchPanel').classList.contains('show')`), true);
+    assert.equal(await selectionContext(temporaryPath), temporaryContext);
+    await fill('#id_keyword', 'workflow');
+    await click('#advancedSearchForm .search-main-row button[type="submit"]');
+    await until(`new URL(location.href).searchParams.get('keyword') === 'workflow' && document.readyState === 'complete'`);
+    await click(`.result-checkbox[value="${cases.second}"]`);
+    await click('#graphSelectedButton');
+    await until(`location.pathname === ${JSON.stringify(temporaryPath)} && document.querySelector('.collection-total')?.textContent === '3 accessible data objects' && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-record').length`), 3);
+    await screenshot('continued-unsaved-selection');
+    await click('#collection-save-panel > summary');
     await fill('#collection-save-form [name="title"]', 'Workflow collection');
     await click('#collection-save-form button[type="submit"]');
     await until(`location.pathname.includes('/graph/collections/') && !!document.querySelector('#collection-edit-form') && document.readyState === 'complete'`);
     const savedPath = await evaluate('location.pathname');
-    const savedId = savedPath.split('/').filter(Boolean).at(-1);
     await screenshot('saved-collection');
     await navigate(cases.home);
-    assert.match(await evaluate(`document.querySelector('.collection-list-link[href="${savedPath}"]').textContent`), /Workflow collection.*2 accessible objects/s);
+    assert.match(await evaluate(`document.querySelector('.collection-list-link[href="${savedPath}"]').textContent`), /Workflow collection.*3 accessible objects/s);
     await click(`.collection-list-link[href="${savedPath}"]`);
     await until(`location.pathname === ${JSON.stringify(savedPath)} && document.readyState === 'complete'`);
     await click('.collection-dimensions a[href*="links=software"]');
@@ -251,8 +377,10 @@ const {join} = require('node:path');
     assert.match(await evaluate(`document.querySelector('.collection-explanation').textContent`), /names.*version/s);
     await click('.collection-dimensions a[href*="links=relations"]');
     await until(`location.search.includes('links=relations') && document.readyState === 'complete'`);
-    await click(`.collection-object-graph[href="${cases.detail}?tab=graph"]`);
-    await until(`location.pathname === ${JSON.stringify(cases.detail)} && location.search === '?tab=graph' && document.readyState === 'complete'`);
+    const savedReturnPath = await evaluate('location.pathname + location.search');
+    await follow(`.collection-object-graph[href^="${cases.detail}?"]`);
+    assert.equal(await evaluate(`new URL(location.href).searchParams.get('tab')`), 'graph');
+    await returnState(savedReturnPath);
     assert.equal(await evaluate(`!!document.querySelector('#plot-variables-data')`), false);
     await click('.relationship-node-software');
     await evaluate(`Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async value => {window.copiedCollectionLink = value;}}})`);
@@ -261,19 +389,38 @@ const {join} = require('node:path');
     const copied = new URL(await evaluate('window.copiedCollectionLink'));
     assert.equal(copied.pathname, cases.detail);
     assert.equal(copied.searchParams.get('tab'), 'graph');
+    assert.ok(copied.searchParams.get('graph_context'));
     assert.equal(copied.hash, '#relationship-software-info');
     await navigate(copied.pathname + copied.search + copied.hash);
     assert.equal(await evaluate(`document.querySelector('.relationship-node[aria-current="true"]').dataset.node`), 'relationship-software');
     await screenshot('object-graph-tab');
 
-    await navigate(cases.myData + '?software=Append%20Solver');
-    assert.equal(await evaluate(`document.querySelectorAll('.my-data-checkbox').length`), 1);
-    await click(`.my-data-checkbox[value="${cases.second}"]`);
+    await navigate(savedPath);
+    await follow('#collection-select-more');
+    await selectionContext(savedPath);
+    assert.match(await evaluate(`document.querySelector('#graph-selection-target').textContent`), /Add to.*Workflow collection/s);
+    await fill('#id_keyword', 'workflow');
+    await click('#advancedSearchForm .search-main-row button[type="submit"]');
+    await until(`new URL(location.href).searchParams.get('keyword') === 'workflow' && document.readyState === 'complete'`);
+    assert.match(await evaluate(`document.querySelector('#graphSelectedButton').textContent`), /Add selected objects/);
+    await click(`.result-checkbox[value="${cases.shared}"]`);
+    await click('#graphSelectedButton');
+    await until(`location.pathname === ${JSON.stringify(savedPath)} && document.querySelector('.collection-total')?.textContent === '4 accessible data objects' && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`!!document.querySelector('#target-collection')`), false);
+    await follow('#collection-select-more-owned');
+    const ownedContext = await selectionContext(savedPath);
+    assert.match(await evaluate(`document.querySelector('#graph-selection-target').textContent`), /Add to.*Workflow collection/s);
+    assert.match(await evaluate(`document.querySelector('#graphMyDataButton').textContent`), /Add selected objects/);
+    await fill('#myDataFilter-software', 'damask');
+    await until(`new URL(location.href).searchParams.get('software') === 'damask' && document.readyState === 'complete'`);
+    assert.equal(await selectionContext(savedPath), ownedContext);
+    await follow('#myDataFilterForm .my-data-filter-footer a');
+    assert.equal(await selectionContext(savedPath), ownedContext);
+    await click(`.my-data-checkbox[value="${cases.ownedExtra}"]`);
     await click('#graphMyDataButton');
-    await until(`location.pathname.includes('/graph/selection/') && !!document.querySelector('#collection-add-form') && document.readyState === 'complete'`);
-    await fill('#target-collection', savedId);
-    await click('#collection-add-form button');
-    await until(`location.pathname === ${JSON.stringify(savedPath)} && document.querySelector('.collection-total')?.textContent === '3 accessible data objects' && document.readyState === 'complete'`);
+    await until(`location.pathname === ${JSON.stringify(savedPath)} && document.querySelector('.collection-total')?.textContent === '5 accessible data objects' && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`!!document.querySelector('#target-collection')`), false);
+    await screenshot('saved-collection-appended');
     await click('.collection-manage > summary');
     await fill('#collection-edit-form [name="title"]', 'Edited workflow collection');
     await fill('#collection-edit-form [name="description"]', 'A named research group, independent of upload batches.');
@@ -282,7 +429,7 @@ const {join} = require('node:path');
     await click(`.collection-member-checkbox[value="${cases.first}"]`);
     assert.equal(await evaluate(`document.querySelector('#collection-selection-count').textContent`), '1 selected');
     await click('#collection-remove-button');
-    await until(`document.querySelector('.collection-total')?.textContent === '2 accessible data objects' && document.readyState === 'complete'`);
+    await until(`document.querySelector('.collection-total')?.textContent === '4 accessible data objects' && document.readyState === 'complete'`);
     assert.equal(await evaluate(`!!document.querySelector('.collection-member-checkbox[value="${cases.first}"]')`), false);
     await click('.collection-manage > summary');
     await click('.collection-delete > summary');
@@ -299,6 +446,18 @@ const {join} = require('node:path');
     await click(`.my-data-checkbox[value="${cases.second}"]`);
     await click('#graphMyDataButton');
     await until(`location.pathname.includes('/graph/selection/') && !!document.querySelector('#collection-save-form') && document.readyState === 'complete'`);
+    const nativeTemporaryPath = await evaluate('location.pathname');
+    assert.equal(await evaluate(`document.querySelector('#collection-save-panel').open`), false);
+    await follow('#collection-select-more');
+    await selectionContext(nativeTemporaryPath);
+    await fill('#id_keyword', 'workflow');
+    await click('#advancedSearchForm .search-main-row button[type="submit"]');
+    await until(`new URL(location.href).searchParams.get('keyword') === 'workflow' && document.readyState === 'complete'`);
+    await selectionContext(nativeTemporaryPath);
+    await click(`.result-checkbox[value="${cases.second}"]`);
+    await click('#graphSelectedButton');
+    await until(`location.pathname === ${JSON.stringify(nativeTemporaryPath)} && document.querySelector('.collection-total')?.textContent === '1 accessible data object' && document.readyState === 'complete'`);
+    await click('#collection-save-panel > summary');
     await fill('#collection-save-form [name="title"]', 'Native browser collection');
     await click('#collection-save-form button[type="submit"]');
     await until(`location.pathname.includes('/graph/collections/') && document.querySelector('#collection-title')?.textContent === 'Native browser collection' && document.readyState === 'complete'`);
@@ -309,8 +468,17 @@ const {join} = require('node:path');
     await click(`.result-checkbox[value="${cases.public}"]`);
     await click('#graphSelectedButton');
     await until(`location.pathname.includes('/graph/selection/') && !!document.querySelector('#collection-add-form') && document.readyState === 'complete'`);
+    await click('#collection-save-panel > summary');
     await fill('#target-collection', nativeId);
     await click('#collection-add-form button');
+    await until(`location.pathname === ${JSON.stringify(nativePath)} && document.querySelector('.collection-total')?.textContent === '2 accessible data objects' && document.readyState === 'complete'`);
+    await follow('#collection-select-more');
+    await selectionContext(nativePath);
+    await fill('#id_keyword', 'workflow');
+    await click('#advancedSearchForm .search-main-row button[type="submit"]');
+    await until(`new URL(location.href).searchParams.get('keyword') === 'workflow' && document.readyState === 'complete'`);
+    await click(`.result-checkbox[value="${cases.public}"]`);
+    await click('#graphSelectedButton');
     await until(`location.pathname === ${JSON.stringify(nativePath)} && document.querySelector('.collection-total')?.textContent === '2 accessible data objects' && document.readyState === 'complete'`);
     await click('.collection-group-list > summary');
     await click('.collection-group-list li a');
@@ -322,8 +490,14 @@ const {join} = require('node:path');
     assert.ok(await evaluate(`document.querySelector(location.hash).getBoundingClientRect().height > 0`));
     await layout('native-collection');
     await screenshot('without-javascript');
+    const nativeReturnPath = await evaluate('location.pathname + location.search');
+    await follow('.collection-object-graph');
+    await returnState(nativeReturnPath);
+    await follow('#graph-return-context');
+    assert.equal(await evaluate('location.pathname'), nativePath);
+    assert.equal(await evaluate(`document.querySelector('#detail-relationships').dataset.view`), 'detailed');
     assert.deepEqual(exceptions, []);
-    console.log('Native forms, saved collections, group links, detail anchors and detailed cards passed without JavaScript.');
+    console.log('Native forms, temporary/saved append, duplicate membership, old add dialog and graph navigation passed without JavaScript.');
     console.log(`Screenshots and graph downloads: ${artifacts}`);
   } finally {
     socket?.close();
