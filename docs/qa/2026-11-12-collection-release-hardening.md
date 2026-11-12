@@ -103,7 +103,19 @@ Local logs: `/tmp/collection-release-final-postgres.log`,
 ## Hosted verification boundary
 
 No production database credentials or records were used for testing. Public health
-requests timed out during the initial check; GitHub had no combined commit status
-entries establishing a Render deployment. A successful push alone does not prove
-deployment, completed migrations or authenticated production workflows. Those
-states must be reported separately from the verified local PostgreSQL results.
+requests timed out during the initial check. After source commit `ba6a5f4` was
+pushed, the final read-only check on 2026-11-12 at 21:05 UTC succeeded:
+
+- `/healthz/` returned HTTP 200 and `{"status":"ok"}`.
+- `/login/` returned HTTP 200 with the username/password form.
+- `/static/assets/js/research-collections.js` returned HTTP 200. Its SHA256 matched
+  the committed source exactly:
+  `0f30feb682515f595ed89ae51f880d5500b98cdd69279c9d375716eb76f1fea2`.
+
+This confirms public health and delivery of the new script. GitHub still supplied
+no combined commit status entries, and no authenticated production workflow or
+Render console deployment status was inspected. These checks do not replace that
+remaining production acceptance step. HTTP evidence is retained locally under
+`/tmp/collection-postgres/`. The isolated local PostgreSQL instance was stopped
+after all tests and measurements; no production service was stopped or modified
+through these verification commands.
