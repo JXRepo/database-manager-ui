@@ -7,6 +7,7 @@ from .credential_validation import validate_account_credentials
 from .getting_started import getting_started_view
 from .graph import graph_view
 from . import research_collections
+from . import collection_relationships
 from .views import account_settings_view, register_view
 from .forms import StyledPasswordChangeForm
 from .views import upload_json_view
@@ -93,6 +94,9 @@ urlpatterns = [
     path("graph/collections/<int:pk>/clear-unavailable/", research_collections.collection_cleanup, name="collection_cleanup"),
     path("graph/collections/<int:pk>/delete/", research_collections.collection_delete, name="collection_delete"),
     path("graph/collections/<int:pk>/export/", research_collections.collection_export, name="collection_export"),
+    path("graph/collections/<int:pk>/relationships/save/", collection_relationships.collection_relationship_save, name="collection_relationship_save"),
+    path("graph/collections/<int:pk>/relationships/<int:relationship_pk>/delete/", collection_relationships.collection_relationship_delete, name="collection_relationship_delete"),
+    path("graph/collections/<int:pk>/relationships/export/", collection_relationships.collection_relationship_export, name="collection_relationship_export"),
     path("search/live-data/", search_live_data_objects_view, name="search_live_data_objects"),
     path("search/export-selected/", export_selected_search_results_view, name="export_selected_search_results"),
     path("search/export-csv/", views.export_selected_search_csv_view, name="export_selected_search_csv"),

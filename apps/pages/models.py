@@ -201,6 +201,27 @@ class ResearchCollection(models.Model):
         return self.title
 
 
+class CollectionRelationship(models.Model):
+    """
+    Store one owner supplied directed link between members of a collection
+    """
+
+    collection = models.ForeignKey(ResearchCollection, on_delete=models.CASCADE, related_name="relationships")
+    source = models.ForeignKey(JSONData, on_delete=models.CASCADE, related_name="outgoing_collection_relationships")
+    target = models.ForeignKey(JSONData, on_delete=models.CASCADE, related_name="incoming_collection_relationships")
+    label = models.CharField(max_length=120)
+    revision = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("pk",)
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(source=models.F("target")), name="collection_relationship_distinct_objects"),
+            models.UniqueConstraint(fields=("collection", "source", "target", "label"), name="collection_relationship_unique_link"),
+        ]
+
+
 class TemporaryGraphSelection(models.Model):
     """
     Keep one bounded selection bucket independent of browser session saves

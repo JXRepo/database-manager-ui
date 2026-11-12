@@ -1,0 +1,52 @@
+<section class="collection-card manual-relationships" id="manual-relationships" aria-labelledby="manual-relationships-heading" data-members-url="{{ manual_editor.members_url }}">
+  <div class="collection-section-heading">
+    <h2 id="manual-relationships-heading">Manual relationships</h2>
+    <span>{{ manual_editor.total }} saved · {{ manual_editor.visible_count }} on this graph</span>
+    <a href="{{ manual_editor.export_url }}" id="manual-relationship-export">Download relationships (JSON)</a>
+  </div>
+  <p class="manual-relationship-note"><span class="manual-relationship-key" aria-hidden="true"></span>Connections you add to this collection. Arrow direction runs from the source to the destination; original data stays unchanged.</p>
+  {% if manual_editor.visible_total > manual_editor.visible_count %}<p class="manual-relationship-focus-note">Showing {{ manual_editor.visible_count }} of {{ manual_editor.visible_total }} manual connections between these objects. Use the list below to open any saved connection.</p>{% endif %}
+  {% if manual_editor.members|length >= 2 %}
+  <details id="manual-relationship-editor"{% if manual_editor.selected or manual_editor.form.is_bound %} open{% endif %}>
+    <summary id="manual-relationship-editor-heading">{% if manual_editor.selected %}Edit relationship{% else %}Add relationship{% endif %}</summary>
+    <form method="post" action="{{ manual_editor.save_url }}" id="manual-relationship-form">
+      {% csrf_token %}
+      <input type="hidden" name="relationship_id" value="{{ manual_editor.form.relationship_id.value|default_if_none:'' }}">
+      <input type="hidden" name="revision" value="{{ manual_editor.form.revision.value|default_if_none:'' }}">
+      {{ manual_editor.form.non_field_errors }}{{ manual_editor.form.relationship_id.errors }}{{ manual_editor.form.revision.errors }}
+      <div class="manual-relationship-fields">
+        <div><label for="manual-relationship-source">From</label><select name="source" id="manual-relationship-source" class="form-select form-select-sm" required>
+          <option value="">Choose a source object</option>
+          {% for member in manual_editor.members %}{% with member_id=member.pk|stringformat:'s' source_id=manual_editor.form.source.value|stringformat:'s' %}<option value="{{ member.pk }}"{% if member_id == source_id %} selected{% endif %}>{{ member.title }}{% if member.identifier %} · {{ member.identifier }}{% endif %}</option>{% endwith %}{% endfor %}
+        </select>{{ manual_editor.form.source.errors }}</div>
+        <div><label for="manual-relationship-label">Relationship</label><input type="text" name="label" id="manual-relationship-label" class="form-control form-control-sm" maxlength="120" value="{{ manual_editor.form.label.value|default_if_none:'' }}" placeholder="e.g. uses output from" required>{{ manual_editor.form.label.errors }}</div>
+        <div><label for="manual-relationship-target">To</label><select name="target" id="manual-relationship-target" class="form-select form-select-sm" required>
+          <option value="">Choose a destination object</option>
+          {% for member in manual_editor.members %}{% with member_id=member.pk|stringformat:'s' target_id=manual_editor.form.target.value|stringformat:'s' %}<option value="{{ member.pk }}"{% if member_id == target_id %} selected{% endif %}>{{ member.title }}{% if member.identifier %} · {{ member.identifier }}{% endif %}</option>{% endwith %}{% endfor %}
+        </select>{{ manual_editor.form.target.errors }}</div>
+      </div>
+      <div class="manual-relationship-actions"><button type="submit" id="manual-relationship-save" class="btn btn-primary btn-sm">Save relationship</button><button type="button" id="manual-relationship-cancel" class="btn btn-outline-secondary btn-sm" hidden>Cancel</button><a href="{{ workspace_url }}?links=members#manual-relationships" class="manual-native-new">Start a new relationship</a></div>
+    </form>
+    <details id="manual-relationship-delete-confirm"{% if not manual_editor.selected %} hidden{% endif %}>
+      <summary>Delete relationship</summary>
+      <p>This removes only this manual connection from the collection.</p>
+      <form method="post" action="{{ manual_editor.selected.delete_url }}" id="manual-relationship-delete-form">
+        {% csrf_token %}<input type="hidden" name="revision" value="{% if manual_editor.form.is_bound %}{{ manual_editor.form.revision.value|default_if_none:'' }}{% else %}{{ manual_editor.selected.revision }}{% endif %}">
+        <button type="submit" class="btn btn-outline-danger btn-sm" id="manual-relationship-delete">Delete this relationship</button>
+      </form>
+    </details>
+  </details>
+  {% else %}<p class="manual-relationship-empty">Add at least two accessible data objects to this collection to connect them.</p>{% endif %}
+  <p id="manual-relationship-status" role="alert" hidden></p>
+  <a href="{{ manual_editor.reload_url }}" id="manual-relationship-reload" hidden>Reload saved relationships</a>
+  {% if manual_editor.rows %}
+  <div class="collection-table-scroll"><table class="table manual-relationship-table">
+    <thead><tr><th scope="col">From</th><th scope="col">Relationship</th><th scope="col">To</th><th scope="col"><span class="visually-hidden">Edit</span></th></tr></thead>
+    <tbody>{% for relationship in manual_editor.rows %}<tr data-manual-row="{{ relationship.id }}"{% if manual_editor.selected.id == relationship.id %} class="is-selected"{% endif %}>
+      <td>{{ relationship.source_title }}</td><td><span aria-hidden="true">→ </span>{{ relationship.label }}<span class="manual-relationship-origin">Manual</span></td><td>{{ relationship.target_title }}</td><td><a href="{{ relationship.edit_url }}" class="manual-relationship-edit">Show / edit</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <nav class="collection-pagination" aria-label="Manual relationship pages"><span>{{ manual_editor.page.start_index }}–{{ manual_editor.page.end_index }} of {{ manual_editor.total }}</span>{% if manual_editor.previous_url %}<a href="{{ manual_editor.previous_url }}">Previous</a>{% endif %}<span>Page {{ manual_editor.page.number }} of {{ manual_editor.page.paginator.num_pages }}</span>{% if manual_editor.next_url %}<a href="{{ manual_editor.next_url }}">Next</a>{% endif %}</nav>
+  {% else %}<p class="manual-relationship-empty">No manual relationships yet.</p>{% endif %}
+  {{ manual_editor.editable_rows|json_script:'manual-relationship-data' }}
+</section>

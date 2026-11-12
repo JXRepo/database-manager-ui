@@ -10,7 +10,7 @@
       <a href="{{ graph_detailed_url }}" data-graph-view="detailed" role="button" aria-pressed="{% if relationship_graph.view == 'detailed' %}true{% else %}false{% endif %}" title="Include key metadata on each card">Detailed</a>
     </div>
     {% endif %}
-    <span class="relationship-readonly">Read only</span>
+    {% if manual_editor %}<a href="#manual-relationships" id="graph-add-relationship" class="graph-manual-add">Add relationship</a>{% else %}<span class="relationship-readonly">Read only</span>{% endif %}
   </div>
   {% if relationship_graph.count %}
   {{ relationship_graph.layouts|json_script:"graph-layouts" }}
@@ -23,12 +23,14 @@
     <button type="button" id="graph-fit" title="Fit the visible connections (0)">Fit</button>
     <button type="button" id="graph-center" title="Center and read the selected node">Center node</button>
     <button type="button" id="graph-focus" aria-pressed="false" title="Emphasize this node and its immediate connections">Focus connections</button>
+    {% if manual_editor %}<button type="button" id="graph-draw-connection" aria-pressed="false" hidden>Draw connection</button>{% endif %}
     <details class="graph-download">
       <summary>Download</summary>
       <div>
         <button type="button" id="graph-save-svg">{% if relationship_graph.is_collection %}Current graph page{% else %}Complete graph{% endif %} (SVG)</button>
         <button type="button" id="graph-save-png">{% if relationship_graph.is_collection %}Current graph page{% else %}Complete graph{% endif %} (PNG)</button>
         {% if graph_json_url %}<a href="{{ graph_json_url }}">All accessible objects (JSON)</a>{% elif data_object %}<a href="{% url 'json_data_export' data_object.pk %}">Original JSON</a>{% endif %}
+        {% if manual_editor %}<a href="{{ manual_editor.export_url }}">Manual relationships (JSON)</a>{% endif %}
       </div>
     </details>
   </div>
@@ -43,14 +45,15 @@
           <marker id="relationship-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
             <path d="M 0 0 L 10 5 L 0 10 z" fill="#a3afc2"></path>
           </marker>
+          {% if manual_editor %}<marker id="relationship-manual-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8054a8"></path></marker>{% endif %}
         </defs>
         {% for edge in relationship_graph.edges %}
-          <path class="relationship-edge" d="{{ edge.path }}" data-source="{{ edge.source }}" data-target="{{ edge.target }}" marker-end="url(#relationship-arrow)"><title>{{ edge.label }}</title></path>
+          <path class="relationship-edge{% if edge.manual_id %} relationship-edge-manual{% endif %}" d="{{ edge.path }}" data-source="{{ edge.source }}" data-target="{{ edge.target }}"{% if edge.manual_id %} data-manual-id="{{ edge.manual_id }}" marker-end="url(#relationship-manual-arrow)"{% else %} marker-end="url(#relationship-arrow)"{% endif %}><title>{{ edge.label }}</title></path>
         {% endfor %}
         {% for node in relationship_graph.nodes %}
           <g transform="translate({{ node.x }} {{ node.y }})">
             <a class="relationship-node relationship-node-{{ node.kind }}" href="#{{ node.id }}-info"
-               data-node="{{ node.id }}" data-legacy-node="{{ node.legacy_id }}" data-kind="{{ node.kind }}"
+               data-node="{{ node.id }}" data-legacy-node="{{ node.legacy_id }}" data-kind="{{ node.kind }}"{% if node.object_pk %} data-object-pk="{{ node.object_pk }}"{% endif %}
                aria-label="{{ node.category }}: {{ node.label }}" tabindex="0">
               <title>{{ node.category }}: {{ node.label }}{% if node.relation %} — {{ node.relation }}{% endif %}</title>
               <rect width="{{ relationship_graph.node_width }}" height="{{ node.height }}" rx="10"></rect>
@@ -67,6 +70,7 @@
               </foreignObject>
               {% endif %}
             </a>
+            {% if manual_editor and node.object_pk %}<g class="relationship-port" data-source-object="{{ node.object_pk }}" role="button" tabindex="-1" aria-label="Start a relationship from {{ node.label }}"><circle cx="232" cy="40" r="8"></circle><title>Drag to another data object, or select a source and destination</title></g>{% endif %}
           </g>
         {% endfor %}
       </svg>

@@ -10,7 +10,8 @@ materials simulation data as JSON.
 The platform is currently a public pilot for a small group of research users.
 Development focuses on the core data workflow and access control. Research
 collections support browsing declared references and shared metadata labels
-across accessible records. Ontology, scientific dependency editing, full Studio
+across accessible records, with separately saved manual relationships between
+collection members. Ontology validation, full Studio
 integration, and production AI features remain future enhancements.
 
 ## Try the Platform
@@ -615,8 +616,40 @@ Collection graph images export the current page and view, including offscreen
 nodes, and explicitly label that scope. Copy link retains the collection,
 group, pagination, selected node and card presentation; collection links remain
 private and temporary links belong to the current session. RO-Crate packaging,
-actual input and output file storage, collection sharing and editing scientific
-dependencies are not part of this release.
+actual input and output file storage, collection sharing and ontology validation
+are not part of this release.
+
+Saved collections support **Manual relationships** between their accessible
+data objects. Choose **Draw connection**, drag a purple connection point to
+another object, enter a name such as “uses output from”, and choose **Save
+relationship**. Clicking or pressing Enter on the source and destination also
+works. **Add relationship** provides From / Relationship / To controls for all
+accessible members, including objects on different pages. Save temporary
+selections as collections before editing their relationships.
+
+Manual links use dashed purple arrows and explicit Manual labels. Click a link
+or its **Show / edit** entry to change its name or endpoints, or delete it.
+Selecting a saved relationship focuses both objects even across member pages.
+**Show collection members** returns to the ordinary member view. Original
+metadata-derived connections remain read only. User-entered relationship names
+are annotations, not ontology validation or inferred scientific facts.
+
+Names must contain 1–120 characters on one line. A collection supports up to
+1,000 manual relationships; self-links and identical directed links are rejected.
+The relationship list uses 12-entry pages and a graph shows at most 100 manual
+connections among its visible objects, with exact scope counts. Each save checks
+current access, membership and revision. A stale tab receives a conflict and must
+reload the saved relationship; an interrupted request keeps the entered values
+and asks the user to check saved state before retrying. Ordinary forms work
+without JavaScript.
+
+Annotations belong to the private collection and never change uploaded JSON.
+Removing a member deletes its incident annotations, while revoking data access
+hides affected annotations until access returns or unavailable members are
+cleared. **Download relationships (JSON)** exports a separate versioned document
+with accessible endpoint IDs, supplied identifiers/titles and user-entered labels.
+Original-object JSON downloads remain unchanged. Graph SVG/PNG downloads retain
+manual arrow styling and omit editing handles.
 
 Individual objects have a **Graph** tab on their detail page. Existing
 `/graph/?object=...` links still open the standalone object workspace, and

@@ -16,7 +16,7 @@ CONTEXT_ERROR = (
     "This collection or selection link is no longer available. "
     "Open Graph and choose the collection or selection again."
 )
-RETURN_PARAMETERS = {"links", "group", "page", "groups_page", "view"}
+RETURN_PARAMETERS = {"links", "group", "page", "groups_page", "view", "edge", "relationships_page"}
 
 
 def _return_parameters(values):
@@ -50,8 +50,12 @@ def _return_parameters(values):
             raise ValueError(CONTEXT_ERROR)
         if key == "group" and not re.fullmatch(r"[0-9a-f]{24}|missing", value):
             raise ValueError(CONTEXT_ERROR)
-        if key in {"page", "groups_page"} and (
+        if key in {"page", "groups_page", "relationships_page"} and (
             not re.fullmatch(r"[1-9][0-9]{0,9}", value) or int(value) > 2147483647
+        ):
+            raise ValueError(CONTEXT_ERROR)
+        if key == "edge" and (
+            not re.fullmatch(r"[1-9][0-9]{0,18}", value) or int(value) > 9223372036854775807
         ):
             raise ValueError(CONTEXT_ERROR)
         params[key] = value
@@ -229,6 +233,10 @@ def workspace_navigation(request, context, *, collection=None, selection_token="
         params[key] = str(context[field].number)
     if context.get("selected_group"):
         params["group"] = context["selected_group"]["key"]
+    if context.get("manual_selected"):
+        params["edge"] = str(context["manual_selected"]["id"])
+    if context.get("manual_editor") and context["manual_editor"]["page"].number > 1:
+        params["relationships_page"] = str(context["manual_editor"]["page"].number)
     params = _return_parameters(params)
     payload = {
         "user": request.user.pk, "kind": "collection" if collection is not None else "selection",

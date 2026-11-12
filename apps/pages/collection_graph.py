@@ -18,6 +18,7 @@ from .collection_summary import build_collection_summary
 PAGE_SIZE = 25
 SMALL_COLLECTION_LIMIT = 8
 MAX_EXPANDED_NODES = 25
+MAX_VISIBLE_MANUAL_EDGES = 100
 MAX_REQUEST_SUMMARY_OBJECTS = 25
 MAX_REQUEST_SUMMARY_BYTES = 16 * 1024 * 1024
 MAX_REQUEST_SUMMARY_SECONDS = 1
@@ -277,16 +278,26 @@ def _layout(nodes, view, connections):
                 positions[node["id"]] = {"x": 20 + depth * 296, "y": y, "height": heights[node["id"]]}
                 y += heights[node["id"]] + 24
         paths = []
+        manual_lane = 0
+        manual_count = sum(bool(connection.get("manual_id")) for connection in connections)
+        lane_step = min(18, 198 / max(1, manual_count - 1))
         for connection in connections:
             parent = positions[connection["source"]]
             target = positions[connection["target"]]
             start_x = parent["x"] + 232
             start_y = parent["y"] + parent["height"] // 2
+            if connection.get("manual_id"):
+                end_x = target["x"] + 232
+                end_y = target["y"] + target["height"] // 2
+                bend = round(max(start_x, end_x) + 64 + manual_lane * lane_step, 3)
+                paths.append(f"M {start_x} {start_y} C {bend} {start_y}, {bend} {end_y}, {end_x} {end_y}")
+                manual_lane += 1
+                continue
             end_x, end_y = target["x"], target["y"] + 14
             middle = (start_x + end_x) // 2
             paths.append(f"M {start_x} {start_y} C {middle} {start_y}, {middle} {end_y}, {end_x} {end_y}")
         layouts[mode] = {
-            "width": 272 + max(columns) * 296, "height": height,
+            "width": 272 + max(columns) * 296 + (280 if manual_lane else 0), "height": height,
             "positions": positions, "paths": paths,
         }
     layout = layouts[view]
@@ -304,7 +315,12 @@ def _layout(nodes, view, connections):
             "source": parent["id"], "target": node["id"],
             "label": f'{parent["label"]} → {relation} → {node["label"]}',
             "path": layout["paths"][len(edges)],
+            "manual_id": connection.get("manual_id"),
+            "revision": connection.get("revision"),
         })
+        if connection.get("manual_id"):
+            edges[-1]["label"] = "Manual: " + edges[-1]["label"]
+            relation = "Manual: " + relation
         parent["connections"].append({"id": node["id"], "label": node["label"], "relation": relation, "direction": "Outgoing"})
         node["connections"].append({"id": parent["id"], "label": parent["label"], "relation": relation, "direction": "Incoming"})
     return {
@@ -314,7 +330,7 @@ def _layout(nodes, view, connections):
     }
 
 
-def build_collection_context(accessible_queryset, *, title, base_url, params):
+def build_collection_context(accessible_queryset, *, title, base_url, params, manual_relationships=()):
     """
     Prepare a collection graph and comparison rows from currently accessible records
 
@@ -331,6 +347,8 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
         Internal URL for this collection or temporary selection.
     params : QueryDict or dict
         Relationship mode, group and pagination arguments.
+    manual_relationships : sequence of dict, optional
+        Collection annotations with both endpoints already checked for access.
 
     Returns
     -------
@@ -348,7 +366,19 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
         raise ValueError("Choose a valid relationship view and group.")
     view = "detailed" if _argument(params, "view", "compact") == "detailed" else "compact"
     summaries = list(collection_summaries(accessible_queryset))
-    if "links" not in params and "group" not in params:
+    member_ids = {row["pk"] for row in summaries}
+    manual_relationships = [row for row in manual_relationships
+                            if row["source_id"] in member_ids and row["target_id"] in member_ids]
+    edge_id = _argument(params, "edge")
+    selected_edge = None
+    if edge_id:
+        if not edge_id.isascii() or not edge_id.isdecimal() or len(edge_id) > 19:
+            raise ValueError("This manual relationship is unavailable. Return to the collection overview.")
+        selected_edge = next((row for row in manual_relationships if str(row["id"]) == edge_id), None)
+        if selected_edge is None:
+            raise ValueError("This manual relationship is unavailable. Return to the collection overview.")
+        mode, selected_key = "members", ""
+    if not selected_edge and "links" not in params and "group" not in params:
         reference_keys = {
             identity
             for row in summaries
@@ -362,6 +392,8 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
         if no_references or crowded_small_collection:
             mode = "members"
     arguments = {"links": mode}
+    if selected_edge:
+        arguments["edge"] = edge_id
     if selected_key:
         arguments["group"] = selected_key
     if view == "detailed":
@@ -402,6 +434,9 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
     group_page = Paginator(group_values, PAGE_SIZE).get_page(params.get("groups_page"))
     selected = groups.get(selected_key)
     matches = [row for row in summaries if not selected_key or selected_key in row["group_keys"]]
+    if selected_edge:
+        endpoints = {selected_edge["source_id"], selected_edge["target_id"]}
+        matches = [row for row in summaries if row["pk"] in endpoints]
     object_page = Paginator(matches, PAGE_SIZE).get_page(params.get("page"))
     object_rows = list(object_page.object_list)
     auto_expanded = bool(
@@ -410,11 +445,13 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
         and 1 + len(summaries) + len(groups) <= MAX_EXPANDED_NODES
     )
     graph = None
+    visible_manual = []
+    visible_manual_total = 0
     if summaries:
         root = _node(
             "collection-root", "collection", "Research collection", title,
             details=[{"label": "Accessible objects", "value": str(len(summaries))}],
-            source_url=url(group=None), source_label="View collection overview",
+            source_url=url(group=None, edge=None), source_label="View collection overview",
         )
         nodes = [root]
         connections = []
@@ -450,6 +487,19 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
                 nodes.append(node)
                 for source in ["collection-group-" + group["key"] for group in parents] or [root["id"]]:
                     connections.append({"source": source, "target": node["id"], "relation": relation})
+        visible_ids = {node["object_pk"] for node in nodes if "object_pk" in node}
+        visible_manual = [row for row in manual_relationships
+                          if row["source_id"] in visible_ids and row["target_id"] in visible_ids]
+        if selected_edge:
+            visible_manual = [selected_edge]
+        visible_manual_total = len(visible_manual)
+        visible_manual = visible_manual[:MAX_VISIBLE_MANUAL_EDGES]
+        for row in visible_manual:
+            connections.append({
+                "source": f"collection-object-{row['source_id']}",
+                "target": f"collection-object-{row['target_id']}",
+                "relation": row["label"], "manual_id": row["id"], "revision": row["revision"],
+            })
         graph = _layout(nodes, view, connections)
     context = {
         "relationship_graph": graph, "links_mode": mode, "auto_expanded": auto_expanded,
@@ -457,13 +507,16 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
         "group_options": list(group_page.object_list), "group_page": group_page,
         "selected_group": selected, "object_rows": object_rows, "object_page": object_page,
         "object_total": len(summaries), "matching_object_count": len(matches),
-        "overview_url": url(group=None), "graph_view_mode": view,
+        "overview_url": url(group=None, edge=None), "graph_view_mode": view,
         "graph_compact_url": url(view=None, page=object_page.number, groups_page=group_page.number),
         "graph_detailed_url": url(view="detailed", page=object_page.number, groups_page=group_page.number),
         "graph_export_name": "collection-relationships",
+        "manual_member_summaries": summaries, "manual_relationship_rows": manual_relationships,
+        "manual_selected": selected_edge, "manual_visible": visible_manual,
+        "manual_visible_total": visible_manual_total,
     }
     for value, (label, _, _) in LINK_MODES.items():
-        context["links_options"].append({"value": value, "label": label, "url": url(links=value, group=None), "active": value == mode})
+        context["links_options"].append({"value": value, "label": label, "url": url(links=value, group=None, edge=None), "active": value == mode})
     for prefix, page, parameter in (("objects", object_page, "page"), ("groups", group_page, "groups_page")):
         page_arguments = {"page": object_page.number, "groups_page": group_page.number}
         if page.has_previous():

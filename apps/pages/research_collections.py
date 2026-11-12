@@ -128,6 +128,9 @@ def _validate_access(user, ids, *, lock=False):
     checked = objects.select_for_update() if lock else objects
     if len(list(checked.values_list("pk", flat=True))) != len(ids):
         raise ValueError(UNAVAILABLE_SELECTION)
+    if lock and objects.count() != len(ids):
+        # a share may have been revoked while the locking statement waited
+        raise ValueError(UNAVAILABLE_SELECTION)
     return objects
 
 
@@ -205,7 +208,7 @@ def _index_response(request, *, error="", status=200):
     }, status=status)
 
 
-def _graph_context(objects, *, title, base_url, params):
+def _graph_context(objects, *, title, base_url, params, manual_relationships=()):
     """
     Build graph summaries after the view has enforced record access
 
@@ -219,6 +222,8 @@ def _graph_context(objects, *, title, base_url, params):
         Local workspace URL.
     params : QueryDict
         Requested grouping and navigation options.
+    manual_relationships : sequence of dict, optional
+        Separately stored collection relationships with accessible endpoints.
 
     Returns
     -------
@@ -227,11 +232,12 @@ def _graph_context(objects, *, title, base_url, params):
     """
     from .collection_graph import build_collection_context
 
-    return build_collection_context(objects, title=title, base_url=base_url, params=params)
+    return build_collection_context(objects, title=title, base_url=base_url, params=params,
+                                    manual_relationships=manual_relationships)
 
 
 def _workspace_response(request, *, collection=None, token="", form=None, error="", status=200,
-                        navigation_params=None):
+                        navigation_params=None, relationship_form=None):
     """
     Render a selection or collection using only currently accessible members
 
@@ -251,6 +257,8 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
         HTTP response status.
     navigation_params : dict or None, optional
         Verified original workspace scope when a continuation action fails.
+    relationship_form : RelationshipForm or None, optional
+        Submitted manual relationship values and errors to preserve.
 
     Returns
     -------
@@ -278,7 +286,20 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
     }
     try:
         params = request.GET if navigation_params is None else navigation_params
-        context.update(_graph_context(objects, title=title, base_url=url, params=params))
+        manual_rows = []
+        if collection is not None:
+            from .collection_relationships import accessible_relationships
+
+            manual_rows = list(accessible_relationships(request.user, collection).values(
+                "id", "source_id", "target_id", "label", "revision",
+            ))
+        graph_options = {"manual_relationships": manual_rows} if manual_rows else {}
+        context.update(_graph_context(objects, title=title, base_url=url, params=params, **graph_options))
+        if collection is not None and "manual_member_summaries" in context:
+            from .collection_relationship_context import relationship_editor_context
+
+            context["manual_editor"] = relationship_editor_context(collection, context, params,
+                                                                  form=relationship_form)
         if "relationship_graph" in context:
             context.update(workspace_navigation(request, context, collection=collection,
                                                 selection_token=token))
@@ -599,6 +620,7 @@ def collection_remove(request, pk):
             _validate_access(request.user, ids, lock=True)
             if collection.members.filter(pk__in=ids).count() != len(ids):
                 raise ValueError(UNAVAILABLE_SELECTION)
+            collection.relationships.filter(Q(source_id__in=ids) | Q(target_id__in=ids)).delete()
             collection.members.remove(*ids)
             collection.save(update_fields=["updated_at"])
     except ValueError as exc:
@@ -636,6 +658,7 @@ def collection_cleanup(request, pk):
         for member_id in member_ids:
             if member_id not in visible_ids:
                 unavailable_ids.append(member_id)
+        collection.relationships.filter(Q(source_id__in=unavailable_ids) | Q(target_id__in=unavailable_ids)).delete()
         collection.members.remove(*unavailable_ids)
         collection.save(update_fields=["updated_at"])
     messages.success(request, "Unavailable members cleared. Data objects are unchanged.")
@@ -660,7 +683,8 @@ def collection_delete(request, pk):
     HttpResponse
         Redirect to the remaining collections.
     """
-    _owned_collection(request, pk).delete()
+    with transaction.atomic():
+        _owned_collection(request, pk, lock=True).delete()
     messages.success(request, "Collection deleted. Its data objects are unchanged.")
     return redirect("collection_index")
 

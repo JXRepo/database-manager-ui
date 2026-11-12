@@ -1,0 +1,39 @@
+.manual-relationships { margin-top: 16px; }
+.manual-relationships [hidden] { display: none !important; }
+.manual-relationships .collection-section-heading { flex-wrap: wrap; gap: 8px 16px; }
+.manual-relationships .collection-section-heading > a { margin-left: auto; font-size: 12px; }
+.manual-relationship-note, .manual-relationship-focus-note, .manual-relationship-empty, .collection-manual-save-note { font-size: 12px; line-height: 1.6; color: #68778d; }
+.manual-relationship-key { display: inline-block; width: 22px; border-top: 2px dashed #8054a8; margin-right: 5px; vertical-align: middle; }
+.manual-relationship-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, .8fr) minmax(0, 1fr); gap: 12px; margin-top: 14px; }
+.manual-relationship-fields > div { min-width: 0; }
+.manual-relationship-fields label { display: block; color: #526580; font-size: 12px; margin-bottom: 5px; }
+.manual-relationship-fields select { width: 100%; text-overflow: ellipsis; }
+.manual-relationship-fields .errorlist, #manual-relationship-form > .errorlist { color: #a83440; font-size: 12px; padding-left: 18px; margin: 5px 0; }
+#manual-relationship-editor { border-top: 1px solid #e3e9f1; padding-top: 12px; margin-top: 12px; scroll-margin-top: 90px; }
+#manual-relationship-editor > summary { color: #3466b7; font-size: 13px; cursor: pointer; }
+.manual-relationship-actions { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
+.manual-native-new { font-size: 12px; }
+.manual-relationships.is-interactive .manual-native-new { display: none; }
+#manual-relationship-delete-confirm { font-size: 12px; margin: 10px 0; }
+#manual-relationship-delete-confirm > summary { color: #a83440; cursor: pointer; }
+#manual-relationship-delete-confirm p { margin: 10px 0; color: #68778d; }
+#manual-relationship-status { color: #805427; background: #fff8ec; border-radius: 5px; padding: 9px 12px; font-size: 12px; margin-top: 12px; }
+#manual-relationship-reload { font-size: 12px; display: inline-block; margin-bottom: 12px; }
+.manual-relationship-table { margin: 16px 0 0; table-layout: fixed; width: 100%; font-size: 12px; }
+.manual-relationship-table th, .manual-relationship-table td { white-space: normal; overflow-wrap: anywhere; vertical-align: top; padding: 10px 12px; }
+.manual-relationship-table th:last-child { width: 96px; }
+.manual-relationship-table .is-selected { background: #f8f4fc; }
+.manual-relationship-origin { display: block; font-size: 10px; color: #8054a8; margin-top: 3px; }
+.graph-manual-add { border: 1px solid #d9c8e7; border-radius: 5px; padding: 5px 9px; color: #754a9c; font-size: 12px; white-space: nowrap; }
+.relationship-edge.relationship-edge-manual { stroke: #8054a8; stroke-width: 2.5; stroke-dasharray: 6 4; cursor: pointer; }
+.relationship-edge.relationship-edge-manual.is-active, .relationship-edge.relationship-edge-manual:hover, .relationship-edge.relationship-edge-manual:focus { stroke: #673e90; stroke-width: 4; }
+.relationship-edge-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; vector-effect: non-scaling-stroke; }
+.relationship-port { display: none; cursor: crosshair; }
+.relationship-port circle { fill: #8054a8; stroke: white; stroke-width: 2; }
+.relationship-port:focus circle { stroke: #342047; stroke-width: 3; }
+.is-drawing .relationship-port { display: block; }
+.is-drawing .relationship-node[data-object-pk] { cursor: crosshair; }
+.relationship-node.is-connection-source rect { stroke: #8054a8; stroke-width: 3; }
+.relationship-draft { fill: none; stroke: #8054a8; stroke-width: 2; stroke-dasharray: 5 4; pointer-events: none; }
+.relationship-panel.is-drawing .relationship-viewport { cursor: crosshair; }
+.collection-manual-save-note { padding: 0 4px; margin: 12px 0; }

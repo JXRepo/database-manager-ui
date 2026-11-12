@@ -2371,9 +2371,22 @@ def export_selected_my_data_objects_view(request):
 
 @login_required
 @require_POST
+@transaction.atomic
 def delete_selected_my_data_objects_view(request):
     """
     Delete selected data objects owned by the current user
+
+    Lock records in a stable order before collecting their dependent rows.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        POST containing selected object identifiers.
+
+    Returns
+    -------
+    HttpResponse
+        Redirect to My Data with the actual deletion result.
     """
     selected_ids = request.POST.getlist("selected_objects")
     object_ids = []
@@ -2389,13 +2402,14 @@ def delete_selected_my_data_objects_view(request):
         return redirect("json_data_list")
 
     data_objects = JSONData.objects.filter(pk__in=object_ids, owner=request.user)
-    deleted_count = data_objects.count()
+    locked_ids = list(data_objects.select_for_update().order_by("pk").values_list("pk", flat=True))
+    deleted_count = len(locked_ids)
 
     if deleted_count == 0:
         messages.error(request, "Select at least one of your data objects to delete.")
         return redirect("json_data_list")
 
-    data_objects.delete()
+    data_objects.filter(pk__in=locked_ids).delete()
     messages.success(request, f"Deleted {deleted_count} data object(s).")
     return redirect("json_data_list")
 
@@ -4337,9 +4351,12 @@ def _group_mechanical_bc_items(items):
 
 @login_required
 @require_POST
+@transaction.atomic
 def json_data_sharing_view(request, pk):
     """
-    Update sharing settings for one data object.
+    Update sharing settings for one data object
+
+    Serialize share changes with operations that check access under the object lock.
 
     Parameters
     ----------
@@ -4353,7 +4370,7 @@ def json_data_sharing_view(request, pk):
     HttpResponse
         Redirect to the detail page.
     """
-    obj = get_object_or_404(JSONData, pk=pk, owner=request.user)
+    obj = get_object_or_404(JSONData.objects.select_for_update(), pk=pk, owner=request.user)
     action = request.POST.get("action", "").strip()
 
     if action == "add_user":
@@ -4397,11 +4414,27 @@ def json_data_sharing_view(request, pk):
 
 @login_required
 @require_POST
+@transaction.atomic
 def json_data_delete_view(request, pk):
     """
     Delete one JSON data object owned by the current user
+
+    Lock the object before collecting references so a concurrent graph write
+    cannot add a connection after cascade discovery.
+
+    Parameters
+    ----------
+    request : HttpRequest
+        Explicit owner deletion request.
+    pk : int
+        Owned data object identifier.
+
+    Returns
+    -------
+    HttpResponse
+        Redirect to My Data after the complete deletion.
     """
-    obj = get_object_or_404(JSONData, pk=pk, owner=request.user)
+    obj = get_object_or_404(JSONData.objects.select_for_update().only("pk"), pk=pk, owner=request.user)
     obj.delete()
     messages.success(request, "Data object deleted successfully.")
     return redirect("json_data_list")

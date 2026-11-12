@@ -4,6 +4,7 @@
 {% block extrastyle %}
 <link rel="stylesheet" href="{% static 'assets/css/detail-relationships.css' %}">
 <link rel="stylesheet" href="{% static 'assets/css/research-collections.css' %}">
+<link rel="stylesheet" href="{% static 'assets/css/collection-relationships.css' %}">
 {% endblock extrastyle %}
 {% block content %}
 <main class="pc-container graph-page collection-page">
@@ -96,8 +97,11 @@
       </details>
       {% endif %}
     </section>
+    {% if manual_selected %}<p class="manual-relationship-focus-note">Manual: <strong>{{ manual_selected.label }}</strong> · Showing this connection and its two data objects. <a href="{{ manual_editor.members_url }}">Show collection members</a></p>{% endif %}
     {% if relationship_graph %}{% include "pages/detail_relationships.html" with graph_json_url=export_url %}{% endif %}
     {% endif %}
+
+    {% if manual_editor %}{% include "pages/collection_relationships.html" %}{% elif selection_token and not summary_preparation and not graph_error %}<p class="collection-manual-save-note"><a href="#collection-save-panel" id="collection-save-for-relationships">Save this selection as a collection</a> to add and edit manual relationships.</p>{% endif %}
 
     {% if not graph_error and not summary_preparation %}
     <section class="collection-card collection-objects" aria-labelledby="collection-objects-heading">
@@ -124,4 +128,5 @@
   </div>
 </main>
 <script src="{% static 'assets/js/research-collections.js' %}" defer></script>
+<script src="{% static 'assets/js/collection-relationships.js' %}" defer></script>
 {% endblock content %}

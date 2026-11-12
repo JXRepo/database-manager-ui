@@ -170,7 +170,11 @@
       node.parentNode.setAttribute('transform', `translate(${position.x} ${position.y})`);
       node.querySelector('rect').setAttribute('height', position.height);
     }
-    edges.forEach((edge, index) => edge.setAttribute('d', layout.paths[index]));
+    edges.forEach((edge, index) => {
+      edge.setAttribute('d', layout.paths[index]);
+      const hit = edge.nextElementSibling;
+      if (hit?.classList.contains('relationship-edge-hit')) hit.setAttribute('d', layout.paths[index]);
+    });
     if (bookmark) {
       const url = new URL(location.href);
       setURLView(url, mode);
@@ -293,7 +297,7 @@
   });
   let drag = null;
   viewport.addEventListener('pointerdown', event => {
-    if (event.button !== 0 || event.target.closest('[data-node]')) return;
+    if (event.button !== 0 || event.target.closest('[data-node], .relationship-port, [data-manual-id]')) return;
     drag = {x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop};
     viewport.setPointerCapture(event.pointerId);
     viewport.focus({preventScroll: true});
@@ -354,11 +358,16 @@
     const title = document.createElementNS(ns, 'title');
     title.textContent = `Relationships: ${nodes[0].querySelector('.relationship-label').textContent}`;
     clone.prepend(title);
+    clone.querySelectorAll('.relationship-port, .relationship-draft, .relationship-edge-hit').forEach(element => element.remove());
     clone.querySelectorAll('.relationship-edge').forEach(edge => {
+      const manual = edge.hasAttribute('data-manual-id');
       edge.removeAttribute('class');
+      edge.removeAttribute('tabindex');
+      edge.removeAttribute('role');
       edge.setAttribute('fill', 'none');
-      edge.setAttribute('stroke', '#a3afc2');
-      edge.setAttribute('stroke-width', '1.5');
+      edge.setAttribute('stroke', manual ? '#8054a8' : '#a3afc2');
+      edge.setAttribute('stroke-width', manual ? '2.5' : '1.5');
+      if (manual) edge.setAttribute('stroke-dasharray', '6 4');
     });
     const colors = {record: ['#edf3ff', '#90ace0'], collection: ['#edf3ff', '#90ace0'],
       reference: ['#f8f4fc', '#d6c8e4'], missing: ['#f5f6f8', '#c9d1dc'], phase: ['#f2f8f5', '#bbd9c9'],
