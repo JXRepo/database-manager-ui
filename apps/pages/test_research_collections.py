@@ -11,7 +11,7 @@ from django.test import Client, TestCase, override_settings
 from django.urls import path, reverse
 
 from . import research_collections as views
-from .models import JSONData, ResearchCollection
+from .models import JSONData, ResearchCollection, TemporaryGraphSelection
 
 
 urlpatterns = [
@@ -177,11 +177,9 @@ class ResearchCollectionTests(TestCase):
         second_browser = Client()
         second_browser.force_login(self.owner)
         self.assertEqual(second_browser.get(url).status_code, 404)
-        session = self.client.session
-        entries = session[views.SELECTION_SESSION_KEY]
-        entries[token]["owner"] = self.other.pk
-        session[views.SELECTION_SESSION_KEY] = entries
-        session.save()
+        bucket = TemporaryGraphSelection.objects.get(owner=self.owner)
+        bucket.selections[token]["owner"] = self.other.pk
+        bucket.save(update_fields=["selections"])
         self.assertEqual(self.client.get(url).status_code, 404)
         self.assertEqual(self.client.get(reverse("selection_detail", args=["bad-token"])).status_code, 404)
 
@@ -190,7 +188,7 @@ class ResearchCollectionTests(TestCase):
         Bound session growth while preserving the most recent worksets
         """
         tokens = [self.selection() for _ in range(9)]
-        self.assertEqual(len(self.client.session[views.SELECTION_SESSION_KEY]), 8)
+        self.assertEqual(len(TemporaryGraphSelection.objects.get(owner=self.owner).selections), 8)
         self.assertEqual(self.client.get(reverse("selection_detail", args=[tokens[0]])).status_code, 404)
         self.assertEqual(self.client.get(reverse("selection_detail", args=[tokens[-1]])).status_code, 200)
 

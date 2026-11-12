@@ -263,6 +263,36 @@ Minimum expectation:
 
 ## Smoke Test Sequence
 
+### Local PostgreSQL verification
+
+SQLite development checks do not exercise PostgreSQL row locks. Before releasing
+collection changes, run the collection tests against a separate local PostgreSQL
+instance with a role that can create test databases. Use synthetic records only.
+Create a base database whose name starts with `collection_test_`, for example
+`collection_test_graph`, and use the project's configured interpreter:
+
+```bash
+DEBUG=True LOCAL_POSTGRES_PORT=55439 LOCAL_POSTGRES_DB=collection_test_graph \
+LOCAL_POSTGRES_USER=collection_test CHARTJS_TEST_BUNDLE=/tmp/ronak-chart.js \
+.venv/bin/python manage.py test apps.pages.test_research_collections \
+  apps.pages.test_collection_navigation apps.pages.test_collection_graph \
+  apps.pages.test_collection_browser --settings=config.settings_postgres_test --noinput
+```
+
+Choose the port and role of the local instance; `55439` is an example. If that role
+requires a password, provide `LOCAL_POSTGRES_PASSWORD` only in the process
+environment. The test settings force `DEBUG=True`, disable loading `.env`, fix the
+host to `127.0.0.1`, and ignore production `DB_*` variables. Missing local settings
+or an unrelated database name abort before a connection. Django creates a separate
+`test_<LOCAL_POSTGRES_DB>` database for the run and removes it afterward. Do not
+point a tunnel at a production database or reuse a database containing real data.
+
+Keep both PostgreSQL concurrency evidence and ordinary SQLite/browser results.
+These local checks do not establish Render capacity or confirm a completed hosted
+deployment; verify the running release and its authenticated workflow separately.
+
+### Hosted workflow
+
 Run this sequence in two stages:
 
 First deployment:

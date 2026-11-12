@@ -3,19 +3,24 @@ Describe declared references and reported metadata within an accessible collecti
 """
 
 import hashlib
-import json
-import re
-from urllib.parse import unquote, urlencode, urlsplit
+from time import monotonic
+from urllib.parse import urlencode
 
 from django.core.paginator import Paginator
+from django.db import connections, transaction
+from django.db.models import BigIntegerField, BinaryField, Count, F, Func, Q, TextField
+from django.db.models.functions import Cast
 from django.urls import reverse
 
-from apps.dyn_api.metadata_compat import field_name, field_value, metadata_view
+from .collection_summary import build_collection_summary
 
 
 PAGE_SIZE = 25
 SMALL_COLLECTION_LIMIT = 8
 MAX_EXPANDED_NODES = 25
+MAX_REQUEST_SUMMARY_OBJECTS = 25
+MAX_REQUEST_SUMMARY_BYTES = 16 * 1024 * 1024
+MAX_REQUEST_SUMMARY_SECONDS = 1
 LINK_MODES = {
     "relations": (
         "Declared relations", "No declared relation",
@@ -34,189 +39,143 @@ LINK_MODES = {
         "Objects explicitly selected for this workspace. Membership does not establish a scientific dependency.",
     ),
 }
-DOI = re.compile(r"10\.\d{4,9}/\S+\Z", re.IGNORECASE)
 
 
-def _names(value, fallback_keys=()):
+class CollectionSummaryPending(Exception):
     """
-    Collect supplied text without turning identifiers or arbitrary objects into names
+    Report actual accessible preparation progress without returning a partial graph
+    """
+
+    def __init__(self, ready_count, total_count, requires_admin):
+        """
+        Keep public progress values for the collection workspace
+
+        Parameters
+        ----------
+        ready_count, total_count : int
+            Current prepared and total accessible member counts.
+        requires_admin : bool
+            Whether any remaining row requires preparation outside a web request.
+        """
+        self.ready_count = ready_count
+        self.total_count = total_count
+        self.requires_admin = requires_admin
+        super().__init__("Collection summaries are still being prepared.")
+
+
+def collection_summaries(accessible_queryset, *, prepare_all=False):
+    """
+    Read cached labels and prepare missing summaries one accessible row at a time
 
     Parameters
     ----------
-    value : object
-        A recognized metadata value.
-    fallback_keys : tuple, optional
-        Explicit name fields, in their preferred order.
+    accessible_queryset : QuerySet
+        Records already restricted to the viewer and current collection.
+    prepare_all : bool, optional
+        Allow operator commands to prepare their bounded batch without web limits.
 
-    Returns
-    -------
-    list of str
-        Distinct labels in supplied order, ignoring case and surrounding spaces.
-    """
-    names = {}
-    pending = [value]
-    while pending:
-        item = pending.pop()
-        if isinstance(item, str) and item.strip():
-            label = item.strip()
-            names.setdefault(label.casefold(), label)
-        elif isinstance(item, list):
-            pending.extend(reversed(item))
-        elif isinstance(item, dict):
-            for key in fallback_keys:
-                labels = _names(field_value(item, key))
-                if labels:
-                    pending.extend(reversed(labels))
-                    break
-    return list(names.values())
-
-
-def _reference_key(label):
-    """
-    Recognize explicit DOI forms while keeping other reference text exact
-
-    Parameters
-    ----------
-    label : str
-        A nonempty supplied relation string.
-
-    Returns
-    -------
-    str
-        Comparable DOI identity or the unchanged reference text.
-    """
-    candidate = label
-    if candidate.lower().startswith("doi:"):
-        candidate = candidate[4:].strip()
-    elif candidate.lower().startswith(("http://", "https://")):
-        try:
-            url = urlsplit(candidate)
-        except ValueError:
-            return "text:" + label
-        if url.netloc.lower() not in {"doi.org", "dx.doi.org"} or url.query or url.fragment:
-            return "text:" + label
-        try:
-            candidate = unquote(url.path.lstrip("/"), errors="strict")
-        except UnicodeDecodeError:
-            return "text:" + label
-    if DOI.fullmatch(candidate):
-        return "doi:" + candidate.casefold()
-    return "text:" + label
-
-
-def _relations(value):
-    """
-    Retain explicit reference strings without searching nested metadata
-
-    Parameters
-    ----------
-    value : object
-        The record's recognized top level relation field.
-
-    Returns
-    -------
+    Yields
+    ------
     dict
-        Comparable reference keys and their first supplied spelling.
+        Scalar summaries with current record IDs and local navigation links.
+
+    Raises
+    ------
+    CollectionSummaryPending
+        Some accessible summaries could not be prepared within this request.
     """
-    references = {}
-    pending = [value]
-    while pending:
-        item = pending.pop()
-        if isinstance(item, list):
-            pending.extend(reversed(item))
-        elif isinstance(item, str) and item.strip():
-            label = item.strip()
-            references.setdefault(_reference_key(label), label)
-    return references
+    started = monotonic()
+    checked_count = 0
+    prepared_bytes = 0
+    pending = False
+    operator_rows = set()
+    objects = accessible_queryset.only("pk", "collection_summary", "size_bytes").order_by("-uploaded_at", "-pk")
 
+    def within_budget(size_bytes):
+        """
+        Check the remaining request allowance before loading one original JSON
 
-def _version_text(value):
-    """
-    Preserve recorded textual and numeric software versions for comparison
+        Parameters
+        ----------
+        size_bytes : int
+            Stored original JSON size, with zero representing an unknown size.
 
-    Parameters
-    ----------
-    value : object
-        Supplied software version or descriptive values in their stored order.
+        Returns
+        -------
+        bool
+            Whether this record may be prepared by the current operation.
+        """
+        return prepare_all or (
+            0 < size_bytes <= MAX_REQUEST_SUMMARY_BYTES
+            and prepared_bytes + size_bytes <= MAX_REQUEST_SUMMARY_BYTES
+            and monotonic() - started < MAX_REQUEST_SUMMARY_SECONDS
+        )
 
-    Returns
-    -------
-    str
-        Complete scalar versions without interpreting numbers as software names.
-    """
-    versions = []
-    pending = [value]
-    while pending:
-        item = pending.pop()
-        if isinstance(item, list):
-            pending.extend(reversed(item))
-            continue
-        if isinstance(item, str):
-            text = item.strip()
-        elif isinstance(item, (int, float, bool)):
-            text = json.dumps(item)
-        else:
-            continue
-        if text and text not in versions:
-            versions.append(text)
-    return "; ".join(versions)
-
-
-def _object_summary(obj):
-    """
-    Release one object's arrays after extracting its comparison and grouping labels
-
-    Parameters
-    ----------
-    obj : JSONData
-        One record already restricted to the viewer's access.
-
-    Returns
-    -------
-    dict
-        Scalar descriptions and label groups, without retained raw metadata.
-    """
-    conflicts = []
-    data = metadata_view(obj.data, conflicts=conflicts)
-    for first, second in conflicts:
-        for field in ("identifier", "relation", "phase", "mechanical_BC"):
-            if field_name(first) == field_name(field) or field_name(second) == field_name(field):
-                data.pop(field, None)
-        if first.startswith("mechanical_BC[") or first.startswith("mechanical_BC."):
-            data.pop("mechanical_BC", None)
-    software = _names(data.get("software"), ("name", "software_name"))
-    phases = _names(data.get("phase"), ("phase_name", "phase_identifier", "name", "identifier"))
-    references = _relations(data.get("relation"))
-    loading = []
-    conditions = data.get("mechanical_BC", [])
-    if not isinstance(conditions, list):
-        conditions = [conditions]
-    for condition in conditions:
-        if not isinstance(condition, dict):
-            continue
-        label = " · ".join(filter(None, (
-            "; ".join(_names(condition.get("loading_type"))),
-            "; ".join(_names(condition.get("loading_mode"))),
-        )))
-        if label and label not in loading:
-            loading.append(label)
-    identifier = "; ".join(_names(data.get("identifier")))
-    title = "; ".join(_names(data.get("title"))) or identifier or "Untitled data object"
-    return {
-        "pk": obj.pk, "title": title, "identifier": identifier,
-        "software": "; ".join(software),
-        "software_version": _version_text(data.get("software_version")),
-        "phase": "; ".join(phases), "loading": "; ".join(loading),
-        "creator": "; ".join(_names(data.get("creator"), ("name", "creator_name"))),
-        "relations": "; ".join(references.values()),
-        "detail_url": reverse("json_data_detail", args=[obj.pk]),
-        "graph_url": reverse("json_data_detail", args=[obj.pk]) + "?tab=graph",
-        "groups": {
-            "relations": references,
-            "software": {name.casefold(): name for name in software},
-            "phase": {name.casefold(): name for name in phases},
-        },
-    }
+    for obj in objects.iterator(chunk_size=100):
+        summary = obj.collection_summary
+        if summary is None:
+            if not prepare_all and (obj.size_bytes <= 0 or obj.size_bytes > MAX_REQUEST_SUMMARY_BYTES):
+                operator_rows.add(obj.pk)
+            if not within_budget(obj.size_bytes):
+                pending = True
+                continue
+            if not prepare_all and checked_count >= MAX_REQUEST_SUMMARY_OBJECTS:
+                pending = True
+                continue
+            checked_count += 1
+            with transaction.atomic(using=accessible_queryset.db):
+                skip_locked = not prepare_all and connections[accessible_queryset.db].features.has_select_for_update_skip_locked
+                current = accessible_queryset.filter(pk=obj.pk).select_for_update(skip_locked=skip_locked).only(
+                    "pk", "size_bytes", "collection_summary",
+                ).first()
+                if current is None:
+                    pending = True
+                    continue
+                summary = current.collection_summary
+                if summary is None:
+                    if not within_budget(current.size_bytes):
+                        if current.size_bytes <= 0 or current.size_bytes > MAX_REQUEST_SUMMARY_BYTES:
+                            operator_rows.add(current.pk)
+                        pending = True
+                        continue
+                    raw_bytes = current.size_bytes
+                    if not prepare_all:
+                        postgres = connections[accessible_queryset.db].vendor == "postgresql"
+                        byte_length = Func(
+                            Cast(F("data"), TextField() if postgres else BinaryField()),
+                            function="OCTET_LENGTH" if postgres else "LENGTH",
+                            output_field=BigIntegerField(),
+                        )
+                        raw_bytes = accessible_queryset.filter(pk=current.pk).annotate(
+                            summary_raw_bytes=byte_length,
+                        ).values_list("summary_raw_bytes", flat=True).first()
+                        if raw_bytes is None:
+                            pending = True
+                            continue
+                        if not within_budget(raw_bytes):
+                            if raw_bytes <= 0 or raw_bytes > MAX_REQUEST_SUMMARY_BYTES:
+                                operator_rows.add(current.pk)
+                            pending = True
+                            continue
+                    summary = build_collection_summary(current.data)
+                    current.collection_summary = summary
+                    current.save(using=accessible_queryset.db, update_fields=["collection_summary"])
+                    prepared_bytes += raw_bytes
+            del current
+        detail_url = reverse("json_data_detail", args=[obj.pk])
+        yield {**summary, "pk": obj.pk, "detail_url": detail_url, "graph_url": detail_url + "?tab=graph"}
+    if pending and not prepare_all:
+        counts = accessible_queryset.aggregate(
+            total=Count("pk"), ready=Count("pk", filter=Q(collection_summary__isnull=False)),
+            blocked=Count("pk", filter=Q(collection_summary__isnull=True) & (
+                Q(size_bytes__lte=0) | Q(size_bytes__gt=MAX_REQUEST_SUMMARY_BYTES)
+                | Q(pk__in=operator_rows)
+            )),
+        )
+        raise CollectionSummaryPending(
+            counts["ready"], counts["total"],
+            bool(counts["blocked"]),
+        )
 
 
 def _argument(params, key, default=""):
@@ -388,10 +347,7 @@ def build_collection_context(accessible_queryset, *, title, base_url, params):
     if mode not in LINK_MODES or (mode == "members" and selected_key):
         raise ValueError("Choose a valid relationship view and group.")
     view = "detailed" if _argument(params, "view", "compact") == "detailed" else "compact"
-    summaries = [
-        _object_summary(obj)
-        for obj in accessible_queryset.only("pk", "data").order_by("-uploaded_at", "-pk").iterator(chunk_size=1)
-    ]
+    summaries = list(collection_summaries(accessible_queryset))
     if "links" not in params and "group" not in params:
         reference_keys = {
             identity

@@ -33,6 +33,7 @@
       </div>
     </section>
 
+    {% if not summary_preparation or request.method != 'GET' %}
     {% if not collection and selection_token %}
     <details class="collection-card collection-save-panel" id="collection-save-panel"{% if collection_form.errors or action_error %} open{% endif %}>
       <summary>Save or add selection</summary>
@@ -69,7 +70,21 @@
     </details>
     {% endif %}
 
-    {% if object_total %}
+    {% endif %}
+    {% if summary_preparation %}
+    <section class="collection-card" id="collection-preparation"
+      data-ready="{{ summary_preparation.ready_count }}" data-total="{{ summary_preparation.total_count }}"
+      data-requires-admin="{{ summary_preparation.requires_admin|yesno:'true,false' }}"
+      data-auto-prepare="{% if request.method == 'GET' and not summary_preparation.requires_admin %}true{% else %}false{% endif %}">
+      <h2 class="h6">Preparing collection view</h2>
+      <p id="collection-preparation-count" class="small text-muted" role="status">{{ summary_preparation.ready_count }} of {{ summary_preparation.total_count }} objects ready</p>
+      <p id="collection-preparation-message">{% if summary_preparation.requires_admin %}Some records need preparation by an administrator before this view can open.{% else %}The complete graph will appear when all objects are ready.{% endif %}</p>
+      <a class="btn btn-outline-primary btn-sm" id="collection-preparation-continue" href="{% if request.method == 'GET' %}{{ request.get_full_path }}{% else %}{{ workspace_url }}{% endif %}">{% if summary_preparation.requires_admin %}Check again{% else %}Continue preparing{% endif %}</a>
+      <a class="btn btn-outline-primary btn-sm" id="collection-preparation-retry" href="{% if request.method == 'GET' %}{{ request.get_full_path }}{% else %}{{ workspace_url }}{% endif %}" hidden>Retry</a>
+    </section>
+    {% endif %}
+
+    {% if object_total and not summary_preparation %}
     <section class="collection-explore" aria-label="Explore collection relationships">
       <nav class="collection-dimensions" aria-label="Relationship view">{% for option in links_options %}<a href="{{ option.url }}"{% if option.active %} aria-current="page"{% endif %}>{{ option.label }}</a>{% endfor %}</nav>
       <p class="collection-explanation">{{ links_description }}</p>
@@ -84,7 +99,7 @@
     {% if relationship_graph %}{% include "pages/detail_relationships.html" with graph_json_url=export_url %}{% endif %}
     {% endif %}
 
-    {% if not graph_error %}
+    {% if not graph_error and not summary_preparation %}
     <section class="collection-card collection-objects" aria-labelledby="collection-objects-heading">
       <div class="collection-section-heading"><h2 id="collection-objects-heading">{% if selected_group %}Objects in this group{% else %}Data objects{% endif %}</h2><span>{{ matching_object_count|default:0 }} object{{ matching_object_count|pluralize }}</span></div>
       {% if object_rows %}

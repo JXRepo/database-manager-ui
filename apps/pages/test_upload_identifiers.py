@@ -229,7 +229,7 @@ class UploadIdentifierTests(TestCase):
                 message = self._messages(response)
                 self.assertNotIn("partially successful", message)
                 self.assertIn("file-1.json", message)
-                self.assertIn("Object 2 in this file", message)
+                self.assertInHTML('<span class="upload-report-object-position">Object 2</span>', message)
                 self.assertIn("used more than once in this upload", message)
 
     def test_distinct_supplied_identifiers_allow_identical_required_content(self):
@@ -318,7 +318,7 @@ class UploadIdentifierTests(TestCase):
         message = self._messages(response)
         self.assertIn("already exists", message)
         self.assertIn("file-1.json", message)
-        self.assertIn("Object 1 in this file", message)
+        self.assertInHTML('<span class="upload-report-object-position">Object 1</span>', message)
 
     def test_zero_and_false_remain_in_saved_json_after_template_hashing(self):
         """
@@ -342,7 +342,7 @@ class UploadIdentifierTests(TestCase):
         message = self._messages(response)
         self.assertNotIn("partially successful", message)
         self.assertIn("file-1.json", message)
-        self.assertIn("Object 2 in this file", message)
+        self.assertInHTML('<span class="upload-report-object-position">Object 2</span>', message)
         self.assertIn("used more than once in this upload", message)
 
     def test_explicit_duplicate_identifiers_in_one_file_reject_the_whole_file(self):
@@ -358,7 +358,7 @@ class UploadIdentifierTests(TestCase):
         message = self._messages(response)
         self.assertNotIn("partially successful", message)
         self.assertIn("file-1.json", message)
-        self.assertIn("Object 2 in this file", message)
+        self.assertInHTML('<span class="upload-report-object-position">Object 2</span>', message)
         self.assertIn("Second supplied object", message)
         self.assertIn('data-upload-category="duplicate_identifier"', message)
 
@@ -370,7 +370,7 @@ class UploadIdentifierTests(TestCase):
         self.assertEqual(JSONData.objects.count(), 1)
         message = self._messages(response)
         self.assertIn("file-2.json", message)
-        self.assertIn("Object 1 in this file", message)
+        self.assertInHTML('<span class="upload-report-object-position">Object 1</span>', message)
         self.assertIn('data-upload-category="duplicate_identifier"', message)
         self.assertEqual(JSONData.objects.get().identifier_fingerprint, "")
 
@@ -384,11 +384,11 @@ class UploadIdentifierTests(TestCase):
         self.assertEqual(JSONData.objects.get().data, payload)
         message = self._messages(response)
         self.assertIn("file-1.json", message)
-        self.assertIn("Object 2 in this file", message)
+        self.assertInHTML('<span class="upload-report-object-position">Object 2</span>', message)
         self.assertIn("file-2.json", message)
         self.assertIn('data-upload-file-status="uploaded"', message)
         self.assertNotIn('data-upload-file-status="skipped"', message)
-        self.assertNotIn("Object 1 in this file", message)
+        self.assertNotInHTML('<span class="upload-report-object-position">Object 1</span>', message)
 
     def test_explicit_duplicate_across_files_preserves_the_earlier_upload(self):
         """
@@ -437,7 +437,7 @@ class UploadIdentifierTests(TestCase):
         self.assertEqual(JSONData.objects.count(), 0)
         message = self._messages(response)
         self.assertIn("file-1.json", message)
-        self.assertIn("Object 2 in this file", message)
+        self.assertInHTML('<span class="upload-report-object-position">Object 2</span>', message)
 
     def test_other_missing_fields_reject_all_objects_in_the_file(self):
         """
@@ -448,7 +448,7 @@ class UploadIdentifierTests(TestCase):
         response = self._upload([invalid, self.data])
         self.assertEqual(JSONData.objects.count(), 0)
         message = self._messages(response)
-        self.assertIn("Object 1 in this file", message)
+        self.assertInHTML('<span class="upload-report-object-position">Object 1</span>', message)
         self.assertIn('data-upload-category="missing_required"', message)
         self.assertIn("<code>phase</code>", message)
         self.assertNotIn("<code>identifier</code>", message)
@@ -462,7 +462,7 @@ class UploadIdentifierTests(TestCase):
                 response = self._upload(dict(self.data, identifier=identifier))
                 self.assertEqual(JSONData.objects.count(), 0)
                 message = self._messages(response)
-                self.assertIn("Object 1 in this file", message)
+                self.assertInHTML('<span class="upload-report-object-position">Object 1</span>', message)
                 self.assertIn("identifier", message)
                 self.assertIn('data-upload-category="invalid_identifier"', message)
                 self.assertIn("data-upload-guidance", message)

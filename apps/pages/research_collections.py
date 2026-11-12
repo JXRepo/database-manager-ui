@@ -3,8 +3,6 @@ Organize accessible records into private research collections
 """
 
 import json
-import re
-import uuid
 
 from django import forms
 from django.contrib import messages
@@ -12,13 +10,15 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Exists, OuterRef, Q
-from django.http import Http404, StreamingHttpResponse
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import JSONData, ResearchCollection
+from .collection_graph import CollectionSummaryPending
 from .collection_navigation import CONTEXT_ERROR, navigation_fields, read_navigation, workspace_navigation
+from .temporary_selections import append_selection, create_selection, selection_ids
 
 
 MAX_SELECTION_OBJECTS = 500
@@ -147,15 +147,7 @@ def _selection_ids(request, token):
     list of int
         Stored record IDs, whose current access is checked separately.
     """
-    if not re.fullmatch(r"[0-9a-f]{32}", token):
-        raise Http404("Selection not found.")
-    entry = request.session.get(SELECTION_SESSION_KEY, {}).get(token)
-    if not isinstance(entry, dict) or entry.get("owner") != request.user.pk:
-        raise Http404("Selection not found.")
-    try:
-        return _parse_ids([str(value) for value in entry.get("objects", [])])
-    except (TypeError, ValueError):
-        raise Http404("Selection not found.") from None
+    return selection_ids(request, token)
 
 
 def _owned_collection(request, pk, *, lock=False):
@@ -290,6 +282,17 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
         if "relationship_graph" in context:
             context.update(workspace_navigation(request, context, collection=collection,
                                                 selection_token=token))
+    except CollectionSummaryPending as exc:
+        context.update(
+            summary_preparation={
+                "ready_count": exc.ready_count, "total_count": exc.total_count,
+                "requires_admin": exc.requires_admin,
+            },
+            object_total=exc.total_count, object_rows=[], relationship_graph=None,
+            graph_error=False,
+        )
+        if status < 400:
+            status = 503 if exc.requires_admin else 202
     except ValueError as exc:
         context.update(selection_error=str(exc), action_error=str(exc), graph_error=True,
                        object_rows=[], object_total=0)
@@ -339,18 +342,8 @@ def _extend_selection(request, navigation, ids):
                    else "The selected objects are already in this collection.")
     else:
         token = navigation["selection_token"]
-        existing = _selection_ids(request, token)
-        combined = list(dict.fromkeys([*existing, *ids]))
-        if len(combined) > MAX_SELECTION_OBJECTS:
-            raise ValueError(
-                f"A temporary selection can contain up to {MAX_SELECTION_OBJECTS} data objects. "
-                "Save this selection as a research collection to add more objects."
-            )
-        _validate_access(request.user, combined)
-        selections = dict(request.session.get(SELECTION_SESSION_KEY, {}))
-        selections[token] = {"owner": request.user.pk, "objects": combined}
-        request.session[SELECTION_SESSION_KEY] = selections
-        message = ("Selected objects added to this selection." if len(combined) > len(existing)
+        added = append_selection(request, token, ids)
+        message = ("Selected objects added to this selection." if added
                    else "The selected objects are already in this selection.")
     messages.success(request, message)
     return redirect(navigation_fields(navigation)["graph_return_url"])
@@ -421,7 +414,7 @@ def selection_create(request):
         ids = _parse_ids(request.POST.getlist("selected_objects"))
         if navigation is not None:
             return _extend_selection(request, navigation, ids)
-        _validate_access(request.user, ids)
+        token = create_selection(request, ids)
     except ValueError as exc:
         if navigation is not None:
             return _workspace_response(
@@ -430,12 +423,6 @@ def selection_create(request):
                 error=str(exc), status=400,
             )
         return _index_response(request, error=str(exc), status=400)
-    selections = request.session.get(SELECTION_SESSION_KEY, {})
-    while len(selections) >= MAX_TEMPORARY_SELECTIONS:
-        selections.pop(next(iter(selections)))
-    token = uuid.uuid4().hex
-    selections[token] = {"owner": request.user.pk, "objects": ids}
-    request.session[SELECTION_SESSION_KEY] = selections
     return redirect("selection_detail", token=token)
 
 

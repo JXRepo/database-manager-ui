@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import subprocess
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
@@ -88,6 +89,34 @@ class CollectionBrowserTests(StaticLiveServerTestCase):
         unlinked.members.add(shared, record)
         empty = ResearchCollection.objects.create(owner=viewer, title="Empty research collection")
         forbidden = ResearchCollection.objects.create(owner=other, title="SECRET private collection")
+        cold_collections = {}
+        cold_ids = []
+        temporary_ids = []
+        for label in ("automatic", "native", "interrupted", "temporary"):
+            records = []
+            for index in range(75):
+                data = {
+                    "identifier": f"cold-{label}-{index}", "title": f"Cold {label} record {index}",
+                    "software": "Cold summary solver", "relation": ["10.1234/cold-summary"],
+                }
+                records.append(JSONData(owner=viewer, data=data, size_bytes=len(json.dumps(data).encode())))
+            JSONData.objects.bulk_create(records)
+            cold_ids.extend(record.pk for record in records)
+            if label == "temporary":
+                temporary_ids = [item.pk for item in records]
+            else:
+                collection = ResearchCollection.objects.create(owner=viewer, title=f"Cold {label} collection")
+                collection.members.add(*records)
+                cold_collections[label] = reverse("collection_detail", args=[collection.pk])
+        large_record = JSONData.objects.create(
+            owner=viewer, data={"identifier": "cold-admin", "title": "Administrator preparation record"},
+            size_bytes=17 * 1024 * 1024,
+        )
+        admin_collection = ResearchCollection.objects.create(owner=viewer, title="Administrator preparation collection")
+        admin_collection.members.add(large_record)
+        JSONData.objects.filter(pk__in=[*cold_ids, large_record.pk]).update(
+            collection_summary=None, uploaded_at=timezone.now() - timedelta(days=365),
+        )
         record_count = JSONData.objects.count()
         cases = {
             "home": reverse("collection_index"), "search": reverse("search"),
@@ -100,8 +129,13 @@ class CollectionBrowserTests(StaticLiveServerTestCase):
             "shared": shared.pk, "hidden": hidden.pk,
             "ownedExtra": record.pk,
             "detail": reverse("json_data_detail", args=[first.pk]),
+            "cold": cold_collections,
+            "adminPreparation": reverse("collection_detail", args=[admin_collection.pk]),
         }
         self.client.force_login(viewer)
+        temporary = self.client.post(reverse("graph_selection_create"), {"selected_objects": temporary_ids})
+        self.assertEqual(temporary.status_code, 302)
+        cold_collections["temporary"] = temporary.url
         environment = dict(
             os.environ, COLLECTION_BASE_URL=self.live_server_url,
             COLLECTION_SESSION=self.client.cookies[settings.SESSION_COOKIE_NAME].value,
@@ -116,6 +150,9 @@ class CollectionBrowserTests(StaticLiveServerTestCase):
         self.assertEqual(JSONData.objects.count(), record_count)
         first.refresh_from_db()
         self.assertEqual(first.data, first_data)
+        self.assertFalse(JSONData.objects.filter(pk__in=cold_ids, collection_summary__isnull=True).exists())
+        large_record.refresh_from_db()
+        self.assertIsNone(large_record.collection_summary)
         self.assertFalse(ResearchCollection.objects.filter(title="Edited workflow collection").exists())
         native = ResearchCollection.objects.get(owner=viewer, title="Native browser collection")
         self.assertEqual(set(native.members.values_list("pk", flat=True)), {second.pk, public.pk})

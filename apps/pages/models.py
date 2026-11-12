@@ -1,10 +1,11 @@
 import uuid
 
-from django.db import models
+from django.db import models, router
 from django.contrib.auth.models import User
 from django.core.validators import URLValidator
 
 from apps.dyn_api.metadata_compat import field_value, identifier_lookup
+from .collection_summary import build_collection_summary
 
 class Product(models.Model):
     """
@@ -33,6 +34,62 @@ class Product(models.Model):
         return self.name
 
 
+class JSONDataQuerySet(models.QuerySet):
+    """
+    Keep derived collection summaries consistent when raw metadata changes
+    """
+
+    def update(self, **kwargs):
+        """
+        Invalidate cached collection metadata during a direct data update
+
+        Parameters
+        ----------
+        **kwargs : object
+            Field assignments or expressions forwarded to Django.
+
+        Returns
+        -------
+        int
+            Number of updated records.
+        """
+        if "data" in kwargs:
+            kwargs["collection_summary"] = None
+        return super().update(**kwargs)
+
+    def bulk_create(self, objs, batch_size=None, ignore_conflicts=False,
+                    update_conflicts=False, update_fields=None, unique_fields=None):
+        """
+        Prepare small summaries for records inserted without calling model save
+
+        Parameters
+        ----------
+        objs : iterable of JSONData
+            New records containing their original metadata.
+        batch_size : int or None, optional
+            Django insertion batch size.
+        ignore_conflicts, update_conflicts : bool, optional
+            Standard Django conflict behavior.
+        update_fields, unique_fields : iterable of str or None, optional
+            Fields used for a conflict update and its matching key.
+
+        Returns
+        -------
+        list of JSONData
+            Inserted objects returned by Django.
+        """
+        objs = list(objs)
+        for obj in objs:
+            obj.collection_summary = build_collection_summary(obj.data)
+        if update_conflicts and update_fields and "data" in update_fields:
+            update_fields = list(dict.fromkeys([*update_fields, "collection_summary"]))
+        return super().bulk_create(
+            objs, batch_size=batch_size, ignore_conflicts=ignore_conflicts,
+            update_conflicts=update_conflicts, update_fields=update_fields,
+            unique_fields=unique_fields,
+        )
+
+
 class JSONData(models.Model):
     """
     Store one unwrapped JSON data object
@@ -43,6 +100,8 @@ class JSONData(models.Model):
         Owner of the data object
     data : dict
         Raw JSON object
+    collection_summary : dict or None
+        Derived collection labels without raw arrays, or missing for legacy data
     identifier_fingerprint : str
         Historical SHA256 digest retained for old records and unused by new uploads
     identifier_lookup : str
@@ -57,6 +116,7 @@ class JSONData(models.Model):
 
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     data = models.JSONField()
+    collection_summary = models.JSONField(null=True, blank=True, editable=False)
     identifier_fingerprint = models.CharField(
         max_length=64, blank=True, default="", db_index=True, editable=False,
     )
@@ -71,10 +131,11 @@ class JSONData(models.Model):
         related_name="shared_json_data",
     )
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    objects = JSONDataQuerySet.as_manager()
 
     def save(self, *args, **kwargs):
         """
-        Maintain the identifier index while retaining the original JSON spelling
+        Maintain lookup metadata while retaining the original JSON spelling
 
         Parameters
         ----------
@@ -84,10 +145,21 @@ class JSONData(models.Model):
             Standard model save options.
         """
         fields = kwargs.get("update_fields")
-        if fields is None or "data" in fields:
+        deferred = self.get_deferred_fields()
+        if fields is None and "data" in deferred and not kwargs.get("force_insert"):
+            using = kwargs.get("using") or router.db_for_write(type(self), instance=self)
+            if using == self._state.db:
+                fields = {
+                    field.attname for field in self._meta.concrete_fields
+                    if not field.primary_key and field.attname not in deferred
+                    and field.name != "collection_summary"
+                }
+                kwargs["update_fields"] = fields
+        if (fields is None and "data" not in deferred) or (fields and "data" in fields):
             self.identifier_lookup = identifier_lookup(field_value(self.data, "identifier"))
+            self.collection_summary = build_collection_summary(self.data)
             if fields is not None:
-                kwargs["update_fields"] = set(fields) | {"identifier_lookup"}
+                kwargs["update_fields"] = set(fields) | {"identifier_lookup", "collection_summary"}
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -127,6 +199,19 @@ class ResearchCollection(models.Model):
             The supplied title.
         """
         return self.title
+
+
+class TemporaryGraphSelection(models.Model):
+    """
+    Keep one bounded selection bucket independent of browser session saves
+    """
+
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    session_digest = models.CharField(max_length=64, unique=True, editable=False)
+    selections = models.JSONField(default=dict)
+    expires_at = models.DateTimeField(db_index=True)
+    session_expires_at = models.DateTimeField(db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
 
 class RateLimitBucket(models.Model):

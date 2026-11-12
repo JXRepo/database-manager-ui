@@ -170,6 +170,10 @@ class DeploymentArtifactTests(SimpleTestCase):
                     "program": "python",
                     "args": ["manage.py", "migrate", "--noinput"],
                 },
+                {
+                    "program": "python",
+                    "args": ["manage.py", "backfill_collection_summaries", "--all"],
+                },
             ],
         )
 

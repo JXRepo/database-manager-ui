@@ -1418,7 +1418,7 @@ class JSONDataSharingTests(TestCase):
         self.assertIn("new THREE.LineSegments", viewer)
         self.assertIn("new THREE.EdgesGeometry", viewer)
         self.assertIn("cubeSheen", viewer)
-        self.assertIn("new THREE.BoxGeometry(1.018, 1.018, 1.018)", viewer)
+        self.assertIn("new THREE.BoxGeometry(1.018, 1.018, 1.018, segments, segments, segments)", viewer)
         self.assertNotIn("cubeEdgeGlow", viewer)
         self.assertNotIn("cubeEdgeCore", viewer)
         self.assertNotIn("makeCylinderBetween(start, end, 0.019", viewer)
@@ -1432,7 +1432,7 @@ class JSONDataSharingTests(TestCase):
         self.assertNotIn("clearcoat: 1", viewer)
         self.assertNotIn("Single vertex", viewer)
         self.assertIn("camera.up.set(0, 0, 1);", viewer)
-        self.assertIn("new THREE.Vector3(1.45, -1.45, 1.15).normalize()", viewer)
+        self.assertIn("new THREE.Vector3(1.45, 1.45, 1.15).normalize()", viewer)
         self.assertLess(
             viewer.index("camera.up.set(0, 0, 1);"),
             viewer.index("new OrbitControls(camera"),

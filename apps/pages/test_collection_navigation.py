@@ -12,7 +12,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from .collection_navigation import CONTEXT_MAX_AGE, CONTEXT_SALT
-from .models import JSONData, ResearchCollection
+from .models import JSONData, ResearchCollection, TemporaryGraphSelection
 from .research_collections import SELECTION_SESSION_KEY
 
 
@@ -109,7 +109,7 @@ class CollectionNavigationTests(TestCase):
         response = self.append(token, [self.public, self.owned, self.second, self.public])
         self.assertEqual(response.status_code, 302)
         self.assertEqual(urlsplit(response.url).path, original_path)
-        selections = self.client.session[SELECTION_SESSION_KEY]
+        selections = TemporaryGraphSelection.objects.get(owner=self.owner).selections
         self.assertEqual(list(selections), [selection_token])
         self.assertEqual(selections[selection_token]["objects"], [self.owned.pk, self.public.pk, self.second.pk])
         self.assertContains(self.client.get(response.url), "Selected objects added to this selection.")
@@ -166,13 +166,13 @@ class CollectionNavigationTests(TestCase):
         """
         workspace = self.workspace(selection=True, objects=[self.owned, self.public])
         token = workspace.context["graph_context"]
-        original = self.client.session[SELECTION_SESSION_KEY]
+        original = TemporaryGraphSelection.objects.get(owner=self.owner).selections
         with patch("apps.pages.research_collections.MAX_SELECTION_OBJECTS", 2):
             response = self.append(token, [self.second])
         self.assertContains(response, "Save this selection as a research collection", status_code=400)
-        self.assertEqual(self.client.session[SELECTION_SESSION_KEY], original)
+        self.assertEqual(TemporaryGraphSelection.objects.get(owner=self.owner).selections, original)
         self.assertEqual(self.append(token, [self.second, self.hidden]).status_code, 400)
-        self.assertEqual(self.client.session[SELECTION_SESSION_KEY], original)
+        self.assertEqual(TemporaryGraphSelection.objects.get(owner=self.owner).selections, original)
 
     def test_saved_capacity_counts_retained_inaccessible_references(self):
         """
@@ -192,7 +192,7 @@ class CollectionNavigationTests(TestCase):
         Refuse additions after an existing share is revoked without dropping it silently
         """
         workspace = self.workspace(selection=True, objects=[self.owned, self.shared])
-        original = self.client.session[SELECTION_SESSION_KEY]
+        original = TemporaryGraphSelection.objects.get(owner=self.owner).selections
         self.shared.shared_users.clear()
         stale_workspace = self.client.get(workspace.context["workspace_url"])
         self.assertContains(stale_workspace, "Some selected objects are unavailable")
@@ -201,7 +201,7 @@ class CollectionNavigationTests(TestCase):
         self.assertNotContains(stale_workspace, self.shared.data["title"])
         response = self.append(workspace.context["graph_context"], [self.public])
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(self.client.session[SELECTION_SESSION_KEY], original)
+        self.assertEqual(TemporaryGraphSelection.objects.get(owner=self.owner).selections, original)
         self.assertNotContains(response, self.shared.data["title"], status_code=400)
 
     def test_tampered_empty_and_repeated_tokens_never_create_new_selection(self):
@@ -278,11 +278,9 @@ class CollectionNavigationTests(TestCase):
         })
         self.assertEqual(response.status_code, 400)
         self.assertNotIn(SELECTION_SESSION_KEY, second_browser.session)
-        session = self.client.session
-        session[SELECTION_SESSION_KEY] = {}
-        session.save()
+        TemporaryGraphSelection.objects.filter(owner=self.owner).update(selections={})
         self.assertEqual(self.append(token, [self.public]).status_code, 400)
-        self.assertEqual(self.client.session[SELECTION_SESSION_KEY], {})
+        self.assertEqual(TemporaryGraphSelection.objects.get(owner=self.owner).selections, {})
 
     def test_return_scope_and_object_links_retain_group_pages_and_view(self):
         """
@@ -355,12 +353,12 @@ class CollectionNavigationTests(TestCase):
         Keep browsing and return navigation free of membership mutations
         """
         workspace = self.workspace(selection=True)
-        original = self.client.session[SELECTION_SESSION_KEY]
+        original = TemporaryGraphSelection.objects.get(owner=self.owner).selections
         token = workspace.context["graph_context"]
         for name in ("search", "json_data_list"):
             self.client.get(reverse(name), {"graph_context": token, "selected_objects": [self.public.pk]})
         self.client.get(reverse("graph_selection_create"), {
             "graph_context": token, "selected_objects": [self.public.pk],
         })
-        self.assertEqual(self.client.session[SELECTION_SESSION_KEY], original)
+        self.assertEqual(TemporaryGraphSelection.objects.get(owner=self.owner).selections, original)
         self.assertEqual(list(self.collection.members.values_list("pk", flat=True)), [self.owned.pk])

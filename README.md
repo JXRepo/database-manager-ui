@@ -548,14 +548,19 @@ objects on the displayed page and choose **Open selection in Graph**. Explore
 the selection immediately, save it with a name and optional description, or add
 it to an existing collection. One object can belong to several collections.
 Collections are private to their owner; their membership never grants access to
-the underlying data. The session retains eight temporary selections, with at
-most 500 objects per selection; saved collections hold at most 1,000 objects.
+the underlying data. Each authenticated browser retains eight temporary selections,
+with at most 500 objects per selection; saved collections hold at most 1,000 objects.
+Temporary membership is stored in a locked database bucket so simultaneous additions
+from different tabs cannot overwrite each other. Temporary selections expire seven
+days after creation or their last change, or when the bound session expires. Viewing
+a selection does not extend that deadline. Existing session selections remain
+readable and are adopted once during the next selection change.
 
 **Select more data** opens Search with the current collection or selection as
 the destination; **Select from My Data** does the same for owned uploads.
 **Add selected objects** adds directly to that destination, deduplicates members
 and returns to the original group, page and presentation. Temporary selections
-keep the same session entry. Filters and Clear retain this destination. The
+keep the same selection URL. Filters and Clear retain this destination. The
 **Save or add selection** disclosure keeps optional saving controls compact;
 saving records collection membership, not an exported research package.
 
@@ -575,6 +580,26 @@ nodes when the complete graph fits within 25 nodes. An object shared by several
 groups appears once with all its group connections. Without supplied references,
 the default view shows collection members; explicit grouping choices are retained.
 Large collections continue to use bounded group and member pages.
+
+Collection graphs read internal scalar metadata summaries instead of repeatedly
+loading mechanical arrays. Uploads and data saves prepare these summaries; raw
+data updates invalidate them. Deployment prepares existing records with
+`backfill_collection_summaries --all`, using a fixed starting range and batches of
+100. The command can be interrupted and rerun without changing original JSON.
+
+If old summaries are still missing, the page prepares a bounded batch and shows
+actual progress until the complete graph is available. Each web request checks at
+most 25 missing records, permits at most 16 MiB of verified JSON bytes, and checks
+a one-second work budget between records. This is not a hard timeout for an
+individual database operation. Unknown or oversized old records require the
+operator preparation command; the page reports that requirement without fetching
+their arrays or presenting a partial graph. Without JavaScript, Continue preparing
+performs the next bounded step. Interrupted automatic preparation stops until Retry.
+
+Operators can run `clear_expired_graph_selections` to clear expired membership and
+remove buckets whose actual Django session is no longer live. Empty expiry markers
+remain while a live session could still contain old entries; stale session writes
+cannot restore evicted or expired selections.
 
 Use **Edit collection** to change its description, and the member table to
 remove selected objects from the displayed page. **Delete collection** removes
@@ -1368,6 +1393,10 @@ finish deployment before checking the changes. The build installs dependencies,
 clears the generated static output before collecting current files, and applies
 database migrations; it does not import local
 accounts or local data.
+After migrations, the build also prepares existing collection summaries before
+release. This can extend the first build after this change; subsequent builds skip
+already prepared records. New or invalidated records arriving during that fixed
+snapshot are handled by normal saves or bounded page preparation.
 Clearing `staticfiles/` prevents cached output with a newer modification time
 from making Django skip changed JavaScript or CSS. The source `static/` directory
 and stored data are separate from this generated output.

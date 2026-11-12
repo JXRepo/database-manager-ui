@@ -33,9 +33,13 @@ const {join} = require('node:path');
     let nextId = 0;
     const pending = new Map();
     const exceptions = [];
+    const requestedUrls = [];
+    const responses = [];
     socket.addEventListener('message', event => {
       const message = JSON.parse(event.data);
       if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails);
+      if (message.method === 'Network.requestWillBeSent') requestedUrls.push(message.params.request.url);
+      if (message.method === 'Network.responseReceived') responses.push(message.params.response);
       const request = pending.get(message.id);
       if (!request) return;
       pending.delete(message.id);
@@ -147,6 +151,19 @@ const {join} = require('node:path');
       const capture = await command('Page.captureScreenshot', {format: 'png'});
       writeFileSync(join(artifacts, `${name}.png`), Buffer.from(capture.data, 'base64'));
     }
+    async function preparationState() {
+      return evaluate(`(() => {
+        const panel = document.querySelector('#collection-preparation');
+        return {ready: Number(panel?.dataset.ready), total: Number(panel?.dataset.total),
+          automatic: panel?.dataset.autoPrepare, requiresAdmin: panel?.dataset.requiresAdmin,
+          graph: !!document.querySelector('#detail-relationships'),
+          empty: !!document.querySelector('.collection-empty'),
+          saveForm: !!document.querySelector('#collection-save-form'),
+          editForm: !!document.querySelector('#collection-edit-form'),
+          count: document.querySelector('#collection-preparation-count')?.textContent,
+          retryVisible: !!document.querySelector('#collection-preparation-retry')?.getClientRects().length};
+      })()`);
+    }
     async function layout(label) {
       const metrics = await evaluate(`(() => {
         const canvas = document.querySelector('.graph-canvas')?.getBoundingClientRect();
@@ -190,6 +207,67 @@ const {join} = require('node:path');
     for (const extension of ['svg', 'png']) {
       rmSync(join(artifacts, `collection-relationships-detailed.${extension}`), {force: true});
     }
+
+    await command('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false});
+    await navigate(cases.cold.automatic);
+    const initialPreparation = await preparationState();
+    assert.equal(initialPreparation.total, 75);
+    assert.ok(initialPreparation.ready > 0 && initialPreparation.ready <= 25);
+    assert.equal(initialPreparation.automatic, 'true');
+    assert.equal(initialPreparation.graph, false, 'A partially prepared collection must not display a partial graph');
+    assert.equal(initialPreparation.empty, false, 'Preparation must not look like an empty collection');
+    assert.equal(initialPreparation.saveForm, false);
+    assert.equal(initialPreparation.editForm, false, 'Automatic preparation must not offer drafts that its reload could discard');
+    assert.match(initialPreparation.count, /75/);
+    await screenshot('collection-preparing');
+    await until(`!!document.querySelector('#detail-relationships') && document.querySelector('.collection-total')?.textContent === '75 accessible data objects'`);
+    assert.equal(await evaluate(`!!document.querySelector('#collection-preparation')`), false);
+    assert.equal(await evaluate(`!!document.querySelector('#collection-edit-form')`), true);
+    const coldResponses = responses.filter(response => new URL(response.url).pathname === cases.cold.automatic);
+    assert.equal(coldResponses[0].status, 202);
+    assert.ok(coldResponses.some(response => response.status === 200));
+    await screenshot('collection-prepared');
+
+    await navigate(cases.cold.temporary);
+    const temporaryPreparation = await preparationState();
+    assert.equal(temporaryPreparation.total, 75);
+    assert.equal(temporaryPreparation.graph, false);
+    assert.equal(temporaryPreparation.saveForm, false, 'A pending selection must not offer a save draft before automatic reload');
+    assert.equal(temporaryPreparation.editForm, false);
+    await until(`!!document.querySelector('#detail-relationships') && !!document.querySelector('#collection-save-form')`);
+    assert.equal(await evaluate(`!!document.querySelector('#collection-preparation')`), false);
+
+    await navigate(cases.cold.interrupted);
+    await command('Network.setBlockedURLs', {urls: ['https://*', process.env.COLLECTION_BASE_URL + cases.cold.interrupted + '*']});
+    await until(`!!document.querySelector('#collection-preparation-retry')?.getClientRects().length`);
+    const interrupted = await preparationState();
+    assert.equal(interrupted.graph, false);
+    assert.equal(interrupted.empty, false);
+    const interruptedRequests = requestedUrls.filter(url => new URL(url).pathname === cases.cold.interrupted).length;
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    assert.equal(requestedUrls.filter(url => new URL(url).pathname === cases.cold.interrupted).length, interruptedRequests,
+      'Failed preparation must stop automatic requests until the user retries');
+    await command('Network.setBlockedURLs', {urls: ['https://*']});
+    await click('#collection-preparation-retry');
+    await until(`!!document.querySelector('#detail-relationships') && document.querySelector('.collection-total')?.textContent === '75 accessible data objects'`);
+
+    await navigate(cases.adminPreparation);
+    const adminPreparation = await preparationState();
+    assert.equal(adminPreparation.total, 1);
+    assert.equal(adminPreparation.ready, 0);
+    assert.equal(adminPreparation.requiresAdmin, 'true');
+    assert.equal(adminPreparation.automatic, 'false');
+    assert.equal(adminPreparation.graph, false);
+    assert.equal(adminPreparation.empty, false);
+    assert.equal(responses.filter(response => new URL(response.url).pathname === cases.adminPreparation).at(-1).status, 503);
+    assert.ok(await evaluate(`document.querySelector('#collection-export').href.endsWith('/export/')`));
+    assert.ok(await evaluate(`!!document.querySelector('.collection-actions a[href="${cases.home}"]')`));
+    const adminRequests = requestedUrls.filter(url => new URL(url).pathname === cases.adminPreparation).length;
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    assert.equal(requestedUrls.filter(url => new URL(url).pathname === cases.adminPreparation).length, adminRequests,
+      'An administrator preparation notice must not poll repeatedly');
+    await screenshot('collection-preparation-admin');
+    console.log('Cold collections prepare automatically with real counts; interrupted preparation stops until Retry; oversized records show a stable recovery state.');
 
     for (const width of [1280, 1440, 1920]) {
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
@@ -441,6 +519,21 @@ const {join} = require('node:path');
     console.log('Real Search/My Data selection, save, reopen, object graph, copy link, append, edit, remove and delete workflows passed.');
 
     await command('Emulation.setScriptExecutionDisabled', {value: true});
+    await navigate(cases.cold.native);
+    const nativePreparation = await preparationState();
+    assert.equal(nativePreparation.total, 75);
+    assert.equal(nativePreparation.ready, 25);
+    assert.equal(nativePreparation.graph, false);
+    assert.equal(nativePreparation.empty, false);
+    assert.equal(nativePreparation.saveForm, false);
+    assert.equal(nativePreparation.editForm, false);
+    await click('#collection-preparation-continue');
+    await until(`Number(document.querySelector('#collection-preparation')?.dataset.ready) === 50 && document.readyState === 'complete'`);
+    assert.equal((await preparationState()).graph, false);
+    await click('#collection-preparation-continue');
+    await until(`!!document.querySelector('#detail-relationships') && document.querySelector('.collection-total')?.textContent === '75 accessible data objects' && document.readyState === 'complete'`);
+    assert.equal(await evaluate(`!!document.querySelector('#collection-edit-form')`), true);
+    console.log('Native collection preparation completes through bounded GET requests without JavaScript.');
     await navigate(cases.myData + '?software=Append%20Solver');
     assert.equal(await evaluate(`document.querySelector('#graphMyDataButton').disabled`), false);
     await click(`.my-data-checkbox[value="${cases.second}"]`);
