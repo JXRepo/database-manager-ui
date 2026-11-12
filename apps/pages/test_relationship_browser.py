@@ -86,7 +86,7 @@ class RelationshipBrowserTests(StaticLiveServerTestCase):
                  "large": f"{reverse('graph')}?object={large_record.pk}",
                  "detail": reverse("json_data_detail", args=[sample.pk]),
                  "examples": examples,
-                 "picker": reverse("graph")}
+                 "picker": reverse("graph") + "?choose=1"}
         self.client.force_login(viewer)
         environment = dict(os.environ, RELATIONSHIP_BASE_URL=self.live_server_url,
                            RELATIONSHIP_SESSION=self.client.cookies[settings.SESSION_COOKIE_NAME].value,

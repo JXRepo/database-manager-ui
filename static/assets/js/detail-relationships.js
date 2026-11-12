@@ -300,19 +300,27 @@
 
   graph.querySelector('#graph-copy-link').addEventListener('click', async () => {
     const url = new URL(location.href);
-    url.search = new URLSearchParams({object: graph.dataset.object}).toString();
+    if (graph.dataset.object) {
+      url.search = new URLSearchParams(url.searchParams.get('tab') === 'graph'
+        ? {tab: 'graph'} : {object: graph.dataset.object}).toString();
+    }
     setURLView(url, view);
     url.hash = selected.getAttribute('href');
+    const accessNotice = graph.dataset.temporary
+      ? 'Save this selection as a collection to keep a lasting link.'
+      : graph.dataset.collection
+        ? 'This collection is private to your account.'
+        : 'The recipient must have access to this data object.';
     try {
       await navigator.clipboard.writeText(url.href);
-      announce('Node link copied. The recipient must have access to this data object.');
+      announce(`Node link copied. ${accessNotice}`);
     } catch {
       const fallback = graph.querySelector('#graph-link-fallback');
       fallback.value = url.href;
       fallback.hidden = false;
       fallback.focus();
       fallback.select();
-      announce('Copy the selected link. The recipient must have access to this data object.');
+      announce(`Copy the selected link. ${accessNotice}`);
     }
   });
 
@@ -339,7 +347,8 @@
       edge.setAttribute('stroke', '#a3afc2');
       edge.setAttribute('stroke-width', '1.5');
     });
-    const colors = {record: ['#edf3ff', '#90ace0'], phase: ['#f2f8f5', '#bbd9c9'],
+    const colors = {record: ['#edf3ff', '#90ace0'], collection: ['#edf3ff', '#90ace0'],
+      reference: ['#f8f4fc', '#d6c8e4'], missing: ['#f5f6f8', '#c9d1dc'], phase: ['#f2f8f5', '#bbd9c9'],
       model: ['#f8f4fc', '#d6c8e4'], output: ['#fff8ee', '#e8d6b9'], loading: ['#eef8fa', '#b8dbe0']};
     const measure = document.createElement('canvas').getContext('2d');
     const prefix = (text, suffix = '') => {
@@ -412,14 +421,15 @@
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `data-${graph.dataset.object}-relationships-${mode}.${extension}`;
+    const name = graph.dataset.exportName || `data-${graph.dataset.object}-relationships`;
+    link.download = `${name}-${mode}.${extension}`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
   graph.querySelector('#graph-save-svg').addEventListener('click', () => {
     download(exportSVG(), 'svg');
     graph.querySelector('.graph-download').open = false;
-    announce('Complete graph downloaded as SVG. Full node names are included in the SVG titles.');
+    announce(`${graph.dataset.collection ? 'Current graph view' : 'Complete graph'} downloaded as SVG. Full node names are included in the SVG titles.`);
   });
   graph.querySelector('#graph-save-png').addEventListener('click', async event => {
     const button = event.currentTarget;
@@ -446,7 +456,7 @@
       if (!blob) throw new Error('Empty image');
       download(blob, 'png', exportView);
       graph.querySelector('.graph-download').open = false;
-      announce(`Complete graph downloaded as PNG (${canvas.width} × ${canvas.height}). SVG retains vector detail at any size.`);
+      announce(`${graph.dataset.collection ? 'Current graph view' : 'Complete graph'} downloaded as PNG (${canvas.width} × ${canvas.height}). SVG retains vector detail at any size.`);
     } catch {
       announce('PNG could not be created. Download SVG to save the complete graph.');
     } finally {

@@ -97,6 +97,10 @@ def graph_view(request):
     HttpResponse
         Graph workspace, object chooser or a clear invalid selection response.
     """
+    if not any(key in request.GET for key in ("object", "choose", "q", "page")):
+        from .research_collections import collection_index
+
+        return collection_index(request)
     values = request.GET.getlist("object")
     value = values[0] if values else ""
     invalid = len(values) > 1 or bool(value and (

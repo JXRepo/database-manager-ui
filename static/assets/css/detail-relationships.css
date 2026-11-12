@@ -69,6 +69,9 @@
 .relationship-node rect { fill: #fff; stroke: #d8e1ec; stroke-width: 1.5; }
 .relationship-node { cursor: pointer; text-decoration: none; }
 .relationship-node-record rect { fill: #edf3ff; stroke: #90ace0; }
+.relationship-node-collection rect { fill: #edf3ff; stroke: #90ace0; }
+.relationship-node-reference rect { fill: #f8f4fc; stroke: #d6c8e4; }
+.relationship-node-missing rect { fill: #f5f6f8; stroke: #c9d1dc; }
 .relationship-node-phase rect { fill: #f2f8f5; stroke: #bbd9c9; }
 .relationship-node-model rect { fill: #f8f4fc; stroke: #d6c8e4; }
 .relationship-node-output rect { fill: #fff8ee; stroke: #e8d6b9; }

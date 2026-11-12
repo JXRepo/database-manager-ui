@@ -4436,7 +4436,8 @@ def json_data_detail_view(request, pk):
     if not _user_can_access_object(obj, request.user):
         raise Http404("Data object not found")
 
-    detail_rows = _build_detail_rows(obj.data or {})
+    detail_tab = "graph" if request.GET.getlist("tab") == ["graph"] else "details"
+    detail_rows = _build_detail_rows(obj.data or {}) if detail_tab == "details" else []
     visualized_fields = {field_name(name) for name in VISUALIZED_DETAIL_FIELDS}
     detail_rows = [
         row for row in detail_rows
@@ -4466,6 +4467,7 @@ def json_data_detail_view(request, pk):
 
     context = {
         "data_object": obj,
+        "detail_tab": detail_tab,
         "metadata": metadata,
         "detail_title": _assistant_text(metadata.get("title")),
         "detail_rows": display_rows,
@@ -4478,4 +4480,14 @@ def json_data_detail_view(request, pk):
         "detail_back_label": detail_back_label,
         "detail_breadcrumb_label": detail_breadcrumb_label,
     }
+    if context["detail_tab"] == "graph":
+        from .detail_relationships import build_relationship_graph
+
+        view = "detailed" if request.GET.getlist("view") == ["detailed"] else "compact"
+        graph = build_relationship_graph(metadata, plot_variables, view=view)
+        graph["has_loading_details"] = any(item["is_defined"] for item in mechanical_bc_items)
+        context["relationship_graph"] = graph
+        detail_url = reverse("json_data_detail", args=[obj.pk])
+        context["graph_compact_url"] = f"{detail_url}?tab=graph&view=compact"
+        context["graph_detailed_url"] = f"{detail_url}?tab=graph&view=detailed"
     return render(request, "pages/data_detail.html", context)

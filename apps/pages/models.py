@@ -102,6 +102,33 @@ class JSONData(models.Model):
         return f"{self.owner.username} - {self.access_type} - {self.id}"
 
 
+class ResearchCollection(models.Model):
+    """
+    Keep a private, named set of research records without changing their access
+    """
+
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="research_collections")
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, max_length=2000)
+    members = models.ManyToManyField(JSONData, blank=True, related_name="research_collections")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at", "-pk")
+
+    def __str__(self):
+        """
+        Return the collection's title
+
+        Returns
+        -------
+        str
+            The supplied title.
+        """
+        return self.title
+
+
 class RateLimitBucket(models.Model):
     """
     Store one fixed-window rate-limit bucket

@@ -3,10 +3,16 @@
 
 {% block title %}Data Detail{% endblock title %}
 
+{% block extrastyle %}
+{% if detail_tab == 'graph' %}<link rel="stylesheet" href="{% static 'assets/css/detail-relationships.css' %}">{% endif %}
+{% endblock extrastyle %}
+
 {% block content %}
+{% if detail_tab != 'graph' %}
 {{ plot_variables|json_script:"plot-variables-data" }}
 {{ metadata.units|json_script:"plot-units-data" }}
 {{ mechanical_bc_items|json_script:"mechanical-bc-data" }}
+{% endif %}
 <style>
 
 
@@ -1521,13 +1527,20 @@ details[open] > .detail-group-summary {
           <div class="text-muted small mt-1">Identifier: {{ metadata.identifier }}</div>
         {% endif %}
         </div>
-        <a href="{% url 'graph' %}?object={{ data_object.pk }}" class="btn btn-outline-primary btn-sm flex-shrink-0">Open in Graph</a>
+        <a href="{% url 'graph' %}?object={{ data_object.pk }}{% if relationship_graph.view == 'detailed' %}&amp;view=detailed{% endif %}" class="btn btn-outline-primary btn-sm flex-shrink-0" id="detail-open-graph">Open in Graph workspace</a>
         </div>
+        <nav class="nav nav-tabs mt-3" aria-label="Data object views">
+          <a href="{% url 'json_data_detail' data_object.pk %}" class="nav-link{% if detail_tab != 'graph' %} active{% endif %}"{% if detail_tab != 'graph' %} aria-current="page"{% endif %}>Details</a>
+          <a href="{% url 'json_data_detail' data_object.pk %}?tab=graph" class="nav-link{% if detail_tab == 'graph' %} active{% endif %}"{% if detail_tab == 'graph' %} aria-current="page"{% endif %}>Graph</a>
+        </nav>
       </div>
 
 
 
       <div class="card-body">
+{% if detail_tab == 'graph' %}
+  {% include "pages/detail_relationships.html" %}
+{% else %}
 <div class="detail-metadata-list" id="data-metadata">
 {% for row in detail_rows %}
   <div class="detail-row-card">
@@ -1991,6 +2004,7 @@ details[open] > .detail-group-summary {
 
 
 
+{% endif %}
         <div class="detail-actions">
           <a href="{% url detail_back_url_name %}" class="btn btn-outline-secondary btn-sm">
             {{ detail_back_label }}
@@ -2022,6 +2036,7 @@ details[open] > .detail-group-summary {
 </div>
 
 
+{% if detail_tab != 'graph' %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="importmap">
   {
@@ -2940,4 +2955,5 @@ plotStatus.textContent = `${pointCount} points plotted.`;
     }
 
 </script>
+{% endif %}
 {% endblock content %}

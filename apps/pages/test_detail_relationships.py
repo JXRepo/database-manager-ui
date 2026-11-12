@@ -285,7 +285,7 @@ class DetailRelationshipTests(TestCase):
         hidden = JSONData.objects.create(owner=self.reader, data={"title": "Private hidden title"})
         shared.shared_users.add(self.owner)
         public.shared_users.add(self.owner)
-        response = self.client.get("/graph/")
+        response = self.client.get("/graph/", {"choose": "1"})
         self.assertEqual(response.status_code, 200)
         options = response.context["object_options"]
         self.assertCountEqual([option["pk"] for option in options], [own.pk, public.pk, shared.pk])
@@ -396,7 +396,7 @@ class DetailRelationshipTests(TestCase):
         records = []
         for index in range(28):
             records.append(JSONData.objects.create(owner=self.owner, data={"title": f"Reference {index}"}))
-        initial = self.client.get("/graph/")
+        initial = self.client.get("/graph/", {"choose": "1"})
         self.assertContains(initial, 'class="graph-object-option', count=25)
         self.assertNotContains(initial, 'class="graph-object-bar"')
         self.assertNotContains(initial, 'class="graph-welcome"')
@@ -414,7 +414,7 @@ class DetailRelationshipTests(TestCase):
         """
         Keep the standalone entry useful when the viewer has no data to open
         """
-        response = self.client.get("/graph/")
+        response = self.client.get("/graph/", {"choose": "1"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No accessible data objects")
         self.assertContains(response, reverse("upload_json"))

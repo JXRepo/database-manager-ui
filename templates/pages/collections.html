@@ -1,0 +1,55 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block title %}Graph{% endblock title %}
+{% block extrastyle %}<link rel="stylesheet" href="{% static 'assets/css/research-collections.css' %}">{% endblock extrastyle %}
+{% block content %}
+<main class="pc-container collection-page">
+  <div class="pc-content">
+    <div class="page-header"><div class="page-block">
+      <div class="page-header-title"><h1 class="h5 m-b-10">Graph</h1></div>
+      <ul class="breadcrumb" aria-label="Breadcrumb"><li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li><li class="breadcrumb-item" aria-current="page">Graph</li></ul>
+    </div></div>
+    {% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}" role="status">{{ message }}</div>{% endfor %}
+    {% if selection_error %}<div class="alert alert-warning" role="alert">{{ selection_error }}</div>{% endif %}
+    <section class="collection-intro" aria-labelledby="collections-heading">
+      <div><h2 id="collections-heading">Research collections</h2><p>Explore related data objects together. Select objects in Search or My Data, then open the selection in Graph.</p></div>
+      <div class="collection-actions">
+        <a class="btn btn-primary btn-sm" href="{% url 'search' %}" id="collection-search-data">Select from Search</a>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'json_data_list' %}">Select from My Data</a>
+      </div>
+    </section>
+    <section class="collection-card" aria-labelledby="saved-collections-heading">
+      <div class="collection-section-heading"><h2 id="saved-collections-heading">My collections</h2><span class="text-muted">Only you can access your collections</span></div>
+      <form class="collection-find" method="get" action="{% url 'collection_index' %}">
+        <label class="visually-hidden" for="collection-query">Find a collection</label>
+        <input class="form-control form-control-sm" type="search" id="collection-query" name="q" value="{{ collection_query }}" placeholder="Find a collection">
+        <button class="btn btn-outline-primary btn-sm" type="submit">Search</button>
+        {% if collection_query %}<a href="{% url 'collection_index' %}">Clear</a>{% endif %}
+      </form>
+      {% if collections %}
+      <ul class="collection-list">
+        {% for item in collections %}
+        <li><a href="{% url 'collection_detail' item.pk %}" class="collection-list-link">
+          <span class="collection-list-description"><strong>{{ item.title }}</strong>{% if item.description %}<span>{{ item.description }}</span>{% endif %}</span>
+          <span class="collection-list-count">{{ item.visible_count }} accessible object{{ item.visible_count|pluralize }}</span>
+          <span class="collection-list-date">{{ item.updated_at|date:"d M Y" }}</span>
+          <span class="collection-list-open">Open collection</span>
+        </a></li>
+        {% endfor %}
+      </ul>
+      <nav class="collection-pagination" aria-label="Collection pages">
+        <span>{{ collection_page.start_index }}–{{ collection_page.end_index }} of {{ collection_page.paginator.count }} collection{{ collection_page.paginator.count|pluralize }}</span>
+        {% if collection_page.has_previous %}<a href="?q={{ collection_query|urlencode }}&amp;page={{ collection_page.previous_page_number }}">Previous</a>{% endif %}
+        <span>Page {{ collection_page.number }} of {{ collection_page.paginator.num_pages }}</span>
+        {% if collection_page.has_next %}<a href="?q={{ collection_query|urlencode }}&amp;page={{ collection_page.next_page_number }}">Next</a>{% endif %}
+      </nav>
+      {% elif collection_query %}
+      <p class="collection-empty">No collections match your search. <a href="{% url 'collection_index' %}">Show all collections</a></p>
+      {% else %}
+      <div class="collection-empty"><h3>No saved collections yet</h3><p>Select data objects, choose <strong>Open selection in Graph</strong>, then save your selection with a name.</p></div>
+      {% endif %}
+    </section>
+    <p class="collection-single-link">Inspect one object on its <strong>Graph</strong> detail tab, or <a href="{% url 'graph' %}?choose=1">open the single-object workspace</a>.</p>
+  </div>
+</main>
+{% endblock content %}

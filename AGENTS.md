@@ -114,10 +114,17 @@ Current priority:
 - My Data combines selected filters on the same object, matches complete names ignoring case and surrounding whitespace, and counts each object once per option under the other selected filters
 - Keep My Data filters and Clear available for empty results, preserve selected values in GET URLs, and limit bulk selection to the displayed records
 - Detail pages may include management actions for the owner
-- Graph is an independent sidebar workspace beside Charts; detail pages offer Open in Graph with the current object selected instead of embedding the graph
-- Graph remains read only and uses the shared metadata compatibility view for the current accessible object; retain original JSON and exports and never infer links to other records
+- Graph starts with private research collections beside Charts; Search and My Data can open selected accessible objects, and detail pages offer Details / Graph navigation plus the standalone object workspace
+- ResearchCollection stores owner, title, description and member references without changing raw JSON or object permissions; an object may belong to multiple collections, and deleting a collection never deletes its objects
+- Temporary selections retain at most 500 objects and eight session entries; saved collections hold at most 1,000 members; all selection mutations validate the entire request and reject invalid or unavailable objects without partial changes
+- Every collection read, graph, count and export starts from currently accessible members; only the owner can view or manage the collection, and collection membership never grants record access
+- Offer explicit owner-only POST cleanup of unavailable member references without exposing hidden titles or counts; keep records and permissions unchanged and retain references until that action is requested
+- Collection graphs distinguish declared top-level relation strings from software and phase name groups; recognize explicit DOI spelling variants, retain case-sensitive other references, and never infer shared scientific identity or dependency from matching labels
+- Keep collection group and member views bounded to 25 entries with missing-metadata groups, exact accessible counts, preserved navigation and a compact supplied-metadata table; single-object graph links open the detail Graph tab
+- Collection JSON export streams accessible original records; temporary selection export rejects stale selections instead of silently exporting a partial set; collection image exports explicitly cover the current page and view
+- Graph remains read only and uses the shared metadata compatibility view; retain original JSON and exports and never invent relationships
 - Graph selection and direct URLs enforce the same owner, public and explicit share permissions as details; reject malformed or repeated object selections without falling back to another record
-- Keep the Graph entry as one searchable list with direct record links and 25 objects per page; avoid duplicate selection cards or an oversized welcome panel, search title and identifier with the shared whole word matcher, and retain the current graph while browsing choices
+- Keep the standalone object chooser at graph/?choose=1 as one searchable list with direct record links and 25 objects per page; avoid duplicate selection cards or an oversized welcome panel, search title and identifier with the shared whole word matcher, and retain the current graph while browsing choices
 - Relationship model nodes belong to their supplied phase entry; keep equal phase names separate and never use phase_id as a name
 - Relationship output nodes reuse the detail plot's available series, show complete sample counts and supplied units, and distinguish calculated equivalents without copying curve arrays into the graph
 - Graph keeps a large canvas open with node details on the right; bound scrolling, retain full names in the inspector, and support keyboard, ordinary GET selection and native links without JavaScript
@@ -125,7 +132,7 @@ Current priority:
 - Graph labels incoming relationships at their card connection headers; Compact shows names and relations, Detailed adds up to three supplied field previews with explicit model units prioritized, and both views retain full inspector values without adding placeholders
 - Graph view switches update immediately and preserve the current node; carry view and node state through interactive chooser navigation, history and copied URLs, keep native GET view links working, and export the chosen complete layout with portable field previews
 - Graph model parameters retain explicitly supplied model units without inferring mappings; summarize large containers, preserve complete detail/JSON access, and keep separate loading conditions with their recorded type, mode, targets and counts without inventing steps or physical interpretation
-- Graph SVG/PNG downloads include the complete graph regardless of the current viewport or focus; use portable SVG text and bound PNG to 8,192 pixels per side and 16 million pixels total
+- Single-object Graph SVG/PNG downloads include the complete graph regardless of the current viewport or focus; collection downloads include the current graph page and view; use portable SVG text and bound PNG to 8,192 pixels per side and 16 million pixels total
 - Detail metadata orders all supplied schema fields by properties declaration order at every level, including fields from the referenced constitutive and microstructure schemas, without prioritizing required fields
 - Place supplied top-level $schema, $id, version, type, and description before identifier in that order; show uploaded values, do not add missing header fields, and show description only once
 - Omit top-level mechanical_BC, stress, total_strain, and plastic_strain from the metadata list while retaining their visualizations and complete export; same-named nested fields remain visible

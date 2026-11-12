@@ -1,0 +1,107 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+{% block title %}{{ workspace_title }} · Graph{% endblock title %}
+{% block extrastyle %}
+<link rel="stylesheet" href="{% static 'assets/css/detail-relationships.css' %}">
+<link rel="stylesheet" href="{% static 'assets/css/research-collections.css' %}">
+{% endblock extrastyle %}
+{% block content %}
+<main class="pc-container graph-page collection-page">
+  <div class="pc-content">
+    <div class="page-header"><div class="page-block">
+      <div class="page-header-title"><h1 class="h5 m-b-10">Graph</h1></div>
+      <ul class="breadcrumb" aria-label="Breadcrumb"><li class="breadcrumb-item"><a href="{% url 'index' %}">Home</a></li><li class="breadcrumb-item"><a href="{% url 'collection_index' %}">Graph</a></li><li class="breadcrumb-item" aria-current="page">{% if collection %}Collection{% else %}Selection{% endif %}</li></ul>
+    </div></div>
+    {% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}" role="status">{{ message }}</div>{% endfor %}
+    {% if selection_error %}<div class="alert alert-warning" role="alert">{{ selection_error }}{% if graph_error %} <a href="{{ workspace_url }}" id="collection-reset-view">Return to overview</a>{% endif %}</div>{% endif %}
+    {% if action_error and not selection_error %}<div class="alert alert-warning" role="alert">{{ action_error }}</div>{% endif %}
+    <section class="collection-intro" aria-labelledby="collection-title">
+      <div class="collection-title-block">
+        <span class="collection-overline">{% if collection %}Research collection · Only you{% else %}Unsaved selection{% endif %}</span>
+        <h2 id="collection-title">{{ workspace_title }}</h2>
+        {% if collection.description %}<p class="collection-description">{{ collection.description }}</p>{% endif %}
+        {% if not graph_error %}<p class="collection-total">{{ object_total }} accessible data object{{ object_total|pluralize }}</p>{% endif %}
+      </div>
+      <div class="collection-actions">
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'search' %}">Select more data</a>
+        {% if object_total %}<a class="btn btn-outline-secondary btn-sm" href="{{ export_url }}" id="collection-export">{% if collection %}Collection{% else %}Selection{% endif %} JSON</a>{% endif %}
+        <a href="{% url 'collection_index' %}">My collections</a>
+      </div>
+    </section>
+
+    {% if not collection and selection_token %}
+    <section class="collection-card collection-save-panel" aria-labelledby="save-selection-heading">
+      <div class="collection-section-heading"><h2 id="save-selection-heading">Keep this selection</h2><span class="text-muted">Collections are private to you. Data permissions stay the same.</span></div>
+      <div class="collection-save-options">
+        <form method="post" action="{% url 'collection_save' selection_token %}" id="collection-save-form" class="collection-edit-form">
+          {% csrf_token %}
+          {{ collection_form.non_field_errors }}
+          <div><label for="{{ collection_form.title.id_for_label }}">Collection name</label>{{ collection_form.title }}{{ collection_form.title.errors }}</div>
+          <details class="collection-optional-description"{% if collection_form.description.errors %} open{% endif %}><summary>Add a description</summary><label class="visually-hidden" for="{{ collection_form.description.id_for_label }}">Description</label>{{ collection_form.description }}{{ collection_form.description.errors }}</details>
+          <button type="submit" class="btn btn-primary btn-sm">Save collection</button>
+        </form>
+        {% if available_collections %}
+        <form method="post" action="{% url 'collection_add' selection_token %}" id="collection-add-form" class="collection-add-form">
+          {% csrf_token %}
+          <label for="target-collection">Or add to an existing collection</label>
+          <select class="form-select form-select-sm" name="collection_id" id="target-collection" required><option value="">Choose a collection</option>{% for item in available_collections %}<option value="{{ item.pk }}">{{ item.title }}</option>{% endfor %}</select>
+          <button type="submit" class="btn btn-outline-primary btn-sm">Add objects</button>
+        </form>
+        {% endif %}
+      </div>
+    </section>
+    {% elif collection %}
+    <details class="collection-card collection-manage"{% if collection_form.errors %} open{% endif %}>
+      <summary>Edit collection</summary>
+      <form method="post" action="{% url 'collection_update' collection.pk %}" id="collection-edit-form" class="collection-edit-form">
+        {% csrf_token %}{{ collection_form.non_field_errors }}
+        <div><label for="{{ collection_form.title.id_for_label }}">Collection name</label>{{ collection_form.title }}{{ collection_form.title.errors }}</div>
+        <div><label for="{{ collection_form.description.id_for_label }}">Description</label>{{ collection_form.description }}{{ collection_form.description.errors }}</div>
+        <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+      </form>
+      <details class="collection-cleanup"><summary>Clear unavailable members</summary><p>Remove references to objects you can no longer access. Data objects stay unchanged.</p><form method="post" action="{% url 'collection_cleanup' collection.pk %}" id="collection-cleanup-form">{% csrf_token %}<button type="submit" class="btn btn-outline-secondary btn-sm">Clear unavailable members</button></form></details>
+      <details class="collection-delete"><summary>Delete collection</summary><p>This removes the collection. Its data objects will remain in the database.</p><form method="post" action="{% url 'collection_delete' collection.pk %}" id="collection-delete-form">{% csrf_token %}<button type="submit" class="btn btn-outline-danger btn-sm">Delete this collection</button></form></details>
+    </details>
+    {% endif %}
+
+    {% if object_total %}
+    <section class="collection-explore" aria-label="Explore collection relationships">
+      <nav class="collection-dimensions" aria-label="Relationship view">{% for option in links_options %}<a href="{{ option.url }}"{% if option.active %} aria-current="page"{% endif %}>{{ option.label }}</a>{% endfor %}</nav>
+      <p class="collection-explanation">{{ links_description }}</p>
+      {% if selected_group %}<div class="collection-group-current"><a href="{{ overview_url }}">All groups</a><span aria-hidden="true">/</span><strong>{{ selected_group.label }}</strong><span>{{ matching_object_count }} object{{ matching_object_count|pluralize }}</span></div>{% endif %}
+      {% if group_options %}
+      <details class="collection-group-list"{% if not relationship_graph %} open{% endif %}><summary>Browse groups{% if group_page %} ({{ group_page.paginator.count }}){% endif %}</summary>
+        <ul>{% for group in group_options %}<li><a href="{{ group.url }}"{% if group.selected %} aria-current="true"{% endif %}><span>{{ group.label }}</span><strong>{{ group.count }}</strong></a></li>{% endfor %}</ul>
+        {% if previous_groups_url or next_groups_url %}<nav class="collection-pagination" aria-label="Group pages">{% if previous_groups_url %}<a href="{{ previous_groups_url }}">Previous groups</a>{% endif %}<span>Page {{ group_page.number }} of {{ group_page.paginator.num_pages }}</span>{% if next_groups_url %}<a href="{{ next_groups_url }}">Next groups</a>{% endif %}</nav>{% endif %}
+      </details>
+      {% endif %}
+    </section>
+    {% if relationship_graph %}{% include "pages/detail_relationships.html" with graph_json_url=export_url %}{% endif %}
+    {% endif %}
+
+    {% if not graph_error %}
+    <section class="collection-card collection-objects" aria-labelledby="collection-objects-heading">
+      <div class="collection-section-heading"><h2 id="collection-objects-heading">{% if selected_group %}Objects in this group{% else %}Data objects{% endif %}</h2><span>{{ matching_object_count|default:0 }} object{{ matching_object_count|pluralize }}</span></div>
+      {% if object_rows %}
+      {% if collection %}<form method="post" action="{% url 'collection_remove' collection.pk %}" id="collection-members-form">{% csrf_token %}
+      <div class="collection-member-actions"><label id="collection-select-all-label" hidden><input type="checkbox" id="collection-select-all" class="form-check-input"> Select this page</label><span id="collection-selection-count" role="status" hidden>0 selected</span><button type="submit" class="btn btn-outline-secondary btn-sm" id="collection-remove-button">Remove selected from collection</button></div>{% endif %}
+      <div class="collection-table-scroll"><table class="table collection-table">
+        <thead><tr>{% if collection %}<th scope="col" class="collection-check-column"><span class="visually-hidden">Select</span></th>{% endif %}<th scope="col">Data object</th><th scope="col">Phase</th><th scope="col">Software / version</th><th scope="col">Loading type / mode</th><th scope="col"><span class="visually-hidden">Open</span></th></tr></thead>
+        <tbody>{% for row in object_rows %}<tr>
+          {% if collection %}<td><input type="checkbox" class="form-check-input collection-member-checkbox" name="selected_objects" value="{{ row.pk }}" aria-label="Select {{ row.title|default:row.identifier }}"></td>{% endif %}
+          <td><a class="collection-object-title" href="{{ row.detail_url }}">{{ row.title|default:row.identifier|default:"Untitled data object" }}</a>{% if row.identifier %}<span class="collection-object-id">{{ row.identifier }}</span>{% endif %}</td>
+          <td>{{ row.phase|default:"—" }}</td><td>{{ row.software|default:"—" }}{% if row.software_version %}<span class="collection-object-version">{{ row.software_version }}</span>{% endif %}</td><td>{{ row.loading|default:"—" }}</td>
+          <td><a href="{{ row.graph_url }}" class="collection-object-graph">Object graph</a></td>
+        </tr>{% endfor %}</tbody>
+      </table></div>
+      {% if collection %}</form>{% endif %}
+      <nav class="collection-pagination" aria-label="Object pages"><span>{{ object_page.start_index }}–{{ object_page.end_index }} of {{ matching_object_count }} objects</span>{% if previous_objects_url %}<a href="{{ previous_objects_url }}">Previous</a>{% endif %}<span>Page {{ object_page.number }} of {{ object_page.paginator.num_pages }}</span>{% if next_objects_url %}<a href="{{ next_objects_url }}">Next</a>{% endif %}</nav>
+      {% else %}
+      <div class="collection-empty"><h3>No accessible data objects</h3><p>Select objects from <a href="{% url 'search' %}">Search</a> or <a href="{% url 'json_data_list' %}">My Data</a> and add them to a collection.</p></div>
+      {% endif %}
+    </section>
+    {% endif %}
+  </div>
+</main>
+<script src="{% static 'assets/js/research-collections.js' %}" defer></script>
+{% endblock content %}

@@ -1,6 +1,6 @@
 {% load static %}
 <script src="{% static 'assets/js/detail-relationships.js' %}" defer></script>
-<section class="relationship-panel" id="detail-relationships" aria-label="Graph workspace" data-object="{{ data_object.pk }}" data-view="{{ relationship_graph.view }}">
+<section class="relationship-panel" id="detail-relationships" aria-label="Graph workspace" data-object="{{ data_object.pk }}" data-view="{{ relationship_graph.view }}"{% if relationship_graph.is_collection %} data-collection="true" data-export-name="{{ graph_export_name }}"{% if selection_token %} data-temporary="true"{% endif %}{% endif %}>
   <div class="relationship-toolbar">
     <h2 id="relationship-heading">Relationships</h2>
     <span class="relationship-count">{{ relationship_graph.nodes|length }} nodes · {{ relationship_graph.count }} connection{{ relationship_graph.count|pluralize }}</span>
@@ -26,9 +26,9 @@
     <details class="graph-download">
       <summary>Download</summary>
       <div>
-        <button type="button" id="graph-save-svg">Graph as SVG</button>
-        <button type="button" id="graph-save-png">Graph as PNG</button>
-        <a href="{% url 'json_data_export' data_object.pk %}">Original JSON</a>
+        <button type="button" id="graph-save-svg">{% if relationship_graph.is_collection %}Current view{% else %}Graph{% endif %} as SVG</button>
+        <button type="button" id="graph-save-png">{% if relationship_graph.is_collection %}Current view{% else %}Graph{% endif %} as PNG</button>
+        {% if graph_json_url %}<a href="{{ graph_json_url }}">Collection JSON</a>{% elif data_object %}<a href="{% url 'json_data_export' data_object.pk %}">Original JSON</a>{% endif %}
       </div>
     </details>
   </div>
@@ -113,7 +113,12 @@
             {% endfor %}
           </nav>
           {% endif %}
+          {% if node.source_url %}
+          <a class="graph-source-link" href="{{ node.source_url }}">{{ node.source_label }}</a>
+          {% if node.graph_url %}<a class="graph-source-link" href="{{ node.graph_url }}">View object graph</a>{% endif %}
+          {% elif data_object %}
           <a class="graph-source-link" href="{% url 'json_data_detail' data_object.pk %}{% if node.kind == 'output' %}#data-curves{% elif node.kind == 'loading' and relationship_graph.has_loading_details %}#data-loading{% else %}#data-metadata{% endif %}">{% if node.kind == 'output' %}View curves and download data{% elif node.kind == 'loading' and relationship_graph.has_loading_details %}View loading details{% else %}View data details{% endif %}</a>
+          {% endif %}
         </section>
       {% endfor %}
       </div>

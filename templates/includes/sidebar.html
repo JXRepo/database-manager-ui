@@ -75,8 +75,8 @@
           </a>
         </li>
 
-        <li class="pc-item{% if request.resolver_match.url_name == 'graph' %} active{% endif %}">
-          <a href="{% url 'graph' %}" class="pc-link"{% if request.resolver_match.url_name == 'graph' %} aria-current="page"{% endif %}>
+        <li class="pc-item{% if request.path|slice:':7' == '/graph/' %} active{% endif %}">
+          <a href="{% url 'graph' %}" class="pc-link"{% if request.path|slice:':7' == '/graph/' %} aria-current="page"{% endif %}>
             <span class="pc-micon"><i data-feather="git-branch"></i></span>
             <span class="pc-mtext">Graph</span>
           </a>

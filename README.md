@@ -8,9 +8,10 @@ A Django platform for uploading, validating, searching, sharing, and exporting
 materials simulation data as JSON.
 
 The platform is currently a public pilot for a small group of research users.
-Development focuses on the core data workflow and access control. Ontology,
-knowledge graphs across records, full Studio integration, and production AI
-features remain future enhancements.
+Development focuses on the core data workflow and access control. Research
+collections support browsing declared references and shared metadata labels
+across accessible records. Ontology, scientific dependency editing, full Studio
+integration, and production AI features remain future enhancements.
 
 ## Try the Platform
 
@@ -541,12 +542,49 @@ for local measurements and verification.
 
 ## Graph
 
-**Graph** is an independent workspace in the sidebar, next to Charts. Choose
-an accessible data object to view its supplied creators, software, phases,
-constitutive models, loading conditions and available mechanical outputs. The
-large canvas remains open, with node details on the right and the current data
-object above it.
-The entry page combines title or identifier search with a bounded list of 25
+**Graph** is a workspace in the sidebar, next to Charts. It starts with the
+current user's saved **Research collections**. In Search or My Data, select
+objects on the displayed page and choose **Open selection in Graph**. Explore
+the selection immediately, save it with a name and optional description, or add
+it to an existing collection. One object can belong to several collections.
+Collections are private to their owner; their membership never grants access to
+the underlying data. The session retains eight temporary selections, with at
+most 500 objects per selection; saved collections hold at most 1,000 objects.
+
+Collection views distinguish **Declared relations**, **Software names**,
+**Phase names** and **Collection members**. Declared relations come only from
+supplied top-level `relation` strings, with explicit DOI spelling variants
+recognized as the same reference. Other reference text remains case sensitive.
+Software and phase names are discovery groups, not proof of shared scientific
+identity, matching model parameters or a dependency between simulations. Missing
+metadata has its own group. Selecting a group reveals its objects; group and
+object lists each use 25-entry pages. A compact table shows supplied identifiers,
+phase names, software versions and loading types and modes. Graphs retain small
+metadata summaries, not raw mechanical arrays.
+
+Use **Edit collection** to change its description, and the member table to
+remove selected objects from the displayed page. **Delete collection** removes
+only the grouping, never its data objects. Saving or adding a temporary
+selection rechecks every object and rejects an unavailable member without
+partial changes. Reads, counts and exports exclude inaccessible members after
+access is revoked. **Edit collection → Clear unavailable members** explicitly
+removes those references and frees collection capacity without deleting data or
+revealing hidden member names or counts. Collection JSON downloads stream currently accessible
+members' original JSON as an array; a stale temporary selection instead asks
+the user to select again rather than silently exporting a partial selection.
+Collection graph images export the current page and view, including offscreen
+nodes, and explicitly label that scope. Copy link retains the collection,
+group, pagination, selected node and card presentation; collection links remain
+private and temporary links belong to the current session. RO-Crate packaging,
+actual input and output file storage, collection sharing and editing scientific
+dependencies are not part of this release.
+
+Individual objects have a **Graph** tab on their detail page. Existing
+`/graph/?object=...` links still open the standalone object workspace, and
+`/graph/?choose=1` opens its chooser. This graph shows supplied creators,
+software, phases, constitutive models, loading conditions and available
+mechanical outputs, with node details beside the canvas.
+The object chooser combines title or identifier search with a bounded list of 25
 objects per page. Click a record row to open its graph directly. **Change data**
 opens the same list above the current graph, and **Close chooser** returns to the
 canvas. Searches require all entered whole words, ignoring case and word order.
@@ -586,7 +624,7 @@ Back, and keeps the record's existing access requirements. The optional
 Drag the canvas background to pan, use **+ / −**, **100%**, **Fit**, **Center node**
 or Ctrl/Command + scroll to navigate, and use **Focus connections** to emphasize
 the selected node's immediate neighbors. With the canvas focused, + / − zoom,
-0 fits and / opens node search. **Download** saves the complete graph as SVG or
+0 fits and / opens node search. **Download** saves the complete single-object graph as SVG or
 PNG, including nodes outside the current viewport or focus. Exported images use
 the chosen Compact or Detailed layout and include its visible relationship
 names and field previews; filenames identify the layout. SVG contains complete
@@ -601,14 +639,15 @@ shared metadata compatibility view and the same access rules as detail pages;
 malformed or repeated object selections are
 rejected. The graph summarizes metadata and availability, not scientific
 comparability or validation results. It does not modify uploaded JSON, infer
-links to other records, or require an ontology service or graph database.
+scientific dependencies, or require an ontology service or graph database.
 
 ## Data Object Details
 
-**Open in Graph** beside the record title opens its graph in the independent
-workspace with the current object already selected. **View data details** returns
-to the same record. Detail pages retain their metadata, boundary conditions,
-curves and exports without an embedded relationship panel.
+**Details / Graph** beside the record title switches between metadata and
+visualizations, and that object's relationship graph. **Open in Graph workspace**
+opens the same object in the standalone workspace. Graph links return to its
+metadata, boundary conditions or curves. The Graph tab does not embed curve
+arrays or load the plot and 3D scripts; all existing detail exports remain.
 
 The FAIR Data Assistant button is available inside the signed in workspace,
 including search, upload, details, My Data, and account settings. It is absent

@@ -360,6 +360,8 @@ const {join} = require('node:path');
     await click('.pc-sidebar a[href="/graph/"]');
     await until(`location.pathname === '/graph/' && location.search === '' && document.readyState === 'complete'`);
     assert.equal(await evaluate(`!!document.querySelector('#detail-relationships')`), false);
+    assert.equal(await evaluate(`!!document.querySelector('#collections-heading')`), true);
+    await navigate(cases.picker);
     for (const width of [1280, 1440, 1920]) {
       await command('Emulation.setDeviceMetricsOverride', {width, height: 1000, deviceScaleFactor: 1, mobile: false});
       await layout(`picker-${width}`);
@@ -396,7 +398,7 @@ const {join} = require('node:path');
     await until(`new URL(location.href).searchParams.get('object') === ${JSON.stringify(new URL(cases.long, process.env.RELATIONSHIP_BASE_URL).searchParams.get('object'))} && document.readyState === 'complete'`);
     assert.equal(await evaluate(`document.querySelector('#detail-relationships').dataset.view`), 'detailed');
     assert.equal(await evaluate(`document.querySelectorAll('.relationship-node-phase').length`), 12);
-    await navigate(cases.picker + '?q=unmatched');
+    await navigate(cases.picker + '&q=unmatched');
     assert.match(await evaluate(`document.querySelector('.graph-picker-empty').innerText`), /No data objects match/);
     assert.equal(await evaluate(`!!document.querySelector('#graph-query')`), true);
     await screenshot('empty-picker');

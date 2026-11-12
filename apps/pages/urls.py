@@ -6,6 +6,7 @@ from .auth_views import HomeLogoutView, RateLimitedLoginView
 from .credential_validation import validate_account_credentials
 from .getting_started import getting_started_view
 from .graph import graph_view
+from . import research_collections
 from .views import account_settings_view, register_view
 from .forms import StyledPasswordChangeForm
 from .views import upload_json_view
@@ -80,6 +81,18 @@ urlpatterns = [
     path("assistant/ask/", fair_assistant_ask_view, name="fair_assistant_ask"),
     path("search/", search_view, name="search"),
     path("graph/", graph_view, name="graph"),
+    path("graph/collections/", research_collections.collection_index, name="collection_index"),
+    path("graph/selection/", research_collections.selection_create, name="graph_selection_create"),
+    path("graph/selection/<str:token>/", research_collections.selection_detail, name="selection_detail"),
+    path("graph/selection/<str:token>/save/", research_collections.collection_save, name="collection_save"),
+    path("graph/selection/<str:token>/add/", research_collections.collection_add, name="collection_add"),
+    path("graph/selection/<str:token>/export/", research_collections.selection_export, name="selection_export"),
+    path("graph/collections/<int:pk>/", research_collections.collection_detail, name="collection_detail"),
+    path("graph/collections/<int:pk>/edit/", research_collections.collection_update, name="collection_update"),
+    path("graph/collections/<int:pk>/remove/", research_collections.collection_remove, name="collection_remove"),
+    path("graph/collections/<int:pk>/clear-unavailable/", research_collections.collection_cleanup, name="collection_cleanup"),
+    path("graph/collections/<int:pk>/delete/", research_collections.collection_delete, name="collection_delete"),
+    path("graph/collections/<int:pk>/export/", research_collections.collection_export, name="collection_export"),
     path("search/live-data/", search_live_data_objects_view, name="search_live_data_objects"),
     path("search/export-selected/", export_selected_search_results_view, name="export_selected_search_results"),
     path("search/export-csv/", views.export_selected_search_csv_view, name="export_selected_search_csv"),
