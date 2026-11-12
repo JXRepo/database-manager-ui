@@ -55,6 +55,60 @@ function tickLabel(value, mode = 'auto') {
   return JSON.parse(JSON.stringify(label));
 }
 
+function axisTick(value, scale) {
+  return JSON.parse(JSON.stringify(vm.runInNewContext(`${scaling}\nformatPlotTickLabel(value, scale.tickFormat, scale.exponent)`, {value, scale})));
+}
+
+test('one shared power formats small axis ticks without changing their values', () => {
+  const scale = plotScale([-0.00014, 0]);
+  assert.equal(scale.exponent, -4);
+  for (const [value, text] of [[-0.0001, '-1.00'], [-0.00006, '-0.60'], [-0.00002, '-0.20'], [0, '0']]) {
+    assert.deepEqual(axisTick(value, scale), {type: 'plain', text});
+  }
+  assert.equal(scale.chartMin, -0.00014);
+  assert.equal(scale.chartMax, 0);
+});
+
+test('independent axis ranges choose their own multiplier or ordinary decimal ticks', () => {
+  const ordinary = plotScale([0, .1]);
+  const tiny = plotScale([0, .000002]);
+  const large = plotScale([0, 200000]);
+  assert.equal(ordinary.exponent, null);
+  assert.equal(tiny.exponent, -6);
+  assert.equal(large.exponent, 5);
+  assert.deepEqual(axisTick(.02, ordinary), {type: 'plain', text: '0.02'});
+  assert.deepEqual(axisTick(.000001, tiny), {type: 'plain', text: '1.00'});
+  assert.deepEqual(axisTick(150000, large), {type: 'plain', text: '1.50'});
+});
+
+test('three-decimal regular steps use a multiplier while hundredths stay decimal', () => {
+  const thousandths = plotScale([0, .15]);
+  assert.equal(thousandths.step, .025);
+  assert.equal(thousandths.exponent, -1);
+  assert.deepEqual(axisTick(.025, thousandths), {type: 'plain', text: '0.25'});
+  const fine = plotScale([0, .03]);
+  assert.equal(fine.exponent, -2);
+  assert.deepEqual(axisTick(.015, fine), {type: 'plain', text: '1.50'});
+  const hundredths = plotScale([0, .05]);
+  assert.equal(hundredths.exponent, null);
+  assert.deepEqual(axisTick(.01, hundredths), {type: 'plain', text: '0.01'});
+  assert.equal(plotScale([0, .1335464475862735]).exponent, null);
+});
+
+test('shared multipliers preserve half-up rounding and tiny signed endpoint coefficients', () => {
+  const scale = plotScale([-0.00014, 1.7e-13]);
+  for (const value of [1.7e-13, -1.7e-13]) {
+    const label = axisTick(value, scale);
+    const coefficient = label.type === 'plain' ? Number(label.text) : Number(`${label.mantissa}e${label.exponent}`);
+    assert.notEqual(coefficient, 0);
+    assert.equal(Math.sign(coefficient), Math.sign(value));
+    assert.ok(Math.abs(coefficient * 10 ** scale.exponent / value - 1) < .005);
+  }
+  assert.deepEqual(axisTick(-0.0001005, scale), {type: 'plain', text: '-1.01'});
+  const wide = plotScale([-1e-100, 1e300]);
+  assert.deepEqual(axisTick(-1e-100, wide), {type: 'scientific', mantissa: '-1.00', exponent: '-400'});
+});
+
 test('ordinary tick labels keep two decimal places with half-up rounding', () => {
   for (const [value, text] of [
     [1, '1.00'], [0.01, '0.01'], [1.004, '1.00'], [1.005, '1.01'],

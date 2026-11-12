@@ -2330,8 +2330,11 @@ function buildPlotScale(values) {
       && (value === 0 || !besideEndpoint)) ticks.push(value);
   }
   ticks.sort((left, right) => left - right);
-  const tickFormat = step < .01 || Math.max(Math.abs(minimum), Math.abs(maximum)) >= 10000
+  const needsExtraDecimals = step < .01 || !Number.isInteger(cleanScaleNumber(step * 100));
+  const tickFormat = needsExtraDecimals || Math.max(Math.abs(minimum), Math.abs(maximum)) >= 10000
     ? "scientific" : "decimal";
+  const exponent = tickFormat === "scientific"
+    ? Math.floor(Math.log10(Math.max(Math.abs(minimum), Math.abs(maximum)))) : null;
 
   return {
     chartMin: minimum,
@@ -2339,6 +2342,7 @@ function buildPlotScale(values) {
     step,
     offset,
     tickFormat,
+    exponent,
     ticks,
   };
 }
@@ -2355,8 +2359,20 @@ const plotTickScientificFormatter = new Intl.NumberFormat("en-US", {
   notation: "scientific",
 });
 
-function formatPlotTickLabel(value, mode = "auto") {
+function formatPlotTickLabel(value, mode = "auto", exponent = null) {
   if (value === 0) return {type: "plain", text: "0"};
+  if (Number.isInteger(exponent)) {
+    // Shift the decimal exponent before formatting to preserve decimal ties.
+    const [coefficient, power] = value.toExponential().split("e");
+    const shiftedPower = Number(power) - exponent;
+    if (shiftedPower < -2) {
+      // Keep a tiny endpoint coefficient nonzero even beyond Number's range.
+      const label = formatPlotTickLabel(value, "scientific");
+      return {...label, exponent: String(Number(label.exponent) - exponent)};
+    }
+    const scaled = Number(`${coefficient}e${shiftedPower}`);
+    return formatPlotTickLabel(scaled, "decimal");
+  }
   if (mode === "scientific" || Math.abs(value) < 0.01 || Math.abs(value) >= 10000) {
     const parts = plotTickScientificFormatter.formatToParts(value);
     const mantissa = parts.filter(part => ["minusSign", "integer", "decimal", "fraction"].includes(part.type))
@@ -2421,16 +2437,26 @@ function measurePlotText(ctx, runs) {
   return {runs: measured, bounds, width: bounds.right - bounds.left, height: bounds.bottom - bounds.top};
 }
 
-function plotTickText(ctx, value, mode) {
-  const label = formatPlotTickLabel(value, mode);
-  const font = "400 16px sans-serif";
+function plotTickText(ctx, value, mode, exponent = null) {
+  const label = formatPlotTickLabel(value, mode, exponent);
+  const font = "400 20px sans-serif";
   const text = label.type === "plain" ? label.text : `${label.mantissa} × 10`;
   const runs = [{text, font, x: 0, y: 0}];
   if (label.type === "scientific") {
     ctx.font = font;
-    runs.push({text: label.exponent, font: "400 11px sans-serif", x: ctx.measureText(text).width + 1, y: -7});
+    runs.push({text: label.exponent, font: "400 16px sans-serif", x: ctx.measureText(text).width + 1, y: -9});
   }
   return measurePlotText(ctx, runs);
+}
+
+function plotMultiplierText(ctx, exponent) {
+  const font = "400 20px sans-serif";
+  const text = "× 10";
+  ctx.font = font;
+  return measurePlotText(ctx, [
+    {text, font, x: 0, y: 0},
+    {text: String(exponent), font: "400 16px sans-serif", x: ctx.measureText(text).width + 1, y: -9},
+  ]);
 }
 
 function plotTitleText(ctx, text) {
@@ -2442,29 +2468,29 @@ function plotTitleText(ctx, text) {
   const subscript = split < 0 ? "" : notation.slice(split + 1);
   const runs = [];
   let x = 0;
-  ctx.font = 'italic 400 18px "Times New Roman", serif';
+  ctx.font = 'italic 400 21px "Times New Roman", serif';
   const symbolHeight = Math.max(...["σ", "ε"].map(symbol => {
     const metrics = ctx.measureText(symbol);
     return metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
   }));
-  for (const run of getPlotTextRuns(main, 18)) {
+  for (const run of getPlotTextRuns(main, 21)) {
     ctx.font = run.font;
     if (/^[σε]$/.test(run.text)) {
       const metrics = ctx.measureText(run.text);
       const height = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-      if (height > 0) run.font = run.font.replace("18px", `${18 * symbolHeight / height}px`);
+      if (height > 0) run.font = run.font.replace("21px", `${21 * symbolHeight / height}px`);
       ctx.font = run.font;
     }
     runs.push({...run, x, y: 0});
     x += ctx.measureText(run.text).width;
   }
   if (subscript) {
-    const font = "400 13px sans-serif";
+    const font = "400 16px sans-serif";
     ctx.font = font;
     runs.push({text: subscript, font, x: x + 1, y: 5});
     x += ctx.measureText(subscript).width + 1;
   }
-  if (unit) runs.push({text: unit, font: "400 18px sans-serif", x: x + 6, y: 0});
+  if (unit) runs.push({text: unit, font: "400 21px sans-serif", x: x + 6, y: 0});
   return measurePlotText(ctx, runs);
 }
 
@@ -2510,7 +2536,7 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
 
   function makeTick(axis, value) {
     const scale = axis === "x" ? xScale : yScale;
-    const group = plotTickText(ctx, value, scale.customTickFormat);
+    const group = plotTickText(ctx, value, scale.customTickFormat, scale.customExponent);
     let left, top;
     if (axis === "x") {
       left = pixelX(value) - group.width / 2;
@@ -2560,11 +2586,35 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
     }
   }
 
+  const multipliers = [];
+  for (const axis of ["y", "x"]) {
+    const scale = axis === "x" ? xScale : yScale;
+    if (!Number.isInteger(scale.customExponent)) continue;
+    const group = plotMultiplierText(ctx, scale.customExponent);
+    const axisTicks = ticks.filter(tick => tick.axis === axis);
+    const left = axis === "x" ? (ySide > 0 ? area.left : area.right - group.width)
+      : ySide < 0 ? axisX - group.width : axisX;
+    let top = axis === "y" ? area.top - axisEndGap - arrowLength - 8 - group.height
+      : xSide < 0 ? Math.min(...axisTicks.map(tick => tick.top)) - 8 - group.height
+      : Math.max(...axisTicks.map(tick => tick.bottom)) + 8;
+    let placed = placePlotText(group, left, top);
+    for (let pass = 0; pass <= ticks.length + arrowBoxes.length + multipliers.length; pass++) {
+      const conflicts = [...ticks, ...arrowBoxes, ...multipliers]
+        .filter(other => plotTextOverlaps(placed, other));
+      if (!conflicts.length) break;
+      top = axis === "x" && xSide > 0
+        ? Math.max(...conflicts.map(other => other.bottom)) + 8
+        : Math.min(...conflicts.map(other => other.top)) - 8 - group.height;
+      placed = placePlotText(group, left, top);
+    }
+    multipliers.push({...placed, axis, exponent: scale.customExponent});
+  }
+
   const xTitle = plotTitleText(ctx, xScale.title.text);
   const yTitle = plotTitleText(ctx, yScale.title.text);
   const axisEnds = Object.values(axisSegments).flat()
     .map(point => ({left: point.x, right: point.x, top: point.y, bottom: point.y}));
-  const envelope = [...ticks, ...arrowBoxes, ...axisEnds, area];
+  const envelope = [...ticks, ...multipliers, ...arrowBoxes, ...axisEnds, area];
   const xTitleTop = xSide < 0
     ? Math.min(...envelope.map(box => box.top)) - titleGap - xTitle.height
     : Math.max(...envelope.map(box => box.bottom)) + titleGap;
@@ -2575,7 +2625,7 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
     x: placePlotText(xTitle, (area.left + area.right - xTitle.width) / 2, xTitleTop),
     y: placePlotText(yTitle, yTitleLeft, (area.top + area.bottom - yTitle.width) / 2, -Math.PI / 2),
   };
-  return {ticks, titles, arrows, axisSegments, area, axes: {x: axisX, y: axisY}, xSide, ySide};
+  return {ticks, multipliers, titles, arrows, axisSegments, area, axes: {x: axisX, y: axisY}, xSide, ySide};
 }
 
 function drawPlotText(ctx, placed) {
@@ -2606,7 +2656,7 @@ const cornerAxisPlugin = {
     for (let pass = 0; pass < 8; pass++) {
       const area = {left: padding.left, top: padding.top, right: width - padding.right, bottom: height - padding.bottom};
       const layout = buildMechanicalPlotLayout(ctx, area, x, y);
-      const boxes = [...layout.ticks, ...Object.values(layout.titles)];
+      const boxes = [...layout.ticks, ...layout.multipliers, ...Object.values(layout.titles)];
       const axisPoints = [...Object.values(layout.arrows).flat(), ...Object.values(layout.axisSegments).flat()];
       const overflow = {
         left: Math.max(0, 8 - Math.min(...boxes.map(box => box.left), ...axisPoints.map(point => point.x))),
@@ -2665,6 +2715,7 @@ const cornerAxisPlugin = {
       }
       drawPlotText(ctx, tick);
     }
+    for (const multiplier of layout.multipliers) drawPlotText(ctx, multiplier);
     drawPlotText(ctx, layout.titles.x);
     drawPlotText(ctx, layout.titles.y);
     ctx.restore();
@@ -2870,6 +2921,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             customTickValues: xScaleConfig.ticks,
             customTickStep: xScaleConfig.step,
             customTickFormat: xScaleConfig.tickFormat,
+            customExponent: xScaleConfig.exponent,
             customOffset: xScaleConfig.offset,
             border: {
               display: false,
@@ -2893,6 +2945,7 @@ function updateRawValues(xVariable, yVariable, pointCount) {
             customTickValues: yScaleConfig.ticks,
             customTickStep: yScaleConfig.step,
             customTickFormat: yScaleConfig.tickFormat,
+            customExponent: yScaleConfig.exponent,
             customOffset: yScaleConfig.offset,
             border: {
               display: false,

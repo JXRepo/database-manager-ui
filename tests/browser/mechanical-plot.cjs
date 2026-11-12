@@ -115,7 +115,8 @@ const {join} = require('node:path');
         right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
       });
       const used = new Set();
-      const groups = [...planned.ticks, planned.titles.x, planned.titles.y];
+      assert.ok(Array.isArray(planned.multipliers), `${label}: scientific multipliers participate in measured layout`);
+      const groups = [...planned.ticks, ...planned.multipliers, planned.titles.x, planned.titles.y];
       for (const position of groups) {
         const bounds = position.group.bounds;
         const drawnRuns = [];
@@ -133,12 +134,17 @@ const {join} = require('node:path');
             top: position.top + local.top - bounds.top,
             bottom: position.top + local.bottom - bounds.top,
           };
+          // Canvas serializes fractional glyph sizes (22.9090909px becomes 22.9091px).
           const index = metrics.texts.findIndex((text, index) => !used.has(index)
-            && text.text === run.text && fontSize(text.font) === fontSize(run.font)
+            && text.text === run.text && Math.abs(fontSize(text.font) - fontSize(run.font)) < .0001
             && ['left', 'top', 'right', 'bottom'].every(edge => Math.abs(text[edge] - expected[edge]) <= .15));
-          assert.ok(index >= 0, `${label}: fillText does not match the measured run ${JSON.stringify({run, expected})}`);
+          assert.ok(index >= 0, `${label}: fillText does not match the measured run ${JSON.stringify({
+            run, expected, drawn: metrics.texts.filter(text => text.text === run.text),
+          })}`);
           used.add(index);
           drawnRuns.push(metrics.texts[index]);
+          const printedSize = fontSize(metrics.texts[index].font) * 85 / 25.4 * 72 / (metrics.width + 48);
+          assert.ok(printedSize >= 5, `${label}: ${run.text} remains at least 5pt in an 85mm PNG, got ${printedSize}pt`);
         }
         const actual = union(drawnRuns);
         for (const edge of ['left', 'top', 'right', 'bottom']) {
@@ -156,6 +162,16 @@ const {join} = require('node:path');
       }
       for (const axis of ['x', 'y']) {
         const ticks = planned.ticks.filter(tick => tick.axis === axis);
+        const exponent = metrics.exponents[axis];
+        const multipliers = planned.multipliers.filter(multiplier => multiplier.axis === axis);
+        assert.equal(multipliers.length, exponent === null ? 0 : 1,
+          `${label}: ${axis} shows exactly one shared multiplier only when needed`);
+        if (multipliers.length) {
+          const multiplier = multipliers[0];
+          assert.equal(multiplier.exponent, exponent, `${label}: ${axis} multiplier matches its scale`);
+          assert.ok(multiplier.group.runs.some(run => run.text === '× 10'), `${label}: shared multiplier has a multiplication sign`);
+          assert.ok(multiplier.group.runs.some(run => run.text === String(exponent)), `${label}: shared exponent is drawn`);
+        }
         for (const endpoint of [metrics[axis + 'Min'], metrics[axis + 'Max']]) {
           assert.ok(ticks.some(tick => tick.value === endpoint), `${label}: ${axis} endpoint remains labelled: ${endpoint}`);
         }
@@ -178,11 +194,11 @@ const {join} = require('node:path');
         for (const tick of ticks) {
           const formatted = labels.find(item => item.value === tick.value).label;
           const main = formatted.type === 'plain' ? formatted.text : `${formatted.mantissa} × 10`;
-          assert.ok(tick.group.runs.some(run => run.text === main && fontSize(run.font) === 16),
-            `${label}: ${axis} tick is drawn at 16px with the expected number: ${main}`);
+          assert.ok(tick.group.runs.some(run => run.text === main),
+            `${label}: ${axis} tick draws the expected coefficient: ${main}`);
           if (formatted.type === 'scientific') {
-            assert.ok(tick.group.runs.some(run => run.text === formatted.exponent && fontSize(run.font) === 11),
-              `${label}: ${axis} scientific exponent is drawn at 11px`);
+            assert.ok(tick.group.runs.some(run => run.text === formatted.exponent),
+              `${label}: ${axis} exceptional coefficient exponent is drawn`);
           }
         }
         const arrow = planned.arrows[axis];
@@ -205,20 +221,15 @@ const {join} = require('node:path');
         }
       }
       const arrowPoints = [...planned.arrows.x, ...planned.arrows.y, ...axisSegments.x, ...axisSegments.y];
+      const axisText = [...planned.ticks, ...planned.multipliers];
       const xTitleGap = planned.xSide < 0
-        ? Math.min(metrics.area.top, ...planned.ticks.map(tick => tick.top), ...arrowPoints.map(point => point.y)) - planned.titles.x.bottom
-        : planned.titles.x.top - Math.max(metrics.area.bottom, ...planned.ticks.map(tick => tick.bottom), ...arrowPoints.map(point => point.y));
+        ? Math.min(metrics.area.top, ...axisText.map(tick => tick.top), ...arrowPoints.map(point => point.y)) - planned.titles.x.bottom
+        : planned.titles.x.top - Math.max(metrics.area.bottom, ...axisText.map(tick => tick.bottom), ...arrowPoints.map(point => point.y));
       const yTitleGap = planned.ySide < 0
-        ? Math.min(metrics.area.left, ...planned.ticks.map(tick => tick.left), ...arrowPoints.map(point => point.x)) - planned.titles.y.right
-        : planned.titles.y.left - Math.max(metrics.area.right, ...planned.ticks.map(tick => tick.right), ...arrowPoints.map(point => point.x));
-      close(xTitleGap, 16, 'X title gap from the plot, tick, arrow and axis endpoint envelope');
-      close(yTitleGap, 16, 'Y title gap from the plot, tick, arrow and axis endpoint envelope');
-      for (const axis of ['x', 'y']) {
-        for (const run of planned.titles[axis].group.runs) {
-          if (run.text === 'σ' || run.text === 'ε') continue;
-          assert.ok([13, 18].includes(fontSize(run.font)), `${label}: title and subscript sizes are consistent`);
-        }
-      }
+        ? Math.min(metrics.area.left, ...axisText.map(tick => tick.left), ...arrowPoints.map(point => point.x)) - planned.titles.y.right
+        : planned.titles.y.left - Math.max(metrics.area.right, ...axisText.map(tick => tick.right), ...arrowPoints.map(point => point.x));
+      close(xTitleGap, 16, 'X title gap includes shared multipliers and the complete axis envelope');
+      close(yTitleGap, 16, 'Y title gap includes shared multipliers and the complete axis envelope');
       const sigma = metrics.texts.find(text => text.text === 'σ');
       const epsilon = metrics.texts.find(text => text.text === 'ε');
       assert.ok(sigma && epsilon && Math.abs(sigma.glyphHeight - epsilon.glyphHeight) <= 1,
@@ -288,10 +299,12 @@ const {join} = require('node:path');
           xGrid: x.options.grid.display, yGrid: y.options.grid.display,
           data, texts: window.plotTexts, filledPaths: window.plotFilledPaths, strokePaths: window.plotStrokePaths,
           plotLayout: chart.$mechanicalPlotLayout,
+          exponents: {x: x.options.customExponent, y: y.options.customExponent},
           tickLabels: chart.$mechanicalPlotLayout.ticks.map(tick => ({
             axis: tick.axis, value: tick.value,
             label: formatPlotTickLabel(tick.value - Number(chart.scales[tick.axis].options.customOffset || 0),
-              chart.scales[tick.axis].options.customTickFormat),
+              chart.scales[tick.axis].options.customTickFormat,
+              chart.scales[tick.axis].options.customExponent),
           })),
           overflow: document.documentElement.scrollWidth > innerWidth};
       })()`);
@@ -310,6 +323,7 @@ const {join} = require('node:path');
         assert.equal(metrics.xSigns, expected.xSigns, `${label}: X quadrants`);
         assert.equal(metrics.ySigns, expected.ySigns, `${label}: Y quadrants`);
         assert.deepEqual(metrics.data, expected.x.map((x, i) => ({x, y: expected.y[i]})), `${label}: original point order`);
+        if (expected.exponents) assert.deepEqual(metrics.exponents, expected.exponents, `${label}: independently selected axis multipliers`);
       }
       for (const coordinate of ['x', 'y']) {
         const values = metrics.data.map(point => point[coordinate]);
@@ -406,11 +420,18 @@ const {join} = require('node:path');
       await until(`(() => {const chart = Chart.getChart('mechanical-plot');
         return chart.getActiveElements().length === 0 && chart.tooltip.opacity === 0;})()`);
     }
+    async function exportedLayout() {
+      return evaluate(`({...window.plotExportGeometry,
+        strokePaths: window.plotExportStrokePaths,
+        filledPaths: window.plotExportFilledPaths,
+        texts: window.plotExportTexts.map(text => ({...text, glyphHeight: text.glyphHeight / 3,
+          left: text.left / 3, right: text.right / 3, top: text.top / 3, bottom: text.bottom / 3}))})`);
+    }
     async function downloadMeasuredPNG(label) {
       const directory = mkdtempSync(join(profile, 'plot-download-'));
       await send('Browser.setDownloadBehavior', {behavior: 'allow', downloadPath: directory});
       try {
-        await evaluate('window.capturePlotExport = true; window.plotExportStrokePaths = []; window.plotExportGeometry = null; document.getElementById("download-plot-btn").click(); window.capturePlotExport = false');
+        await evaluate('window.capturePlotExport = true; window.plotExportTexts = []; window.plotExportFilledPaths = []; window.plotExportStrokePaths = []; window.plotExportGeometry = null; document.getElementById("download-plot-btn").click(); window.capturePlotExport = false');
         let name;
         for (let attempt = 0; attempt < 100; attempt++) {
           name = readdirSync(directory).find(file => file.endsWith('.png'));
@@ -418,8 +439,7 @@ const {join} = require('node:path');
           await new Promise(resolve => setTimeout(resolve, 50));
         }
         assert.ok(name, `${label}: PNG downloads`);
-        const geometry = await evaluate('({...window.plotExportGeometry, strokePaths: window.plotExportStrokePaths})');
-        verifyAxisSegments(geometry, `${label} PNG`);
+        verifyTextLayout(await exportedLayout(), `${label} PNG`);
         const png = readFileSync(join(directory, name));
         assert.equal(png.readUInt32BE(16), 2304);
         assert.equal(png.readUInt32BE(20), 1584);
@@ -440,6 +460,7 @@ const {join} = require('node:path');
       window.plotTexts = [];
       window.plotExportTexts = [];
       window.plotFilledPaths = [];
+      window.plotExportFilledPaths = [];
       window.plotStrokePaths = [];
       window.plotExportStrokePaths = [];
       const isPlotExport = context => window.capturePlotExport && context.canvas.width === 2160 && context.canvas.height === 1440;
@@ -482,8 +503,11 @@ const {join} = require('node:path');
       }
       const fill = CanvasRenderingContext2D.prototype.fill;
       CanvasRenderingContext2D.prototype.fill = function(...args) {
-        if (this.canvas.id === 'mechanical-plot' && this.plotTestPath?.length === 3) {
-          window.plotFilledPaths.push(this.plotTestPath.slice());
+        const exporting = isPlotExport(this);
+        if ((this.canvas.id === 'mechanical-plot' || exporting) && this.plotTestPath?.length === 3) {
+          const paths = exporting ? window.plotExportFilledPaths : window.plotFilledPaths;
+          const ratio = exporting ? 3 : 1;
+          paths.push(this.plotTestPath.map(point => ({x: point.x / ratio, y: point.y / ratio})));
         }
         return fill.apply(this, args);
       };
@@ -506,7 +530,16 @@ const {join} = require('node:path');
             const chart = Chart.getChart(this.canvas);
             if (chart?.$mechanicalPlotLayout) window.plotExportGeometry = {
               plotLayout: chart.$mechanicalPlotLayout, width: chart.width, height: chart.height,
-              xMin: chart.scales.x.min, yMin: chart.scales.y.min,
+              area: chart.chartArea,
+              xMin: chart.scales.x.min, xMax: chart.scales.x.max,
+              yMin: chart.scales.y.min, yMax: chart.scales.y.max,
+              exponents: {x: chart.scales.x.options.customExponent, y: chart.scales.y.options.customExponent},
+              tickLabels: chart.$mechanicalPlotLayout.ticks.map(tick => ({
+                axis: tick.axis, value: tick.value,
+                label: formatPlotTickLabel(tick.value - Number(chart.scales[tick.axis].options.customOffset || 0),
+                  chart.scales[tick.axis].options.customTickFormat,
+                  chart.scales[tick.axis].options.customExponent),
+              })),
             };
           }
         }
@@ -576,7 +609,7 @@ const {join} = require('node:path');
     await evaluate('Chart.getChart("mechanical-plot").resize()');
     await until('canvas.width === 1440');
     await hover('PNG excludes the active sample marker', 0, .7, 1);
-    await evaluate('window.capturePlotExport = true; window.plotExportTexts = []; document.getElementById("download-plot-btn").click(); window.capturePlotExport = false');
+    await evaluate('window.capturePlotExport = true; window.plotExportTexts = []; window.plotExportFilledPaths = []; window.plotExportStrokePaths = []; window.plotExportGeometry = null; document.getElementById("download-plot-btn").click(); window.capturePlotExport = false');
     await evaluate('document.getElementById("download-xy-csv-btn").click()');
     for (let attempt = 0; attempt < 100; attempt++) {
       if (readdirSync(profile).some(name => name.endsWith('.png')) && readdirSync(profile).some(name => name.endsWith('.csv'))) break;
@@ -589,7 +622,7 @@ const {join} = require('node:path');
     assert.equal(png.readUInt32BE(16), (720 + 48) * 3, 'PNG uses three pixels per CSS pixel with equal margins');
     assert.equal(png.readUInt32BE(20), (480 + 48) * 3);
     const exportTexts = await evaluate('window.plotExportTexts');
-    verifyAxisSegments(await evaluate('({...window.plotExportGeometry, strokePaths: window.plotExportStrokePaths})'), 'positive PNG');
+    verifyTextLayout(await exportedLayout(), 'positive PNG');
     assert.ok(exportTexts.length > 5, 'PNG redraws its labels on the full resolution canvas');
     assert.ok(exportTexts.every(text => Math.abs(text.scaleX - 3) < 1e-6 && Math.abs(text.scaleY - 3) < 1e-6),
       'PNG uses a genuine threefold text transform rather than scaling an existing bitmap');
@@ -632,6 +665,15 @@ const {join} = require('node:path');
       }
       assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), 242);
     }
+    const initialSample = JSON.parse(process.env.PLOT_INITIAL_SAMPLE);
+    await navigate(initialSample.path);
+    await select('plot-x-select', 'total_strain.strain_33');
+    const initialMetrics = await layout('sample-initial-25', 1440, initialSample);
+    assert.equal(initialMetrics.data.length, 25, 'The offline initial fixture preserves all 25 original samples');
+    assert.equal(initialMetrics.plotLayout.multipliers.length, 1, 'The initial fixture needs only one X-axis multiplier');
+    assert.ok(initialMetrics.tickLabels.every(tick => tick.label.type === 'plain'),
+      'The initial fixture uses plain coefficients without repeated powers of ten');
+    await downloadMeasuredPNG('sample-initial-25');
     await navigate(process.env.PLOT_EMPTY_PATH, false);
     assert.match(await evaluate('document.querySelector(".plot-empty").textContent'), /No plot-ready mechanical variables/);
     for (const width of [1280, 1440, 1920]) {
@@ -639,7 +681,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; measured Canvas text matches its layout without overlaps or clipping, titles have equal 16px gaps, arrow bases stay 24px beyond range endpoints, two-place ticks remain distinct, and mathematical glyph heights match. Curve hover, original samples, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; measured Canvas text and per-axis multipliers match their layout without overlaps or clipping, titles have equal 16px gaps, arrow bases stay 24px beyond range endpoints, two-place ticks remain distinct, and all text is at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

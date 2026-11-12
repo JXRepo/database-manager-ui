@@ -803,13 +803,20 @@ edge; range endpoints are labelled even when they do not fall on a regular tick.
 Nearby regular ticks are omitted to leave room for the endpoint labels.
 Regular steps target seven intervals before rounding to readable values;
 measured label bounds suppress collisions when longer numbers need more space.
-Axes and numbers are black, with 16px tick labels. Nonzero tick labels use two
-decimal places with half-up rounding; small or large scales use scientific
-notation with two decimal places in the mantissa. The two origin labels remain
-`0`. This formatting does not round the data, hover values or CSV exports.
+Axes and numbers are black, with 20px tick labels. Nonzero tick labels use two
+decimal places with half-up rounding. Regular steps that need at most two
+decimal places use ordinary decimals; finer steps, including 0.025, use a single
+shared power of ten beside that axis. Magnitudes of 10000 or greater also use
+this scientific scaling. Each axis chooses its own exponent from its range;
+ticks show coefficients of that multiplier. An irregular endpoint's extra
+decimals alone do not trigger scientific scaling. Exceptionally tiny endpoint
+coefficients retain scientific notation rather than being rounded to a false
+zero. The two origin labels remain `0`. This formatting does not round the data,
+hover values or CSV exports.
 Titles stay outside the plotting area, with a vertical Y title. Their visible
-text edges sit 16 CSS pixels beyond the outer envelope of the ticks, axis ends,
-arrowheads and plotting area, using measured glyph bounds rather than fixed text baselines.
+text edges sit 16 CSS pixels beyond the outer envelope of the ticks, shared
+multipliers, axis ends, arrowheads and plotting area, using measured glyph bounds
+rather than fixed text baselines.
 Arrowheads start 24 CSS pixels beyond each positive range endpoint and extend
 another 8 pixels, leaving room around the maximum tick. When a range includes
 negative values, its axis also extends 24 CSS pixels beyond the minimum tick
@@ -838,10 +845,13 @@ canvas margins, or outside the canvas clears the highlight and tooltip.
 Plots and downloaded PNGs omit the figure title. Axis labels italicize only the
 scalar symbols sigma and epsilon.
 Subscripts, descriptions, and units stay upright, including in downloaded PNGs.
-Axis labels and units use 18px text with 13px subscripts. Sigma and epsilon use
+Axis labels and units use 21px text with 16px subscripts and scientific exponents.
+At an exported image width of 85 mm, the smallest nominal font is just over
+5 pt; placement at a smaller width reduces it further. Sigma and epsilon use
 the same italic serif font, with their visible glyph heights matched. PNG
-downloads use the same measured layout and redraw the plot at three pixels per
-CSS pixel, with equal white margins and no active hover marker or tooltip;
+downloads remain the only image export format, use the same measured layout,
+and redraw the plot at three pixels per CSS pixel, with equal white margins
+and no active hover marker or tooltip;
 the interactive chart keeps its displayed dimensions. Stress units come from
 the uploaded `units.Stress` value. For total and plastic strain, an explicit
 `units.Strain` value of `1` is displayed as `(-)` on the axes. Missing units stay
