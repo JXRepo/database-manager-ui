@@ -911,17 +911,21 @@ PNG downloads remain available.
 Detail curves use the Charts palette, with a blue line and no endpoint markers
 or grid lines. Their canvas is centered at a fixed 720 × 480 CSS pixels on
 desktop, with width capped by the available panel space to prevent overflow.
-Two Cartesian axes intersect at the actual origin, without arrowheads or
-decorative extensions, and with a separate zero label for each axis; no rectangular
+Two Cartesian axes intersect at the actual origin, without arrowheads,
+and with a separate zero label for each axis; no rectangular
 frame is drawn. Each range covers the paired data extrema and zero independently,
 without making signed ranges symmetric. An entirely zero coordinate uses a
 positive range. Small signed values retain their actual signs and scale.
-Single quadrants close at the origin. Adjacent quadrant pairs show the relevant
-half plane; diagonal pairs and curves spanning three or four quadrants use all
+Zero endpoints close at the origin; nonzero endpoints whose labels are readable
+and clear of both zero labels leave another 16 CSS pixels of axis line beyond
+their ticks. Tiny endpoints crowded against zero get no extension; their true
+signed range and all data remain unchanged.
+Adjacent quadrant pairs show the relevant half plane; diagonal pairs and curves
+spanning three or four quadrants use all
 four quadrants. This follows the actual signs, including tiny recorded reversals.
-Tick labels sit beside the actual axes, on the side closest to the plotting
-edge. Readable range endpoints take priority over regular ticks. A near-zero
-endpoint label is omitted if it would collide with another label or need its
+Nonzero tick labels sit 8 CSS pixels beside the actual axes, on the side closest
+to the plotting edge. Readable range endpoints take priority over regular ticks.
+A near-zero endpoint label is omitted if it would collide with another label or need its
 own scientific exponent; it is never moved away from its coordinate or shown
 as a false zero. The complete signed range and all samples remain available.
 Regular steps target seven intervals before rounding to readable values;
@@ -940,14 +944,14 @@ do not move these slots, and neither factor moves a title. The two origin labels
 This formatting does not round the data,
 hover values or CSV exports.
 Titles stay centered outside the plotting area, with a vertical Y title. Their
-visible text edges sit at fixed distances of 64 CSS pixels for X and 112 for Y
+visible text edges sit at fixed distances of 48 CSS pixels for X and 96 for Y
 from the corresponding outer plot edge, independently of tick labels and
 scientific multipliers. X titles sit above wholly nonpositive Y ranges and below
 otherwise; Y titles sit right of wholly nonpositive X ranges and left otherwise.
 When a zero axis is on the boundary, that boundary is the title's axis reference;
 internal zero axes never pull titles inside the plot. Measured glyph bounds
-include titles and multipliers in canvas padding and PNG layout. Axis text
-is drawn before the curve and has no background masks. Curves retain original
+include titles, multipliers and the extended axis ends in canvas padding and PNG
+layout. Axis text is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
 all exports.
 

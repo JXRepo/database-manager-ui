@@ -75,9 +75,19 @@ const {join} = require('node:path');
     }
     function verifyAxisSegments(metrics, label) {
       const {area, axes} = metrics.plotLayout;
+      const endpointGap = (axis, value) => {
+        if (value === 0) return 0;
+        const tick = metrics.endpointTicks.find(item => item.axis === axis && item.value === value);
+        const touchesOrigin = metrics.plotLayout.ticks.filter(item => item.value === 0).some(zero =>
+          tick.left < zero.right + 6 && tick.right > zero.left - 6
+          && tick.top < zero.bottom + 6 && tick.bottom > zero.top - 6);
+        return tick.label.type !== 'plain' || Number(tick.label.text) === 0 || touchesOrigin ? 0 : 16;
+      };
       const segments = {
-        x: [{x: area.left, y: axes.y}, {x: area.right, y: axes.y}],
-        y: [{x: axes.x, y: area.bottom}, {x: axes.x, y: area.top}],
+        x: [{x: area.left - endpointGap('x', metrics.xMin), y: axes.y},
+          {x: area.right + endpointGap('x', metrics.xMax), y: axes.y}],
+        y: [{x: axes.x, y: area.bottom + endpointGap('y', metrics.yMin)},
+          {x: axes.x, y: area.top - endpointGap('y', metrics.yMax)}],
       };
       assert.equal(Object.hasOwn(metrics.plotLayout, 'arrows'), false, `${label}: axes have no arrow geometry`);
       assert.deepEqual(metrics.filledPaths, [], `${label}: the canvas draws no triangular arrowheads`);
@@ -86,7 +96,7 @@ const {join} = require('node:path');
         const matches = points => points.length === 2 && points.every((point, index) =>
           Math.hypot(point.x - expected[index].x, point.y - expected[index].y) < .15);
         const actual = metrics.strokePaths.find(path => path.color === '#111111' && matches(path.points));
-        assert.ok(actual, `${label}: ${axis} axis ends at the plot boundaries without decorative extensions`);
+        assert.ok(actual, `${label}: ${axis} axis leaves 16px beyond readable endpoints without protruding at zero`);
         assert.ok(matches(metrics.plotLayout.axisSegments[axis]), `${label}: ${axis} measured segment matches its actual stroke`);
         const zero = axis === 'x' ? axes.x : axes.y;
         if (metrics[axis + 'Min'] === 0) {
@@ -176,17 +186,17 @@ const {join} = require('node:path');
           assert.ok(multiplier.group.runs.some(run => run.text === '× 10'), `${label}: shared multiplier has a multiplication sign`);
           assert.ok(multiplier.group.runs.some(run => run.text === String(exponent)), `${label}: shared exponent is drawn`);
           if (axis === 'x') {
-            close(multiplier.right, metrics.area.right, 'X multiplier stays aligned with the right plot edge');
+            close(multiplier.right, planned.axisSegments.x[1].x, 'X multiplier stays aligned with the right axis end');
             close(planned.xSide < 0 ? planned.axes.y - multiplier.bottom : multiplier.top - planned.axes.y,
               36, 'X multiplier stays at its fixed distance from the axis');
           } else {
-            const normal = {...multiplier, top: metrics.area.top - 18 - multiplier.group.height,
-              bottom: metrics.area.top - 18};
+            const normal = {...multiplier, top: planned.axisSegments.y[1].y - 18 - multiplier.group.height,
+              bottom: planned.axisSegments.y[1].y - 18};
             const xMultiplier = planned.multipliers.find(item => item.axis === 'x');
             const cornerConflict = xMultiplier && normal.left < xMultiplier.right + 8
               && normal.right > xMultiplier.left - 8 && normal.top < xMultiplier.bottom + 8
               && normal.bottom > xMultiplier.top - 8;
-            close(multiplier.bottom, cornerConflict ? xMultiplier.top - 8 : metrics.area.top - 18,
+            close(multiplier.bottom, cornerConflict ? xMultiplier.top - 8 : planned.axisSegments.y[1].y - 18,
               'Y multiplier stays above the axis or clears the X multiplier by 8px');
             close(planned.ySide < 0 ? planned.axes.x - multiplier.right : multiplier.left - planned.axes.x,
               8, 'Y multiplier stays on its fixed side of the axis');
@@ -232,8 +242,8 @@ const {join} = require('node:path');
         ? metrics.area.top - planned.titles.x.bottom : planned.titles.x.top - metrics.area.bottom;
       const yTitleGap = titleSides.y < 0
         ? metrics.area.left - planned.titles.y.right : planned.titles.y.left - metrics.area.right;
-      close(xTitleGap, 64, 'X title stays at a fixed plot-edge distance');
-      close(yTitleGap, 112, 'Y title stays at a fixed plot-edge distance');
+      close(xTitleGap, 48, 'X title stays at a compact fixed plot-edge distance');
+      close(yTitleGap, 96, 'Y title stays at a compact fixed plot-edge distance');
       close((planned.titles.x.left + planned.titles.x.right) / 2,
         (metrics.area.left + metrics.area.right) / 2, 'X title remains centred');
       close((planned.titles.y.top + planned.titles.y.bottom) / 2,
@@ -483,9 +493,9 @@ const {join} = require('node:path');
               const text = plotTickText(chart.ctx, value, scale.options.customTickFormat, scale.options.customExponent);
               const position = scale.getPixelForValue(value);
               const left = axis === 'x' ? position - text.width / 2
-                : layout.ySide < 0 ? layout.axes.x - 13 - text.width : layout.axes.x + 13;
+                : layout.ySide < 0 ? layout.axes.x - 8 - text.width : layout.axes.x + 8;
               const top = axis === 'y' ? position - text.height / 2
-                : layout.xSide < 0 ? layout.axes.y - 13 - text.height : layout.axes.y + 13;
+                : layout.xSide < 0 ? layout.axes.y - 8 - text.height : layout.axes.y + 8;
               return {axis, value, label, left, top, right: left + text.width, bottom: top + text.height};
             });
           });
@@ -689,10 +699,10 @@ const {join} = require('node:path');
     await downloadMeasuredPNG('negative-axis');
     if (process.env.PLOT_SAMPLE_PATH) {
       await navigate(process.env.PLOT_SAMPLE_PATH);
-      for (const component of ['33', '22', '13', '23']) {
+      for (const component of ['11', '33', '22', '13', '23']) {
         await select('plot-x-select', `total_strain.strain_${component}`);
         await layout(`sample-${component}`, 1440);
-        if (component === '33') await downloadMeasuredPNG('sample-33');
+        if (component === '11' || component === '33') await downloadMeasuredPNG(`sample-${component}`);
       }
       assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), 242);
       await select('plot-x-select', 'plastic_strain.plastic_strain_13');
@@ -716,7 +726,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; axes close at the plot boundaries without arrowheads, titles and shared multipliers keep fixed positions, visible two-place coefficients remain aligned and distinct, and all measured text stays clear and at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; axes leave 16px beyond readable endpoints without protruding at zero, compact titles and shared multipliers keep fixed positions, visible two-place coefficients remain aligned and distinct, and all measured text stays clear and at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

@@ -2512,10 +2512,24 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
   const xSide = axisY < (area.top + area.bottom) / 2 ? -1 : 1;
   const ySide = axisX > (area.left + area.right) / 2 ? 1 : -1;
   const ticks = [];
-  const tickGap = 13;
+  const tickGap = 8;
+  ticks.push(makeTick("x", 0), makeTick("y", 0));
+
+  function endpointGap(axis, value) {
+    if (value === 0) return 0;
+    const scale = axis === "x" ? xScale : yScale;
+    const label = formatPlotTickLabel(value, scale.customTickFormat, scale.customExponent);
+    if (label.type !== "plain" || Number(label.text) === 0) return 0;
+    const tick = makeTick(axis, value);
+    // Tiny reversals retain their range without making the origin protrude
+    return ticks.some(zero => plotTextOverlaps(tick, zero)) ? 0 : 16;
+  }
+
   const axisSegments = {
-    x: [{x: area.left, y: axisY}, {x: area.right, y: axisY}],
-    y: [{x: axisX, y: area.bottom}, {x: axisX, y: area.top}],
+    x: [{x: area.left - endpointGap("x", xScale.min), y: axisY},
+      {x: area.right + endpointGap("x", xScale.max), y: axisY}],
+    y: [{x: axisX, y: area.bottom + endpointGap("y", yScale.min)},
+      {x: axisX, y: area.top - endpointGap("y", yScale.max)}],
   };
 
   // Keep axis factors in fixed slots, separate from the centered titles
@@ -2524,9 +2538,9 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
     const scale = axis === "x" ? xScale : yScale;
     if (!Number.isInteger(scale.customExponent)) continue;
     const group = plotMultiplierText(ctx, scale.customExponent);
-    const left = axis === "x" ? area.right - group.width
+    const left = axis === "x" ? axisSegments.x[1].x - group.width
       : ySide < 0 ? axisX - 8 - group.width : axisX + 8;
-    let top = axis === "y" ? area.top - 18 - group.height
+    let top = axis === "y" ? axisSegments.y[1].y - 18 - group.height
       : xSide < 0 ? axisY - 36 - group.height : axisY + 36;
     const placed = placePlotText(group, left, top);
     if (axis === "y" && multipliers.some(other => plotTextOverlaps(placed, other, 8))) {
@@ -2552,8 +2566,6 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
       tickX: axis === "x" ? pixelX(value) : axisX,
       tickY: axis === "y" ? pixelY(value) : axisY};
   }
-
-  ticks.push(makeTick("x", 0), makeTick("y", 0));
 
   function addTick(axis, value) {
     const scale = axis === "x" ? xScale : yScale;
@@ -2584,8 +2596,8 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
   const yTitle = plotTitleText(ctx, yScale.title.text);
   // Internal zero axes must not pull the titles into the plotting area
   const titleSides = {x: yScale.max <= 0 ? -1 : 1, y: xScale.max <= 0 ? 1 : -1};
-  const xTitleTop = titleSides.x < 0 ? area.top - 64 - xTitle.height : area.bottom + 64;
-  const yTitleLeft = titleSides.y < 0 ? area.left - 112 - yTitle.height : area.right + 112;
+  const xTitleTop = titleSides.x < 0 ? area.top - 48 - xTitle.height : area.bottom + 48;
+  const yTitleLeft = titleSides.y < 0 ? area.left - 96 - yTitle.height : area.right + 96;
   const titles = {
     x: placePlotText(xTitle, (area.left + area.right - xTitle.width) / 2, xTitleTop),
     y: placePlotText(yTitle, yTitleLeft, (area.top + area.bottom - yTitle.width) / 2, -Math.PI / 2),

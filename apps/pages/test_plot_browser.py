@@ -84,6 +84,7 @@ class MechanicalPlotBrowserTests(StaticLiveServerTestCase):
             ("constant-x", [2, 2, 2], [10, 30, 20], "+", "+"),
             ("constant-y", [-3, -2, -1], [-2, -2, -2], "-", "-"),
             ("long-decimal-upper", [0, .123456789], [0, 1234.567891234], "+", "+"),
+            ("wide-negative-ticks", [-9999.99, 0], [-9999.99, 0], "-", "-"),
             ("half-up-ticks", [0, .005, .015, .025], [0, 1.005, 2.675, 3.005], "+", "+"),
             ("negative-half-up", [-.025, -.015, -.005], [-3.005, -2.675, -1.005], "-", "-"),
             ("scientific-bounds", [-.000123456789, .000987654321],
