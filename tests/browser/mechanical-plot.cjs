@@ -122,13 +122,14 @@ const {join} = require('node:path');
         `${label}: ${message}: ${actual} instead of ${expected}`);
       const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > .5
         && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > .5;
-      const crowded = (a, b) => a.left < b.right + 6 && a.right > b.left - 6
-        && a.top < b.bottom + 6 && a.bottom > b.top - 6;
+      const crowded = (a, b, gap = 6) => a.left < b.right + gap && a.right > b.left - gap
+        && a.top < b.bottom + gap && a.bottom > b.top - gap;
       const union = boxes => ({
         left: Math.min(...boxes.map(box => box.left)), top: Math.min(...boxes.map(box => box.top)),
         right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
       });
       const used = new Set();
+      const drawnGroups = new Map();
       assert.ok(Array.isArray(planned.multipliers), `${label}: scientific multipliers participate in measured layout`);
       const groups = [...planned.ticks, ...planned.multipliers, planned.titles.x, planned.titles.y];
       for (const position of groups) {
@@ -161,6 +162,7 @@ const {join} = require('node:path');
           assert.ok(printedSize >= 5, `${label}: ${run.text} remains at least 5pt in an 85mm PNG, got ${printedSize}pt`);
         }
         const actual = union(drawnRuns);
+        drawnGroups.set(position, actual);
         for (const edge of ['left', 'top', 'right', 'bottom']) {
           close(actual[edge], position[edge], `${position.axis || 'title'} group ${edge}`);
         }
@@ -185,21 +187,33 @@ const {join} = require('node:path');
           assert.equal(multiplier.exponent, exponent, `${label}: ${axis} multiplier matches its scale`);
           assert.ok(multiplier.group.runs.some(run => run.text === '× 10'), `${label}: shared multiplier has a multiplication sign`);
           assert.ok(multiplier.group.runs.some(run => run.text === String(exponent)), `${label}: shared exponent is drawn`);
+          const actual = drawnGroups.get(multiplier);
+          const previous = planned.multipliers.slice(0, planned.multipliers.indexOf(multiplier));
+          const obstacles = [...planned.ticks, ...Object.values(planned.titles), ...previous]
+            .map(position => drawnGroups.get(position));
+          const direction = axis === 'x' ? planned.xSide : -1;
+          let initialTop;
           if (axis === 'x') {
-            close(multiplier.right, planned.axisSegments.x[1].x, 'X multiplier stays aligned with the right axis end');
-            close(planned.xSide < 0 ? planned.axes.y - multiplier.bottom : multiplier.top - planned.axes.y,
-              36, 'X multiplier stays at its fixed distance from the axis');
+            close(actual.right, planned.axisSegments.x[1].x, 'X multiplier stays aligned with the right axis end');
+            initialTop = planned.xSide < 0 ? planned.axes.y - 36 - multiplier.group.height : planned.axes.y + 36;
           } else {
-            const normal = {...multiplier, top: planned.axisSegments.y[1].y - 18 - multiplier.group.height,
-              bottom: planned.axisSegments.y[1].y - 18};
-            const xMultiplier = planned.multipliers.find(item => item.axis === 'x');
-            const cornerConflict = xMultiplier && normal.left < xMultiplier.right + 8
-              && normal.right > xMultiplier.left - 8 && normal.top < xMultiplier.bottom + 8
-              && normal.bottom > xMultiplier.top - 8;
-            close(multiplier.bottom, cornerConflict ? xMultiplier.top - 8 : planned.axisSegments.y[1].y - 18,
-              'Y multiplier stays above the axis or clears the X multiplier by 8px');
-            close(planned.ySide < 0 ? planned.axes.x - multiplier.right : multiplier.left - planned.axes.x,
+            initialTop = planned.axisSegments.y[1].y - 18 - multiplier.group.height;
+            close(planned.ySide < 0 ? planned.axes.x - actual.right : actual.left - planned.axes.x,
               8, 'Y multiplier stays on its fixed side of the axis');
+          }
+          const initial = {...actual, top: initialTop, bottom: initialTop + multiplier.group.height};
+          const movement = direction * (actual.top - initialTop);
+          assert.ok(movement >= -.15, `${label}: ${axis} multiplier moves only outward from its normal slot`);
+          assert.ok(obstacles.every(other => !crowded(actual, other, 7.85)),
+            `${label}: ${axis} multiplier keeps 8px clear of ticks, titles and earlier multipliers`);
+          if (!obstacles.some(other => crowded(initial, other, 8))) {
+            close(actual.top, initialTop, `${axis} multiplier stays in its normal slot when it is clear`);
+          } else if (movement > .15) {
+            assert.ok(obstacles.some(other => {
+              const horizontal = actual.left < other.right + 8 && actual.right > other.left - 8;
+              const gap = direction < 0 ? other.top - actual.bottom : actual.top - other.bottom;
+              return horizontal && Math.abs(gap - 8) <= .15;
+            }), `${label}: ${axis} multiplier stops at an 8px clearance instead of adding unnecessary space`);
           }
         }
         const endpoints = metrics.endpointTicks.filter(tick => tick.axis === axis);
@@ -238,15 +252,26 @@ const {join} = require('node:path');
       }
       const titleSides = {x: metrics.yMax <= 0 ? -1 : 1, y: metrics.xMax <= 0 ? 1 : -1};
       assert.deepEqual(planned.titleSides, titleSides, `${label}: title sides follow the displayed half-plane, not the relative range magnitudes`);
+      const xTitle = drawnGroups.get(planned.titles.x);
+      const yTitle = drawnGroups.get(planned.titles.y);
+      const xTicks = planned.ticks.filter(tick => tick.axis === 'x').map(tick => drawnGroups.get(tick));
+      const yTicks = planned.ticks.filter(tick => tick.axis === 'y').map(tick => drawnGroups.get(tick));
+      const axisEnds = Object.values(planned.axisSegments).flat().map(point => ({
+        left: point.x - .75, right: point.x + .75, top: point.y - .75, bottom: point.y + .75,
+      }));
+      const xNeighbors = [...yTicks, ...axisEnds].filter(tick => tick.left < xTitle.right + 6 && tick.right > xTitle.left - 6);
+      const yNeighbors = [...xTicks, ...axisEnds].filter(tick => tick.top < yTitle.bottom + 6 && tick.bottom > yTitle.top - 6);
+      const xEnvelope = union([metrics.area, ...xTicks, ...xNeighbors]);
+      const yEnvelope = union([metrics.area, ...yTicks, ...yNeighbors]);
       const xTitleGap = titleSides.x < 0
-        ? metrics.area.top - planned.titles.x.bottom : planned.titles.x.top - metrics.area.bottom;
+        ? xEnvelope.top - xTitle.bottom : xTitle.top - xEnvelope.bottom;
       const yTitleGap = titleSides.y < 0
-        ? metrics.area.left - planned.titles.y.right : planned.titles.y.left - metrics.area.right;
-      close(xTitleGap, 48, 'X title stays at a compact fixed plot-edge distance');
-      close(yTitleGap, 96, 'Y title stays at a compact fixed plot-edge distance');
-      close((planned.titles.x.left + planned.titles.x.right) / 2,
+        ? yEnvelope.left - yTitle.right : yTitle.left - yEnvelope.right;
+      close(xTitleGap, 10, 'X title stays 10px outside tick glyphs, nearby axis ends and the plot boundary');
+      close(yTitleGap, 10, 'Y title stays 10px outside tick glyphs, nearby axis ends and the plot boundary');
+      close((xTitle.left + xTitle.right) / 2,
         (metrics.area.left + metrics.area.right) / 2, 'X title remains centred');
-      close((planned.titles.y.top + planned.titles.y.bottom) / 2,
+      close((yTitle.top + yTitle.bottom) / 2,
         (metrics.area.top + metrics.area.bottom) / 2, 'Y title remains centred');
       const sigma = metrics.texts.find(text => text.text === 'σ');
       const epsilon = metrics.texts.find(text => text.text === 'ε');
@@ -726,7 +751,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; axes leave 16px beyond readable endpoints without protruding at zero, compact titles and shared multipliers keep fixed positions, visible two-place coefficients remain aligned and distinct, and all measured text stays clear and at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; axes leave 16px beyond readable endpoints without protruding at zero, titles stay 10px beyond tick glyphs and the plot boundary, shared multipliers keep 8px clear without moving titles, visible two-place coefficients remain aligned and distinct, and all measured text stays clear and at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {
