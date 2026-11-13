@@ -17,7 +17,8 @@ CONTEXT_ERROR = (
     "Open Graph and choose the collection or selection again."
 )
 RETURN_PARAMETERS = {"links", "group", "page", "groups_page", "view", "edge", "relationships_page",
-                     "compare", "panel", "member_q", "members_page", "differences"}
+                     "compare", "panel", "member_q", "members_page", "differences",
+                     "find_candidates", "match_fields", "vary_field", "candidates_page", "curve_component", "curve_strain"}
 
 
 def _return_parameters(values):
@@ -62,7 +63,9 @@ def _return_parameters(values):
         params[key] = value
     if params.get("links") == "members" and "group" in params:
         raise ValueError(CONTEXT_ERROR)
-    if any(key in params for key in ("compare", "panel", "member_q", "members_page", "differences")):
+    if any(key in params for key in ("compare", "panel", "member_q", "members_page", "differences",
+                                    "find_candidates", "match_fields", "vary_field", "candidates_page",
+                                    "curve_component", "curve_strain")):
         from .study_workspace import study_parameters
 
         try:
@@ -217,9 +220,9 @@ def read_mutation_navigation(request, *, collection=None, selection_token=""):
     ValueError
         Navigation is ambiguous, unsigned, repeated or names a different workspace.
     """
-    if any(key in request.GET for key in RETURN_PARAMETERS | {"graph_context"}):
+    if any(key in request.GET for key in RETURN_PARAMETERS | {"graph_context", "match_field"}):
         raise ValueError(CONTEXT_ERROR)
-    if any(key in request.POST for key in RETURN_PARAMETERS):
+    if any(key in request.POST for key in RETURN_PARAMETERS | {"match_field"}):
         raise ValueError(CONTEXT_ERROR)
     navigation = read_navigation(request, data=request.POST)
     if navigation is None:
@@ -301,7 +304,11 @@ def workspace_navigation(request, context, *, collection=None, selection_token="
         fields[f"graph_context_{view}"] = signing.dumps(
             {**payload, "params": {**params, "view": view}}, salt=CONTEXT_SALT,
         )
-    source_rows = [*context.get("object_rows", []), *context.get("study_comparison", {}).get("objects", [])]
+    candidates = context.get("study_candidates", {})
+    source_rows = [*context.get("object_rows", []), *context.get("study_comparison", {}).get("objects", []),
+                   *candidates.get("rows", []), *candidates.get("uncertain_rows", [])]
+    if candidates.get("reference"):
+        source_rows.append(candidates["reference"])
     for row in source_rows:
         row["detail_url"] = with_graph_context(row["detail_url"], token)
         row["graph_url"] = with_graph_context(row["graph_url"], token)

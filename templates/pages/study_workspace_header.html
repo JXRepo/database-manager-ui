@@ -9,10 +9,10 @@
   {% if study_comparison.objects or object_total and study_workspace.panel == 'compare' or not object_total and study_workspace.panel == 'explore' %}
   <div class="study-selection-tray" id="study-selection-tray" aria-label="Selected comparison records">
     {% if study_comparison.objects %}
-    <div class="study-selection-heading"><span>{{ study_comparison.objects|length }} of 4 records selected</span><a href="{{ study_workspace.clear_url }}" id="study-clear-selection">Clear selection</a></div>
+    <div class="study-selection-heading"><span>{{ study_comparison.objects|length }} of 4 records selected</span><a href="{{ study_workspace.candidate_url }}" id="study-find-candidates">Find comparison candidates</a><a href="{{ study_workspace.clear_url }}" id="study-clear-selection">Clear selection</a></div>
     <div class="study-pinned-records" style="--study-columns:{{ study_comparison.objects|length }}">
       {% for item in study_comparison.objects %}
-      <article class="study-pinned-record{% if forloop.first %} is-reference{% endif %}" data-study-pin="{{ item.pk }}" data-reference="{{ forloop.first|yesno:'true,false' }}">
+      <article class="study-pinned-record{% if forloop.first %} is-reference{% endif %}" data-study-pin="{{ item.pk }}" data-study-object="{{ item.pk }}" data-reference="{{ forloop.first|yesno:'true,false' }}">
         <div class="study-pin-heading">{% if forloop.first %}<span class="study-reference-label">Reference record</span>{% else %}<a href="{{ item.reference_url }}" data-study-reference="{{ item.pk }}">Use as reference</a>{% endif %}<a href="{{ item.remove_url }}" data-study-remove="{{ item.pk }}" aria-label="Remove {{ item.title }} from comparison" title="Remove from comparison">×</a></div>
         <a class="study-pin-title" href="{{ item.detail_url }}" title="{{ item.title }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a>
         {% if item.identifier %}<span class="study-pin-identifier" title="{{ item.identifier }}">{{ item.identifier }}</span>{% endif %}

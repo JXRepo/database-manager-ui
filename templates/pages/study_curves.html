@@ -1,0 +1,21 @@
+<details class="study-curves" id="study-curves" data-endpoint="{{ study_curves.url }}" data-selection="{{ study_comparison.selection_value }}"{% if study_curves.open %} open{% endif %}>
+  <summary><span>Result curves</span><span class="study-curves-summary-note">Inspect the recorded response beside its settings</span></summary>
+  <div class="study-curves-body">
+    <form method="get" action="{{ study_curves.form_url|default:workspace_url }}" class="study-curves-form" id="study-curves-form">
+      {% for field in study_curves.hidden_fields %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
+      <label for="study-curve-component">Component <select id="study-curve-component" name="curve_component"><option value="equivalent"{% if study_curves.component == 'equivalent' %} selected{% endif %}>Equivalent</option><option value="11"{% if study_curves.component == '11' %} selected{% endif %}>11</option><option value="22"{% if study_curves.component == '22' %} selected{% endif %}>22</option><option value="33"{% if study_curves.component == '33' %} selected{% endif %}>33</option><option value="12"{% if study_curves.component == '12' %} selected{% endif %}>12</option><option value="13"{% if study_curves.component == '13' %} selected{% endif %}>13</option><option value="23"{% if study_curves.component == '23' %} selected{% endif %}>23</option></select></label>
+      <label for="study-curve-strain">Strain <select id="study-curve-strain" name="curve_strain"><option value="total"{% if study_curves.strain == 'total' %} selected{% endif %}>Total strain</option><option value="plastic"{% if study_curves.strain == 'plastic' %} selected{% endif %}>Plastic strain</option></select></label>
+      <button type="submit" class="study-curves-update">Update curves</button>
+    </form>
+    <div class="study-curves-toolbar" id="study-curves-toolbar" hidden><div role="group" aria-label="Curve presentation"><button type="button" id="study-curves-separate" aria-pressed="true">Side by side</button><button type="button" id="study-curves-overlay" aria-pressed="false" disabled>Overlay</button></div><button type="button" id="study-curves-clear-focus" hidden>Clear record focus</button></div>
+    <p class="study-curves-status" id="study-curves-status" role="status">Open this section to load the selected curves.</p>
+    <p class="study-curves-scale-note" id="study-curves-scale-note" hidden>Each panel uses its own scale.</p>
+    <p class="study-curves-overlay-note" id="study-curves-overlay-note" hidden></p>
+    <button type="button" id="study-curves-retry" class="study-curves-update" hidden>Retry loading curves</button>
+    <div id="study-curves-records" class="study-curve-records" hidden></div>
+    <div id="study-curves-overlay-view" class="study-curve-overlay-view" hidden></div>
+    <p class="study-curves-guidance" id="study-curves-guidance" hidden>Choose a record or click its curve to highlight its settings. Hover a curve for an actual sample; focus a plot and use the arrow keys to inspect samples.</p>
+    <noscript><p class="study-curves-native">Interactive curve comparison needs JavaScript. Complete curves remain available on each source record.</p></noscript>
+    <nav class="study-curves-sources" aria-label="Complete source curves">{% for item in study_comparison.objects %}<a href="{{ item.detail_url }}#data-curves" data-curve-source="{{ item.pk }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a>{% endfor %}</nav>
+  </div>
+</details>

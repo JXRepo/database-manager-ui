@@ -3,6 +3,7 @@ Describe declared references and reported metadata within an accessible collecti
 """
 
 import hashlib
+from dataclasses import dataclass, field
 from time import monotonic
 from urllib.parse import urlencode
 
@@ -65,7 +66,18 @@ class CollectionSummaryPending(Exception):
         super().__init__("Collection summaries are still being prepared.")
 
 
-def collection_summaries(accessible_queryset, *, prepare_all=False, require_comparison=False):
+@dataclass
+class SummaryPreparationBudget:
+    """
+    Share web preparation allowances across the parts of one workspace request
+    """
+
+    started: float = field(default_factory=lambda: monotonic())
+    checked_count: int = 0
+    prepared_bytes: int = 0
+
+
+def collection_summaries(accessible_queryset, *, prepare_all=False, require_comparison=False, budget=None):
     """
     Read cached labels and prepare missing summaries one accessible row at a time
 
@@ -77,6 +89,8 @@ def collection_summaries(accessible_queryset, *, prepare_all=False, require_comp
         Allow operator commands to prepare their bounded batch without web limits.
     require_comparison : bool, optional
         Upgrade only the selected records when their comparison projection is outdated.
+    budget : SummaryPreparationBudget or None, optional
+        Shared request allowance, or a fresh allowance for an independent caller.
 
     Yields
     ------
@@ -88,9 +102,7 @@ def collection_summaries(accessible_queryset, *, prepare_all=False, require_comp
     CollectionSummaryPending
         Some accessible summaries could not be prepared within this request.
     """
-    started = monotonic()
-    checked_count = 0
-    prepared_bytes = 0
+    budget = budget if budget is not None else SummaryPreparationBudget()
     pending = False
     operator_rows = set()
     objects = accessible_queryset.only("pk", "collection_summary", "size_bytes").order_by("-uploaded_at", "-pk")
@@ -127,8 +139,8 @@ def collection_summaries(accessible_queryset, *, prepare_all=False, require_comp
         """
         return prepare_all or (
             0 < size_bytes <= MAX_REQUEST_SUMMARY_BYTES
-            and prepared_bytes + size_bytes <= MAX_REQUEST_SUMMARY_BYTES
-            and monotonic() - started < MAX_REQUEST_SUMMARY_SECONDS
+            and budget.prepared_bytes + size_bytes <= MAX_REQUEST_SUMMARY_BYTES
+            and monotonic() - budget.started < MAX_REQUEST_SUMMARY_SECONDS
         )
 
     for obj in objects.iterator(chunk_size=100):
@@ -139,10 +151,10 @@ def collection_summaries(accessible_queryset, *, prepare_all=False, require_comp
             if not within_budget(obj.size_bytes):
                 pending = True
                 continue
-            if not prepare_all and checked_count >= MAX_REQUEST_SUMMARY_OBJECTS:
+            if not prepare_all and budget.checked_count >= MAX_REQUEST_SUMMARY_OBJECTS:
                 pending = True
                 continue
-            checked_count += 1
+            budget.checked_count += 1
             with transaction.atomic(using=accessible_queryset.db):
                 skip_locked = not prepare_all and connections[accessible_queryset.db].features.has_select_for_update_skip_locked
                 current = accessible_queryset.filter(pk=obj.pk).select_for_update(skip_locked=skip_locked).only(
@@ -180,7 +192,7 @@ def collection_summaries(accessible_queryset, *, prepare_all=False, require_comp
                     summary = build_collection_summary(current.data)
                     current.collection_summary = summary
                     current.save(using=accessible_queryset.db, update_fields=["collection_summary"])
-                    prepared_bytes += raw_bytes
+                    budget.prepared_bytes += raw_bytes
             del current
         detail_url = reverse("json_data_detail", args=[obj.pk])
         displayed = summary if require_comparison else {key: value for key, value in summary.items()
@@ -352,7 +364,7 @@ def _layout(nodes, view, connections):
     }
 
 
-def build_collection_context(accessible_queryset, *, title, base_url, params, manual_relationships=()):
+def build_collection_context(accessible_queryset, *, title, base_url, params, manual_relationships=(), summary_budget=None):
     """
     Prepare a collection graph and comparison rows from currently accessible records
 
@@ -371,6 +383,8 @@ def build_collection_context(accessible_queryset, *, title, base_url, params, ma
         Relationship mode, group and pagination arguments.
     manual_relationships : sequence of dict, optional
         Collection annotations with both endpoints already checked for access.
+    summary_budget : SummaryPreparationBudget or None, optional
+        Request allowance shared with comparison and candidate preparation.
 
     Returns
     -------
@@ -387,7 +401,7 @@ def build_collection_context(accessible_queryset, *, title, base_url, params, ma
     if mode not in LINK_MODES or (mode == "members" and selected_key):
         raise ValueError("Choose a valid relationship view and group.")
     view = "detailed" if _argument(params, "view", "compact") == "detailed" else "compact"
-    summaries = list(collection_summaries(accessible_queryset))
+    summaries = list(collection_summaries(accessible_queryset, budget=summary_budget))
     member_ids = {row["pk"] for row in summaries}
     from .study_workspace import study_parameters
 

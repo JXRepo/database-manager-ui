@@ -38,7 +38,7 @@ TEST_TEMPLATES = [{
 }]
 
 
-def graph_context(objects, *, title, base_url, params):
+def graph_context(objects, *, title, base_url, params, manual_relationships=(), summary_budget=None):
     """
     Isolate graph rendering while observing exactly which records reach it
 
@@ -52,6 +52,10 @@ def graph_context(objects, *, title, base_url, params):
         Workspace URL.
     params : QueryDict
         Requested display options.
+    manual_relationships : sequence of dict, optional
+        Accessible manual annotations passed to the actual renderer.
+    summary_budget : object or None, optional
+        Shared preparation budget passed to the actual renderer.
 
     Returns
     -------

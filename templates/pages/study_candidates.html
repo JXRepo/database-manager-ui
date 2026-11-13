@@ -1,0 +1,29 @@
+<details class="study-candidates" id="study-candidates"{% if study_candidates.error or study_candidates.preparation or study_candidates.enabled and study_workspace.panel == 'explore' %} open{% endif %}>
+  <summary>Find comparison candidates <span>Keep selected fields the same and explore one difference</span></summary>
+  <div class="study-candidates-body">
+    {% if study_comparison.objects %}
+    <p class="study-candidate-reference">Reference: <strong>{{ study_comparison.objects.0.title }}</strong></p>
+    {% if study_candidates.enabled %}
+    <form method="get" action="{{ workspace_url }}" id="study-candidate-form">
+      {% for field in study_candidates.form_hidden_fields %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
+      <input type="hidden" name="match_field" value="">
+      <fieldset><legend>Keep these recorded fields the same</legend><div class="study-candidate-fields">
+      {% for field in study_candidates.fields %}<label><input type="checkbox" name="match_field" value="{{ field.key }}"{% if field.selected %} checked{% endif %}> {{ field.label }}</label>{% endfor %}
+      </div></fieldset>
+      <div class="study-candidate-actions"><label for="study-vary-field">Find a different <select id="study-vary-field" name="vary_field">{% for field in study_candidates.fields %}<option value="{{ field.key }}"{% if field.is_vary %} selected{% endif %}>{{ field.label }}</option>{% endfor %}</select></label><button type="submit" id="study-candidate-submit">Find candidates</button><a href="{{ study_candidates.clear_url }}" id="study-candidate-clear">Clear criteria</a></div>
+    </form>
+    {% else %}<p>Choose the fields to match against this reference. Candidates come from the accessible records in this workspace.</p><a href="{{ study_workspace.candidate_url }}" class="study-candidate-open">Choose matching fields</a>{% endif %}
+    {% else %}<p>Pin a data object to use as your reference.</p>{% endif %}
+    {% if study_candidates.error %}<div class="study-candidate-error" id="study-candidate-error" role="alert">{{ study_candidates.error }}</div>{% endif %}
+    {% if study_candidates.preparation %}<div class="study-candidate-preparation" id="study-candidate-preparation"><p role="status">{{ study_candidates.preparation.ready_count }} of {{ study_candidates.preparation.total_count }} records prepared for candidate search.</p><p>{% if study_candidates.preparation.requires_admin %}An administrator needs to prepare metadata before this search can finish.{% else %}Continue preparation to search the complete workspace.{% endif %}</p><a href="{{ study_candidates.retry_url }}">{% if study_candidates.preparation.requires_admin %}Check again{% else %}Continue preparing{% endif %}</a></div>{% endif %}
+    {% if study_candidates.ready %}
+    <p class="study-candidate-counts" id="study-candidate-counts"><strong>{{ study_candidates.counts.matching }} match the selected conditions</strong><span>{{ study_candidates.counts.uncertain }} need more information</span><span>{{ study_candidates.counts.excluded }} do not match</span></p>
+    <p class="study-candidate-scope">Only the selected fields are checked. Matching model or phase names does not establish scientific comparability.</p>
+    <div class="study-candidate-results" id="study-candidate-results">
+      {% for candidate in study_candidates.rows %}{% include "pages/study_candidate_row.html" with uncertain=False %}{% empty %}<p class="study-candidate-empty">No records match every selected condition. Adjust the matching fields or choose a different reference.</p>{% endfor %}
+    </div>
+    {% if study_candidates.previous_url or study_candidates.next_url %}<nav class="study-candidate-pagination" aria-label="Candidate pages">{% if study_candidates.previous_url %}<a href="{{ study_candidates.previous_url }}" id="study-candidate-previous">Previous</a>{% endif %}<span>Page {{ study_candidates.page.number }} of {{ study_candidates.page.paginator.num_pages }}</span>{% if study_candidates.next_url %}<a href="{{ study_candidates.next_url }}" id="study-candidate-next">Next</a>{% endif %}</nav>{% endif %}
+    {% if study_candidates.uncertain_rows %}<details class="study-candidate-uncertain" id="study-candidate-uncertain"><summary>Need more information ({{ study_candidates.counts.uncertain }})</summary><p>Showing the first {{ study_candidates.uncertain_rows|length }} records whose incomplete fields prevent a match decision.</p>{% for candidate in study_candidates.uncertain_rows %}{% include "pages/study_candidate_row.html" with uncertain=True %}{% endfor %}</details>{% endif %}
+    {% endif %}
+  </div>
+</details>

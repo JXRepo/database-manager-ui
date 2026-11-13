@@ -578,8 +578,39 @@ entries retain their order; explicit units and original numeric text remain
 distinct. Each field shows up to eight entries of 240 characters, within a 32-KiB
 projection. Incomplete or shortened summaries are never classified as complete
 matches. **Recognized fields** shows schema locators; **Metadata** and **Curves**
-open the source record with a return link to the same comparison. Curve arrays
-remain on the detail page and are not overlaid or compared automatically.
+open the source record with a return link to the same comparison.
+
+**Find comparison candidates** searches the accessible records in the current
+collection or temporary selection against the first pinned record. Choose at least
+one recorded field to keep the same and a different field that must vary. Results
+show the reference and candidate values behind every decision, separating matches,
+incomplete information and contradictions. Only selected fields are checked; names
+and matching settings do not establish physical comparability. Open a candidate
+with its reference or add it to the current comparison. Matching results have
+25-entry pages; the incomplete-information section previews up to ten records.
+Candidate search prepares the complete accessible scope before returning results,
+sharing the existing 25-record, 16-MiB, one-second preparation allowance with the
+graph and selected comparison. A bounded preparation step never presents partial
+candidate counts as a completed search.
+
+**Result curves** loads arrays only when opened in a two-to-four-record comparison.
+Choose equivalent or tensor components and total or plastic strain. Separate panels
+retain each curve's own scale; an explicit overlay uses shared axes only when all
+records have the requested pair and recognized matching stress and strain units.
+There is no unit conversion or claim of scientific equivalence. The full paired
+samples retain their original order, including loops; hover and keyboard inspection
+show a recorded sample index and values. Selecting a curve highlights its record
+and settings column. Supplied equivalents take precedence; eligible calculated
+equivalents and unpaired tails are identified. Missing or conflicting sources stay
+visible with an explanation and links to the original record.
+
+Curve requests recheck the complete selected membership and current access, reject
+more than 16 MiB of actual stored JSON or 100,000 paired samples in total, and return
+no partial curve preview when over budget. Larger records remain available through
+their individual detail pages. Native criteria forms, selectors and source links
+work without JavaScript; drawing and sample inspection need JavaScript. Candidate
+criteria and curve selectors survive signed source navigation and relationship
+editing. Uploaded JSON, permissions and existing exports remain unchanged.
 
 Selecting two to four records focuses Explore on those objects and their existing
 manual relationships. Clear the selection to return to whole-collection browsing.

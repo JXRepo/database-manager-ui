@@ -16,7 +16,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from .models import JSONData, ResearchCollection
-from .collection_graph import CollectionSummaryPending
+from .collection_graph import CollectionSummaryPending, SummaryPreparationBudget
 from .collection_navigation import CONTEXT_ERROR, navigation_fields, read_navigation, workspace_navigation
 from .temporary_selections import append_selection, create_selection, selection_ids
 
@@ -208,7 +208,7 @@ def _index_response(request, *, error="", status=200):
     }, status=status)
 
 
-def _graph_context(objects, *, title, base_url, params, manual_relationships=()):
+def _graph_context(objects, *, title, base_url, params, manual_relationships=(), summary_budget=None):
     """
     Build graph summaries after the view has enforced record access
 
@@ -224,6 +224,8 @@ def _graph_context(objects, *, title, base_url, params, manual_relationships=())
         Requested grouping and navigation options.
     manual_relationships : sequence of dict, optional
         Separately stored collection relationships with accessible endpoints.
+    summary_budget : SummaryPreparationBudget or None, optional
+        Request allowance shared with comparison and candidate preparation.
 
     Returns
     -------
@@ -233,7 +235,7 @@ def _graph_context(objects, *, title, base_url, params, manual_relationships=())
     from .collection_graph import build_collection_context
 
     return build_collection_context(objects, title=title, base_url=base_url, params=params,
-                                    manual_relationships=manual_relationships)
+                                    manual_relationships=manual_relationships, summary_budget=summary_budget)
 
 
 def _workspace_response(request, *, collection=None, token="", form=None, error="", status=200,
@@ -293,17 +295,21 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
             manual_rows = list(accessible_relationships(request.user, collection).values(
                 "id", "source_id", "target_id", "label", "revision",
             ))
-        graph_options = {"manual_relationships": manual_rows} if manual_rows else {}
+        summary_budget = SummaryPreparationBudget()
+        graph_options = {"manual_relationships": manual_rows, "summary_budget": summary_budget}
         context.update(_graph_context(objects, title=title, base_url=url, params=params, **graph_options))
         if "manual_member_summaries" in context:
             from .study_workspace import build_study_workspace_context
 
             context.update(build_study_workspace_context(
                 objects, context, params, base_url=url, collection=collection, selection_token=token,
+                preparation_budget=summary_budget,
             ))
             if context["study_workspace"]["error"] and status < 400:
                 status = 400
-            preparation = context["study_comparison"].get("preparation")
+            if context["study_candidates"]["error"] and status < 400:
+                status = 400
+            preparation = context["study_candidates"].get("preparation") or context["study_comparison"].get("preparation")
             if preparation and status < 400:
                 status = 503 if preparation["requires_admin"] else 202
         if collection is not None and "manual_member_summaries" in context:

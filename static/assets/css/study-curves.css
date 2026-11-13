@@ -1,0 +1,39 @@
+.study-curves { border-top: 1px solid var(--study-line); background: #fff; }
+.study-curves > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 18px; padding: 12px 18px; color: var(--study-ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+.study-curves > summary::before { content: "▸"; color: var(--study-teal); }
+.study-curves[open] > summary::before { content: "▾"; }
+.study-curves-summary-note { font-size: 11px; font-weight: 400; color: var(--study-muted); }
+.study-curves-body { padding: 0 18px 16px; }
+.study-curves-form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 18px; margin: 0 0 12px; }
+.study-curves-form label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--study-ink); }
+.study-curves-form select, .study-curves-update { padding: 5px 9px; border: 1px solid #bdcad8; border-radius: 4px; background: #fff; color: var(--study-ink); font: inherit; font-size: 12px; }
+.study-curves-update { color: var(--study-teal); border-color: #a9cccf; }
+.study-curves-toolbar { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; margin: 9px 0; }
+.study-curves-toolbar > div { display: inline-flex; }
+.study-curves-toolbar button { font: inherit; font-size: 11px; padding: 5px 9px; border: 1px solid #cbd7e2; color: var(--study-muted); background: #fff; }
+.study-curves-toolbar button + button { margin-left: -1px; }
+.study-curves-toolbar button[aria-pressed="true"] { background: #edf7f7; color: var(--study-teal); border-color: #aacfd2; position: relative; }
+.study-curves-toolbar button:disabled { opacity: .55; cursor: not-allowed; }
+.study-curves-status, .study-curves-scale-note, .study-curves-overlay-note, .study-curves-guidance, .study-curves-native { margin: 8px 0; font-size: 11px; line-height: 1.6; color: var(--study-muted); }
+.study-curves-status[data-error="true"] { padding: 10px 12px; border-left: 3px solid #b7791f; background: #fff8e9; color: #72501d; }
+.study-curve-records { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.study-curve-record { min-width: 0; border: 1px solid var(--study-line); border-top: 3px solid var(--curve-color); border-radius: 4px; padding: 10px 12px; }
+.study-curve-record.is-study-active { outline: 2px solid var(--curve-color); outline-offset: 1px; }
+.study-curve-record-heading { display: flex; align-items: baseline; gap: 10px; }
+.study-curve-record-name { border: 0; padding: 0; text-align: left; background: transparent; color: var(--study-ink); font: inherit; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; cursor: pointer; }
+.study-curve-record-heading > a { margin-left: auto; white-space: nowrap; font-size: 10px; color: var(--study-teal); }
+.study-curve-record-units, .study-curve-record-source, .study-curve-record-note { margin: 6px 0 0; font-size: 10px; line-height: 1.6; color: var(--study-muted); overflow-wrap: anywhere; }
+.study-curve-record-note { color: #74521c; }
+.study-curve-plot { position: relative; width: 100%; height: 280px; margin-top: 7px; }
+.study-curve-plot canvas { display: block; width: 100%; height: 100%; }
+.study-curve-plot canvas:focus-visible { outline: 2px solid var(--study-teal); outline-offset: 2px; }
+.study-curve-hover { min-height: 35px; margin: 4px 0 0; font-size: 11px; line-height: 1.6; color: var(--study-ink); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.study-curve-overlay-view { border: 1px solid var(--study-line); border-radius: 4px; padding: 12px; }
+.study-curve-overlay-view .study-curve-plot { height: 360px; }
+.study-curve-legend { display: flex; flex-wrap: wrap; gap: 8px 15px; }
+.study-curve-legend button { padding: 3px 0 3px 10px; background: transparent; border: 0; border-left: 4px solid var(--curve-color); font: inherit; font-size: 11px; color: var(--study-ink); text-align: left; max-width: 42%; overflow-wrap: anywhere; }
+.study-curve-legend button[aria-pressed="true"] { font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.study-curves-sources { display: flex; flex-wrap: wrap; gap: 7px 16px; padding-top: 10px; margin-top: 10px; border-top: 1px solid #e8eef3; font-size: 10px; }
+.study-curves-sources a { color: var(--study-teal); max-width: 45%; overflow-wrap: anywhere; }
+.study-page [data-study-object].is-study-active { outline: 2px solid var(--study-focus-color, #087f8c); outline-offset: -2px; }
+.study-page .study-pinned-record[data-study-object].is-study-active { box-shadow: inset 0 0 0 1px var(--study-focus-color, #087f8c); }

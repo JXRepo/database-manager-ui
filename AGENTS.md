@@ -236,11 +236,18 @@ Current priority:
 - Collections and temporary selections support Explore and Compare with up to four ordered accessible member IDs; the first is the explicit reference
 - Preserve comparison pins across member searches/pages, source-detail return links, manual relationship saves/deletes and temporary collection saves; validate signed navigation before mutations
 - Reject invalid, repeated, inaccessible or nonmember comparison IDs as a whole selection; never silently drop an object or reveal inaccessible titles
-- Compare recorded settings only, retaining phase/loading order, numeric precision and explicit units; do not infer physical comparability, align phases by name, overlay curves or infer causal relationships
+- Compare recorded settings only, retaining phase/loading order, numeric precision and explicit units; do not infer physical comparability, align phases by name or infer causal relationships
 - Distinguish matching, differing and incomplete rows; missing, ambiguous or truncated values must never produce a complete equality fingerprint, and Differences & gaps retains incomplete rows
 - Use version 2 collection summaries with a bounded comparison projection: eight entries per field, 240 characters per displayed value and 32 KiB total; keep raw arrays out of retained summaries
 - Ordinary graphs may read legacy summaries; comparison preparation upgrades selected records only within existing request budgets, while deployment backfill upgrades outdated versions in bounded batches
 - Show schema locators as Recognized fields, with links to complete source metadata/curves; comparison CSV is a bounded snapshot with formula protection, separate from unchanged original JSON exports
+- Find comparison candidates only among currently accessible collection or temporary-selection members, using the first pin as reference; require at least one complete matching field and one distinct differing field, show supplied-value evidence, and separate incomplete results from matches and contradictions
+- Candidate matching uses complete existing field fingerprints without similarity scores, unit conversions or scientific inference; keep matching results at 25 per page and incomplete previews at ten, with complete accessible counts
+- Share one summary-preparation budget across graph, comparison and candidate search; prepare the complete candidate scope before returning results, never expose partial candidate counts, and preserve valid pins plus correctable criteria on form errors
+- Load study curves only on explicit opening for two to four fully authorized members; check actual database JSON bytes before reading raw arrays, cap each request at 16 MiB and 100,000 paired samples, and reject over-budget selections without partial curves
+- Study curves preserve complete paired sample order, original indices, explicit units and unequal-tail counts; supplied equivalents remain authoritative, eligible calculated equivalents are labeled, and missing or conflicting sources remain explicit
+- Separate curve panels use their own labeled scales; optional overlay requires the same selected quantity/component and recognized equal units on both axes, uses shared scales, and never converts units, aligns samples, fits material properties or infers causality
+- Link curve focus to the record pin and settings column, preserve native selectors/source links and signed candidate/curve state, and keep uploaded JSON, object permissions and original exports unchanged
 - Verify the study workspace and existing collection/manual relationship flows in real Chromium at desktop widths, including native forms, long content, empty collections and four-record tables
 
 ## Search rules

@@ -16,10 +16,11 @@
     <div class="study-field-filter" role="group" aria-label="Comparison fields"><a href="{{ study_comparison.all_fields_url }}" id="study-all-fields-link"{% if not study_comparison.differences %} aria-current="true"{% endif %}>All fields</a><a href="{{ study_comparison.differences_url }}" id="study-differences-link"{% if study_comparison.differences %} aria-current="true"{% endif %}>Differences &amp; gaps</a></div>
     <p class="study-comparison-counts"><span class="study-count-different">{{ study_comparison.counts.different }} differing</span><span>{{ study_comparison.counts.same }} matching</span><span>{{ study_comparison.counts.incomplete }} incomplete</span></p>
   </div>
+  {% include "pages/study_curves.html" %}
   {% if study_comparison.objects|length > 2 %}<div class="study-column-navigation" id="study-column-navigation"><span>Scroll across to see all {{ study_comparison.objects|length }} records.</span><div><button type="button" id="study-columns-left" aria-label="Scroll comparison left" hidden>←</button><button type="button" id="study-columns-right" aria-label="Scroll comparison right" hidden>→</button></div></div>{% endif %}
   <div class="study-comparison-scroll" tabindex="0" aria-label="Recorded metadata comparison">
     <table class="study-comparison-table" id="study-comparison-table" style="--study-columns:{{ study_comparison.objects|length }}">
-      <thead><tr><th scope="col">Recorded field</th>{% for item in study_comparison.objects %}<th scope="col"{% if forloop.first %} class="is-reference"{% endif %}><span class="study-column-kind">{% if forloop.first %}Reference{% else %}Selected record{% endif %}</span><a href="{{ item.detail_url }}" title="{{ item.title }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a><div class="study-column-links"><a href="{{ item.detail_url }}#data-metadata">Metadata</a><a href="{{ item.detail_url }}#data-curves">Curves</a></div></th>{% endfor %}</tr></thead>
+      <thead><tr><th scope="col">Recorded field</th>{% for item in study_comparison.objects %}<th scope="col" data-study-object="{{ item.pk }}"{% if forloop.first %} class="is-reference"{% endif %}><span class="study-column-kind">{% if forloop.first %}Reference{% else %}Selected record{% endif %}</span><a href="{{ item.detail_url }}" title="{{ item.title }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a><div class="study-column-links"><a href="{{ item.detail_url }}#data-metadata">Metadata</a><a href="{{ item.detail_url }}#data-curves">Curves</a></div></th>{% endfor %}</tr></thead>
       <tbody>
       {% for row in study_comparison.rows %}
         {% if not study_comparison.differences or row.status != 'same' %}
@@ -27,7 +28,7 @@
         <tr data-field="{{ row.key }}" data-state="{{ row.status }}">
           <th scope="row"><span>{{ row.label }}</span><span class="study-row-state">{% if row.status == 'same' %}Same recorded values{% elif row.status == 'different' %}Different recorded values{% else %}Incomplete information{% endif %}</span></th>
           {% for cell in row.cells %}
-          <td data-state="{{ cell.state }}" data-reference-match="{{ cell.matches_reference|yesno:'true,false,unknown' }}"{% if forloop.first %} class="is-reference"{% endif %}>
+          <td data-study-object="{{ cell.object_pk }}" data-state="{{ cell.state }}" data-reference-match="{{ cell.matches_reference|yesno:'true,false,unknown' }}"{% if forloop.first %} class="is-reference"{% endif %}>
             <div class="study-cell-content">
               {% if cell.entries %}<ul class="study-cell-values">{% for entry in cell.entries %}<li>{% if entry.context %}<span class="study-entry-context">{{ entry.context }}</span>{% endif %}<span class="study-entry-value">{{ entry.value }}</span></li>{% endfor %}</ul>{% endif %}
               {% if cell.state == 'not_supplied' and not cell.entries %}<span class="study-cell-state">Not supplied</span>{% elif cell.state == 'ambiguous' %}<span class="study-cell-state">Ambiguous metadata</span>{% elif cell.state == 'truncated' %}<span class="study-cell-state">Partial summary</span>{% endif %}

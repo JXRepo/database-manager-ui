@@ -420,7 +420,7 @@ def parse_comparison_ids(params):
     return ids
 
 
-def build_comparison_context(accessible_queryset, params, *, base_url):
+def build_comparison_context(accessible_queryset, params, *, base_url, preparation_budget=None):
     """
     Prepare complete comparison rows only after checking every selected member
 
@@ -432,6 +432,8 @@ def build_comparison_context(accessible_queryset, params, *, base_url):
         Ordered comparison IDs and optional differences flag.
     base_url : str
         Canonical workspace URL for recovery and continuation.
+    preparation_budget : SummaryPreparationBudget or None, optional
+        Request allowance shared with graph and candidate preparation.
 
     Returns
     -------
@@ -456,7 +458,7 @@ def build_comparison_context(accessible_queryset, params, *, base_url):
             raise ValueError("Some comparison objects are unavailable. Choose accessible objects from this collection again.")
         if not ids:
             return context
-        summaries = list(collection_summaries(selected, require_comparison=len(ids) >= 2))
+        summaries = list(collection_summaries(selected, require_comparison=len(ids) >= 2, budget=preparation_budget))
         by_id = {row["pk"]: row for row in summaries}
         if set(by_id) != set(ids):
             raise ValueError("Some comparison objects are unavailable. Choose accessible objects from this collection again.")
