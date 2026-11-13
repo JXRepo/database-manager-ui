@@ -2513,26 +2513,27 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
   const ySide = axisX > (area.left + area.right) / 2 ? 1 : -1;
   const ticks = [];
   const tickGap = 13;
-  const titleGap = 16;
-  const axisEndGap = 24, arrowLength = 8, arrowHalfWidth = 4;
-  const arrows = {
-    x: [{x: area.right + axisEndGap + arrowLength, y: axisY},
-      {x: area.right + axisEndGap, y: axisY - arrowHalfWidth},
-      {x: area.right + axisEndGap, y: axisY + arrowHalfWidth}],
-    y: [{x: axisX, y: area.top - axisEndGap - arrowLength},
-      {x: axisX - arrowHalfWidth, y: area.top - axisEndGap},
-      {x: axisX + arrowHalfWidth, y: area.top - axisEndGap}],
-  };
   const axisSegments = {
-    x: [{x: area.left - (xScale.min < 0 ? axisEndGap : 0), y: axisY}, arrows.x[0]],
-    y: [{x: axisX, y: area.bottom + (yScale.min < 0 ? axisEndGap : 0)}, arrows.y[0]],
+    x: [{x: area.left, y: axisY}, {x: area.right, y: axisY}],
+    y: [{x: axisX, y: area.bottom}, {x: axisX, y: area.top}],
   };
-  const arrowBoxes = Object.values(arrows).map(points => ({
-    left: Math.min(...points.map(point => point.x)),
-    right: Math.max(...points.map(point => point.x)),
-    top: Math.min(...points.map(point => point.y)),
-    bottom: Math.max(...points.map(point => point.y)),
-  }));
+
+  // Keep axis factors in fixed slots, separate from the centered titles
+  const multipliers = [];
+  for (const axis of ["x", "y"]) {
+    const scale = axis === "x" ? xScale : yScale;
+    if (!Number.isInteger(scale.customExponent)) continue;
+    const group = plotMultiplierText(ctx, scale.customExponent);
+    const left = axis === "x" ? area.right - group.width
+      : ySide < 0 ? axisX - 8 - group.width : axisX + 8;
+    let top = axis === "y" ? area.top - 18 - group.height
+      : xSide < 0 ? axisY - 36 - group.height : axisY + 36;
+    const placed = placePlotText(group, left, top);
+    if (axis === "y" && multipliers.some(other => plotTextOverlaps(placed, other, 8))) {
+      top = Math.min(...multipliers.map(other => other.top)) - 8 - group.height;
+    }
+    multipliers.push({...placePlotText(group, left, top), axis, exponent: scale.customExponent});
+  }
 
   function makeTick(axis, value) {
     const scale = axis === "x" ? xScale : yScale;
@@ -2553,79 +2554,43 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
   }
 
   ticks.push(makeTick("x", 0), makeTick("y", 0));
+
+  function addTick(axis, value) {
+    const scale = axis === "x" ? xScale : yScale;
+    const label = formatPlotTickLabel(value, scale.customTickFormat, scale.customExponent);
+    // A second exponent or a rounded zero would obscure the shared axis scale
+    if (label.type !== "plain" || Number(label.text) === 0) return;
+    const tick = makeTick(axis, value);
+    const text = tick.group.runs.map(run => run.text).join("");
+    const duplicate = ticks.some(other => other.axis === axis
+      && other.group.runs.map(run => run.text).join("") === text);
+    if (!duplicate && ![...ticks, ...multipliers].some(other => plotTextOverlaps(tick, other))) ticks.push(tick);
+  }
+
   for (const axis of ["x", "y"]) {
     const scale = axis === "x" ? xScale : yScale;
-    for (const value of [scale.min, scale.max]) {
-      if (value === 0) continue;
-      let tick = makeTick(axis, value);
-      for (let pass = 0; pass <= ticks.length + arrowBoxes.length; pass++) {
-        const conflicts = [...ticks, ...arrowBoxes].filter(other => plotTextOverlaps(tick, other));
-        if (!conflicts.length) break;
-        let left = tick.left, top = tick.top;
-        if (axis === "x") {
-          left = value > 0 ? Math.max(...conflicts.map(other => other.right)) + 6
-            : Math.min(...conflicts.map(other => other.left)) - 6 - tick.group.width;
-        } else {
-          top = value > 0 ? Math.min(...conflicts.map(other => other.top)) - 6 - tick.group.height
-            : Math.max(...conflicts.map(other => other.bottom)) + 6;
-        }
-        tick = {...tick, ...placePlotText(tick.group, left, top)};
-      }
-      ticks.push(tick);
-    }
+    const endpoints = [scale.min, scale.max].sort((first, second) => Math.abs(second) - Math.abs(first));
+    for (const value of endpoints) if (value !== 0) addTick(axis, value);
   }
   for (const axis of ["x", "y"]) {
     const scale = axis === "x" ? xScale : yScale;
     for (const value of scale.customTickValues) {
       if (value === 0 || value === scale.min || value === scale.max) continue;
-      const tick = makeTick(axis, value);
-      const text = tick.group.runs.map(run => run.text).join("");
-      const duplicate = ticks.some(other => other.axis === axis
-        && other.group.runs.map(run => run.text).join("") === text);
-      if (!duplicate && ![...ticks, ...arrowBoxes].some(other => plotTextOverlaps(tick, other))) ticks.push(tick);
+      addTick(axis, value);
     }
-  }
-
-  const multipliers = [];
-  for (const axis of ["y", "x"]) {
-    const scale = axis === "x" ? xScale : yScale;
-    if (!Number.isInteger(scale.customExponent)) continue;
-    const group = plotMultiplierText(ctx, scale.customExponent);
-    const axisTicks = ticks.filter(tick => tick.axis === axis);
-    const left = axis === "x" ? (ySide > 0 ? area.left : area.right - group.width)
-      : ySide < 0 ? axisX - group.width : axisX;
-    let top = axis === "y" ? area.top - axisEndGap - arrowLength - 8 - group.height
-      : xSide < 0 ? Math.min(...axisTicks.map(tick => tick.top)) - 8 - group.height
-      : Math.max(...axisTicks.map(tick => tick.bottom)) + 8;
-    let placed = placePlotText(group, left, top);
-    for (let pass = 0; pass <= ticks.length + arrowBoxes.length + multipliers.length; pass++) {
-      const conflicts = [...ticks, ...arrowBoxes, ...multipliers]
-        .filter(other => plotTextOverlaps(placed, other));
-      if (!conflicts.length) break;
-      top = axis === "x" && xSide > 0
-        ? Math.max(...conflicts.map(other => other.bottom)) + 8
-        : Math.min(...conflicts.map(other => other.top)) - 8 - group.height;
-      placed = placePlotText(group, left, top);
-    }
-    multipliers.push({...placed, axis, exponent: scale.customExponent});
   }
 
   const xTitle = plotTitleText(ctx, xScale.title.text);
   const yTitle = plotTitleText(ctx, yScale.title.text);
-  const axisEnds = Object.values(axisSegments).flat()
-    .map(point => ({left: point.x, right: point.x, top: point.y, bottom: point.y}));
-  const envelope = [...ticks, ...multipliers, ...arrowBoxes, ...axisEnds, area];
-  const xTitleTop = xSide < 0
-    ? Math.min(...envelope.map(box => box.top)) - titleGap - xTitle.height
-    : Math.max(...envelope.map(box => box.bottom)) + titleGap;
-  const yTitleLeft = ySide < 0
-    ? Math.min(...envelope.map(box => box.left)) - titleGap - yTitle.height
-    : Math.max(...envelope.map(box => box.right)) + titleGap;
+  // Internal zero axes must not pull the titles into the plotting area
+  const titleSides = {x: yScale.max <= 0 ? -1 : 1, y: xScale.max <= 0 ? 1 : -1};
+  const xTitleTop = titleSides.x < 0 ? area.top - 64 - xTitle.height : area.bottom + 64;
+  const yTitleLeft = titleSides.y < 0 ? area.left - 112 - yTitle.height : area.right + 112;
   const titles = {
     x: placePlotText(xTitle, (area.left + area.right - xTitle.width) / 2, xTitleTop),
     y: placePlotText(yTitle, yTitleLeft, (area.top + area.bottom - yTitle.width) / 2, -Math.PI / 2),
   };
-  return {ticks, multipliers, titles, arrows, axisSegments, area, axes: {x: axisX, y: axisY}, xSide, ySide};
+  return {ticks, multipliers, titles, titleSides, axisSegments, area, axes: {x: axisX, y: axisY}, xSide, ySide};
 }
 
 function drawPlotText(ctx, placed) {
@@ -2657,7 +2622,7 @@ const cornerAxisPlugin = {
       const area = {left: padding.left, top: padding.top, right: width - padding.right, bottom: height - padding.bottom};
       const layout = buildMechanicalPlotLayout(ctx, area, x, y);
       const boxes = [...layout.ticks, ...layout.multipliers, ...Object.values(layout.titles)];
-      const axisPoints = [...Object.values(layout.arrows).flat(), ...Object.values(layout.axisSegments).flat()];
+      const axisPoints = Object.values(layout.axisSegments).flat();
       const overflow = {
         left: Math.max(0, 8 - Math.min(...boxes.map(box => box.left), ...axisPoints.map(point => point.x))),
         right: Math.max(0, Math.max(...boxes.map(box => box.right), ...axisPoints.map(point => point.x)) + 8 - width),
@@ -2679,7 +2644,7 @@ const cornerAxisPlugin = {
   beforeDraw(chart) {
     const {ctx, $mechanicalPlotLayout: layout} = chart;
     if (!layout) return;
-    const {axisSegments, arrows} = layout;
+    const {axisSegments} = layout;
     ctx.save();
     ctx.strokeStyle = "#111111";
     ctx.fillStyle = "#111111";
@@ -2690,12 +2655,6 @@ const cornerAxisPlugin = {
       ctx.lineTo(end.x, end.y);
     }
     ctx.stroke();
-    for (const points of Object.values(arrows)) {
-      ctx.beginPath();
-      points.forEach((point, index) => index ? ctx.lineTo(point.x, point.y) : ctx.moveTo(point.x, point.y));
-      ctx.closePath();
-      ctx.fill();
-    }
     ctx.restore();
   },
   beforeDatasetsDraw(chart) {

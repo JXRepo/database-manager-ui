@@ -880,14 +880,19 @@ PNG downloads remain available.
 Detail curves use the Charts palette, with a blue line and no endpoint markers
 or grid lines. Their canvas is centered at a fixed 720 × 480 CSS pixels on
 desktop, with width capped by the available panel space to prevent overflow.
-Two Cartesian axes intersect at the actual origin, with arrows
-pointing right and up and a separate zero label for each axis; no rectangular
+Two Cartesian axes intersect at the actual origin, without arrowheads or
+decorative extensions, and with a separate zero label for each axis; no rectangular
 frame is drawn. Each range covers the paired data extrema and zero independently,
 without making signed ranges symmetric. An entirely zero coordinate uses a
 positive range. Small signed values retain their actual signs and scale.
+Single quadrants close at the origin. Adjacent quadrant pairs show the relevant
+half plane; diagonal pairs and curves spanning three or four quadrants use all
+four quadrants. This follows the actual signs, including tiny recorded reversals.
 Tick labels sit beside the actual axes, on the side closest to the plotting
-edge; range endpoints are labelled even when they do not fall on a regular tick.
-Nearby regular ticks are omitted to leave room for the endpoint labels.
+edge. Readable range endpoints take priority over regular ticks. A near-zero
+endpoint label is omitted if it would collide with another label or need its
+own scientific exponent; it is never moved away from its coordinate or shown
+as a false zero. The complete signed range and all samples remain available.
 Regular steps target seven intervals before rounding to readable values;
 measured label bounds suppress collisions when longer numbers need more space.
 Axes and numbers are black, with 20px tick labels. Nonzero tick labels use two
@@ -895,21 +900,22 @@ decimal places with half-up rounding. Regular steps that need at most two
 decimal places use ordinary decimals; finer steps, including 0.025, use a single
 shared power of ten beside that axis. Magnitudes of 10000 or greater also use
 this scientific scaling. Each axis chooses its own exponent from its range;
-ticks show coefficients of that multiplier. An irregular endpoint's extra
-decimals alone do not trigger scientific scaling. Exceptionally tiny endpoint
-coefficients retain scientific notation rather than being rounded to a false
-zero. The two origin labels remain `0`. This formatting does not round the data,
+ticks show plain decimal coefficients of that multiplier. An irregular endpoint's
+extra decimals alone do not trigger scientific scaling. The X multiplier is
+right-aligned at the axis's right end in a separate band outside its tick labels;
+the Y multiplier sits above the top end on the tick-label side. If the two factors
+share a crowded corner, only Y moves above X with an 8-pixel gap. Endpoint labels
+do not move these slots, and neither factor moves a title. The two origin labels remain `0`.
+This formatting does not round the data,
 hover values or CSV exports.
-Titles stay outside the plotting area, with a vertical Y title. Their visible
-text edges sit 16 CSS pixels beyond the outer envelope of the ticks, shared
-multipliers, axis ends, arrowheads and plotting area, using measured glyph bounds
-rather than fixed text baselines.
-Arrowheads start 24 CSS pixels beyond each positive range endpoint and extend
-another 8 pixels, leaving room around the maximum tick. When a range includes
-negative values, its axis also extends 24 CSS pixels beyond the minimum tick
-to the left or below, without adding another arrow. A zero minimum stays at
-the origin. These extensions leave data bounds and tick coordinates unchanged
-and are included in the page and PNG layout. Axis text
+Titles stay centered outside the plotting area, with a vertical Y title. Their
+visible text edges sit at fixed distances of 64 CSS pixels for X and 112 for Y
+from the corresponding outer plot edge, independently of tick labels and
+scientific multipliers. X titles sit above wholly nonpositive Y ranges and below
+otherwise; Y titles sit right of wholly nonpositive X ranges and left otherwise.
+When a zero axis is on the boundary, that boundary is the title's axis reference;
+internal zero axes never pull titles inside the plot. Measured glyph bounds
+include titles and multipliers in canvas padding and PNG layout. Axis text
 is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
 all exports.

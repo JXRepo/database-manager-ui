@@ -74,42 +74,46 @@ const {join} = require('node:path');
         Chart.getChart('mechanical-plot').stop(); Chart.getChart('mechanical-plot').update('none')`);
     }
     function verifyAxisSegments(metrics, label) {
-      const {area, axes, arrows} = metrics.plotLayout;
+      const {area, axes} = metrics.plotLayout;
       const segments = {
-        x: [{x: area.left - (metrics.xMin < 0 ? 24 : 0), y: axes.y}, {x: arrows.x[0].x, y: axes.y}],
-        y: [{x: axes.x, y: area.bottom + (metrics.yMin < 0 ? 24 : 0)}, {x: axes.x, y: arrows.y[0].y}],
+        x: [{x: area.left, y: axes.y}, {x: area.right, y: axes.y}],
+        y: [{x: axes.x, y: area.bottom}, {x: axes.x, y: area.top}],
       };
+      assert.equal(Object.hasOwn(metrics.plotLayout, 'arrows'), false, `${label}: axes have no arrow geometry`);
+      assert.deepEqual(metrics.filledPaths, [], `${label}: the canvas draws no triangular arrowheads`);
       for (const axis of ['x', 'y']) {
         const expected = segments[axis];
         const matches = points => points.length === 2 && points.every((point, index) =>
           Math.hypot(point.x - expected[index].x, point.y - expected[index].y) < .15);
-        const actual = metrics.strokePaths.find(path => path.color === '#111111' && path.points.length === 2
-          && Math.hypot(path.points[1].x - expected[1].x, path.points[1].y - expected[1].y) < .15);
-        assert.ok(actual, `${label}: ${axis} axis has a real stroke ending at its arrow tip`);
-        const gap = axis === 'x' ? area.left - actual.points[0].x : actual.points[0].y - area.bottom;
-        const expectedGap = metrics[axis + 'Min'] < 0 ? 24 : 0;
-        assert.ok(Math.abs(gap - expectedGap) < .15,
-          `${label}: ${axis} minimum-to-axis-end gap is ${gap}px; expected ${expectedGap}px`);
-        assert.ok(matches(actual.points), `${label}: ${axis} axis remains aligned with its true zero coordinate`);
-        if (metrics.plotLayout.axisSegments) {
-          assert.ok(matches(metrics.plotLayout.axisSegments[axis]), `${label}: ${axis} measured segment matches its actual stroke`);
+        const actual = metrics.strokePaths.find(path => path.color === '#111111' && matches(path.points));
+        assert.ok(actual, `${label}: ${axis} axis ends at the plot boundaries without decorative extensions`);
+        assert.ok(matches(metrics.plotLayout.axisSegments[axis]), `${label}: ${axis} measured segment matches its actual stroke`);
+        const zero = axis === 'x' ? axes.x : axes.y;
+        if (metrics[axis + 'Min'] === 0) {
+          assert.ok(Math.abs((axis === 'x' ? actual.points[0].x : actual.points[0].y) - zero) < .15,
+            `${label}: ${axis} minimum closes at the origin`);
+        }
+        if (metrics[axis + 'Max'] === 0) {
+          assert.ok(Math.abs((axis === 'x' ? actual.points[1].x : actual.points[1].y) - zero) < .15,
+            `${label}: ${axis} maximum closes at the origin`);
         }
         assert.ok(expected.every(point => point.x >= .75 && point.y >= .75
           && point.x <= metrics.width - .75 && point.y <= metrics.height - .75),
         `${label}: ${axis} axis stroke remains inside the canvas`);
       }
-      return segments;
     }
     function verifyTextLayout(metrics, label) {
       const planned = metrics.plotLayout;
       assert.ok(planned && planned.ticks.length && planned.titles.x && planned.titles.y,
         `${label}: the drawing exposes its measured text layout`);
-      const axisSegments = verifyAxisSegments(metrics, label);
+      verifyAxisSegments(metrics, label);
       const fontSize = font => Number(font.match(/([\d.]+)px/)[1]);
       const close = (actual, expected, message) => assert.ok(Math.abs(actual - expected) <= .15,
         `${label}: ${message}: ${actual} instead of ${expected}`);
       const overlap = (a, b) => Math.min(a.right, b.right) - Math.max(a.left, b.left) > .5
         && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > .5;
+      const crowded = (a, b) => a.left < b.right + 6 && a.right > b.left - 6
+        && a.top < b.bottom + 6 && a.bottom > b.top - 6;
       const union = boxes => ({
         left: Math.min(...boxes.map(box => box.left)), top: Math.min(...boxes.map(box => box.top)),
         right: Math.max(...boxes.map(box => box.right)), bottom: Math.max(...boxes.map(box => box.bottom)),
@@ -171,9 +175,34 @@ const {join} = require('node:path');
           assert.equal(multiplier.exponent, exponent, `${label}: ${axis} multiplier matches its scale`);
           assert.ok(multiplier.group.runs.some(run => run.text === '× 10'), `${label}: shared multiplier has a multiplication sign`);
           assert.ok(multiplier.group.runs.some(run => run.text === String(exponent)), `${label}: shared exponent is drawn`);
+          if (axis === 'x') {
+            close(multiplier.right, metrics.area.right, 'X multiplier stays aligned with the right plot edge');
+            close(planned.xSide < 0 ? planned.axes.y - multiplier.bottom : multiplier.top - planned.axes.y,
+              36, 'X multiplier stays at its fixed distance from the axis');
+          } else {
+            const normal = {...multiplier, top: metrics.area.top - 18 - multiplier.group.height,
+              bottom: metrics.area.top - 18};
+            const xMultiplier = planned.multipliers.find(item => item.axis === 'x');
+            const cornerConflict = xMultiplier && normal.left < xMultiplier.right + 8
+              && normal.right > xMultiplier.left - 8 && normal.top < xMultiplier.bottom + 8
+              && normal.bottom > xMultiplier.top - 8;
+            close(multiplier.bottom, cornerConflict ? xMultiplier.top - 8 : metrics.area.top - 18,
+              'Y multiplier stays above the axis or clears the X multiplier by 8px');
+            close(planned.ySide < 0 ? planned.axes.x - multiplier.right : multiplier.left - planned.axes.x,
+              8, 'Y multiplier stays on its fixed side of the axis');
+          }
         }
+        const endpoints = metrics.endpointTicks.filter(tick => tick.axis === axis);
+        const farEndpoint = Math.abs(metrics[axis + 'Min']) > Math.abs(metrics[axis + 'Max'])
+          ? metrics[axis + 'Min'] : metrics[axis + 'Max'];
+        assert.ok(ticks.some(tick => tick.value === farEndpoint), `${label}: ${axis} outer range endpoint remains labelled`);
         for (const endpoint of [metrics[axis + 'Min'], metrics[axis + 'Max']]) {
-          assert.ok(ticks.some(tick => tick.value === endpoint), `${label}: ${axis} endpoint remains labelled: ${endpoint}`);
+          if (ticks.some(tick => tick.value === endpoint)) continue;
+          const candidate = endpoints.find(tick => tick.value === endpoint);
+          const collision = [...planned.ticks.filter(tick => tick.value === 0 || tick.axis !== axis), ...planned.multipliers]
+            .some(other => crowded(candidate, other));
+          assert.ok(endpoint !== 0 && (candidate.label.type === 'scientific' || collision),
+            `${label}: ${axis} omits an endpoint without a precision or overlap reason: ${endpoint}`);
         }
         const labels = metrics.tickLabels.filter(tick => tick.axis === axis);
         const visibleLabels = labels.map(({value, label: tickLabel}) => {
@@ -181,55 +210,34 @@ const {join} = require('node:path');
             assert.deepEqual(tickLabel, {type: 'plain', text: '0'}, `${label}: true zero remains plain`);
             return '0';
           }
-          if (tickLabel.type === 'plain') {
-            assert.match(tickLabel.text, /^-?\d+\.\d{2}$/, `${label}: ordinary ticks use exactly two decimals`);
-            assert.notEqual(Number(tickLabel.text), 0, `${label}: a nonzero tick must not round to a false zero`);
-            return tickLabel.text;
-          }
-          assert.match(tickLabel.mantissa, /^-?\d+\.\d{2}$/, `${label}: scientific mantissas use two decimals`);
-          assert.match(tickLabel.exponent, /^-?\d+$/, `${label}: scientific exponents remain integers`);
-          return `${tickLabel.mantissa}e${tickLabel.exponent}`;
+          assert.equal(tickLabel.type, 'plain', `${label}: every visible tick uses a plain coefficient, without a second exponent`);
+          assert.match(tickLabel.text, /^-?\d+\.\d{2}$/, `${label}: ordinary ticks use exactly two decimals`);
+          assert.notEqual(Number(tickLabel.text), 0, `${label}: a nonzero tick must not round to a false zero`);
+          return tickLabel.text;
         });
         assert.equal(new Set(visibleLabels).size, visibleLabels.length, `${label}: ${axis} tick labels remain distinct`);
         for (const tick of ticks) {
           const formatted = labels.find(item => item.value === tick.value).label;
-          const main = formatted.type === 'plain' ? formatted.text : `${formatted.mantissa} × 10`;
-          assert.ok(tick.group.runs.some(run => run.text === main),
-            `${label}: ${axis} tick draws the expected coefficient: ${main}`);
-          if (formatted.type === 'scientific') {
-            assert.ok(tick.group.runs.some(run => run.text === formatted.exponent),
-              `${label}: ${axis} exceptional coefficient exponent is drawn`);
+          assert.ok(tick.group.runs.some(run => run.text === formatted.text),
+            `${label}: ${axis} tick draws the expected coefficient: ${formatted.text}`);
+          if (tick.value !== 0) {
+            close(axis === 'x' ? (tick.left + tick.right) / 2 : (tick.top + tick.bottom) / 2,
+              axis === 'x' ? tick.tickX : tick.tickY, `${axis} tick label stays centred on its own coordinate`);
           }
         }
-        const arrow = planned.arrows[axis];
-        assert.equal(arrow.length, 3, `${label}: ${axis} arrow has three vertices`);
-        assert.ok(metrics.filledPaths.some(path => path.length === arrow.length
-          && path.every((point, index) => Math.hypot(point.x - arrow[index].x, point.y - arrow[index].y) < .15)),
-        `${label}: ${axis} arrow's actual filled vertices match the layout`);
-        const arrowBox = union(arrow.map(point => ({left: point.x, right: point.x, top: point.y, bottom: point.y})));
-        assert.ok(arrowBox.left >= 0 && arrowBox.top >= 0
-          && arrowBox.right <= metrics.width && arrowBox.bottom <= metrics.height,
-        `${label}: ${axis} arrow remains inside the canvas`);
-        const rangeEnd = axis === 'x' ? metrics.area.right : metrics.area.top;
-        const baseGap = axis === 'x' ? arrowBox.left - rangeEnd : rangeEnd - arrowBox.bottom;
-        assert.ok(baseGap >= 24 - .15, `${label}: ${axis} arrow base stays 24px beyond the range endpoint`);
-        close(axis === 'x' ? arrowBox.right - arrowBox.left : arrowBox.bottom - arrowBox.top, 8,
-          `${axis} arrow length`);
-        for (const group of groups) {
-          assert.equal(overlap(group, arrowBox), false,
-            `${label}: ${axis} arrow overlaps text: ${JSON.stringify({group, arrowBox})}`);
-        }
       }
-      const arrowPoints = [...planned.arrows.x, ...planned.arrows.y, ...axisSegments.x, ...axisSegments.y];
-      const axisText = [...planned.ticks, ...planned.multipliers];
-      const xTitleGap = planned.xSide < 0
-        ? Math.min(metrics.area.top, ...axisText.map(tick => tick.top), ...arrowPoints.map(point => point.y)) - planned.titles.x.bottom
-        : planned.titles.x.top - Math.max(metrics.area.bottom, ...axisText.map(tick => tick.bottom), ...arrowPoints.map(point => point.y));
-      const yTitleGap = planned.ySide < 0
-        ? Math.min(metrics.area.left, ...axisText.map(tick => tick.left), ...arrowPoints.map(point => point.x)) - planned.titles.y.right
-        : planned.titles.y.left - Math.max(metrics.area.right, ...axisText.map(tick => tick.right), ...arrowPoints.map(point => point.x));
-      close(xTitleGap, 16, 'X title gap includes shared multipliers and the complete axis envelope');
-      close(yTitleGap, 16, 'Y title gap includes shared multipliers and the complete axis envelope');
+      const titleSides = {x: metrics.yMax <= 0 ? -1 : 1, y: metrics.xMax <= 0 ? 1 : -1};
+      assert.deepEqual(planned.titleSides, titleSides, `${label}: title sides follow the displayed half-plane, not the relative range magnitudes`);
+      const xTitleGap = titleSides.x < 0
+        ? metrics.area.top - planned.titles.x.bottom : planned.titles.x.top - metrics.area.bottom;
+      const yTitleGap = titleSides.y < 0
+        ? metrics.area.left - planned.titles.y.right : planned.titles.y.left - metrics.area.right;
+      close(xTitleGap, 64, 'X title stays at a fixed plot-edge distance');
+      close(yTitleGap, 112, 'Y title stays at a fixed plot-edge distance');
+      close((planned.titles.x.left + planned.titles.x.right) / 2,
+        (metrics.area.left + metrics.area.right) / 2, 'X title remains centred');
+      close((planned.titles.y.top + planned.titles.y.bottom) / 2,
+        (metrics.area.top + metrics.area.bottom) / 2, 'Y title remains centred');
       const sigma = metrics.texts.find(text => text.text === 'σ');
       const epsilon = metrics.texts.find(text => text.text === 'ε');
       assert.ok(sigma && epsilon && Math.abs(sigma.glyphHeight - epsilon.glyphHeight) <= 1,
@@ -300,6 +308,7 @@ const {join} = require('node:path');
           data, texts: window.plotTexts, filledPaths: window.plotFilledPaths, strokePaths: window.plotStrokePaths,
           plotLayout: chart.$mechanicalPlotLayout,
           exponents: {x: x.options.customExponent, y: y.options.customExponent},
+          endpointTicks: window.measurePlotEndpoints(chart),
           tickLabels: chart.$mechanicalPlotLayout.ticks.map(tick => ({
             axis: tick.axis, value: tick.value,
             label: formatPlotTickLabel(tick.value - Number(chart.scales[tick.axis].options.customOffset || 0),
@@ -463,6 +472,27 @@ const {join} = require('node:path');
       window.plotExportFilledPaths = [];
       window.plotStrokePaths = [];
       window.plotExportStrokePaths = [];
+      window.measurePlotEndpoints = chart => {
+        const layout = chart.$mechanicalPlotLayout;
+        chart.ctx.save();
+        try {
+          return ['x', 'y'].flatMap(axis => {
+            const scale = chart.scales[axis];
+            return [scale.min, scale.max].map(value => {
+              const label = formatPlotTickLabel(value, scale.options.customTickFormat, scale.options.customExponent);
+              const text = plotTickText(chart.ctx, value, scale.options.customTickFormat, scale.options.customExponent);
+              const position = scale.getPixelForValue(value);
+              const left = axis === 'x' ? position - text.width / 2
+                : layout.ySide < 0 ? layout.axes.x - 13 - text.width : layout.axes.x + 13;
+              const top = axis === 'y' ? position - text.height / 2
+                : layout.xSide < 0 ? layout.axes.y - 13 - text.height : layout.axes.y + 13;
+              return {axis, value, label, left, top, right: left + text.width, bottom: top + text.height};
+            });
+          });
+        } finally {
+          chart.ctx.restore();
+        }
+      };
       const isPlotExport = context => window.capturePlotExport && context.canvas.width === 2160 && context.canvas.height === 1440;
       const drawText = CanvasRenderingContext2D.prototype.fillText;
       CanvasRenderingContext2D.prototype.fillText = function(text, x, y, ...args) {
@@ -534,6 +564,7 @@ const {join} = require('node:path');
               xMin: chart.scales.x.min, xMax: chart.scales.x.max,
               yMin: chart.scales.y.min, yMax: chart.scales.y.max,
               exponents: {x: chart.scales.x.options.customExponent, y: chart.scales.y.options.customExponent},
+              endpointTicks: window.measurePlotEndpoints(chart),
               tickLabels: chart.$mechanicalPlotLayout.ticks.map(tick => ({
                 axis: tick.axis, value: tick.value,
                 label: formatPlotTickLabel(tick.value - Number(chart.scales[tick.axis].options.customOffset || 0),
@@ -664,6 +695,10 @@ const {join} = require('node:path');
         if (component === '33') await downloadMeasuredPNG('sample-33');
       }
       assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), 242);
+      await select('plot-x-select', 'plastic_strain.plastic_strain_13');
+      await layout('sample-plastic-13', 1440);
+      await downloadMeasuredPNG('sample-plastic-13');
+      assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), 250);
     }
     const initialSample = JSON.parse(process.env.PLOT_INITIAL_SAMPLE);
     await navigate(initialSample.path);
@@ -681,7 +716,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; measured Canvas text and per-axis multipliers match their layout without overlaps or clipping, titles have equal 16px gaps, arrow bases stay 24px beyond range endpoints, two-place ticks remain distinct, and all text is at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; axes close at the plot boundaries without arrowheads, titles and shared multipliers keep fixed positions, visible two-place coefficients remain aligned and distinct, and all measured text stays clear and at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {
