@@ -5,6 +5,7 @@
 - Read the relevant sections of `README.md` for setup and current functionality
 - Check `git status --short` and recent commits before changing files
 - Do not assume another computer or Codex session has the previous chat, local environment, or credentials
+- Store downloaded research references, paper figures and source notes under `local-research/` in this repository, not on the Desktop; ensure `/local-research/` is listed in the local exclude file returned by `git rev-parse --git-path info/exclude`, and do not commit or push those materials
 
 ## Project overview
 
