@@ -19,7 +19,7 @@ from django.urls import reverse
 from .collection_summary import build_collection_summary
 from .models import JSONData, ResearchCollection
 from .research_collections import accessible_objects
-from .study_comparison import MAX_PROJECTION_BYTES, outdated_summary_query, parse_comparison_ids
+from .study_comparison import MAX_PROJECTION_BYTES, SUMMARY_VERSION, outdated_summary_query, parse_comparison_ids
 
 
 class StudyComparisonTests(TestCase):
@@ -84,7 +84,7 @@ class StudyComparisonTests(TestCase):
         original = deepcopy(self.metadata)
         summary = build_collection_summary(original)
         self.assertIn("comparison", summary)
-        self.assertEqual(summary["summary_version"], 2)
+        self.assertEqual(summary["summary_version"], SUMMARY_VERSION)
         fields = summary["comparison"]["fields"]
         self.assertEqual(fields["rve_continuity"]["entries"][0]["value"], "false")
         self.assertEqual(fields["discretization_count"]["entries"][0]["value"], "0")
@@ -354,7 +354,7 @@ class StudyComparisonTests(TestCase):
         self.hidden.refresh_from_db()
         self.assertEqual(self.hidden.collection_summary, legacy)
         self.first.refresh_from_db()
-        self.assertEqual(self.first.collection_summary["summary_version"], 2)
+        self.assertEqual(self.first.collection_summary["summary_version"], SUMMARY_VERSION)
 
     def test_outdated_query_and_backfill_include_missing_json_keys_and_null_versions(self):
         """

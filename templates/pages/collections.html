@@ -29,7 +29,7 @@
       {% if collections %}
       <ul class="collection-list">
         {% for item in collections %}
-        <li><a href="{% url 'collection_detail' item.pk %}" class="collection-list-link">
+        <li><a href="{% url 'collection_detail' item.pk %}?panel=map" class="collection-list-link">
           <span class="collection-list-description"><strong>{{ item.title }}</strong>{% if item.description %}<span>{{ item.description }}</span>{% endif %}</span>
           <span class="collection-list-count">{{ item.visible_count }} accessible object{{ item.visible_count|pluralize }}</span>
           <span class="collection-list-date">{{ item.updated_at|date:"d M Y" }}</span>

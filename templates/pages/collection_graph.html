@@ -8,6 +8,8 @@
 <link rel="stylesheet" href="{% static 'assets/css/study-workspace.css' %}">
 <link rel="stylesheet" href="{% static 'assets/css/study-candidates.css' %}">
 <link rel="stylesheet" href="{% static 'assets/css/study-curves.css' %}">
+<link rel="stylesheet" href="{% static 'assets/css/study-map.css' %}">
+<link rel="stylesheet" href="{% static 'assets/css/study-details.css' %}">
 {% endblock extrastyle %}
 {% block content %}
 <main class="pc-container graph-page collection-page study-page">
@@ -90,9 +92,11 @@
     {% endif %}
 
     {% if study_workspace and not summary_preparation %}{% include "pages/study_workspace_header.html" %}{% endif %}
-    {% if not summary_preparation and study_workspace %}{% if study_comparison.ids or study_candidates.enabled %}{% include "pages/study_candidates.html" %}{% endif %}{% endif %}
+    {% if not summary_preparation and study_workspace and study_workspace.panel != 'map' %}{% if study_comparison.ids or study_candidates.enabled %}{% include "pages/study_candidates.html" %}{% endif %}{% endif %}
     {% if study_workspace.panel == 'compare' and not summary_preparation %}
       {% include "pages/study_comparison.html" %}
+    {% elif study_workspace.panel == 'map' and not summary_preparation %}
+      {% include "pages/study_map.html" %}
     {% else %}
     {% if study_comparison.error %}<div class="study-comparison-error" id="study-comparison-error" role="alert"><strong>This comparison cannot be opened.</strong><p>{{ study_comparison.error }}</p><a href="{{ study_workspace.clear_url }}">Clear the selection and choose records again</a></div>{% endif %}
     {% if object_total and not summary_preparation %}
@@ -118,7 +122,7 @@
     {% endif %}
     {% if study_workspace and not summary_preparation %}</div></div></section>{% endif %}
 
-    {% if not graph_error and not summary_preparation %}
+    {% if not graph_error and not summary_preparation and study_workspace.panel != 'map' %}
     <section class="collection-card collection-objects" aria-labelledby="collection-objects-heading">
       <div class="collection-section-heading"><h2 id="collection-objects-heading">{% if selected_group %}Objects in this group{% else %}Data objects{% endif %}</h2><span>{{ matching_object_count|default:0 }} object{{ matching_object_count|pluralize }}</span></div>
       {% if object_rows %}

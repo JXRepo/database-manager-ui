@@ -13,7 +13,8 @@ from .advanced_search import matches_whole_words
 
 STUDY_PARAMETERS = {"compare", "panel", "member_q", "members_page", "differences",
                     "find_candidates", "match_fields", "vary_field", "candidates_page",
-                    "curve_component", "curve_strain"}
+                    "curve_component", "curve_strain", "inspect", "map_x", "map_y", "map_unit",
+                    "map_x_page", "map_y_page", "map_cell", "map_row"}
 
 
 def study_parameters(params):
@@ -38,6 +39,7 @@ def study_parameters(params):
     from .study_comparison import parse_comparison_ids
     from .study_candidates import candidate_parameters
     from .study_curves import curve_parameters
+    from .study_map import map_parameters
 
     values = {}
     for name in STUDY_PARAMETERS:
@@ -48,8 +50,11 @@ def study_parameters(params):
             values[name] = items[0]
     ids = parse_comparison_ids(params)
     panel = values.get("panel", "explore")
-    if panel not in {"explore", "compare"}:
-        raise ValueError("Choose Explore or Compare for this study.")
+    if panel not in {"explore", "compare", "map"}:
+        raise ValueError("Choose Parameter map, Explore or Compare for this study.")
+    inspect = values.get("inspect", "0")
+    if inspect not in {"0", "1"}:
+        raise ValueError("Choose a valid parameter inspection option.")
     differences = values.get("differences", "0")
     if differences not in {"0", "1"}:
         raise ValueError("Choose a valid comparison display.")
@@ -62,8 +67,10 @@ def study_parameters(params):
     result = {}
     if ids:
         result["compare"] = ",".join(map(str, ids))
-    if panel == "compare":
+    if panel != "explore":
         result["panel"] = panel
+    if inspect == "1":
+        result["inspect"] = inspect
     if query:
         result["member_q"] = query
     if page != "1":
@@ -71,6 +78,7 @@ def study_parameters(params):
     if differences == "1":
         result["differences"] = differences
     result.update(candidate_parameters(params))
+    result.update(map_parameters(params))
     curves = curve_parameters(params)
     for key in ("curve_component", "curve_strain"):
         if key in params:
@@ -108,6 +116,7 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
     from .study_comparison import build_comparison_context
     from .study_candidates import CANDIDATE_FORM_PARAMETERS, build_candidate_context, candidate_parameters
     from .study_curves import curve_parameters
+    from .study_map import MAP_PARAMETERS, build_map_context
 
     error = ""
     controls = params
@@ -120,7 +129,7 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
     try:
         state = study_parameters(controls)
     except ValueError as exc:
-        state = {"panel": "compare"} if params.get("panel") == "compare" else {}
+        state = {"panel": params["panel"]} if params.get("panel") in {"compare", "map"} else {}
         error = str(exc)
     comparison = build_comparison_context(objects, params, base_url=base_url, preparation_budget=preparation_budget)
     if error or comparison.get("error"):
@@ -160,6 +169,21 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
         return base_url + "?" + urlencode({key: value for key, value in values.items()
                                             if value is not None and value != ""})
 
+    parameter_map = {"ready": False, "error": "", "preparation": None, "member_ids": None}
+    if state.get("panel") == "map":
+        parameter_map = build_map_context(objects, params, base_url=base_url,
+                                          navigation_params=arguments, preparation_budget=preparation_budget)
+        for key in MAP_PARAMETERS:
+            state.pop(key, None)
+            arguments.pop(key, None)
+        state.update(parameter_map.get("state", {}))
+        arguments.update(parameter_map.get("state", {}))
+        if error:
+            parameter_map.update(ready=False, error=error, member_ids=[])
+    map_member_ids = parameter_map.get("member_ids")
+    if map_member_ids is not None:
+        map_member_ids = set(map_member_ids)
+
     for record in comparison["objects"]:
         record["remove_url"] = url(compare=",".join(str(pk) for pk in ids if pk != record["pk"]),
                                    edge=None, candidates_page=None)
@@ -170,6 +194,8 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
     members = context["manual_member_summaries"]
     matching = []
     for member in members:
+        if map_member_ids is not None and member["pk"] not in map_member_ids:
+            continue
         values = (member.get(key, "") for key in ("title", "identifier", "software", "phase", "creator", "loading"))
         if not matches_whole_words(values, query.split()):
             continue
@@ -205,6 +231,8 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
         differences_url=url(panel="compare", differences="1"),
         all_fields_url=url(panel="compare", differences=None),
         retry_url=url(panel="compare"),
+        inspect_url=url(panel="compare", inspect="1", edge=None) + "#study-parameters",
+        close_inspect_url=url(inspect=None),
         csv_url="",
     )
     if comparison["ready"]:
@@ -218,6 +246,8 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
     return {
         "study_comparison": comparison,
         "study_candidates": candidates,
+        "study_map": parameter_map,
+        "study_details": {"ready": False, "error": "", "open": state.get("inspect") == "1"},
         "study_curves": {
             "url": reverse(curve_route, args=[curve_target]) + "?" + urlencode({"compare": selection, **curves}),
             "component": curves["curve_component"], "strain": curves["curve_strain"],
@@ -229,6 +259,10 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
         "study_return_params": state,
         "study_workspace": {
             "panel": state.get("panel", "explore"), "error": error,
+            "map_url": url(panel="map", edge=None),
+            "map_selection": state.get("panel") == "map" and parameter_map["ready"] and map_member_ids is not None,
+            "map_selection_label": parameter_map.get("selected_label", ""),
+            "browser_available": state.get("panel") != "map" or parameter_map["ready"],
             "explore_url": url(panel="explore"), "compare_url": url(panel="compare", edge=None),
             "clear_url": url(compare=None, differences=None, edge=None, member_q=None, members_page=None,
                              find_candidates=None, match_fields=None, vary_field=None, candidates_page=None),

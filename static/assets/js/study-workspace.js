@@ -17,10 +17,11 @@
       try { sessionStorage.setItem(storageKey, open ? 'open' : 'closed'); } catch { /* Presentation remains usable without storage */ }
     }
   };
-  let open = Boolean(query.value) || (workspace.dataset.panel === 'compare' && Number(workspace.dataset.selectionCount) < 2);
+  const mapSelection = workspace.dataset.mapSelection === 'true';
+  let open = mapSelection || Boolean(query.value) || (workspace.dataset.panel === 'compare' && Number(workspace.dataset.selectionCount) < 2);
   try {
     const previous = sessionStorage.getItem(storageKey);
-    if (previous) open = previous === 'open';
+    if (previous && !mapSelection) open = previous === 'open';
   } catch { /* Use the current view's default when browser storage is unavailable */ }
   showBrowser(open, false);
   toggle.hidden = false;

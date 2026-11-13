@@ -233,12 +233,12 @@ Current priority:
 
 ## Study workspace rules
 
-- Collections and temporary selections support Explore and Compare with up to four ordered accessible member IDs; the first is the explicit reference
+- Collections and temporary selections support Parameter map, Explore and Compare with up to four ordered accessible member IDs; the first is the explicit reference, and saved collection entry links open Parameter map
 - Preserve comparison pins across member searches/pages, source-detail return links, manual relationship saves/deletes and temporary collection saves; validate signed navigation before mutations
 - Reject invalid, repeated, inaccessible or nonmember comparison IDs as a whole selection; never silently drop an object or reveal inaccessible titles
 - Compare recorded settings only, retaining phase/loading order, numeric precision and explicit units; do not infer physical comparability, align phases by name or infer causal relationships
 - Distinguish matching, differing and incomplete rows; missing, ambiguous or truncated values must never produce a complete equality fingerprint, and Differences & gaps retains incomplete rows
-- Use version 2 collection summaries with a bounded comparison projection: eight entries per field, 240 characters per displayed value and 32 KiB total; keep raw arrays out of retained summaries
+- Use version 3 collection summaries with a bounded comparison projection (eight entries per field, 240 characters per displayed value and 32 KiB total) and a separate scalar parameter-map projection; keep raw arrays out of retained summaries
 - Ordinary graphs may read legacy summaries; comparison preparation upgrades selected records only within existing request budgets, while deployment backfill upgrades outdated versions in bounded batches
 - Show schema locators as Recognized fields, with links to complete source metadata/curves; comparison CSV is a bounded snapshot with formula protection, separate from unchanged original JSON exports
 - Find comparison candidates only among currently accessible collection or temporary-selection members, using the first pin as reference; require at least one complete matching field and one distinct differing field, show supplied-value evidence, and separate incomplete results from matches and contradictions
@@ -248,6 +248,13 @@ Current priority:
 - Study curves preserve complete paired sample order, original indices, explicit units and unequal-tail counts; supplied equivalents remain authoritative, eligible calculated equivalents are labeled, and missing or conflicting sources remain explicit
 - Separate curve panels use their own labeled scales; optional overlay requires the same selected quantity/component and recognized equal units on both axes, uses shared scales, and never converts units, aligns samples, fits material properties or infers causality
 - Link curve focus to the record pin and settings column, preserve native selectors/source links and signed candidate/curve state, and keep uploaded JSON, object permissions and original exports unchanged
+- Parameter maps use explicit global temperature and discretization count, exact Decimal coordinates and separate supplied temperature units; never parse display labels, convert units, infer physical equivalence or flatten multi-phase grain counts
+- Keep maps at eight values per axis, with native cell/whole-row member filtering, exact accessible counts, explicit excluded states and empty-window guidance; retain pins across cells/pages and signed map controls across source navigation and mutations
+- Prepare all accessible map summaries using the shared request budget before showing counts; warm maps read scalar caches only, and incomplete/error maps hide the member browser instead of presenting an empty selection
+- Detailed parameter inspection requires explicit inspect=1 in Compare, complete current access/membership, collection and ordered object locks, and a 16-MiB actual JSON byte precheck; temporary inspection rechecks its entire session-bound membership
+- Compare supplied model parameters and units, loading fields/steps and top-level units by recorded phase/condition/array position, preserving exact scalar types, numeric text, arbitrary field names and source paths; never align phases by names or guess parameter/unit associations
+- Bound deep inspection to 300 rows, 6,000 visited nodes, depth 30, 32 entries per array and 512 display characters; expose all limits, keep missing/ambiguous/truncated content incomplete, and retain complete source links
+- Keep quick comparison labels explicit about model names and loading type/mode; deep difference previews show actual typed values and recorded source positions, without causal claims
 - Verify the study workspace and existing collection/manual relationship flows in real Chromium at desktop widths, including native forms, long content, empty collections and four-record tables
 
 ## Search rules

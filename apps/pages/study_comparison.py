@@ -17,7 +17,7 @@ from apps.dyn_api.metadata_compat import NUMBER_TEXT, field_name, unwrap_single_
 from apps.charts.analytics import COMPONENTS, curve_summary
 
 
-SUMMARY_VERSION = 2
+SUMMARY_VERSION = 3
 MAX_COMPARISON_OBJECTS = 4
 MAX_FIELD_ENTRIES = 8
 MAX_VALUE_CHARACTERS = 240
@@ -30,14 +30,14 @@ COMPARISON_FIELDS = (
     ("texture", "Texture", "Material and microstructure"),
     ("lattice_structure", "Crystal structure", "Material and microstructure"),
     ("grain_count", "Grain number", "Material and microstructure"),
-    ("elastic_model", "Elastic model", "Material and microstructure"),
-    ("plastic_model", "Plastic model", "Material and microstructure"),
+    ("elastic_model", "Elastic model name", "Material and microstructure"),
+    ("plastic_model", "Plastic model name", "Material and microstructure"),
     ("rve_size", "RVE dimensions", "Discretization and boundaries"),
     ("rve_continuity", "RVE continuity", "Discretization and boundaries"),
     ("discretization_type", "Discretization type", "Discretization and boundaries"),
     ("discretization_count", "Discretization count", "Discretization and boundaries"),
     ("temperature", "Global temperature", "Loading and units"),
-    ("loading", "Loading conditions", "Loading and units"),
+    ("loading", "Loading type and mode", "Loading and units"),
     ("units", "Recorded units", "Loading and units"),
     ("outputs", "Mechanical output availability", "Mechanical outputs"),
 )

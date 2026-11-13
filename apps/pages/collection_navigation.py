@@ -18,7 +18,8 @@ CONTEXT_ERROR = (
 )
 RETURN_PARAMETERS = {"links", "group", "page", "groups_page", "view", "edge", "relationships_page",
                      "compare", "panel", "member_q", "members_page", "differences",
-                     "find_candidates", "match_fields", "vary_field", "candidates_page", "curve_component", "curve_strain"}
+                     "find_candidates", "match_fields", "vary_field", "candidates_page", "curve_component", "curve_strain",
+                     "inspect", "map_x", "map_y", "map_unit", "map_x_page", "map_y_page", "map_cell", "map_row"}
 
 
 def _return_parameters(values):
@@ -65,7 +66,8 @@ def _return_parameters(values):
         raise ValueError(CONTEXT_ERROR)
     if any(key in params for key in ("compare", "panel", "member_q", "members_page", "differences",
                                     "find_candidates", "match_fields", "vary_field", "candidates_page",
-                                    "curve_component", "curve_strain")):
+                                    "curve_component", "curve_strain", "inspect", "map_x", "map_y", "map_unit",
+                                    "map_x_page", "map_y_page", "map_cell", "map_row")):
         from .study_workspace import study_parameters
 
         try:
@@ -316,6 +318,8 @@ def workspace_navigation(request, context, *, collection=None, selection_token="
         row["curves_url"] = row["detail_url"] + "#data-curves"
     for row in context.get("study_workspace", {}).get("browser_rows", []):
         row["show_url"] = with_graph_context(row["show_url"], token)
+    for row in context.get("study_details", {}).get("objects", []):
+        row["detail_url"] = with_graph_context(row["detail_url"], token)
     for node in (context.get("relationship_graph") or {}).get("nodes", []):
         if node.get("id", "").startswith("collection-object-"):
             for key in ("source_url", "graph_url"):

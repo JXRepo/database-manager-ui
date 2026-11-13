@@ -1,10 +1,11 @@
-<section class="study-workspace{% if not object_total %} is-browser-collapsed{% endif %}" id="study-workspace" data-panel="{{ study_workspace.panel }}" data-selection-count="{{ study_comparison.objects|length }}">
+<section class="study-workspace{% if not object_total or not study_workspace.browser_available %} is-browser-collapsed{% endif %}" id="study-workspace" data-panel="{{ study_workspace.panel }}" data-selection-count="{{ study_comparison.objects|length }}" data-map-selection="{{ study_workspace.map_selection|yesno:'true,false' }}">
   <div class="study-mode-bar">
     <nav class="study-modes" aria-label="Study workspace">
+      <a href="{{ study_workspace.map_url }}" id="study-map-link"{% if study_workspace.panel == 'map' %} aria-current="page"{% endif %}>Parameter map</a>
       <a href="{{ study_workspace.explore_url }}" id="study-explore-link"{% if study_workspace.panel == 'explore' %} aria-current="page"{% endif %}>Explore relationships</a>
       <a href="{{ study_workspace.compare_url }}" id="study-compare-link"{% if study_workspace.panel == 'compare' %} aria-current="page"{% endif %}>Compare records{% if study_comparison.objects %}<span>{{ study_comparison.objects|length }}</span>{% endif %}</a>
     </nav>
-    {% if object_total %}<button type="button" id="study-browser-toggle" class="study-browser-toggle" aria-controls="study-member-browser" aria-expanded="true" hidden>Browse data objects</button>{% endif %}
+    {% if object_total and study_workspace.browser_available %}<button type="button" id="study-browser-toggle" class="study-browser-toggle" aria-controls="study-member-browser" aria-expanded="true" hidden>Browse data objects</button>{% endif %}
   </div>
   {% if study_comparison.objects or object_total and study_workspace.panel == 'compare' or not object_total and study_workspace.panel == 'explore' %}
   <div class="study-selection-tray" id="study-selection-tray" aria-label="Selected comparison records">
@@ -27,7 +28,7 @@
   </div>
   {% endif %}
   <div class="study-layout">
-    {% if object_total %}
+    {% if object_total and study_workspace.browser_available %}
     <aside class="study-member-browser" id="study-member-browser" aria-labelledby="study-member-heading">
       <div class="study-browser-heading"><h2 id="study-member-heading">Data objects</h2><span>{{ study_workspace.browser_page.paginator.count }}</span></div>
       <form method="get" action="{{ workspace_url }}" id="study-member-search" class="study-member-search">
@@ -37,6 +38,7 @@
         {% if study_workspace.browser_query %}<a href="{{ study_workspace.browser_clear_url }}" id="study-member-clear">Clear search</a>{% endif %}
       </form>
       <p class="study-browser-guidance">Pin records from any page. Your first selection is the reference.</p>
+      {% if study_workspace.map_selection %}<p class="study-browser-map-scope" id="study-browser-map-scope">{{ study_workspace.map_selection_label }} <a href="{{ study_map.clear_url }}">Clear map selection</a></p>{% endif %}
       {% if study_comparison.objects|length >= 4 %}<p class="study-selection-limit">Four records selected. Remove one to add another.</p>{% endif %}
       {% if study_workspace.browser_rows %}
       <ul class="study-member-list">

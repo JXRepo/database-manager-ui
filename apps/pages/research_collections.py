@@ -309,9 +309,23 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
                 status = 400
             if context["study_candidates"]["error"] and status < 400:
                 status = 400
-            preparation = context["study_candidates"].get("preparation") or context["study_comparison"].get("preparation")
+            if context["study_map"]["error"] and status < 400:
+                status = 400
+            preparation = (context["study_map"].get("preparation")
+                           or context["study_candidates"].get("preparation")
+                           or context["study_comparison"].get("preparation"))
             if preparation and status < 400:
                 status = 503 if preparation["requires_admin"] else 202
+            if (context["study_workspace"]["panel"] == "compare"
+                    and context["study_details"]["open"] and context["study_comparison"]["ready"]):
+                from .study_details import build_parameter_context
+
+                context["study_details"] = build_parameter_context(
+                    request, context["study_comparison"]["ids"], collection=collection, selection_token=token,
+                )
+                context["study_details"]["open"] = True
+                if context["study_details"]["error"] and status < 400:
+                    status = 400
         if collection is not None and "manual_member_summaries" in context:
             from .collection_relationship_context import relationship_editor_context
 

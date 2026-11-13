@@ -196,7 +196,7 @@ def collection_summaries(accessible_queryset, *, prepare_all=False, require_comp
             del current
         detail_url = reverse("json_data_detail", args=[obj.pk])
         displayed = summary if require_comparison else {key: value for key, value in summary.items()
-                                                        if key != "comparison"}
+                                                        if key not in {"comparison", "parameter_map"}}
         yield {**displayed, "pk": obj.pk, "detail_url": detail_url, "graph_url": detail_url + "?tab=graph"}
     if pending and not prepare_all:
         missing = outdated_summary_query() if require_comparison else Q(collection_summary__isnull=True)

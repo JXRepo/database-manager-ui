@@ -14,9 +14,11 @@
   {% elif study_comparison.ready %}
   <div class="study-comparison-controls">
     <div class="study-field-filter" role="group" aria-label="Comparison fields"><a href="{{ study_comparison.all_fields_url }}" id="study-all-fields-link"{% if not study_comparison.differences %} aria-current="true"{% endif %}>All fields</a><a href="{{ study_comparison.differences_url }}" id="study-differences-link"{% if study_comparison.differences %} aria-current="true"{% endif %}>Differences &amp; gaps</a></div>
+    {% if not study_details.open %}<a href="{{ study_comparison.inspect_url }}" id="study-parameters-open" class="study-inspect-link" title="Inspect model parameters, loading values and recorded units">Inspect detailed parameters</a>{% endif %}
     <p class="study-comparison-counts"><span class="study-count-different">{{ study_comparison.counts.different }} differing</span><span>{{ study_comparison.counts.same }} matching</span><span>{{ study_comparison.counts.incomplete }} incomplete</span></p>
   </div>
   {% include "pages/study_curves.html" %}
+  {% if study_details.open %}{% include "pages/study_details.html" %}{% endif %}
   {% if study_comparison.objects|length > 2 %}<div class="study-column-navigation" id="study-column-navigation"><span>Scroll across to see all {{ study_comparison.objects|length }} records.</span><div><button type="button" id="study-columns-left" aria-label="Scroll comparison left" hidden>←</button><button type="button" id="study-columns-right" aria-label="Scroll comparison right" hidden>→</button></div></div>{% endif %}
   <div class="study-comparison-scroll" tabindex="0" aria-label="Recorded metadata comparison">
     <table class="study-comparison-table" id="study-comparison-table" style="--study-columns:{{ study_comparison.objects|length }}">

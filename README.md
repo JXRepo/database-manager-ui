@@ -557,6 +557,22 @@ days after creation or their last change, or when the bound session expires. Vie
 a selection does not extend that deadline. Existing session selections remain
 readable and are adopted once during the next selection change.
 
+Opening a saved collection starts at its **Parameter map**. The map uses supplied
+global temperature and discretization count; **Swap axes** reverses their placement.
+Each populated cell shows its exact accessible record count. Click a cell or row
+to filter the member browser, pin records across cells, then open **Compare records**.
+Rows include all horizontal values, including those on other axis pages. Each axis
+shows eight values per page; empty windows and unavailable parameters remain explicit.
+**Explore relationships** remains available beside the map and comparison.
+
+Temperature units stay separate, with an explicit unit selector and units attached
+to the temperature axis. Exact decimal sorting preserves large integers and numeric
+text without converting units or parsing formatted labels. Missing, ambiguous,
+invalid and unsupported-unit records appear in coverage counts outside the grid.
+An empty cell means no visible records in this collection, not a recommended future
+experiment. Map coordinates describe recorded values and do not establish scientific
+comparability. Multi-phase grain counts are not collapsed into one coordinate.
+
 **Select more data** opens Search with the current collection or selection as
 the destination; **Select from My Data** does the same for owned uploads.
 **Add selected objects** adds directly to that destination, deduplicates members
@@ -565,13 +581,38 @@ keep the same selection URL. Filters and Clear retain this destination. The
 **Save or add selection** disclosure keeps optional saving controls compact;
 saving records collection membership, not an exported research package.
 
-Each workspace has **Explore relationships** and **Compare records**. Browse or
+Each workspace has **Parameter map**, **Explore relationships** and **Compare records**. Browse or
 search accessible members and select up to four records across pages. The first
 record is the reference; **Use as reference** changes its position. Compare shows
 16 recorded metadata fields, grouped by topic, including phases, model names, discretization,
 temperature, loading conditions and mechanical output availability. **Differences
 & gaps** hides matching rows while retaining missing, ambiguous and partial values.
 The member browser can collapse to leave more room for the comparison.
+
+**Inspect detailed parameters** opens the actual supplied
+constitutive model parameters, recorded model units, loading values and steps,
+and top-level units for the complete comparison. The brief overview shows actual
+differing or incomplete values; the expandable table retains each source field.
+Model-name and loading-type summaries remain clearly labeled as such. Phase,
+condition and array positions stay in their supplied order; equal names do not
+align different phases, and arbitrary model units are not assigned to parameters.
+
+Detailed inspection is an explicit native GET action. It rechecks ownership,
+membership and current access under collection and ordered object locks, and checks
+actual database JSON byte lengths before loading the complete selected set. Requests
+over 16 MiB retain source links without a partial inspection. Traversal is bounded
+to 6,000 nodes and depth 30, with 32 entries per array, 300 table rows and 512
+characters per cell. Missing, conflicting and shortened content stays incomplete;
+the interface reports omissions and links to complete source data. Original numeric
+text, scalar types, zero/false, arbitrary parameter names and uploaded JSON are kept.
+
+Map coordinates and inspection choices survive signed source navigation, manual
+relationship actions and temporary collection saves. Current version 3 collection
+summaries contain a small map projection; warm map aggregation does not load raw JSON. Map and
+comparison preparation share the existing request allowance, and an incomplete
+preparation shows progress without partial map counts. Deployment backfill prepares
+outdated summaries in restartable batches. Without JavaScript, grid links, pinning,
+parameter inspection and source return remain ordinary forms and links.
 
 Comparison means recorded values, not scientific equivalence. Phase and loading
 entries retain their order; explicit units and original numeric text remain

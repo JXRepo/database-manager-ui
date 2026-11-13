@@ -1,0 +1,41 @@
+<section class="study-parameters" id="study-parameters" aria-labelledby="study-parameters-heading" data-inspected="{{ study_details.open|yesno:'true,false' }}">
+  <div class="study-parameters-heading">
+    <div><h3 id="study-parameters-heading">Detailed parameters</h3><p>Inspect supplied model parameters, loading conditions and units in their recorded positions.</p></div>
+    <a href="{{ study_comparison.close_inspect_url }}" id="study-parameters-close">Close inspection</a>
+  </div>
+  {% if study_details.open %}
+    {% if study_details.error %}
+    <div class="study-parameters-error" id="study-parameters-error" role="alert"><strong>Detailed inspection is unavailable.</strong><p>{{ study_details.error }}</p></div>
+    {% elif study_details.ready %}
+    <div class="study-parameters-overview" id="study-parameters-overview">
+      <p class="study-parameters-counts"><strong>{{ study_details.counts.different }} differing</strong><span>{{ study_details.counts.same }} matching</span><span>{{ study_details.counts.incomplete }} incomplete</span><span>{{ study_details.counts.total }} recorded fields inspected</span></p>
+      {% if study_details.differences %}<ul class="study-parameters-differences">{% for difference in study_details.differences %}<li><span>{{ difference.label }}</span><code>{{ difference.path }}</code><ul class="study-parameter-preview-values">{% for cell in difference.cells %}<li><span>{% if forloop.first %}Reference{% else %}Record {{ forloop.counter }}{% endif %}</span><strong title="{{ cell.value }}">{% if cell.state == 'recorded' %}{{ cell.value|truncatechars:90 }}{% else %}{{ cell.state_label }}{% endif %}</strong>{% if cell.state == 'recorded' and cell.value_type %}<small>{{ cell.value_type }}</small>{% endif %}</li>{% endfor %}</ul></li>{% endfor %}</ul>{% endif %}
+      <p class="study-parameters-scope">{{ study_details.scope_note }}</p>
+      {% if study_details.limited %}<div class="study-parameters-limits" id="study-parameters-limits"><strong>This inspection is bounded.</strong><ul>{% for reason in study_details.limit_reasons %}<li>{{ reason }}</li>{% endfor %}</ul><p>Open the source records for the complete supplied data.</p></div>{% endif %}
+    </div>
+    <details class="study-parameter-fields" id="study-parameter-fields">
+      <summary>Recorded parameter table <span>{{ study_details.rows|length }} fields</span></summary>
+      <div class="study-parameter-scroll" tabindex="0" aria-label="Detailed recorded parameters">
+        <table class="study-parameter-table" id="study-parameter-table" style="--study-columns:{{ study_details.objects|length }}">
+          <thead><tr><th scope="col">Recorded position and field</th>{% for item in study_details.objects %}<th scope="col" data-study-object="{{ item.pk }}"{% if forloop.first %} class="is-reference"{% endif %}><span class="study-column-kind">{% if forloop.first %}Reference{% else %}Selected record{% endif %}</span><a href="{{ item.detail_url }}" data-parameter-source="{{ item.pk }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a><span class="study-parameter-source-label">Open complete source record</span></th>{% endfor %}</tr></thead>
+          <tbody>
+          {% for row in study_details.rows %}
+            {% ifchanged row.group %}<tr class="study-parameter-group"><th scope="rowgroup" colspan="{{ study_details.objects|length|add:'1' }}">{{ row.group }}</th></tr>{% endifchanged %}
+            <tr data-parameter-path="{{ row.path }}" data-state="{{ row.status }}">
+              <th scope="row"><span>{{ row.label }}</span><code class="study-parameter-path">{{ row.path }}</code><span class="study-parameter-status">{{ row.status_label }}</span></th>
+              {% for cell in row.cells %}<td data-study-object="{{ cell.object_pk }}" data-state="{{ cell.state }}"{% if forloop.first %} class="is-reference"{% endif %}>
+                {% if cell.state != 'not_supplied' %}<div class="study-parameter-value">{{ cell.value }}</div>{% endif %}
+                {% if cell.value_type %}<span class="study-parameter-type">{{ cell.value_type }}</span>{% endif %}
+                {% if cell.state != 'recorded' %}<span class="study-parameter-cell-state">{{ cell.state_label }}</span>{% endif %}
+                {% if cell.source_paths %}<details class="study-parameter-sources"><summary>Source fields</summary><ul>{% for path in cell.source_paths %}<li><code>{{ path }}</code></li>{% endfor %}</ul></details>{% endif %}
+              </td>{% endfor %}
+            </tr>
+          {% empty %}<tr><td colspan="{{ study_details.objects|length|add:'1' }}">No model parameters, loading conditions or units were supplied.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+    {% endif %}
+    {% if study_details.error and study_details.objects %}<div class="study-parameters-source-links">{% for item in study_details.objects %}<a href="{{ item.detail_url }}">{{ item.title|default:item.identifier }}</a>{% endfor %}</div>{% endif %}
+  {% endif %}
+</section>

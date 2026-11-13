@@ -11,6 +11,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import CollectionRelationship, JSONData, ResearchCollection
+from .study_comparison import SUMMARY_VERSION
 
 
 class StudyDiscoveryIntegrationTests(TestCase):
@@ -133,7 +134,7 @@ class StudyDiscoveryIntegrationTests(TestCase):
         self.assertFalse(response.context["study_candidates"]["ready"])
         self.assertEqual(response.context["study_candidates"]["rows"], [])
         self.assertEqual(response.context["study_candidates"]["preparation"]["ready_count"], 3)
-        self.assertEqual(JSONData.objects.filter(owner=self.owner, collection_summary__summary_version=2).count(), 3)
+        self.assertEqual(JSONData.objects.filter(owner=self.owner, collection_summary__summary_version=SUMMARY_VERSION).count(), 3)
 
     def test_curve_endpoint_uses_the_complete_current_selection(self):
         """
