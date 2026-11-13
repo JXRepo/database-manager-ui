@@ -979,18 +979,22 @@ this scientific scaling. Each axis chooses its own exponent from its range;
 ticks show plain decimal coefficients of that multiplier. An irregular endpoint's
 extra decimals alone do not trigger scientific scaling. The X multiplier is
 right-aligned at the axis's right end in a separate band outside its tick labels;
-the Y multiplier sits above the top end on the tick-label side. If the two factors
-share a crowded corner, only Y moves above X with an 8-pixel gap. Endpoint labels
-do not move these slots, and neither factor moves a title. The two origin labels remain `0`.
+the Y multiplier sits above the top end on the tick-label side. Titles and ticks
+are placed first. If a multiplier would collide with text or another multiplier,
+it moves outward vertically with an 8-pixel gap, without moving the title.
+The two origin labels remain `0`.
 This formatting does not round the data,
 hover values or CSV exports.
 Titles stay centered outside the plotting area, with a vertical Y title. Their
-visible text edges sit at fixed distances of 48 CSS pixels for X and 96 for Y
-from the corresponding outer plot edge, independently of tick labels and
-scientific multipliers. X titles sit above wholly nonpositive Y ranges and below
-otherwise; Y titles sit right of wholly nonpositive X ranges and left otherwise.
-When a zero axis is on the boundary, that boundary is the title's axis reference;
-internal zero axes never pull titles inside the plot. Measured glyph bounds
+visible text edges stay 10 CSS pixels beyond their own axis's tick text or the
+plot boundary, whichever lies farther out. Only neighbouring labels from the
+other axis and nearby axis ends (including stroke width) are also considered,
+so distant corner labels and scientific
+multipliers cannot push titles away. This keeps the visible gap compact for
+short numbers while accommodating longer numbers. X titles sit above wholly
+nonpositive Y ranges and below otherwise; Y titles sit right of wholly
+nonpositive X ranges and left otherwise. Internal zero axes never pull titles
+inside the plot. Measured glyph bounds
 include titles, multipliers and the extended axis ends in canvas padding and PNG
 layout. Axis text is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and

@@ -2540,12 +2540,8 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
     const group = plotMultiplierText(ctx, scale.customExponent);
     const left = axis === "x" ? axisSegments.x[1].x - group.width
       : ySide < 0 ? axisX - 8 - group.width : axisX + 8;
-    let top = axis === "y" ? axisSegments.y[1].y - 18 - group.height
+    const top = axis === "y" ? axisSegments.y[1].y - 18 - group.height
       : xSide < 0 ? axisY - 36 - group.height : axisY + 36;
-    const placed = placePlotText(group, left, top);
-    if (axis === "y" && multipliers.some(other => plotTextOverlaps(placed, other, 8))) {
-      top = Math.min(...multipliers.map(other => other.top)) - 8 - group.height;
-    }
     multipliers.push({...placePlotText(group, left, top), axis, exponent: scale.customExponent});
   }
 
@@ -2576,7 +2572,7 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
     const text = tick.group.runs.map(run => run.text).join("");
     const duplicate = ticks.some(other => other.axis === axis
       && other.group.runs.map(run => run.text).join("") === text);
-    if (!duplicate && ![...ticks, ...multipliers].some(other => plotTextOverlaps(tick, other))) ticks.push(tick);
+    if (!duplicate && !ticks.some(other => plotTextOverlaps(tick, other))) ticks.push(tick);
   }
 
   for (const axis of ["x", "y"]) {
@@ -2594,14 +2590,41 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
 
   const xTitle = plotTitleText(ctx, xScale.title.text);
   const yTitle = plotTitleText(ctx, yScale.title.text);
-  // Internal zero axes must not pull the titles into the plotting area
+  // Keep a consistent gap from nearby tick text, including on internal axes
   const titleSides = {x: yScale.max <= 0 ? -1 : 1, y: xScale.max <= 0 ? 1 : -1};
-  const xTitleTop = titleSides.x < 0 ? area.top - 48 - xTitle.height : area.bottom + 48;
-  const yTitleLeft = titleSides.y < 0 ? area.left - 96 - yTitle.height : area.right + 96;
+  const xTitleLeft = (area.left + area.right - xTitle.width) / 2;
+  const yTitleTop = (area.top + area.bottom - yTitle.width) / 2;
+  const axisEnds = Object.values(axisSegments).flat().map(point => ({
+    left: point.x - .75, right: point.x + .75, top: point.y - .75, bottom: point.y + .75,
+  }));
+  const titleObstacles = [...ticks, ...axisEnds];
+  const xNeighbours = titleObstacles.filter(tick => tick.axis === "x"
+    || (tick.left < xTitleLeft + xTitle.width + 6 && tick.right > xTitleLeft - 6));
+  const yNeighbours = titleObstacles.filter(tick => tick.axis === "y"
+    || (tick.top < yTitleTop + yTitle.width + 6 && tick.bottom > yTitleTop - 6));
+  const xTitleTop = titleSides.x < 0
+    ? Math.min(area.top, ...xNeighbours.map(tick => tick.top)) - 10 - xTitle.height
+    : Math.max(area.bottom, ...xNeighbours.map(tick => tick.bottom)) + 10;
+  const yTitleLeft = titleSides.y < 0
+    ? Math.min(area.left, ...yNeighbours.map(tick => tick.left)) - 10 - yTitle.height
+    : Math.max(area.right, ...yNeighbours.map(tick => tick.right)) + 10;
   const titles = {
-    x: placePlotText(xTitle, (area.left + area.right - xTitle.width) / 2, xTitleTop),
-    y: placePlotText(yTitle, yTitleLeft, (area.top + area.bottom - yTitle.width) / 2, -Math.PI / 2),
+    x: placePlotText(xTitle, xTitleLeft, xTitleTop),
+    y: placePlotText(yTitle, yTitleLeft, yTitleTop, -Math.PI / 2),
   };
+
+  // Move a crowded factor outward without pulling its title away from the ticks
+  multipliers.forEach((multiplier, index) => {
+    const obstacles = [...ticks, ...Object.values(titles), ...multipliers.slice(0, index)];
+    for (let pass = 0; pass <= obstacles.length; pass++) {
+      const conflicts = obstacles.filter(other => plotTextOverlaps(multiplier, other, 8));
+      if (!conflicts.length) break;
+      multiplier.top = multiplier.axis === "x" && xSide > 0
+        ? Math.max(...conflicts.map(other => other.bottom)) + 8
+        : Math.min(...conflicts.map(other => other.top)) - 8 - multiplier.group.height;
+      multiplier.bottom = multiplier.top + multiplier.group.height;
+    }
+  });
   return {ticks, multipliers, titles, titleSides, axisSegments, area, axes: {x: axisX, y: axisY}, xSide, ySide};
 }
 
