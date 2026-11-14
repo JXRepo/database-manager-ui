@@ -83,7 +83,31 @@ function measuredLayout(xValues, yValues) {
   {context, xValues, yValues})));
 }
 
-test('single quadrant factors use separate outer ends and titles follow their axes', () => {
+function assertFactorPlacement(layout, expected) {
+  assert.deepEqual({x: layout.xSide, y: layout.ySide}, {x: expected.xSide, y: expected.ySide});
+  assert.deepEqual(layout.titleSides, {x: expected.xSide, y: expected.ySide});
+  assert.equal(layout.multipliers.length, 2);
+  const xFactor = layout.multipliers.find(factor => factor.axis === 'x');
+  const yFactor = layout.multipliers.find(factor => factor.axis === 'y');
+  const xEnd = layout.axisSegments.x[expected.xEnd === 'left' ? 0 : 1].x;
+  const xEdge = expected.xEnd === 'left' ? xFactor.left : xFactor.right;
+  assert.ok(Math.abs(xEdge - xEnd) < .01, `X factor stays at the ${expected.xEnd} end`);
+  assert.ok(expected.yEnd === 'top'
+    ? yFactor.bottom <= layout.axisSegments.y[1].y - 8
+    : yFactor.top >= layout.axisSegments.y[0].y + 8,
+  `Y factor stays beyond the ${expected.yEnd} end`);
+  assert.ok(expected.xSide < 0 ? xFactor.bottom < layout.axes.y : xFactor.top > layout.axes.y,
+    'X factor stays on the X tick-label side');
+  assert.ok(expected.ySide < 0 ? yFactor.left >= layout.axes.x + 8 : yFactor.right <= layout.axes.x - 8,
+    'Y factor stays opposite the Y tick labels');
+  assert.ok(expected.xSide < 0 ? layout.titles.x.bottom < layout.area.top : layout.titles.x.top > layout.area.bottom);
+  assert.ok(expected.ySide < 0 ? layout.titles.y.right < layout.area.left : layout.titles.y.left > layout.area.right);
+  for (const factor of [xFactor, yFactor]) {
+    assert.ok(factor.group.runs.some(run => run.text === '· 10'));
+  }
+}
+
+test('single quadrant factors use separate outer ends with Y opposite its tick labels', () => {
   const cases = [
     {x: 1, y: 1, xSide: 1, ySide: -1, xEnd: 'right', yEnd: 'top'},
     {x: -1, y: 1, xSide: 1, ySide: 1, xEnd: 'left', yEnd: 'top'},
@@ -91,40 +115,45 @@ test('single quadrant factors use separate outer ends and titles follow their ax
     {x: 1, y: -1, xSide: -1, ySide: -1, xEnd: 'right', yEnd: 'bottom'},
   ];
   for (const item of cases) {
-    const layout = measuredLayout([0, item.x * .00108], [0, item.y * 7.82e-6]);
-    assert.deepEqual(layout.titleSides, {x: item.xSide, y: item.ySide});
-    assert.equal(layout.multipliers.length, 2);
-    const xFactor = layout.multipliers.find(factor => factor.axis === 'x');
-    const yFactor = layout.multipliers.find(factor => factor.axis === 'y');
-    assert.ok(item.xEnd === 'left' ? xFactor.right < 400 : xFactor.left > 400,
-      `X factor belongs at the ${item.xEnd} end for signs ${item.x}, ${item.y}`);
-    assert.ok(item.yEnd === 'top' ? yFactor.bottom < 250 : yFactor.top > 250,
-      `Y factor belongs at the ${item.yEnd} end for signs ${item.x}, ${item.y}`);
-    assert.ok(item.xSide < 0 ? xFactor.bottom < layout.axes.y : xFactor.top > layout.axes.y);
-    assert.ok(item.ySide < 0 ? yFactor.right < layout.axes.x : yFactor.left > layout.axes.x);
-    for (const factor of [xFactor, yFactor]) {
-      assert.ok(factor.group.runs.some(run => run.text === '· 10'));
+    assertFactorPlacement(measuredLayout([0, item.x * .00108], [0, item.y * 7.82e-6]), item);
+  }
+});
+
+test('adjacent half planes retain the agreed factor ends with asymmetric signed ranges', () => {
+  const cases = [
+    {x: [-.0009, .0001], y: [0, 7.82e-6], xSide: 1, ySide: -1, xEnd: 'right', yEnd: 'top'},
+    {x: [-.00108, 0], y: [-9e-6, 1e-6], xSide: 1, ySide: 1, xEnd: 'left', yEnd: 'top'},
+    {x: [-.0009, .0001], y: [-7.82e-6, 0], xSide: -1, ySide: -1, xEnd: 'right', yEnd: 'bottom'},
+    {x: [0, .00108], y: [-9e-6, 1e-6], xSide: 1, ySide: -1, xEnd: 'right', yEnd: 'top'},
+  ];
+  for (const item of cases) assertFactorPlacement(measuredLayout(item.x, item.y), item);
+});
+
+test('four-quadrant factors and titles stay fixed when positive or negative branches dominate', () => {
+  for (const positiveX of [.1, .9]) {
+    for (const positiveY of [.1, .9]) {
+      const layout = measuredLayout([-(1 - positiveX) * .001, positiveX * .001],
+        [-(1 - positiveY) * 1e-5, positiveY * 1e-5]);
+      assertFactorPlacement(layout, {xSide: 1, ySide: -1, xEnd: 'right', yEnd: 'top'});
     }
   }
 });
 
-test('tiny positive reversals keep titles and factors beside the visible negative branches', () => {
-  const layout = measuredLayout([-.00108, 1e-14], [-7.82e-6, 1e-18]);
+test('subpixel positive reversals retain the visible third-quadrant layout without changing data bounds', () => {
+  const xValues = [-.00108, 5.2316e-7];
+  const yValues = [-7.82e-6, 3.51e-14];
+  const layout = measuredLayout(xValues, yValues);
   assert.ok(layout.axes.x > 649 && layout.axes.y < 101);
-  assert.deepEqual(layout.titleSides, {x: -1, y: 1});
-  assert.ok(layout.titles.x.bottom < layout.area.top);
-  assert.ok(layout.titles.y.left > layout.area.right);
-  const xFactor = layout.multipliers.find(factor => factor.axis === 'x');
-  const yFactor = layout.multipliers.find(factor => factor.axis === 'y');
-  assert.ok(xFactor.right < 400, 'X factor leaves the crowded upper-right origin');
-  assert.ok(yFactor.top > 250, 'Y factor leaves the crowded upper-right origin');
+  assertFactorPlacement(layout, {xSide: -1, ySide: 1, xEnd: 'left', yEnd: 'bottom'});
+  assert.equal(plotScale(xValues).chartMax, xValues[1]);
+  assert.equal(plotScale(yValues).chartMax, yValues[1]);
 });
 
-test('visible positive branches retain the preferred right and top multiplier ends', () => {
-  const layout = measuredLayout([-.001, .002], [-2e-6, 4e-6]);
-  assert.ok(layout.multipliers.find(factor => factor.axis === 'x').left > 400);
-  assert.ok(layout.multipliers.find(factor => factor.axis === 'y').bottom < 250);
-  assert.deepEqual(layout.titleSides, {x: layout.xSide, y: layout.ySide});
+test('small but visible positive branches use fixed interior-axis positions even beside the origin', () => {
+  const layout = measuredLayout([-.00108, 3e-6], [-7.82e-6, 3e-8]);
+  assert.ok(layout.area.right - layout.axes.x > 1);
+  assert.ok(layout.axes.y - layout.area.top > 1);
+  assertFactorPlacement(layout, {xSide: 1, ySide: -1, xEnd: 'right', yEnd: 'top'});
 });
 
 test('one shared power formats small axis ticks without changing their values', () => {

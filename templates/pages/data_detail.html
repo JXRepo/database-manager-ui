@@ -2509,8 +2509,9 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
   const pixelX = value => area.left + (value - xScale.min) / (xScale.max - xScale.min) * (area.right - area.left);
   const pixelY = value => area.bottom - (value - yScale.min) / (yScale.max - yScale.min) * (area.bottom - area.top);
   const axisX = pixelX(0), axisY = pixelY(0);
-  const xSide = axisY < (area.top + area.bottom) / 2 ? -1 : 1;
-  const ySide = axisX > (area.left + area.right) / 2 ? 1 : -1;
+  // Subpixel reversals keep their range without changing an edge axis's layout
+  const xSide = axisY - area.top < 1 ? -1 : 1;
+  const ySide = area.right - axisX < 1 ? 1 : -1;
   const ticks = [];
   const tickGap = 8;
   ticks.push(makeTick("x", 0), makeTick("y", 0));
@@ -2600,55 +2601,36 @@ function buildMechanicalPlotLayout(ctx, area, xScale, yScale) {
     y: placePlotText(yTitle, yTitleLeft, yTitleTop, -Math.PI / 2),
   };
 
-  // Attach each factor to a visible branch, leaving the origin labels clear
+  // Keep fixed ends for internal axes and put Y factors opposite their ticks
   const multipliers = [];
-  const zeroTicks = ticks.filter(tick => tick.value === 0);
   for (const axis of ["x", "y"]) {
     const scale = axis === "x" ? xScale : yScale;
     if (!Number.isInteger(scale.customExponent)) continue;
     const group = plotMultiplierText(ctx, scale.customExponent);
-    const lengths = axis === "x"
-      ? [axisX - area.left, area.right - axisX]
-      : [area.bottom - axisY, axisY - area.top];
-    const originSpace = axis === "x"
-      ? [axisX - Math.min(...zeroTicks.map(tick => tick.left)),
-        Math.max(...zeroTicks.map(tick => tick.right)) - axisX]
-      : [Math.max(...zeroTicks.map(tick => tick.bottom)) - axisY,
-        axisY - Math.min(...zeroTicks.map(tick => tick.top))];
-    const extent = axis === "x" ? group.width : group.height;
-    const ends = [1, 0].filter(end => lengths[end] >= extent + originSpace[end] + 8);
-    if (!ends.length) ends.push(lengths[1] >= lengths[0] ? 1 : 0);
+    const end = axis === "x" ? (ySide > 0 ? 0 : 1) : (xSide < 0 ? 0 : 1);
     const ownTicks = ticks.filter(tick => tick.axis === axis);
     const obstacles = [...ticks, ...Object.values(titles), ...multipliers];
-    const candidates = ends.map(end => {
-      let left, top;
-      if (axis === "x") {
-        left = end === 1 ? axisSegments.x[1].x - group.width : axisSegments.x[0].x;
-        top = xSide < 0
-          ? Math.min(...ownTicks.map(tick => tick.top)) - 10 - group.height
-          : Math.max(...ownTicks.map(tick => tick.bottom)) + 10;
-      } else {
-        left = ySide < 0 ? axisX - 8 - group.width : axisX + 8;
-        top = end === 1
-          ? axisSegments.y[1].y - 8 - group.height
-          : axisSegments.y[0].y + 8;
-      }
-      return {...placePlotText(group, left, top), axis, end, exponent: scale.customExponent};
-    });
-    // Try the other visible end before adding space outside the axis
-    let multiplier = candidates.find(candidate =>
-      !obstacles.some(other => plotTextOverlaps(candidate, other, 8)));
-    if (!multiplier) {
-      multiplier = candidates[0];
-      const direction = axis === "x" ? xSide : multiplier.end === 1 ? -1 : 1;
-      for (let pass = 0; pass <= obstacles.length; pass++) {
-        const conflicts = obstacles.filter(other => plotTextOverlaps(multiplier, other, 8));
-        if (!conflicts.length) break;
-        multiplier.top = direction > 0
-          ? Math.max(...conflicts.map(other => other.bottom)) + 8
-          : Math.min(...conflicts.map(other => other.top)) - 8 - group.height;
-        multiplier.bottom = multiplier.top + group.height;
-      }
+    let left, top;
+    if (axis === "x") {
+      left = end === 1 ? axisSegments.x[1].x - group.width : axisSegments.x[0].x;
+      top = xSide < 0
+        ? Math.min(...ownTicks.map(tick => tick.top)) - 10 - group.height
+        : Math.max(...ownTicks.map(tick => tick.bottom)) + 10;
+    } else {
+      left = ySide < 0 ? axisX + 8 : axisX - 8 - group.width;
+      top = end === 1
+        ? axisSegments.y[1].y - 8 - group.height
+        : axisSegments.y[0].y + 8;
+    }
+    const multiplier = {...placePlotText(group, left, top), axis, end, exponent: scale.customExponent};
+    const direction = axis === "x" ? xSide : end === 1 ? -1 : 1;
+    for (let pass = 0; pass <= obstacles.length; pass++) {
+      const conflicts = obstacles.filter(other => plotTextOverlaps(multiplier, other, 8));
+      if (!conflicts.length) break;
+      multiplier.top = direction > 0
+        ? Math.max(...conflicts.map(other => other.bottom)) + 8
+        : Math.min(...conflicts.map(other => other.top)) - 8 - group.height;
+      multiplier.bottom = multiplier.top + group.height;
     }
     multipliers.push(multiplier);
   }

@@ -117,6 +117,14 @@ const {join} = require('node:path');
       assert.ok(planned && planned.ticks.length && planned.titles.x && planned.titles.y,
         `${label}: the drawing exposes its measured text layout`);
       verifyAxisSegments(metrics, label);
+      // Only a subpixel positive branch keeps the visible top/right edge layout.
+      // Interior axes always use below/left, including strongly asymmetric ranges.
+      const expectedSides = {
+        x: planned.axes.y - metrics.area.top < 1 ? -1 : 1,
+        y: metrics.area.right - planned.axes.x < 1 ? 1 : -1,
+      };
+      assert.deepEqual({x: planned.xSide, y: planned.ySide}, expectedSides,
+        `${label}: tick sides follow the displayed quadrant, with fixed interior-axis positions`);
       const fontSize = font => Number(font.match(/([\d.]+)px/)[1]);
       const close = (actual, expected, message) => assert.ok(Math.abs(actual - expected) <= .15,
         `${label}: ${message}: ${actual} instead of ${expected}`);
@@ -193,29 +201,20 @@ const {join} = require('node:path');
           assert.ok(obstacles.every(other => !crowded(actual, other, 7.85)),
             `${label}: ${axis} multiplier keeps 8px clear of ticks, titles and the other multiplier`);
           if (axis === 'x') {
-            const atLeft = Math.abs(actual.left - planned.axisSegments.x[0].x) <= .15;
-            const atRight = Math.abs(actual.right - planned.axisSegments.x[1].x) <= .15;
-            assert.ok(atLeft || atRight, `${label}: X multiplier stays aligned with an actual axis end`);
-            assert.ok(planned.xSide < 0 ? actual.bottom < planned.axes.y : actual.top > planned.axes.y,
+            const leftEnd = expectedSides.y > 0;
+            close(leftEnd ? actual.left : actual.right,
+              planned.axisSegments.x[leftEnd ? 0 : 1].x,
+              `X multiplier stays aligned with its fixed ${leftEnd ? 'left' : 'right'} end`);
+            assert.ok(expectedSides.x < 0 ? actual.bottom < planned.axes.y : actual.top > planned.axes.y,
               `${label}: X multiplier stays on its tick-label side`);
-            if (metrics.xMax === 0 || metrics.area.right - planned.axes.x < 1) {
-              assert.ok(atLeft, `${label}: X multiplier leaves the crowded negative-branch origin`);
-            }
-            if (metrics.xMin === 0 || planned.axes.x - metrics.area.left < 1) {
-              assert.ok(atRight, `${label}: X multiplier stays at the positive outer end`);
-            }
           } else {
-            const atTop = actual.bottom <= planned.axisSegments.y[1].y - 7.85;
-            const atBottom = actual.top >= planned.axisSegments.y[0].y + 7.85;
-            assert.ok(atTop || atBottom, `${label}: Y multiplier stays beyond an actual axis end`);
-            close(planned.ySide < 0 ? planned.axes.x - actual.right : actual.left - planned.axes.x,
-              8, 'Y multiplier stays beside its own axis on the tick-label side');
-            if (metrics.yMax === 0 || planned.axes.y - metrics.area.top < 1) {
-              assert.ok(atBottom, `${label}: Y multiplier leaves the crowded negative-branch origin`);
-            }
-            if (metrics.yMin === 0 || metrics.area.bottom - planned.axes.y < 1) {
-              assert.ok(atTop, `${label}: Y multiplier stays at the positive outer end`);
-            }
+            const bottomEnd = expectedSides.x < 0;
+            assert.ok(bottomEnd
+              ? actual.top >= planned.axisSegments.y[0].y + 7.85
+              : actual.bottom <= planned.axisSegments.y[1].y - 7.85,
+            `${label}: Y multiplier stays beyond its fixed ${bottomEnd ? 'bottom' : 'top'} end`);
+            close(expectedSides.y < 0 ? actual.left - planned.axes.x : planned.axes.x - actual.right,
+              8, 'Y multiplier stays 8px across the axis from its tick labels');
           }
         }
         const endpoints = metrics.endpointTicks.filter(tick => tick.axis === axis);
@@ -623,6 +622,10 @@ const {join} = require('node:path');
         'The detail page shows the complete curve without sample-range controls');
       await select('plot-x-select', 'total_strain.strain_11');
       for (const width of [1280, 1440, 1920]) await layout(item.name, width, item);
+      if (['scientific-positive', 'scientific-second', 'independent-exponents', 'scientific-fourth',
+        'scientific-upper', 'scientific-lower', 'scientific-left', 'scientific-right', 'corner-multipliers'].includes(item.name)) {
+        await downloadMeasuredPNG(item.name);
+      }
     }
     for (const width of [1280, 1440, 1920]) {
       await navigate(cases[0].path);
