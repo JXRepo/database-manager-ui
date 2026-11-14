@@ -201,6 +201,24 @@ class ResearchCollection(models.Model):
         return self.title
 
 
+class SavedStudyAnalysis(models.Model):
+    """
+    Keep private research choices and notes beside their collection.
+    """
+
+    collection = models.ForeignKey(ResearchCollection, on_delete=models.CASCADE, related_name="saved_analyses")
+    title = models.CharField(max_length=120)
+    notes = models.TextField(blank=True, max_length=5000)
+    state = models.JSONField(default=dict)
+    source_digests = models.JSONField(default=dict, editable=False)
+    revision = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-updated_at", "-pk")
+
+
 class CollectionRelationship(models.Model):
     """
     Store one owner supplied directed link between members of a collection

@@ -458,6 +458,8 @@ def _finish_context(context, extracted, budget):
     dict
         Ready native table context with factual differences and explicit limits.
     """
+    from hashlib import sha256
+
     paths = {}
     for record, fields in extracted:
         context["objects"].append(record)
@@ -475,12 +477,16 @@ def _finish_context(context, extracted, budget):
         for cell in cells:
             cell.pop("token", None)
         display_path = path[:MAX_DISPLAY_CHARACTERS - 1] + "…" if len(path) > MAX_DISPLAY_CHARACTERS else path
-        row = {"path": display_path, "label": label[:MAX_DISPLAY_CHARACTERS], "group": group, "status": status,
+        key = sha256(path.encode("utf-8", errors="surrogatepass")).hexdigest()[:24]
+        row = {"path": display_path, "key": key, "id": "study-parameter-" + key,
+               "label": label[:MAX_DISPLAY_CHARACTERS], "group": group, "status": status,
                "status_label": STATUS_LABELS[status], "cells": cells}
         context["rows"].append(row)
         context["counts"][status] += 1
         if status != "same" and len(context["differences"]) < 3:
-            context["differences"].append({"path": display_path, "status": status, "label": STATUS_LABELS[status], "cells": cells})
+            context["differences"].append({"path": display_path, "key": key, "id": row["id"],
+                                           "field_label": row["label"], "status": status,
+                                           "label": STATUS_LABELS[status], "cells": cells})
     reasons = []
     for key, label in (("omitted_rows", "additional field rows omitted"), ("omitted_array_entries", "array entries omitted"),
                        ("depth_limits", "branches stopped at the depth limit"), ("node_limits", "branches stopped at the traversal limit"),

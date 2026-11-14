@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="{% static 'assets/css/study-curves.css' %}">
 <link rel="stylesheet" href="{% static 'assets/css/study-map.css' %}">
 <link rel="stylesheet" href="{% static 'assets/css/study-details.css' %}">
+<link rel="stylesheet" href="{% static 'assets/css/study-analyses.css' %}">
 {% endblock extrastyle %}
 {% block content %}
 <main class="pc-container graph-page collection-page study-page">
@@ -91,7 +92,10 @@
     </section>
     {% endif %}
 
-    {% if study_workspace and not summary_preparation %}{% include "pages/study_workspace_header.html" %}{% endif %}
+    {% if study_workspace and not summary_preparation %}
+    {% include "pages/study_analyses.html" %}
+    <p id="study-state-error" class="alert alert-warning" role="alert" hidden></p>
+    {% include "pages/study_workspace_header.html" %}{% endif %}
     {% if not summary_preparation and study_workspace and study_workspace.panel != 'map' %}{% if study_comparison.ids or study_candidates.enabled %}{% include "pages/study_candidates.html" %}{% endif %}{% endif %}
     {% if study_workspace.panel == 'compare' and not summary_preparation %}
       {% include "pages/study_comparison.html" %}
@@ -149,5 +153,9 @@
 <script src="{% static 'assets/js/research-collections.js' %}" defer></script>
 <script src="{% static 'assets/js/collection-relationships.js' %}" defer></script>
 <script src="{% static 'assets/js/study-workspace.js' %}" defer></script>
+{% if study_state %}{{ study_state|json_script:"study-state-data" }}{% endif %}
+<script src="{% static 'assets/js/study-state.js' %}" defer></script>
+<script src="{% static 'assets/js/study-details.js' %}" defer></script>
+<script src="{% static 'assets/js/study-analyses.js' %}" defer></script>
 <script src="{% static 'assets/js/study-curves.js' %}" defer></script>
 {% endblock content %}

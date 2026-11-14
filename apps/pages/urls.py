@@ -10,6 +10,8 @@ from . import research_collections
 from . import collection_relationships
 from . import study_comparison_views
 from . import study_curves
+from . import study_analyses
+from . import study_navigation
 from .views import account_settings_view, register_view
 from .forms import StyledPasswordChangeForm
 from .views import upload_json_view
@@ -92,6 +94,7 @@ urlpatterns = [
     path("graph/selection/<str:token>/export/", research_collections.selection_export, name="selection_export"),
     path("graph/selection/<str:token>/comparison.csv", study_comparison_views.selection_comparison_export, name="selection_comparison_export"),
     path("graph/selection/<str:token>/curves.json", study_curves.selection_study_curves, name="selection_study_curves"),
+    path("graph/selection/<str:token>/study-state.json", study_navigation.selection_study_navigation, name="selection_study_navigation"),
     path("graph/collections/<int:pk>/", research_collections.collection_detail, name="collection_detail"),
     path("graph/collections/<int:pk>/edit/", research_collections.collection_update, name="collection_update"),
     path("graph/collections/<int:pk>/remove/", research_collections.collection_remove, name="collection_remove"),
@@ -100,6 +103,10 @@ urlpatterns = [
     path("graph/collections/<int:pk>/export/", research_collections.collection_export, name="collection_export"),
     path("graph/collections/<int:pk>/comparison.csv", study_comparison_views.collection_comparison_export, name="collection_comparison_export"),
     path("graph/collections/<int:pk>/curves.json", study_curves.collection_study_curves, name="collection_study_curves"),
+    path("graph/collections/<int:pk>/study-state.json", study_navigation.collection_study_navigation, name="collection_study_navigation"),
+    path("graph/collections/<int:pk>/analyses/save/", study_analyses.collection_analysis_save, name="collection_analysis_save"),
+    path("graph/collections/<int:pk>/analyses/<int:analysis_pk>/open/", study_analyses.collection_analysis_open, name="collection_analysis_open"),
+    path("graph/collections/<int:pk>/analyses/<int:analysis_pk>/delete/", study_analyses.collection_analysis_delete, name="collection_analysis_delete"),
     path("graph/collections/<int:pk>/relationships/save/", collection_relationships.collection_relationship_save, name="collection_relationship_save"),
     path("graph/collections/<int:pk>/relationships/<int:relationship_pk>/delete/", collection_relationships.collection_relationship_delete, name="collection_relationship_delete"),
     path("graph/collections/<int:pk>/relationships/export/", collection_relationships.collection_relationship_export, name="collection_relationship_export"),

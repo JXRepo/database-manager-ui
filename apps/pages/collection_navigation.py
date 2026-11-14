@@ -12,6 +12,7 @@ from django.urls import reverse
 
 CONTEXT_SALT = "pages.collection-navigation.v1"
 CONTEXT_MAX_AGE = 7 * 24 * 60 * 60
+CONTEXT_MAX_LENGTH = 32768
 CONTEXT_ERROR = (
     "This collection or selection link is no longer available. "
     "Open Graph and choose the collection or selection again."
@@ -19,7 +20,8 @@ CONTEXT_ERROR = (
 RETURN_PARAMETERS = {"links", "group", "page", "groups_page", "view", "edge", "relationships_page",
                      "compare", "panel", "member_q", "members_page", "differences",
                      "find_candidates", "match_fields", "vary_field", "candidates_page", "curve_component", "curve_strain",
-                     "inspect", "map_x", "map_y", "map_unit", "map_x_page", "map_y_page", "map_cell", "map_row"}
+                     "inspect", "map_x", "map_y", "map_unit", "map_x_page", "map_y_page", "map_cell", "map_row",
+                     "detail_status", "detail_q", "detail_focus", "analysis", "analyses_page", "curve_view", "curve_open"}
 
 
 def _return_parameters(values):
@@ -67,7 +69,8 @@ def _return_parameters(values):
     if any(key in params for key in ("compare", "panel", "member_q", "members_page", "differences",
                                     "find_candidates", "match_fields", "vary_field", "candidates_page",
                                     "curve_component", "curve_strain", "inspect", "map_x", "map_y", "map_unit",
-                                    "map_x_page", "map_y_page", "map_cell", "map_row")):
+                                    "map_x_page", "map_y_page", "map_cell", "map_row", "detail_status", "detail_q",
+                                    "detail_focus", "analysis", "analyses_page", "curve_view", "curve_open")):
         from .study_workspace import study_parameters
 
         try:
@@ -131,7 +134,7 @@ def read_navigation(request, *, data=None):
     values = data.getlist("graph_context")
     if not values:
         return None
-    if len(values) != 1 or not values[0] or len(values[0]) > 4096:
+    if len(values) != 1 or not values[0] or len(values[0]) > CONTEXT_MAX_LENGTH:
         raise ValueError(CONTEXT_ERROR)
     token = values[0]
     try:
@@ -299,13 +302,19 @@ def workspace_navigation(request, context, *, collection=None, selection_token="
             _validate_access(request.user, _selection_ids(request, selection_token))
         except ValueError as exc:
             return {**navigation_fields(None), "graph_navigation_error": str(exc)}
-    token = signing.dumps(payload, salt=CONTEXT_SALT)
+    token = signing.dumps(payload, salt=CONTEXT_SALT, compress=True)
     navigation = {**payload, "token": token, "collection": collection, "selection_token": selection_token}
     fields = navigation_fields(navigation)
+    state_route = "collection_study_navigation" if collection is not None else "selection_study_navigation"
+    state_target = collection.pk if collection is not None else selection_token
+    fields["study_state"] = {"state": params, "allowed": sorted(RETURN_PARAMETERS),
+                             "endpoint": reverse(state_route, args=[state_target]), "token": token,
+                             "workspace": reverse("collection_detail" if collection is not None else "selection_detail", args=[state_target])}
     for view in ("compact", "detailed"):
         fields[f"graph_context_{view}"] = signing.dumps(
-            {**payload, "params": {**params, "view": view}}, salt=CONTEXT_SALT,
+            {**payload, "params": {**params, "view": view}}, salt=CONTEXT_SALT, compress=True,
         )
+    fields["study_state"]["variants"] = {view: fields[f"graph_context_{view}"] for view in ("compact", "detailed")}
     candidates = context.get("study_candidates", {})
     source_rows = [*context.get("object_rows", []), *context.get("study_comparison", {}).get("objects", []),
                    *candidates.get("rows", []), *candidates.get("uncertain_rows", [])]

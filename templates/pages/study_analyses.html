@@ -1,0 +1,44 @@
+{% if study_analyses.enabled %}
+<details class="study-analyses" id="study-analyses" data-active-id="{{ study_analyses.active.id|default:'' }}"{% if study_analyses.form.errors or study_analyses.error %} open{% endif %}>
+  <summary>
+    <span class="study-analysis-current">{% if study_analyses.active %}<span>Analysis</span><strong id="study-analysis-active-title">{{ study_analyses.active.title }}</strong>{% else %}<strong>Save analysis</strong><span>Keep this view and your notes</span>{% endif %}</span>
+    <span class="study-analysis-status" id="study-analysis-dirty"{% if not study_analyses.active.dirty %} hidden{% endif %}>Unsaved changes</span>
+    {% if study_analyses.active.changed %}<span class="study-analysis-status is-warning" id="study-analysis-source-badge">Source data changed</span>{% elif study_analyses.active.unavailable %}<span class="study-analysis-status is-warning" id="study-analysis-source-badge">Review sources</span>{% endif %}
+    <span class="study-analysis-library-count">{{ study_analyses.page.paginator.count }} saved</span>
+  </summary>
+  <div class="study-analysis-body">
+    <div class="study-analysis-editor">
+      <div class="study-analysis-editor-heading"><h2>{% if study_analyses.active %}Continue this analysis{% else %}Name this analysis{% endif %}</h2><span>Private to you</span></div>
+      <p class="study-analysis-guidance">Save your selected records, reference, filters and curve settings. Add your own observations below.</p>
+      {% if study_analyses.error %}<p class="study-analysis-notice is-warning" id="study-analysis-server-error" role="alert">{{ study_analyses.error }}</p>{% endif %}
+      {% if study_analyses.active.changed %}<p class="study-analysis-notice is-warning" id="study-analysis-source-changed">Source data changed since this analysis was saved. Review the current values before saving changes. Your saved notes have been kept.</p>{% endif %}
+      {% if study_analyses.active.unavailable %}<p class="study-analysis-notice is-warning" id="study-analysis-source-unavailable">{{ study_analyses.active.source_error }} Your saved analysis and notes have been kept.</p>{% endif %}
+      <form method="post" action="{{ study_analyses.save_url }}" id="study-analysis-form" data-study-analysis-mutation="save">
+        {% csrf_token %}<input type="hidden" name="graph_context" value="{{ graph_context }}">
+        {{ study_analyses.form.analysis_id }}{{ study_analyses.form.revision }}{{ study_analyses.form.workspace_state }}
+        {% if not study_analyses.error %}{{ study_analyses.form.non_field_errors }}{% endif %}
+        <div class="study-analysis-field"><label for="{{ study_analyses.form.title.id_for_label }}">Analysis name</label>{{ study_analyses.form.title }}{{ study_analyses.form.title.errors }}</div>
+        <div class="study-analysis-field"><label for="{{ study_analyses.form.notes.id_for_label }}">Your notes <span>Optional</span></label>{{ study_analyses.form.notes }}{{ study_analyses.form.notes.errors }}</div>
+        <div class="study-analysis-save-actions">
+          {% if study_analyses.active %}<button type="submit" name="intent" value="update" id="study-analysis-update"{% if not study_analyses.can_save %} disabled{% endif %}>Save changes</button><button type="submit" name="intent" value="create" id="study-analysis-copy" class="is-secondary"{% if not study_analyses.can_save %} disabled{% endif %}>Save as new</button>{% else %}<button type="submit" name="intent" value="create" id="study-analysis-create"{% if not study_analyses.can_save %} disabled{% endif %}>Save analysis</button>{% endif %}
+          {% if study_analyses.active %}<a href="{{ study_analyses.active.open_url }}" id="study-analysis-reopen">Reopen saved view</a>{% endif %}
+        </div>
+        {% if not study_analyses.can_save %}<p class="study-analysis-save-help" id="study-analysis-save-help">Choose 2–4 accessible records to save an analysis.</p>{% endif %}
+      </form>
+      <p class="study-analysis-notice" id="study-analysis-feedback" role="status" hidden></p>
+      <div class="study-analysis-recovery" id="study-analysis-recovery" hidden><a href="{{ workspace_url }}?analyses_page=1#study-analyses" target="_blank" rel="noopener" id="study-analysis-check-saved">Check saved analyses in a new tab</a><button type="button" id="study-analysis-acknowledge" hidden>I checked; allow another save</button></div>
+      {% if study_analyses.active %}<details class="study-analysis-delete"><summary>Remove this saved analysis</summary><p>This removes its saved view and notes. The collection and data objects stay unchanged.</p><form method="post" action="{{ study_analyses.active.delete_url }}" data-study-analysis-mutation="delete" id="study-analysis-delete-form">{% csrf_token %}<input type="hidden" name="graph_context" value="{{ graph_context }}"><input type="hidden" name="revision" value="{{ study_analyses.active.revision }}"><button type="submit" id="study-analysis-delete">Delete saved analysis</button></form></details>{% endif %}
+    </div>
+    <aside class="study-analysis-library" aria-labelledby="study-analysis-library-heading">
+      <h2 id="study-analysis-library-heading">Saved analyses <span>{{ study_analyses.page.paginator.count }}</span></h2>
+      {% if study_analyses.rows %}<ul>{% for item in study_analyses.rows %}<li data-saved-analysis="{{ item.id }}"{% if item.id == study_analyses.active.id %} class="is-active"{% endif %}><a href="{{ item.open_url }}" data-analysis-open="{{ item.id }}"{% if item.id == study_analyses.active.id %} aria-current="true"{% endif %}>{{ item.title }}</a><time datetime="{{ item.updated_at|date:'c' }}">{{ item.updated_at|date:'M j, Y · H:i' }}</time></li>{% endfor %}</ul>{% else %}<p class="study-analysis-library-empty">Saved analyses will appear here. Each keeps a view of this collection and your notes.</p>{% endif %}
+      {% if study_analyses.previous_url or study_analyses.next_url %}<nav class="study-analysis-pagination" aria-label="Saved analysis pages">{% if study_analyses.previous_url %}<a href="{{ study_analyses.previous_url }}#study-analyses" id="study-analysis-previous">Previous</a>{% endif %}<span>{{ study_analyses.page.number }} / {{ study_analyses.page.paginator.num_pages }}</span>{% if study_analyses.next_url %}<a href="{{ study_analyses.next_url }}#study-analyses" id="study-analysis-next">Next</a>{% endif %}</nav>{% endif %}
+    </aside>
+  </div>
+  {{ study_analyses.active_state_json|json_script:"study-analysis-baseline" }}
+  {{ study_analyses.active.title|default:""|json_script:"study-analysis-saved-title" }}
+  {{ study_analyses.active.notes|default:""|json_script:"study-analysis-saved-notes" }}
+</details>
+{% elif selection_token and study_comparison.ready %}
+<p class="study-analysis-temporary">To keep this analysis and notes, <a href="#collection-save-panel" id="study-analysis-save-collection">save this selection as a collection</a>.</p>
+{% endif %}

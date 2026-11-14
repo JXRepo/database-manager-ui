@@ -239,7 +239,7 @@ def _graph_context(objects, *, title, base_url, params, manual_relationships=(),
 
 
 def _workspace_response(request, *, collection=None, token="", form=None, error="", status=200,
-                        navigation_params=None, relationship_form=None):
+                        navigation_params=None, relationship_form=None, analysis_form=None):
     """
     Render a selection or collection using only currently accessible members
 
@@ -261,6 +261,8 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
         Verified original workspace scope when a continuation action fails.
     relationship_form : RelationshipForm or None, optional
         Submitted manual relationship values and errors to preserve.
+    analysis_form : AnalysisForm or None, optional
+        Submitted analysis text and view state to retain after a failed action.
 
     Returns
     -------
@@ -331,9 +333,42 @@ def _workspace_response(request, *, collection=None, token="", form=None, error=
 
             context["manual_editor"] = relationship_editor_context(collection, context, params,
                                                                   form=relationship_form)
+        if "objects" in context.get("study_details", {}):
+            from .study_detail_navigation import apply_detail_navigation
+
+            detail_arguments = dict(context["study_navigation_params"])
+            if context.get("manual_editor") and context["manual_editor"]["page"].number > 1:
+                detail_arguments["relationships_page"] = str(context["manual_editor"]["page"].number)
+            apply_detail_navigation(context["study_details"], params, base_url=url,
+                                    navigation_params=detail_arguments)
+            for name in ("detail_status", "detail_q", "detail_focus"):
+                context["study_return_params"].pop(name, None)
+            context["study_return_params"].update(context["study_details"]["navigation"]["state"])
+        if "study_workspace" in context:
+            from .study_analyses import build_analysis_context
+
+            context["study_analyses"] = build_analysis_context(
+                request, context, params, collection=collection, form=analysis_form,
+            )
+            if context["study_analyses"].get("error") and status < 400:
+                status = 400
         if "relationship_graph" in context:
             context.update(workspace_navigation(request, context, collection=collection,
                                                 selection_token=token))
+            if context.get("study_state") and context.get("study_analyses", {}).get("enabled"):
+                canonical = json.loads(context["study_analyses"]["state_json"])
+                for name in ("analysis", "analyses_page"):
+                    if name in context["study_return_params"]:
+                        canonical[name] = context["study_return_params"][name]
+                context["study_state"]["state"] = canonical
+            if analysis_form is not None and analysis_form.is_bound and context.get("study_state"):
+                submitted_state = getattr(analysis_form, "cleaned_data", {}).get("state")
+                if isinstance(submitted_state, dict):
+                    retained = dict(submitted_state)
+                    for name in ("analysis", "analyses_page"):
+                        if name in context["study_return_params"]:
+                            retained[name] = context["study_return_params"][name]
+                    context["study_state"]["state"] = retained
     except CollectionSummaryPending as exc:
         context.update(
             summary_preparation={

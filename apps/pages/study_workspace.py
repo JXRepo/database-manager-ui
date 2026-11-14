@@ -14,7 +14,8 @@ from .advanced_search import matches_whole_words
 STUDY_PARAMETERS = {"compare", "panel", "member_q", "members_page", "differences",
                     "find_candidates", "match_fields", "vary_field", "candidates_page",
                     "curve_component", "curve_strain", "inspect", "map_x", "map_y", "map_unit",
-                    "map_x_page", "map_y_page", "map_cell", "map_row"}
+                    "map_x_page", "map_y_page", "map_cell", "map_row", "detail_status", "detail_q",
+                    "detail_focus", "analysis", "analyses_page", "curve_view", "curve_open"}
 
 
 def study_parameters(params):
@@ -40,6 +41,9 @@ def study_parameters(params):
     from .study_candidates import candidate_parameters
     from .study_curves import curve_parameters
     from .study_map import map_parameters
+    from .study_detail_navigation import detail_parameters
+    from .study_analyses import analysis_parameters
+    from .study_navigation import curve_presentation_parameters
 
     values = {}
     for name in STUDY_PARAMETERS:
@@ -79,6 +83,9 @@ def study_parameters(params):
         result["differences"] = differences
     result.update(candidate_parameters(params))
     result.update(map_parameters(params))
+    result.update(detail_parameters(params))
+    result.update(analysis_parameters(params))
+    result.update(curve_presentation_parameters(params))
     curves = curve_parameters(params)
     for key in ("curve_component", "curve_strain"):
         if key in params:
@@ -251,12 +258,15 @@ def build_study_workspace_context(objects, context, params, *, base_url, collect
         "study_curves": {
             "url": reverse(curve_route, args=[curve_target]) + "?" + urlencode({"compare": selection, **curves}),
             "component": curves["curve_component"], "strain": curves["curve_strain"],
-            "open": any(name in params for name in ("curve_component", "curve_strain")),
+            "open": state.get("curve_open") == "1" if "curve_open" in state else any(
+                name in params for name in ("curve_component", "curve_strain")),
+            "view": state.get("curve_view", "separate"),
             "form_url": base_url,
             "hidden_fields": [{"name": key, "value": value} for key, value in arguments.items()
-                              if key not in {"curve_component", "curve_strain"}],
+                              if key not in {"curve_component", "curve_strain", "curve_open"}],
         },
         "study_return_params": state,
+        "study_navigation_params": arguments,
         "study_workspace": {
             "panel": state.get("panel", "explore"), "error": error,
             "map_url": url(panel="map", edge=None),

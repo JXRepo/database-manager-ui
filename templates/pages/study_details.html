@@ -1,4 +1,4 @@
-<section class="study-parameters" id="study-parameters" aria-labelledby="study-parameters-heading" data-inspected="{{ study_details.open|yesno:'true,false' }}">
+<section class="study-parameters" id="study-parameters" aria-labelledby="study-parameters-heading" data-inspected="{{ study_details.open|yesno:'true,false' }}" data-detail-status="{{ study_details.navigation.status|default:'all' }}" data-detail-focus="{{ study_details.navigation.focus_id }}">
   <div class="study-parameters-heading">
     <div><h3 id="study-parameters-heading">Detailed parameters</h3><p>Inspect supplied model parameters, loading conditions and units in their recorded positions.</p></div>
     <a href="{{ study_comparison.close_inspect_url }}" id="study-parameters-close">Close inspection</a>
@@ -9,19 +9,32 @@
     {% elif study_details.ready %}
     <div class="study-parameters-overview" id="study-parameters-overview">
       <p class="study-parameters-counts"><strong>{{ study_details.counts.different }} differing</strong><span>{{ study_details.counts.same }} matching</span><span>{{ study_details.counts.incomplete }} incomplete</span><span>{{ study_details.counts.total }} recorded fields inspected</span></p>
-      {% if study_details.differences %}<ul class="study-parameters-differences">{% for difference in study_details.differences %}<li><span>{{ difference.label }}</span><code>{{ difference.path }}</code><ul class="study-parameter-preview-values">{% for cell in difference.cells %}<li><span>{% if forloop.first %}Reference{% else %}Record {{ forloop.counter }}{% endif %}</span><strong title="{{ cell.value }}">{% if cell.state == 'recorded' %}{{ cell.value|truncatechars:90 }}{% else %}{{ cell.state_label }}{% endif %}</strong>{% if cell.state == 'recorded' and cell.value_type %}<small>{{ cell.value_type }}</small>{% endif %}</li>{% endfor %}</ul></li>{% endfor %}</ul>{% endif %}
+      {% if study_details.differences %}<ul class="study-parameters-differences">{% for difference in study_details.differences %}<li><strong class="study-parameter-preview-label">{{ difference.field_label|default:difference.label }}</strong><span>{{ difference.label }}</span><a href="{{ difference.focus_url }}" data-detail-jump="{{ difference.id }}" class="study-parameter-jump"><code>{{ difference.path }}</code><span>Show field →</span></a><ul class="study-parameter-preview-values">{% for cell in difference.cells %}<li><span>{% if forloop.first %}Reference{% else %}Record {{ forloop.counter }}{% endif %}</span><strong title="{{ cell.value }}">{% if cell.state == 'recorded' %}{{ cell.value|truncatechars:90 }}{% else %}{{ cell.state_label }}{% endif %}</strong>{% if cell.state == 'recorded' and cell.value_type %}<small>{{ cell.value_type }}</small>{% endif %}</li>{% endfor %}</ul></li>{% endfor %}</ul>{% endif %}
       <p class="study-parameters-scope">{{ study_details.scope_note }}</p>
       {% if study_details.limited %}<div class="study-parameters-limits" id="study-parameters-limits"><strong>This inspection is bounded.</strong><ul>{% for reason in study_details.limit_reasons %}<li>{{ reason }}</li>{% endfor %}</ul><p>Open the source records for the complete supplied data.</p></div>{% endif %}
     </div>
-    <details class="study-parameter-fields" id="study-parameter-fields">
+    {% if study_details.navigation %}
+    <div class="study-detail-tools" id="study-detail-tools">
+      <nav class="study-detail-filters" aria-label="Detailed parameter fields">{% for filter in study_details.navigation.filters %}<a href="{{ filter.url }}" data-detail-status="{{ filter.value }}"{% if filter.selected %} aria-current="true"{% endif %}>{{ filter.label }} <span>{{ filter.count }}</span></a>{% endfor %}</nav>
+      <form method="get" action="{{ study_details.navigation.form_url }}#study-parameter-fields" id="study-detail-search" class="study-detail-search">
+        {% for field in study_details.navigation.search_hidden_fields %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
+        <label class="visually-hidden" for="study-detail-query">Find a parameter field</label><input type="search" name="detail_q" id="study-detail-query" value="{{ study_details.navigation.query }}" maxlength="200" placeholder="Find a parameter field" autocomplete="off"><button type="submit">Find</button>
+      </form>
+      <p id="study-detail-visible-count" class="study-detail-visible-count" role="status">{{ study_details.navigation.visible_count }} of {{ study_details.counts.total }} fields shown</p>
+      <a href="{{ study_details.navigation.clear_url }}" id="study-detail-clear"{% if not study_details.navigation.query and study_details.navigation.status == 'all' %} hidden{% endif %}>Clear filters</a>
+    </div>
+    {% if study_details.navigation.focus_missing %}<p class="study-detail-focus-missing" id="study-detail-focus-missing" role="status">This field is no longer included in the current inspection. The available fields are shown below.</p>{% endif %}
+    {% endif %}
+    <details class="study-parameter-fields" id="study-parameter-fields"{% if study_details.navigation.table_open %} open{% endif %}>
       <summary>Recorded parameter table <span>{{ study_details.rows|length }} fields</span></summary>
       <div class="study-parameter-scroll" tabindex="0" aria-label="Detailed recorded parameters">
         <table class="study-parameter-table" id="study-parameter-table" style="--study-columns:{{ study_details.objects|length }}">
           <thead><tr><th scope="col">Recorded position and field</th>{% for item in study_details.objects %}<th scope="col" data-study-object="{{ item.pk }}"{% if forloop.first %} class="is-reference"{% endif %}><span class="study-column-kind">{% if forloop.first %}Reference{% else %}Selected record{% endif %}</span><a href="{{ item.detail_url }}" data-parameter-source="{{ item.pk }}">{{ item.title|default:item.identifier|default:"Untitled data object" }}</a><span class="study-parameter-source-label">Open complete source record</span></th>{% endfor %}</tr></thead>
           <tbody>
-          {% for row in study_details.rows %}
-            {% ifchanged row.group %}<tr class="study-parameter-group"><th scope="rowgroup" colspan="{{ study_details.objects|length|add:'1' }}">{{ row.group }}</th></tr>{% endifchanged %}
-            <tr data-parameter-path="{{ row.path }}" data-state="{{ row.status }}">
+          {% for group in study_details.navigation.groups %}
+            <tr class="study-parameter-group" data-parameter-group="{{ group.key }}"{% if not group.visible %} hidden{% endif %}><th scope="rowgroup" colspan="{{ study_details.objects|length|add:'1' }}">{{ group.label }}</th></tr>
+            {% for row in group.rows %}
+            <tr id="{{ row.id }}" data-parameter-row="{{ row.key }}" data-parameter-path="{{ row.path }}" data-parameter-search="{{ row.search_text }}" data-parameter-group-key="{{ row.group_key }}" data-state="{{ row.status }}" tabindex="-1"{% if not row.visible %} hidden{% endif %}{% if row.focused %} class="is-field-focused"{% endif %}>
               <th scope="row"><span>{{ row.label }}</span><code class="study-parameter-path">{{ row.path }}</code><span class="study-parameter-status">{{ row.status_label }}</span></th>
               {% for cell in row.cells %}<td data-study-object="{{ cell.object_pk }}" data-state="{{ cell.state }}"{% if forloop.first %} class="is-reference"{% endif %}>
                 {% if cell.state != 'not_supplied' %}<div class="study-parameter-value">{{ cell.value }}</div>{% endif %}
@@ -30,7 +43,9 @@
                 {% if cell.source_paths %}<details class="study-parameter-sources"><summary>Source fields</summary><ul>{% for path in cell.source_paths %}<li><code>{{ path }}</code></li>{% endfor %}</ul></details>{% endif %}
               </td>{% endfor %}
             </tr>
-          {% empty %}<tr><td colspan="{{ study_details.objects|length|add:'1' }}">No model parameters, loading conditions or units were supplied.</td></tr>{% endfor %}
+            {% endfor %}
+          {% endfor %}
+          <tr id="study-detail-empty"{% if study_details.navigation.visible_count %} hidden{% endif %}><td colspan="{{ study_details.objects|length|add:'1' }}">{% if study_details.rows %}No fields match these filters. Try another field name or <a href="{{ study_details.navigation.clear_url }}" data-detail-clear>clear the filters</a>.{% else %}No model parameters, loading conditions or units were supplied.{% endif %}</td></tr>
           </tbody>
         </table>
       </div>

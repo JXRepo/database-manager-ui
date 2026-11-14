@@ -119,13 +119,33 @@ if (typeof document !== 'undefined') (() => {
   const overlayView = document.getElementById('study-curves-overlay-view');
   const clearFocus = document.getElementById('study-curves-clear-focus');
   const palette = ['#087f8c', '#a36518', '#7653a2', '#327446'];
-  const sourceLinks = new Map(Array.from(section.querySelectorAll('[data-curve-source]'), link => [Number(link.dataset.curveSource), link.href]));
+  const sourceLinks = new Map(Array.from(section.querySelectorAll('[data-curve-source]'), link => [Number(link.dataset.curveSource), link]));
   let payload = null;
   let loading = false;
   let controller = null;
   let active = null;
   const plots = [];
   const colors = new Map();
+  let presentation = section.dataset.view || 'separate';
+
+  function preservePresentation() {
+    window.dispatchEvent(new CustomEvent('study:state-change', {detail: {
+      curve_open: section.open ? '1' : '0',
+      curve_view: presentation === 'overlay' ? 'overlay' : null,
+      curve_component: form.elements.curve_component.value,
+      curve_strain: form.elements.curve_strain.value,
+    }}));
+  }
+
+  function showPresentation(next, remember = true) {
+    presentation = next === 'overlay' && payload && StudyCurves.canOverlay(payload) ? 'overlay' : 'separate';
+    const combined = presentation === 'overlay';
+    separateView.hidden = combined; overlayView.hidden = !combined;
+    scaleNote.textContent = combined ? 'All curves use the same axes and scale.' : 'Each panel uses its own scale.';
+    separate.setAttribute('aria-pressed', String(!combined)); overlay.setAttribute('aria-pressed', String(combined));
+    for (const plot of plots) plot.resize();
+    if (remember) preservePresentation();
+  }
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -327,7 +347,7 @@ if (typeof document !== 'undefined') (() => {
       title.type = 'button'; title.setAttribute('aria-pressed', 'false');
       title.addEventListener('click', () => selectRecord(record.pk));
       heading.append(title);
-      const source = sourceLinks.get(record.pk);
+      const source = sourceLinks.get(record.pk)?.href;
       if (source) { const link = element('a', '', 'Source'); link.href = source; heading.append(link); }
       card.append(heading, element('p', 'study-curve-record-units', seriesLabel(record)));
       if (StudyCurves.hasCurve(record)) {
@@ -364,6 +384,9 @@ if (typeof document !== 'undefined') (() => {
     document.getElementById('study-curves-guidance').hidden = !payload.records.some(StudyCurves.hasCurve);
     status.textContent = payload.records.some(StudyCurves.hasCurve) ? '' : 'No complete paired curves are available for the selected component and strain.';
     section.dataset.loaded = 'true';
+    const requested = presentation;
+    showPresentation(requested, false);
+    if (requested !== presentation) preservePresentation();
     for (const plot of plots) plot.resize();
   }
 
@@ -395,21 +418,16 @@ if (typeof document !== 'undefined') (() => {
     } finally { clearTimeout(timeout); loading = false; controller = null; }
   }
 
-  section.addEventListener('toggle', () => { if (section.open) load(); });
+  section.addEventListener('toggle', () => {
+    preservePresentation();
+    if (section.open) load();
+  });
   retry.addEventListener('click', load);
   clearFocus.addEventListener('click', () => selectRecord(null));
-  separate.addEventListener('click', () => {
-    separateView.hidden = false; overlayView.hidden = true;
-    scaleNote.textContent = 'Each panel uses its own scale.';
-    separate.setAttribute('aria-pressed', 'true'); overlay.setAttribute('aria-pressed', 'false');
-    for (const plot of plots) plot.resize();
-  });
+  separate.addEventListener('click', () => showPresentation('separate'));
   overlay.addEventListener('click', () => {
     if (!payload || !StudyCurves.canOverlay(payload)) return;
-    separateView.hidden = true; overlayView.hidden = false;
-    scaleNote.textContent = 'All curves use the same axes and scale.';
-    separate.setAttribute('aria-pressed', 'false'); overlay.setAttribute('aria-pressed', 'true');
-    for (const plot of plots) plot.resize();
+    showPresentation('overlay');
   });
   window.addEventListener('pagehide', () => controller?.abort());
   if (section.open) load();

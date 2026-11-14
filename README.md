@@ -597,6 +597,41 @@ Model-name and loading-type summaries remain clearly labeled as such. Phase,
 condition and array positions stay in their supplied order; equal names do not
 align different phases, and arbitrary model units are not assigned to parameters.
 
+The detailed table has **All fields**, **Differences** and **Incomplete** views,
+plus field-name and path search. The visible count follows those controls while
+the overall inspection counts and limits stay visible. **Show field** in a
+difference card opens the table and focuses that exact field, clearing incompatible
+filters. Field and reference columns stay fixed while scrolling across additional
+records. Native GET forms work without JavaScript; the enhanced controls filter
+the existing bounded rows immediately, without reading source JSON again.
+
+**Save analysis**, above the workspace, saves the selected records in reference
+order, map position, candidate criteria, comparison and detail filters, curve
+component, strain and presentation, plus a name and optional personal notes.
+Open an item from **Saved analyses** to continue it; **Save changes** explicitly
+updates it and **Save as new** preserves the earlier analysis. The compact editor
+stays collapsed until requested or a form error needs attention. Actual unsaved
+name or note edits receive browser navigation protection; routine view changes do
+not. Unconfirmed saves retain the entered text and require checking saved analyses
+before another attempt, with no automatic mutation retry.
+
+Analyses belong to the private collection and never grant access to its records.
+Saving requires two to four currently accessible members. Temporary selections
+must first use **Save collection**, which retains their study choices. Each
+collection holds at most 100 analyses; the list has 12 entries per page. Names are
+limited to 120 characters on one line, notes to 5,000 characters, and validated
+view state to 16 KiB. Deleting an analysis leaves the collection and source records
+unchanged. Migration `0019_savedstudyanalysis` adds its table.
+
+Opening checks the entire saved selection and warns if accessible source JSON
+changed since saving. It never silently accepts a new baseline. Source checks
+compute database digests only after current access and actual byte checks, with
+16 MiB combined JSON per saved selection; no source JSON is copied into an
+analysis. Missing access or membership prevents reopening the selected set rather
+than dropping records. Concurrent edits require matching revisions; conflicts
+return 409 and retain the submitted name and notes. Source changes and matching
+digests are technical revision checks, not scientific identity claims.
+
 Detailed inspection is an explicit native GET action. It rechecks ownership,
 membership and current access under collection and ordered object locks, and checks
 actual database JSON byte lengths before loading the complete selected set. Requests
@@ -613,6 +648,10 @@ comparison preparation share the existing request allowance, and an incomplete
 preparation shows progress without partial map counts. Deployment backfill prepares
 outdated summaries in restartable batches. Without JavaScript, grid links, pinning,
 parameter inspection and source return remain ordinary forms and links.
+Enhanced presentation changes refresh signed return links through an authenticated,
+non-cacheable endpoint. Saving and ordinary source navigation wait for that state
+to be confirmed; a connection failure preserves inputs and offers an explicit
+retry. Bounded compressed tokens also support valid multibyte search text.
 
 Comparison means recorded values, not scientific equivalence. Phase and loading
 entries retain their order; explicit units and original numeric text remain
