@@ -59,6 +59,74 @@ function axisTick(value, scale) {
   return JSON.parse(JSON.stringify(vm.runInNewContext(`${scaling}\nformatPlotTickLabel(value, scale.tickFormat, scale.exponent)`, {value, scale})));
 }
 
+function measuredLayout(xValues, yValues) {
+  const textRuns = template.slice(template.indexOf('  function getPlotTextRuns('),
+    template.indexOf('  let isSyncingPlotSelects'));
+  // Geometry checks use simple glyph widths; the browser suite measures actual fonts.
+  const context = {
+    font: '',
+    measureText(text) {
+      const size = Number(this.font.match(/([\d.]+)px/)[1]);
+      return {width: text.length * size * .5, actualBoundingBoxLeft: 0,
+        actualBoundingBoxRight: text.length * size * .5,
+        actualBoundingBoxAscent: size * .75, actualBoundingBoxDescent: size * .2};
+    },
+  };
+  return JSON.parse(JSON.stringify(vm.runInNewContext(`${textRuns}\n${scaling}
+    function scale(values, title) {
+      const result = buildPlotScale(values);
+      return {min: result.chartMin, max: result.chartMax, customTickValues: result.ticks,
+        customTickFormat: result.tickFormat, customExponent: result.exponent, title: {text: title}};
+    }
+    buildMechanicalPlotLayout(context, {left: 150, right: 650, top: 100, bottom: 400},
+      scale(xValues, 'Strain, ε_12 (-)'), scale(yValues, 'Stress, σ_12 (MPa)'))`,
+  {context, xValues, yValues})));
+}
+
+test('single quadrant factors use separate outer ends and titles follow their axes', () => {
+  const cases = [
+    {x: 1, y: 1, xSide: 1, ySide: -1, xEnd: 'right', yEnd: 'top'},
+    {x: -1, y: 1, xSide: 1, ySide: 1, xEnd: 'left', yEnd: 'top'},
+    {x: -1, y: -1, xSide: -1, ySide: 1, xEnd: 'left', yEnd: 'bottom'},
+    {x: 1, y: -1, xSide: -1, ySide: -1, xEnd: 'right', yEnd: 'bottom'},
+  ];
+  for (const item of cases) {
+    const layout = measuredLayout([0, item.x * .00108], [0, item.y * 7.82e-6]);
+    assert.deepEqual(layout.titleSides, {x: item.xSide, y: item.ySide});
+    assert.equal(layout.multipliers.length, 2);
+    const xFactor = layout.multipliers.find(factor => factor.axis === 'x');
+    const yFactor = layout.multipliers.find(factor => factor.axis === 'y');
+    assert.ok(item.xEnd === 'left' ? xFactor.right < 400 : xFactor.left > 400,
+      `X factor belongs at the ${item.xEnd} end for signs ${item.x}, ${item.y}`);
+    assert.ok(item.yEnd === 'top' ? yFactor.bottom < 250 : yFactor.top > 250,
+      `Y factor belongs at the ${item.yEnd} end for signs ${item.x}, ${item.y}`);
+    assert.ok(item.xSide < 0 ? xFactor.bottom < layout.axes.y : xFactor.top > layout.axes.y);
+    assert.ok(item.ySide < 0 ? yFactor.right < layout.axes.x : yFactor.left > layout.axes.x);
+    for (const factor of [xFactor, yFactor]) {
+      assert.ok(factor.group.runs.some(run => run.text === '· 10'));
+    }
+  }
+});
+
+test('tiny positive reversals keep titles and factors beside the visible negative branches', () => {
+  const layout = measuredLayout([-.00108, 1e-14], [-7.82e-6, 1e-18]);
+  assert.ok(layout.axes.x > 649 && layout.axes.y < 101);
+  assert.deepEqual(layout.titleSides, {x: -1, y: 1});
+  assert.ok(layout.titles.x.bottom < layout.area.top);
+  assert.ok(layout.titles.y.left > layout.area.right);
+  const xFactor = layout.multipliers.find(factor => factor.axis === 'x');
+  const yFactor = layout.multipliers.find(factor => factor.axis === 'y');
+  assert.ok(xFactor.right < 400, 'X factor leaves the crowded upper-right origin');
+  assert.ok(yFactor.top > 250, 'Y factor leaves the crowded upper-right origin');
+});
+
+test('visible positive branches retain the preferred right and top multiplier ends', () => {
+  const layout = measuredLayout([-.001, .002], [-2e-6, 4e-6]);
+  assert.ok(layout.multipliers.find(factor => factor.axis === 'x').left > 400);
+  assert.ok(layout.multipliers.find(factor => factor.axis === 'y').bottom < 250);
+  assert.deepEqual(layout.titleSides, {x: layout.xSide, y: layout.ySide});
+});
+
 test('one shared power formats small axis ticks without changing their values', () => {
   const scale = plotScale([-0.00014, 0]);
   assert.equal(scale.exponent, -4);

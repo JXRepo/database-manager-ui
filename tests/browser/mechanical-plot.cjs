@@ -185,35 +185,37 @@ const {join} = require('node:path');
         if (multipliers.length) {
           const multiplier = multipliers[0];
           assert.equal(multiplier.exponent, exponent, `${label}: ${axis} multiplier matches its scale`);
-          assert.ok(multiplier.group.runs.some(run => run.text === '× 10'), `${label}: shared multiplier has a multiplication sign`);
+          assert.ok(multiplier.group.runs.some(run => run.text === '· 10'), `${label}: shared multiplier uses a centered dot`);
           assert.ok(multiplier.group.runs.some(run => run.text === String(exponent)), `${label}: shared exponent is drawn`);
           const actual = drawnGroups.get(multiplier);
-          const previous = planned.multipliers.slice(0, planned.multipliers.indexOf(multiplier));
-          const obstacles = [...planned.ticks, ...Object.values(planned.titles), ...previous]
-            .map(position => drawnGroups.get(position));
-          const direction = axis === 'x' ? planned.xSide : -1;
-          let initialTop;
-          if (axis === 'x') {
-            close(actual.right, planned.axisSegments.x[1].x, 'X multiplier stays aligned with the right axis end');
-            initialTop = planned.xSide < 0 ? planned.axes.y - 36 - multiplier.group.height : planned.axes.y + 36;
-          } else {
-            initialTop = planned.axisSegments.y[1].y - 18 - multiplier.group.height;
-            close(planned.ySide < 0 ? planned.axes.x - actual.right : actual.left - planned.axes.x,
-              8, 'Y multiplier stays on its fixed side of the axis');
-          }
-          const initial = {...actual, top: initialTop, bottom: initialTop + multiplier.group.height};
-          const movement = direction * (actual.top - initialTop);
-          assert.ok(movement >= -.15, `${label}: ${axis} multiplier moves only outward from its normal slot`);
+          const obstacles = [...planned.ticks, ...Object.values(planned.titles),
+            ...planned.multipliers.filter(other => other !== multiplier)].map(position => drawnGroups.get(position));
           assert.ok(obstacles.every(other => !crowded(actual, other, 7.85)),
-            `${label}: ${axis} multiplier keeps 8px clear of ticks, titles and earlier multipliers`);
-          if (!obstacles.some(other => crowded(initial, other, 8))) {
-            close(actual.top, initialTop, `${axis} multiplier stays in its normal slot when it is clear`);
-          } else if (movement > .15) {
-            assert.ok(obstacles.some(other => {
-              const horizontal = actual.left < other.right + 8 && actual.right > other.left - 8;
-              const gap = direction < 0 ? other.top - actual.bottom : actual.top - other.bottom;
-              return horizontal && Math.abs(gap - 8) <= .15;
-            }), `${label}: ${axis} multiplier stops at an 8px clearance instead of adding unnecessary space`);
+            `${label}: ${axis} multiplier keeps 8px clear of ticks, titles and the other multiplier`);
+          if (axis === 'x') {
+            const atLeft = Math.abs(actual.left - planned.axisSegments.x[0].x) <= .15;
+            const atRight = Math.abs(actual.right - planned.axisSegments.x[1].x) <= .15;
+            assert.ok(atLeft || atRight, `${label}: X multiplier stays aligned with an actual axis end`);
+            assert.ok(planned.xSide < 0 ? actual.bottom < planned.axes.y : actual.top > planned.axes.y,
+              `${label}: X multiplier stays on its tick-label side`);
+            if (metrics.xMax === 0 || metrics.area.right - planned.axes.x < 1) {
+              assert.ok(atLeft, `${label}: X multiplier leaves the crowded negative-branch origin`);
+            }
+            if (metrics.xMin === 0 || planned.axes.x - metrics.area.left < 1) {
+              assert.ok(atRight, `${label}: X multiplier stays at the positive outer end`);
+            }
+          } else {
+            const atTop = actual.bottom <= planned.axisSegments.y[1].y - 7.85;
+            const atBottom = actual.top >= planned.axisSegments.y[0].y + 7.85;
+            assert.ok(atTop || atBottom, `${label}: Y multiplier stays beyond an actual axis end`);
+            close(planned.ySide < 0 ? planned.axes.x - actual.right : actual.left - planned.axes.x,
+              8, 'Y multiplier stays beside its own axis on the tick-label side');
+            if (metrics.yMax === 0 || planned.axes.y - metrics.area.top < 1) {
+              assert.ok(atBottom, `${label}: Y multiplier leaves the crowded negative-branch origin`);
+            }
+            if (metrics.yMin === 0 || metrics.area.bottom - planned.axes.y < 1) {
+              assert.ok(atTop, `${label}: Y multiplier stays at the positive outer end`);
+            }
           }
         }
         const endpoints = metrics.endpointTicks.filter(tick => tick.axis === axis);
@@ -250,8 +252,8 @@ const {join} = require('node:path');
           }
         }
       }
-      const titleSides = {x: metrics.yMax <= 0 ? -1 : 1, y: metrics.xMax <= 0 ? 1 : -1};
-      assert.deepEqual(planned.titleSides, titleSides, `${label}: title sides follow the displayed half-plane, not the relative range magnitudes`);
+      const titleSides = {x: planned.xSide, y: planned.ySide};
+      assert.deepEqual(planned.titleSides, titleSides, `${label}: titles and ticks follow the same actual axis side`);
       const xTitle = drawnGroups.get(planned.titles.x);
       const yTitle = drawnGroups.get(planned.titles.y);
       const xTicks = planned.ticks.filter(tick => tick.axis === 'x').map(tick => drawnGroups.get(tick));
@@ -724,10 +726,10 @@ const {join} = require('node:path');
     await downloadMeasuredPNG('negative-axis');
     if (process.env.PLOT_SAMPLE_PATH) {
       await navigate(process.env.PLOT_SAMPLE_PATH);
-      for (const component of ['11', '33', '22', '13', '23']) {
+      for (const component of ['12', '11', '33', '22', '13', '23']) {
         await select('plot-x-select', `total_strain.strain_${component}`);
         await layout(`sample-${component}`, 1440);
-        if (component === '11' || component === '33') await downloadMeasuredPNG(`sample-${component}`);
+        if (['12', '11', '33'].includes(component)) await downloadMeasuredPNG(`sample-${component}`);
       }
       assert.equal(await evaluate('Chart.getChart("mechanical-plot").data.datasets[0].data.length'), 242);
       await select('plot-x-select', 'plastic_strain.plastic_strain_13');
@@ -751,7 +753,7 @@ const {join} = require('node:path');
       assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false);
     }
     assert.deepEqual(exceptions, []);
-    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; axes leave 16px beyond readable endpoints without protruding at zero, titles stay 10px beyond tick glyphs and the plot boundary, shared multipliers keep 8px clear without moving titles, visible two-place coefficients remain aligned and distinct, and all measured text stays clear and at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
+    console.log(`Mechanical plot browser checks passed: ${cases.length} cases at 3 desktop widths; axes leave 16px beyond readable endpoints without protruding at zero, titles stay 10px beyond tick glyphs and the plot boundary, centered-dot multipliers follow visible axis ends and keep 8px clear without moving titles, visible two-place coefficients remain aligned and distinct, and all measured text stays clear and at least 5pt at 85mm PNG width. The original 25-sample fixture, curve hover, linked selectors, raw values, full resolution PNG without hover markers, CSV downloads and empty data remain intact.`);
   } finally {
     socket?.close();
     if (browser.exitCode === null) {

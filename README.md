@@ -1016,11 +1016,18 @@ decimal places use ordinary decimals; finer steps, including 0.025, use a single
 shared power of ten beside that axis. Magnitudes of 10000 or greater also use
 this scientific scaling. Each axis chooses its own exponent from its range;
 ticks show plain decimal coefficients of that multiplier. An irregular endpoint's
-extra decimals alone do not trigger scientific scaling. The X multiplier is
-right-aligned at the axis's right end in a separate band outside its tick labels;
-the Y multiplier sits above the top end on the tick-label side. Titles and ticks
-are placed first. If a multiplier would collide with text or another multiplier,
-it moves outward vertically with an 8-pixel gap, without moving the title.
+extra decimals alone do not trigger scientific scaling. Multipliers use a centered
+dot, `·10ⁿ`, and stay separate from titles. They attach to the nonzero outer end
+of each single quadrant axis: X right and Y top in quadrant I, X left and Y top
+in II, X left and Y bottom in III, and X right and Y bottom in IV. When an axis
+has both signs, prefer its positive end if the rendered branch has enough space
+for the factor and origin labels; a tiny signed reversal does not move the factor
+back to the origin. X factors align with their selected axis end in a band
+10 CSS pixels outside the X tick text. Y factors sit 8 pixels beyond their
+selected axis end and 8 pixels to its tick side. Place ticks and titles first,
+then try the other usable end if a factor would collide. If both ends are
+crowded, move the factor outward just far enough to leave an 8-pixel gap;
+the measured canvas padding includes it without moving the title.
 The two origin labels remain `0`.
 This formatting does not round the data,
 hover values or CSV exports.
@@ -1030,10 +1037,12 @@ plot boundary, whichever lies farther out. Only neighbouring labels from the
 other axis and nearby axis ends (including stroke width) are also considered,
 so distant corner labels and scientific
 multipliers cannot push titles away. This keeps the visible gap compact for
-short numbers while accommodating longer numbers. X titles sit above wholly
-nonpositive Y ranges and below otherwise; Y titles sit right of wholly
-nonpositive X ranges and left otherwise. Internal zero axes never pull titles
-inside the plot. Measured glyph bounds
+short numbers while accommodating longer numbers. Titles use the same side as
+their axis's tick labels, chosen from the actual pixel position of the zero axis:
+an X axis nearer the top has its title above, and a Y axis nearer the right has
+its title on the right. At the midpoint, use below for X and left for Y.
+Tiny opposite-sign values retain their true range without flipping titles to
+the other side. Internal zero axes never pull titles inside the plot. Measured glyph bounds
 include titles, multipliers and the extended axis ends in canvas padding and PNG
 layout. Axis text is drawn before the curve and has no background masks. Curves retain original
 sample order, including loops and reversals, selected variables, raw values and
