@@ -66,6 +66,10 @@ Application verification before integrating independent plot changes:
 - Django checks and migration consistency pass; migration 0019 is the only new
   schema change. Whitespace checks pass.
 
+After integrating the separate plot-placement change `23386e9`, another **11
+browser/navigation tests** and the updated **157-test JavaScript suite** passed.
+The detail-plot implementation and its tests remain identical to that commit.
+
 ```sh
 DEBUG=True CHARTJS_TEST_BUNDLE=/tmp/ronak-chart.js CHROMIUM_BIN=/usr/bin/chromium .venv/bin/python manage.py test apps.pages apps.charts apps.dyn_api --noinput
 DEBUG=True LOCAL_POSTGRES_PORT=55439 LOCAL_POSTGRES_DB=collection_test_analysis_final LOCAL_POSTGRES_USER=collection_test .venv/bin/python manage.py test apps.pages.test_study_analyses apps.pages.test_study_navigation apps.pages.test_study_detail_navigation apps.pages.test_study_details apps.pages.test_study_map_integration apps.pages.test_study_workspace apps.pages.test_collection_navigation apps.pages.test_collection_relationships apps.pages.test_collection_relationship_mutations apps.pages.test_temporary_selections --settings=config.settings_postgres_test --noinput
@@ -77,6 +81,8 @@ Local evidence:
 - `/tmp/study-analysis-full-tests-final.log`
 - `/tmp/study-analysis-postgres-final.log`
 - `/tmp/study-analysis-js-tests-final.log`
+- `/tmp/study-analysis-merged-browser.log`
+- `/tmp/study-analysis-merged-js.log`
 - `/tmp/study-analysis-browser-final.log`
 - `/tmp/study-analysis-browser-layout.log`
 - `/tmp/study-analyses-review-final.log`
