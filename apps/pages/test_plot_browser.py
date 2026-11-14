@@ -90,6 +90,8 @@ class MechanicalPlotBrowserTests(StaticLiveServerTestCase):
             ("scientific-bounds", [-.000123456789, .000987654321],
              [-123456789, 987654321], "-+", "-+"),
             ("scientific-positive", [0, 1.005e-8, 2.675e-8], [0, 1.005e9, 2.675e9], "+", "+"),
+            ("scientific-second", [-2.675e-8, -1.005e-8, 0], [2.675e9, 1.005e9, 0], "-", "+"),
+            ("scientific-fourth", [0, 1.005e-8, 2.675e-8], [0, -1.005e9, -2.675e9], "+", "-"),
             ("symmetric-scientific", [-.0012345, .0012345], [-1, 1], "-+", "-+"),
             ("symmetric-negative-y", [-.0012345, .0012345], [-1, -.5], "-+", "-"),
             ("corner-multipliers", [-9e-5, 1e-5], [-9e-5, 1e-5], "-+", "-+"),
